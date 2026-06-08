@@ -276,6 +276,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Required indexes are included.
 - **Validation:** Migration unit/integration tests pass.
 
+**Status:** Completed on 2026-06-08. Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations. `silica-storage` can create and upgrade an empty catalog through schema version 2, and tests verify required indexes plus foreign key enforcement.
+
 ### Task 3.5: Decide MLX Deferral for Local DMG Alpha
 
 - **Location:** `docs/wiki/decisions/adr-0004-mlx-deferral-for-local-alpha.md`

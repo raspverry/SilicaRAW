@@ -2,7 +2,6 @@
 
 Storage and persistence boundary for SilicaRAW.
 
-This crate will own SQLite migrations, sidecar persistence, cache coordination, backups, and storage safety rules through typed APIs.
+Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations.
 
-Task 0101 only creates the crate boundary. No database, migration, sidecar, or cache implementation is present yet.
-
+This crate currently owns the catalog migration runner and initial empty catalog schema/index proof. It does not scan folders, import photos, mutate originals, write sidecars, manage caches, or expose database access to plugins/MCP.

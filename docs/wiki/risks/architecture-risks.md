@@ -40,11 +40,11 @@ Next evidence needed: tagged raster fixtures, ICC embedding proof, Preview.app c
 
 ### Storage and Migration Safety
 
-Current status: planned, not implemented.
+Current status: partially resolved by Spike 004. `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes.
 
 Why it matters: catalog corruption, lost edits, or original mutation would undermine trust immediately.
 
-Next evidence needed: migration framework, original hash protection tests, sidecar read/write tests, and cache clear safety tests.
+Next evidence needed: file-backed library create/open APIs, WAL backup/checkpoint policy, original hash protection tests, sidecar read/write tests, and cache clear safety tests.
 
 ### Extension Permission Safety
 
@@ -60,6 +60,7 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 - [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
+- [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [System Architecture](../../03_System_Architecture.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)

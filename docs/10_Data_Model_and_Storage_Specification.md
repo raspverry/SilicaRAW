@@ -109,7 +109,9 @@ All MCP/plugin mutations go through Core APIs and action_log. No direct DB acces
 
 GO WITH CONDITIONS.
 
-Need exact SQL indexes, Rust edit graph types, migration framework, sidecar conflict UX, cache size policy.
+Spike 004 added the initial embedded SQLite migrations and required indexes to `silica-storage`.
+
+Still needed: Rust edit graph types, sidecar conflict UX, cache size policy, backup/checkpoint policy, and file-backed library create/open behavior.
 
 ---
 
@@ -130,6 +132,8 @@ Codex must implement Rust types equivalent to these schemas.
 ## Minimum SQLite Indexes
 
 The initial migration must include these indexes unless benchmark tests prove a better alternative.
+
+Spike 004 implements these indexes in schema version 2 and tests every index by name.
 
 ```sql
 CREATE INDEX IF NOT EXISTS idx_folders_library_id

@@ -25,8 +25,6 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 
 ## Storage and Data Safety
 
-- Which SQLite binding will be selected, and why?
-- What migration framework shape will be used?
 - How will sidecar conflicts be surfaced to users?
 - What cache size and cleanup policy will be used?
 
@@ -49,6 +47,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Tauri is not rejected by Spike 001, so no SwiftUI/AppKit shell switch is planned yet.
 - Spike 002 selected Core Image RAW primary with LibRaw deferred on 2026-06-08.
 - Spike 003 selected a linear Display P3-compatible working-space recommendation, sRGB default export, and Display P3 export support on 2026-06-08.
+- Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations on 2026-06-08.
 
 ## Links
 
@@ -58,6 +57,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
+- [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [Dependencies Policy](../../DEPENDENCIES.md)
 
 ## Notes for LLM Agents

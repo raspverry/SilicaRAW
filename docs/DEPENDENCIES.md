@@ -200,18 +200,36 @@ Verification source: `cargo info objc2-quartz-core` for 0.3.2 metadata; Apple Qu
 ### SQLite binding
 
 ```txt
-Name: rusqlite or sqlx
-Version: TBD
+Name: rusqlite
+Version: 0.40.1
 Purpose: SQLite catalog
-License: rusqlite is MIT; sqlx license must be verified if chosen
+License: MIT
 Repository/Homepage: https://github.com/rusqlite/rusqlite
-Used by: crates/silica-catalog, crates/silica-storage
-Why needed: local-first SQLite catalog, migrations, query persistence
-Alternatives considered: sled, redb, direct sqlite3 bindings
-Risk notes: Must support WAL, migrations, parameterized queries, and robust error handling.
-Binary size impact: Verify after selection.
-Security notes: No raw SQL access from plugins/MCP.
-Verification source: rusqlite repository license statement.
+Used by: crates/silica-storage
+Why needed: local-first SQLite catalog, embedded migrations, parameterized queries, and migration verification.
+Alternatives considered: sqlx, refinery + rusqlite, direct sqlite3 bindings, sled, redb.
+Risk notes: Synchronous local database access must stay off latency-sensitive UI/render loops. Migrations must be tested on empty and existing databases.
+Binary size impact: Uses bundled SQLite through `libsqlite3-sys`; measure final `.app` and `.dmg` size during packaging phases.
+Security notes: No raw SQL access from plugins/MCP. Treat catalog paths and sidecar payloads as untrusted input.
+Verification source: `cargo info rusqlite` for 0.40.1 metadata; rusqlite docs at https://docs.rs/rusqlite/; SQLite docs at https://www.sqlite.org/docs.html.
+Status after Spike 004: selected and added to `crates/silica-storage` with `default-features = false` and `features = ["bundled"]`.
+```
+
+### SQLite Native Binding
+
+```txt
+Name: libsqlite3-sys
+Version: 0.38.1
+Purpose: Native SQLite FFI used transitively by rusqlite.
+License: MIT
+Repository/Homepage: https://github.com/rusqlite/rusqlite
+Used by: crates/silica-storage through rusqlite.
+Why needed: Provides the SQLite C API binding and bundled SQLite build path.
+Alternatives considered: system SQLite linkage, sqlx SQLite driver, direct sqlite3 bindings.
+Risk notes: Bundled SQLite improves build determinism but adds native build work and binary size. Recheck before notarized release packaging.
+Binary size impact: Bundles SQLite into the app binary path; measure during packaging phases.
+Security notes: Keep SQLite access behind typed storage APIs; enable foreign key enforcement per connection.
+Verification source: `cargo info libsqlite3-sys` for 0.38.1 metadata; rusqlite repository at https://github.com/rusqlite/rusqlite.
 ```
 
 ### Serialization

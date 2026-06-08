@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-3 | Spike 004 recorded SQLite persistence path
+
+- Added the SQLite catalog persistence spike report.
+- Selected `rusqlite` with bundled SQLite and embedded SQL migrations.
+- Added initial catalog schema and required index migration tests to `silica-storage`.
+
 ## [2026-06-08] phase-3 | Spike 003 recorded color-management path
 
 - Added the color-managed preview/export spike report.
