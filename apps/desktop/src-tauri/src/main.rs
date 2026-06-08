@@ -70,6 +70,40 @@ fn open_photo_preview(library_path: String, photo_id: String) -> Result<Option<S
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn preview_exposure_contrast_edit(
+    library_path: String,
+    photo_id: String,
+    exposure: f64,
+    contrast: f64,
+) -> Result<Option<String>, String> {
+    silica_core::preview_exposure_contrast_edit(
+        PathBuf::from(library_path),
+        &photo_id,
+        exposure,
+        contrast,
+    )
+    .map(|preview| preview.map(|preview| preview.status_text()))
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn commit_exposure_contrast_edit(
+    library_path: String,
+    photo_id: String,
+    exposure: f64,
+    contrast: f64,
+) -> Result<Option<String>, String> {
+    silica_core::commit_exposure_contrast_edit(
+        PathBuf::from(library_path),
+        &photo_id,
+        exposure,
+        contrast,
+    )
+    .map(|commit| commit.map(|commit| commit.status_text()))
+    .map_err(|error| error.to_string())
+}
+
 fn photo_flags_status_text(
     photo_id: &str,
     rating: u8,
@@ -95,7 +129,9 @@ fn main() {
             open_library,
             set_photo_flags,
             get_photo_flags,
-            open_photo_preview
+            open_photo_preview,
+            preview_exposure_contrast_edit,
+            commit_exposure_contrast_edit
         ])
         .run(tauri::generate_context!())
         .expect("failed to run SilicaRAW desktop shell");
@@ -176,6 +212,47 @@ mod tests {
         assert!(preview.contains("File: sample.jpg"));
         assert!(preview.contains("Preview: Ready"));
         assert!(preview.contains("display-profile-aware"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_preview_and_commit_exposure_contrast_edit() {
+        let workspace = unique_library_root("desktop-edit-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.5,
+            -8.0,
+        )
+        .expect("preview edit command")
+        .expect("preview edit request");
+        assert!(preview.contains("Preview: Ready"));
+        assert!(preview.contains("Exposure: 0.5"));
+        assert!(preview.contains("Contrast: -8"));
+
+        let committed = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id,
+            0.5,
+            -8.0,
+        )
+        .expect("commit edit command")
+        .expect("committed edit");
+        assert!(committed.contains("Persisted: true"));
+        assert!(committed.contains("Exposure: 0.5"));
+        assert!(committed.contains("Contrast: -8"));
 
         remove_library_root(&workspace);
     }

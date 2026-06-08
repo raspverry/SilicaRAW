@@ -2,7 +2,7 @@
 title: UI Mockups
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-09
 source_of_truth: MockupUI/MANIFEST.md
 ---
 
@@ -28,6 +28,16 @@ catalog photo -> preview candidate -> decode readiness -> render readiness -> de
 ```
 
 It does not implement the M004/M005 screens, native viewer layout, or final interaction behavior.
+
+## Phase 5.3 Relationship
+
+Phase 5.3 adds the command/API path for the future M005 Develop exposure/contrast controls:
+
+```txt
+catalog photo -> active/default edit graph -> draft exposure/contrast render request -> commit active edit graph
+```
+
+It does not implement the M005 screen, product sliders, actual pixel rendering, or final viewer interaction behavior.
 
 ## Links
 

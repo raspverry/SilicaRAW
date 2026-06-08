@@ -76,6 +76,21 @@ Security notes: Desktop commands accept local paths and must not mutate original
 Verification source: local workspace Cargo metadata and Phase 4.2 desktop command test.
 ```
 
+```txt
+Name: silica-edit
+Version: workspace
+Purpose: Typed edit graph construction, validation, and exposure/contrast update contract.
+License: project internal
+Repository/Homepage: this repository
+Used by: crates/silica-storage, crates/silica-core
+Why needed: Phase 5.3 persists schema-valid active edit graphs and lets Core validate draft exposure/contrast updates before render requests or commit.
+Alternatives considered: duplicate edit graph JSON construction in storage/core, untyped JSON strings across the command boundary.
+Risk notes: Keep edit graph ownership inside `silica-edit`; storage should persist validated graphs, not invent schema fields.
+Binary size impact: Internal workspace code only.
+Security notes: Imported or stored edit graph JSON remains untrusted and must validate before use.
+Verification source: local workspace Cargo metadata and Phase 5.3 edit flow tests.
+```
+
 ### Tauri Runtime
 
 ```txt
@@ -304,8 +319,8 @@ Version: 1.0.150
 Purpose: JSON value, number, map, parsing, and serialization support.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/serde-rs/json
-Used by: crates/silica-edit in Phase 5.2; expected later for silica-storage, silica-plugin, and silica-mcp when their schema-backed JSON tasks are reached.
-Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, and numeric representation preservation.
+Used by: crates/silica-edit in Phase 5.2 and crates/silica-storage in Phase 5.3; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
+Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, and active edit graph JSON persistence in SQLite.
 Alternatives considered: simd-json, manual JSON parsing, schemars-only workflows
 Risk notes: JSON Schema validation rules still need explicit validation or a schema validator; serde_json only parses and serializes JSON.
 Binary size impact: Low/typical Rust ecosystem dependency.

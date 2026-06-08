@@ -394,6 +394,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Final value persists on commit/release.
 - **Validation:** Unit test for edit state and manual slider test.
 
+**Status:** Completed on 2026-06-09 as a command/API-level edit flow. `silica-edit` can build a default graph and apply validated exposure/contrast values, `silica-render` returns draft preview adjustment requests, `silica-storage` persists active edit graphs only on commit, `silica-core` proves preview updates do not write `edit_states`, and the minimal Tauri shell exposes preview/commit commands. Product M005 Develop UI controls, actual pixel rendering, sidecar writing, RAW decoding, and Metal viewer behavior remain later explicit tasks.
+
 ### Task 5.4: Implement JPEG sRGB Export
 
 - **Location:** `crates/silica-export`, `crates/silica-render`

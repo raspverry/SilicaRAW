@@ -12,6 +12,7 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
+use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -121,7 +122,9 @@ pub struct PhotoPreviewCandidate {
 pub enum LibraryStorageError {
     Io(std::io::Error),
     Sqlite(rusqlite::Error),
+    Json(serde_json::Error),
     CatalogFlag(CatalogFlagError),
+    EditGraph(silica_edit::EditGraphValidationError),
     MissingCatalog(PathBuf),
     NotDirectory(PathBuf),
     InvalidPath(PathBuf),
@@ -132,7 +135,9 @@ impl fmt::Display for LibraryStorageError {
         match self {
             Self::Io(error) => write!(formatter, "filesystem error: {error}"),
             Self::Sqlite(error) => write!(formatter, "sqlite error: {error}"),
+            Self::Json(error) => write!(formatter, "json error: {error}"),
             Self::CatalogFlag(error) => write!(formatter, "catalog flag error: {error}"),
+            Self::EditGraph(error) => write!(formatter, "edit graph error: {error}"),
             Self::MissingCatalog(path) => {
                 write!(formatter, "missing catalog database at {}", path.display())
             }
@@ -149,7 +154,9 @@ impl Error for LibraryStorageError {
         match self {
             Self::Io(error) => Some(error),
             Self::Sqlite(error) => Some(error),
+            Self::Json(error) => Some(error),
             Self::CatalogFlag(error) => Some(error),
+            Self::EditGraph(error) => Some(error),
             Self::MissingCatalog(_) | Self::NotDirectory(_) | Self::InvalidPath(_) => None,
         }
     }
@@ -167,9 +174,21 @@ impl From<rusqlite::Error> for LibraryStorageError {
     }
 }
 
+impl From<serde_json::Error> for LibraryStorageError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json(error)
+    }
+}
+
 impl From<CatalogFlagError> for LibraryStorageError {
     fn from(error: CatalogFlagError) -> Self {
         Self::CatalogFlag(error)
+    }
+}
+
+impl From<silica_edit::EditGraphValidationError> for LibraryStorageError {
+    fn from(error: silica_edit::EditGraphValidationError) -> Self {
+        Self::EditGraph(error)
     }
 }
 
@@ -236,7 +255,7 @@ pub fn import_folder(
     library_root_path: impl AsRef<Path>,
     folder_path: impl AsRef<Path>,
 ) -> Result<FolderImportSummary, LibraryStorageError> {
-    let library = open_local_library(library_root_path)?;
+    let library = open_existing_library_for_read(library_root_path)?;
     let folder_path = folder_path.as_ref();
     if !folder_path.is_dir() {
         return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
@@ -273,7 +292,7 @@ pub fn set_photo_flags(
     color_label: Option<String>,
 ) -> Result<PhotoFlags, LibraryStorageError> {
     let flags = PhotoFlags::new(photo_id, rating, picked, rejected, color_label)?;
-    let library = open_local_library(library_root_path)?;
+    let library = open_existing_library_for_read(library_root_path)?;
     let connection = open_catalog(&library.catalog_path)?;
 
     connection.execute(
@@ -308,7 +327,7 @@ pub fn get_photo_flags(
         return Err(CatalogFlagError::EmptyPhotoId.into());
     }
 
-    let library = open_local_library(library_root_path)?;
+    let library = open_existing_library_for_read(library_root_path)?;
     let connection = open_catalog(&library.catalog_path)?;
     let row = connection
         .query_row(
@@ -345,7 +364,7 @@ pub fn get_photo_preview_candidate(
         return Err(CatalogFlagError::EmptyPhotoId.into());
     }
 
-    let library = open_local_library(library_root_path)?;
+    let library = open_existing_library_for_read(library_root_path)?;
     let connection = open_catalog(&library.catalog_path)?;
     connection
         .query_row(
@@ -366,6 +385,103 @@ pub fn get_photo_preview_candidate(
         )
         .optional()
         .map_err(LibraryStorageError::from)
+}
+
+/// Load the active edit graph for a photo, or build a default draft without writing it.
+pub fn load_active_edit_graph_or_default(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<silica_edit::EditGraph>, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+
+    if let Some(json) = connection
+        .query_row(
+            r#"
+            SELECT edit_graph_json
+            FROM edit_states
+            WHERE photo_id = ?1 AND active = 1
+            ORDER BY updated_at DESC
+            LIMIT 1
+            "#,
+            params![photo_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+    {
+        let graph: silica_edit::EditGraph = serde_json::from_str(&json)?;
+        silica_edit::validate_edit_graph(&graph)?;
+        return Ok(Some(graph));
+    }
+
+    let source = connection
+        .query_row(
+            r#"
+            SELECT id, path, file_size, modified_at, partial_hash, full_hash
+            FROM photos
+            WHERE id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok(silica_edit::EditGraphSource {
+                    photo_id: row.get(0)?,
+                    path: row.get(1)?,
+                    file_size: row.get(2)?,
+                    modified_at: row.get(3)?,
+                    partial_hash: row.get(4)?,
+                    full_hash: row.get(5)?,
+                })
+            },
+        )
+        .optional()?;
+
+    Ok(source.map(|source| silica_edit::default_edit_graph(source, current_timestamp_string())))
+}
+
+/// Persist the active edit graph for a photo. Draft preview updates should not call this.
+pub fn commit_edit_graph(
+    library_root_path: impl AsRef<Path>,
+    graph: silica_edit::EditGraph,
+) -> Result<silica_edit::EditGraph, LibraryStorageError> {
+    silica_edit::validate_edit_graph(&graph)?;
+
+    let library = open_local_library(library_root_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let photo_id = graph.source.photo_id.clone();
+    let edit_state_id = stable_catalog_id("edit-state", &photo_id);
+    let edit_graph_json = serde_json::to_string(&graph)?;
+
+    let transaction = connection.transaction()?;
+    transaction.execute(
+        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1 AND id <> ?2",
+        params![photo_id, edit_state_id],
+    )?;
+    transaction.execute(
+        r#"
+        INSERT INTO edit_states(id, photo_id, active, edit_graph_json, updated_at)
+        VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          active = 1,
+          edit_graph_json = excluded.edit_graph_json,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![edit_state_id, photo_id, edit_graph_json],
+    )?;
+    transaction.execute(
+        r#"
+        UPDATE photo_flags
+        SET edited = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE photo_id = ?1
+        "#,
+        params![graph.source.photo_id],
+    )?;
+    transaction.commit()?;
+
+    Ok(graph)
 }
 
 /// Apply connection-local safety and durability settings.
@@ -441,6 +557,29 @@ fn open_library_catalog(
     Ok(LocalLibrary {
         root_path: root_path.to_path_buf(),
         catalog_path: catalog_path.to_path_buf(),
+        schema_version,
+    })
+}
+
+fn open_existing_library_for_read(
+    root_path: impl AsRef<Path>,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = open_catalog(&catalog_path)?;
+    let schema_version = current_schema_version(&connection)?;
+
+    Ok(LocalLibrary {
+        root_path: root_path.to_path_buf(),
+        catalog_path,
         schema_version,
     })
 }
@@ -599,6 +738,13 @@ fn modified_at_string(metadata: &fs::Metadata) -> Option<String> {
         .ok()
         .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
         .map(|duration| format!("unix:{}", duration.as_secs()))
+}
+
+fn current_timestamp_string() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| format!("unix:{}", duration.as_secs()))
+        .unwrap_or_else(|_| "unix:0".to_string())
 }
 
 fn partial_file_hash(path: &Path) -> Result<String, LibraryStorageError> {
@@ -1259,6 +1405,59 @@ mod tests {
         remove_library_root(&workspace);
     }
 
+    #[test]
+    fn commits_active_edit_graph_without_draft_write() {
+        let workspace = unique_library_root("edit-state");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        assert_eq!(count_edit_states(&connection), 0);
+        drop(connection);
+
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft edit graph")
+            .expect("draft edit graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+
+        let connection = open_catalog(&library.catalog_path).expect("reopen catalog");
+        assert_eq!(
+            count_edit_states(&connection),
+            0,
+            "draft slider update must not write edit_states"
+        );
+        drop(connection);
+
+        commit_edit_graph(&library.root_path, edited).expect("commit edit graph");
+
+        let reopened = open_local_library(&library_root).expect("reopen library");
+        let persisted = load_active_edit_graph_or_default(&reopened.root_path, &photo_id)
+            .expect("read active edit graph")
+            .expect("active edit graph");
+        assert_eq!(persisted.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(persisted.basic.contrast.as_f64(), Some(-8.0));
+
+        let connection = open_catalog(&reopened.catalog_path).expect("open reopened catalog");
+        assert_eq!(count_edit_states(&connection), 1);
+
+        remove_library_root(&workspace);
+    }
+
     fn unique_catalog_path(label: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1289,5 +1488,11 @@ mod tests {
 
     fn remove_library_root(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn count_edit_states(connection: &Connection) -> i64 {
+        connection
+            .query_row("SELECT COUNT(*) FROM edit_states", [], |row| row.get(0))
+            .expect("count edit states")
     }
 }

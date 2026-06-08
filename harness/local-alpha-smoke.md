@@ -86,6 +86,21 @@ Use this section after preview status command APIs are available.
 - [ ] Confirm preview status clearly says Core Image RAW preview is blocked until fixture-backed probe coverage exists.
 - [ ] Do not treat this as a Metal viewer, RAW decode, or color correctness smoke test.
 
+## Phase 5.3 Exposure/Contrast Command Smoke
+
+Use this section after exposure/contrast preview and commit command APIs are available.
+
+- [ ] Import a folder with a `.jpg` candidate.
+- [ ] Open preview status for the `.jpg` catalog photo and confirm it is ready.
+- [ ] Send a draft exposure/contrast preview update.
+- [ ] Confirm the draft response includes the requested exposure and contrast values.
+- [ ] Confirm the draft update does not create an `edit_states` row.
+- [ ] Commit/release the final exposure/contrast values.
+- [ ] Quit and relaunch the app.
+- [ ] Open the same library path.
+- [ ] Confirm the active edit graph contains the committed exposure and contrast values.
+- [ ] Do not treat this as product M005 UI, actual pixel rendering, RAW decoding, Metal viewer behavior, or sidecar writing.
+
 ## Minimal Workflow
 
 This section applies only after the app implements the local alpha product workflows.
