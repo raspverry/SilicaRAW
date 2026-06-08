@@ -381,6 +381,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Unknown experimental data stays under `extensions`.
 - **Validation:** Serialization and schema validation tests.
 
+**Status:** Completed on 2026-06-09. `silica-edit` now exposes typed Rust structures for the edit graph schema, preserves the example JSON shape through round-trip serialization, validates schema/version/range constraints, rejects unknown closed-field data through `serde(deny_unknown_fields)`, and keeps experimental top-level data under `extensions`. This task does not apply edits, persist sidecars, render previews, add UI controls, implement RAW decoding, or add MLX/MCP/plugin behavior.
+
 ### Task 5.3: Implement Exposure and Contrast Edit Flow
 
 - **Location:** `crates/silica-edit`, `crates/silica-render`, `apps/desktop`

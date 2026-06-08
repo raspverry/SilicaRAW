@@ -284,18 +284,33 @@ Verification source: `cargo info libsqlite3-sys` for 0.38.1 metadata; rusqlite r
 ### Serialization
 
 ```txt
-Name: serde / serde_json
-Version: TBD
-Purpose: Edit graph, sidecar, manifest serialization
+Name: serde
+Version: 1.0.228
+Purpose: Derive-backed typed serialization and deserialization.
 License: MIT OR Apache-2.0
-Repository/Homepage: https://github.com/serde-rs/serde and https://github.com/serde-rs/json
-Used by: silica-edit, silica-storage, silica-plugin, silica-mcp
-Why needed: typed serialization/deserialization for JSON schemas
-Alternatives considered: simd-json, schemars-only workflows
-Risk notes: Schema validation still required; serde alone is not schema validation.
+Repository/Homepage: https://github.com/serde-rs/serde
+Used by: crates/silica-edit in Phase 5.2; expected later for silica-storage, silica-plugin, and silica-mcp when their schema-backed JSON tasks are reached.
+Why needed: typed serialization/deserialization for the edit graph JSON schema boundary.
+Alternatives considered: manual JSON parsing, schemars-only workflows
+Risk notes: Schema-aware validation is still required; serde derives alone are not full JSON Schema validation.
 Binary size impact: Low/typical Rust ecosystem dependency.
-Security notes: Validate untrusted plugin/model/MCP manifests.
-Verification source: serde and serde_json repository license sections.
+Security notes: Validate untrusted edit graph, plugin, model, and MCP manifest JSON before accepting it.
+Verification source: `Cargo.lock` after Phase 5.2 and serde repository license section.
+```
+
+```txt
+Name: serde_json
+Version: 1.0.150
+Purpose: JSON value, number, map, parsing, and serialization support.
+License: MIT OR Apache-2.0
+Repository/Homepage: https://github.com/serde-rs/json
+Used by: crates/silica-edit in Phase 5.2; expected later for silica-storage, silica-plugin, and silica-mcp when their schema-backed JSON tasks are reached.
+Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, and numeric representation preservation.
+Alternatives considered: simd-json, manual JSON parsing, schemars-only workflows
+Risk notes: JSON Schema validation rules still need explicit validation or a schema validator; serde_json only parses and serializes JSON.
+Binary size impact: Low/typical Rust ecosystem dependency.
+Security notes: Treat imported edit graph JSON as untrusted and validate it before accepting it.
+Verification source: `Cargo.lock` after Phase 5.2 and serde_json repository license section.
 ```
 
 ### RAW Decode — Core Image
