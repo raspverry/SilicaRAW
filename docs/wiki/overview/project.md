@@ -18,7 +18,9 @@ AI, MLX, plugins, and MCP are secondary extensions. They should support the edit
 
 - The repository has planning documents, schemas, mockups, and a Rust workspace scaffold.
 - The project is not production-ready.
-- The app shell, RAW decoder, Metal viewer, color pipeline, catalog, and MLX runtime still require feasibility spikes or implementation tasks.
+- The app shell and initial catalog migration foundation exist, but product library workflows are not implemented yet.
+- RAW decoding, the product Metal viewer bridge, color fixture proof, export, and local alpha UI workflows still require explicit implementation tasks.
+- MLX is deferred from local alpha by ADR 0005.
 
 ## Project Identity
 
@@ -46,4 +48,3 @@ AI, MLX, plugins, and MCP are secondary extensions. They should support the edit
 ## Notes for LLM Agents
 
 Do not overemphasize AI, MLX, plugins, or MCP when working on early tasks. The product is a RAW editor first, and every implementation choice should preserve original-file safety and local-first behavior.
-

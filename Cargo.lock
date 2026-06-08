@@ -2847,6 +2847,7 @@ name = "silica-storage"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "silica-catalog",
 ]
 
 [[package]]

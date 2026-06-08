@@ -27,6 +27,25 @@ Verification source:
 
 These are expected but still require version-specific confirmation during implementation.
 
+## Internal Workspace Dependencies
+
+Internal path dependencies between `crates/silica-*` packages are allowed when they preserve the architecture boundaries and do not introduce an external package. They are still recorded here when added so agents can distinguish workspace coupling from third-party dependency growth.
+
+```txt
+Name: silica-catalog
+Version: workspace
+Purpose: Catalog domain schema contract for local alpha storage.
+License: project internal
+Repository/Homepage: this repository
+Used by: crates/silica-storage
+Why needed: Phase 4.1 keeps the required catalog table/index/version contract in the catalog domain crate while `silica-storage` owns SQLite migration execution.
+Alternatives considered: duplicate table/index lists in `silica-storage`, storage-only contract ownership.
+Risk notes: Keep the dependency direction one-way from storage to catalog. Do not let catalog depend on storage or rusqlite.
+Binary size impact: None meaningful; internal constants only.
+Security notes: No runtime I/O or SQL access is added by the contract dependency.
+Verification source: local workspace Cargo metadata and Phase 4.1 tests.
+```
+
 ### Tauri Runtime
 
 ```txt

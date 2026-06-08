@@ -10,7 +10,7 @@ This repository currently contains the monorepo foundation plus a minimal Tauri 
 - Minimal Tauri desktop shell
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
-- SQLite migration foundation for empty catalog schema and required indexes
+- SQLite migration foundation for empty catalog schema, required indexes, and catalog schema contract
 - MLX boundary crate is explicitly deferred from local alpha
 - Per-crate responsibility notes
 

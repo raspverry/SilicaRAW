@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-4 | Catalog migration foundation completed
+
+- Added the local alpha catalog schema contract to `silica-catalog`.
+- Aligned `silica-storage` migration verification with the catalog contract for required tables, required indexes, schema version, and migration bookkeeping.
+- Added the Catalog wiki topic and marked Task 4.1 complete in the local DMG distribution plan.
+
 ## [2026-06-08] phase-3 | ADR 0005 deferred MLX from local alpha
 
 - Added ADR 0005 for MLX local-alpha deferral.

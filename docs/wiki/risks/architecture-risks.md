@@ -40,7 +40,7 @@ Next evidence needed: tagged raster fixtures, ICC embedding proof, Preview.app c
 
 ### Storage and Migration Safety
 
-Current status: partially resolved by Spike 004. `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes.
+Current status: partially resolved by Spike 004 and Phase 4.1. `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes, and `silica-storage` now verifies migration output against the `silica-catalog` alpha schema contract.
 
 Why it matters: catalog corruption, lost edits, or original mutation would undermine trust immediately.
 
@@ -76,6 +76,7 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 - [Metal Rendering](../topics/metal-rendering.md)
 - [Color Management](../topics/color-management.md)
 - [Data Safety](../topics/data-safety.md)
+- [Catalog](../topics/catalog.md)
 
 ## Notes for LLM Agents
 

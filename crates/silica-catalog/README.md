@@ -4,5 +4,11 @@ Catalog domain boundary for SilicaRAW.
 
 This crate will model libraries, folders, photo identity, collections, culling flags, missing-file state, and query-facing catalog behavior.
 
-Task 0101 only creates the crate boundary. No catalog implementation is present yet.
+Phase 4.1 adds the local alpha catalog schema contract:
 
+- current schema version
+- required catalog tables
+- required catalog indexes
+- migration bookkeeping table name
+
+`silica-storage` owns SQLite execution and migration application. `silica-catalog` owns the domain-facing contract that later library create/open, import, culling, and query code should reference.

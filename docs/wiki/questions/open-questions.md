@@ -49,6 +49,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Spike 003 selected a linear Display P3-compatible working-space recommendation, sRGB default export, and Display P3 export support on 2026-06-08.
 - Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations on 2026-06-08.
 - ADR 0005 deferred MLX from local alpha on 2026-06-08.
+- Phase 4.1 recorded the local alpha catalog schema contract in `silica-catalog` on 2026-06-08.
 
 ## Links
 
@@ -60,6 +61,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [ADR 0005: Defer MLX from Local Alpha](../decisions/adr-0005-mlx-deferral-for-local-alpha.md)
+- [Catalog](../topics/catalog.md)
 - [Dependencies Policy](../../DEPENDENCIES.md)
 
 ## Notes for LLM Agents
