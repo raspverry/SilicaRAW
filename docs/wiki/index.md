@@ -35,6 +35,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 
 - [Decision Index](decisions/index.md): accepted, proposed, and superseded decisions.
 - [ADR 0001: Monorepo Foundation](decisions/adr-0001-monorepo-foundation.md): initial Rust workspace and crate boundary decision.
+- [ADR 0005: Defer MLX from Local Alpha](decisions/adr-0005-mlx-deferral-for-local-alpha.md): MLX remains outside local alpha scope.
 
 ### Topics
 

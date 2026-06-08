@@ -280,13 +280,15 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 
 ### Task 3.5: Decide MLX Deferral for Local DMG Alpha
 
-- **Location:** `docs/wiki/decisions/adr-0004-mlx-deferral-for-local-alpha.md`
+- **Location:** `docs/wiki/decisions/adr-0005-mlx-deferral-for-local-alpha.md`
 - **Description:** Explicitly defer MLX from local DMG alpha unless maintainers decide otherwise.
 - **Dependencies:** none
 - **Acceptance Criteria:**
   - Decision states MLX is not required for local alpha.
   - `silica-mlx` remains a boundary crate only.
 - **Validation:** CI dependency guard confirms no MLX dependency.
+
+**Status:** Completed on 2026-06-08. ADR 0005 defers MLX from local alpha, and `silica-mlx` remains a dependency-free boundary crate.
 
 ## Phase 4: Local Library and Data Safety MVP
 

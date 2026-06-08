@@ -46,6 +46,14 @@ Why it matters: catalog corruption, lost edits, or original mutation would under
 
 Next evidence needed: file-backed library create/open APIs, WAL backup/checkpoint policy, original hash protection tests, sidecar read/write tests, and cache clear safety tests.
 
+### MLX Runtime and Model Safety
+
+Current status: deferred from local alpha by ADR 0005.
+
+Why it matters: MLX can add model-license, memory-pressure, scheduling, cache, and user-approval risks if added before the editor core is stable.
+
+Next evidence needed: later MLX runtime spike covering selected binding, model licensing, preprocessing/output contracts, memory pressure, cancellation, and user approval flow.
+
 ### Extension Permission Safety
 
 Current status: later-stage.
@@ -61,6 +69,7 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
+- [ADR 0005: Defer MLX from Local Alpha](../decisions/adr-0005-mlx-deferral-for-local-alpha.md)
 - [System Architecture](../../03_System_Architecture.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)

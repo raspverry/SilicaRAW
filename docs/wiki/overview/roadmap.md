@@ -24,7 +24,7 @@ The current implementation order starts with:
 6. Spike RAW decoder comparison.
 7. Spike color-managed preview/export.
 8. Spike SQLite catalog persistence.
-9. Spike MLX runtime.
+9. Decide MLX deferral for local DMG alpha.
 
 ## Gate Logic
 
@@ -41,6 +41,7 @@ The current implementation order starts with:
 - RAW decoder-dependent work remains tagged as `decoder-blocking` until real fixture-backed decoding exists.
 - Spike 003 recorded Path B: color-management direction is selected, but tagged color fixtures are still required before color correctness claims.
 - Spike 004 recorded Path A: `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes.
+- ADR 0005 defers MLX from local alpha; `silica-mlx` remains a dependency-free boundary crate.
 
 ## Links
 
@@ -52,6 +53,7 @@ The current implementation order starts with:
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
+- [ADR 0005: Defer MLX from Local Alpha](../decisions/adr-0005-mlx-deferral-for-local-alpha.md)
 
 ## Notes for LLM Agents
 
