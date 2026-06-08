@@ -26,11 +26,14 @@ This is not a final commitment to Tauri for the whole product. It is a controlle
 
 If Spike 001 records Path C, Tauri-dependent product UI work stops and planning switches to SwiftUI/AppKit shell plus Rust Core.
 
+Spike 001 recorded Path B on 2026-06-08. Continue with Tauri for the shell, but do not treat the native viewer as solved until a stronger AppKit/Metal bridge boundary is designed.
+
 ## Consequences
 
 - Tauri dependencies may be added only with `docs/DEPENDENCIES.md` updates.
 - The first Tauri shell should be minimal and must not implement RAW decoding, Metal viewer, MLX, MCP, plugin behavior, or broad UI screens.
 - Packaging skeleton work may proceed before the Metal spike, but Develop/editor UI work must wait for the spike result.
+- After Spike 001 Path B, viewer-dependent work must first define the native bridge layout, lifecycle, and event ownership.
 
 ## Alternatives Considered
 
@@ -41,11 +44,11 @@ If Spike 001 records Path C, Tauri-dependent product UI work stops and planning 
 ## Links
 
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
+- [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Metal Rendering Topic](../topics/metal-rendering.md)
 - [Architecture Risks](../risks/architecture-risks.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 
 ## Notes for LLM Agents
 
-Do not build broad Tauri UI before the Metal viewer spike. Keep the first shell minimal and reversible.
-
+Do not build broad Tauri UI that assumes the native viewer is solved. Spike 001 Path B keeps Tauri viable but requires a dedicated native viewer bridge.

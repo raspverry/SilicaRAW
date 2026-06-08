@@ -13,10 +13,12 @@ The Tauri + native Metal viewer bridge is the highest-risk spike.
 
 ```txt
 Tauri window can host or coordinate a native Metal-rendered view.
+Metal output appears in the app window.
 Resize works.
 Retina scaling works.
 Mouse/trackpad events map correctly.
 UI remains responsive.
+Render timing is available.
 Metal render loop can be controlled from Rust/Core.
 ```
 
@@ -29,7 +31,7 @@ Continue with Tauri + Rust Core + native Metal viewer.
 ### Path B — Partial Success
 
 ```txt
-Keep Tauri shell and controls, but isolate viewer as stronger native AppKit/Metal subview bridge.
+Keep Tauri shell and controls, but isolate the viewer behind a stronger native AppKit/Metal bridge.
 ```
 
 ### Path C — Failure

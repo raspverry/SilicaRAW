@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-3 | Spike 001 recorded Path B
+
+- Added the Tauri + native Metal viewer spike report.
+- Recorded Path B: Tauri can host a native Metal view, but the product viewer needs a dedicated AppKit/Metal bridge.
+- Updated Metal rendering, architecture risk, and open question pages to point at the spike result.
+- Added optional macOS native bridge dependencies to the dependency policy.
+
 ## [2026-06-08] phase-2 | Desktop shell skeleton started
 
 - Replaced the desktop placeholder boundary with a minimal Tauri v2 shell under `apps/desktop/src-tauri`.

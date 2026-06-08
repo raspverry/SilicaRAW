@@ -36,7 +36,7 @@ The current implementation order starts with:
 ## Current Status
 
 - Task 0101, monorepo foundation, has been implemented as a placeholder Rust workspace.
-- The Tauri shell should not be treated as settled until the Tauri + Metal spike records a path.
+- Spike 001 recorded Path B: Tauri remains viable, but native viewer work needs a dedicated AppKit/Metal bridge before product UI depends on it.
 - RAW decoder-dependent work should wait for the decoder spike or be explicitly tagged as blocked.
 
 ## Links
@@ -45,8 +45,8 @@ The current implementation order starts with:
 - [Task Breakdown](../../14_Codex_Claude_Task_Breakdown.md)
 - [Issue List](../../../github/ISSUE_LIST.md)
 - [Architecture Risks](../risks/architecture-risks.md)
+- [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 
 ## Notes for LLM Agents
 
 When choosing the next task, prefer the documented task order. Do not skip ahead to broad UI, RAW, Metal, MLX, plugin, or MCP implementation without explicit task scope.
-

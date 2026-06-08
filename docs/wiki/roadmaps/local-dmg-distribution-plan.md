@@ -229,10 +229,13 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 - **Description:** Verify whether the selected shell can host or coordinate a native Metal-rendered view.
 - **Dependencies:** Phase 2
 - **Acceptance Criteria:**
+  - Metal output appears in the app window.
   - Resize works.
   - Retina scaling works.
   - Mouse and trackpad events map correctly.
   - UI remains responsive.
+  - Render timing is available.
+  - Metal render loop can be controlled from Rust/Core.
   - Result is recorded as Path A, B, or C.
 - **Validation:** Manual spike checklist and screenshot/video evidence.
 
