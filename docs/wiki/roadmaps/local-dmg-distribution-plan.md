@@ -250,6 +250,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Decoder-dependent features are tagged.
 - **Validation:** Spike report with fixture results.
 
+**Status:** Completed on 2026-06-08. Spike 002 selected Core Image RAW primary, deferred LibRaw until fixture evidence proves a gap, and recorded that the repository currently has no legally usable RAW fixtures.
+
 ### Task 3.3: Spike Color-Managed Preview and Export
 
 - **Location:** `docs/spikes/003-color-managed-preview-export.md`

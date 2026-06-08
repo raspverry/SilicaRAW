@@ -80,20 +80,22 @@ Broad camera support: LibRaw-preferred
 ### Spike 002 outcomes
 
 ```txt
-Path A: Core Image RAW primary
+Path A: Core Image RAW primary [selected 2026-06-08]
 Path B: LibRaw primary
 Path C: Hybrid
 ```
 
-Recommendation:
+Spike 002 result:
 
 ```txt
-Initial MVP:
-Core Image RAW primary + LibRaw spike.
+Initial MVP decoder direction:
+Core Image RAW primary.
 
-After Spike 002:
-Decide whether v0.2 uses Core Image only or hybrid.
+LibRaw:
+Deferred until legal fixtures prove a concrete camera-support gap.
 ```
+
+No decoder backend or RAW fixture loader is implemented yet.
 
 ---
 

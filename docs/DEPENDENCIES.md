@@ -246,6 +246,7 @@ Risk notes: Supported formats depend on Apple. Less low-level control.
 Binary size impact: platform framework
 Security notes: Decode failures must be non-fatal.
 Verification source: Apple Developer documentation.
+Status after Spike 002: selected as first implementation target, but no Rust/Core Image binding has been added yet.
 ```
 
 ### RAW Decode — LibRaw
@@ -262,7 +263,8 @@ Alternatives considered: Core Image RAW only
 Risk notes: FFI/distribution/color pipeline complexity; binding maturity risk.
 Binary size impact: TBD
 Security notes: Treat decoder input as untrusted; handle corrupt RAW safely.
-Verification source: must be completed during Spike 002.
+Verification source: LibRaw documentation at https://www.libraw.org/docs; selected Rust binding still TBD.
+Status after Spike 002: deferred until legal RAW fixtures prove a camera-support gap. No LibRaw dependency has been added.
 ```
 
 ### MLX
