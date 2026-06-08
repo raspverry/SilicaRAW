@@ -133,7 +133,7 @@ Local distribution is complete when:
 
 ### Task 1.2: Add Dependency Guard Check
 
-- **Location:** `.github/workflows/ci.yml`, `scripts/check-dependencies-documented.sh`
+- **Location:** `.github/workflows/ci.yml`, `scripts/harness/check-cargo-deps.py`
 - **Description:** Add a lightweight check that fails when dependencies are added without `docs/DEPENDENCIES.md` changes.
 - **Dependencies:** Task 1.1
 - **Acceptance Criteria:**
@@ -143,7 +143,7 @@ Local distribution is complete when:
 
 ### Task 1.3: Add Architecture Scope Check
 
-- **Location:** `scripts/check-scope-guardrails.sh`, `.github/workflows/ci.yml`
+- **Location:** `scripts/harness/check-scope-guardrails.sh`, `.github/workflows/ci.yml`
 - **Description:** Add a conservative guard that scans for early MLX/MCP/plugin/telemetry/cloud additions.
 - **Dependencies:** Task 1.1
 - **Acceptance Criteria:**
@@ -572,4 +572,3 @@ Do not store signing certificates or private keys directly in the repository.
 - Do not treat unsigned developer DMGs as user-ready releases.
 - Do not add dependencies without updating `docs/DEPENDENCIES.md`.
 - Do not add MLX, MCP, plugins, telemetry, cloud sync, or auto-update for local DMG alpha unless a maintainer explicitly changes the scope.
-

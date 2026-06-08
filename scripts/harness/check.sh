@@ -9,6 +9,9 @@ python3 scripts/harness/check-md-links.py
 echo "==> Checking Cargo dependency documentation"
 python3 scripts/harness/check-cargo-deps.py
 
+echo "==> Checking early-alpha scope guardrails"
+scripts/harness/check-scope-guardrails.sh
+
 echo "==> Checking Rust formatting"
 cargo fmt --all --check
 
@@ -19,4 +22,3 @@ echo "==> Testing Rust workspace"
 cargo test --workspace
 
 echo "==> Harness checks passed"
-
