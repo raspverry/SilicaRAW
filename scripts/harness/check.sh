@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/../.."
+
+echo "==> Checking Markdown local links"
+python3 scripts/harness/check-md-links.py
+
+echo "==> Checking Cargo dependency documentation"
+python3 scripts/harness/check-cargo-deps.py
+
+echo "==> Checking Rust formatting"
+cargo fmt --all --check
+
+echo "==> Building Rust workspace"
+cargo build --workspace
+
+echo "==> Testing Rust workspace"
+cargo test --workspace
+
+echo "==> Harness checks passed"
+

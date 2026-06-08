@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+._*
+
+# Rust
+/target/
+*.rs.bk
+
+# Local agent/tool state
+/.code-review-graph/
+/.serena/
+/.playwright-mcp/
+
+# Local caches and reports
+/.pytest_cache/
+/playwright-report/
+/test-results/
+/artifacts/
+/tmp/
+/.tmp/
+
+# Local release/build scratch output
+/release/
+/dist/
+/build/
+*.dmg
+*.app
+*.pkg
+*.zip
+*.tar.gz
+*.sha256
+
+# Local logs
+*.log
+/.codex-log/
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.provisionprofile
+
+# Editor state
+.idea/
+.vscode/
+*.swp
+*.swo
+

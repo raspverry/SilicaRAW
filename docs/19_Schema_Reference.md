@@ -1,0 +1,220 @@
+# 19 — SilicaRAW Schema Reference v1.1
+
+Status: AUTHORITATIVE FOR v0.1 IMPLEMENTATION
+
+## Purpose
+
+This document defines schema sources that Codex / Claude Code must use when implementing storage, sidecars, plugin manifests, MLX model manifests, and MCP tool declarations.
+
+## Authoritative Schema Files
+
+```txt
+schemas/edit_graph.schema.json
+schemas/edit_graph.example.json
+schemas/sidecar.schema.json
+schemas/sidecar.example.json
+schemas/plugin_manifest.schema.json
+schemas/model_manifest.schema.json
+schemas/mcp_tool_manifest.schema.json
+```
+
+## Codex Rules
+
+```txt
+1. Do not invent a different edit graph structure.
+2. Implement typed Rust structs equivalent to schemas/edit_graph.schema.json.
+3. Edit graph JSON must validate against schemas/edit_graph.schema.json.
+4. Sidecar JSON must validate against schemas/sidecar.schema.json.
+5. Plugin manifests must validate before enabling plugins.
+6. Model manifests must include license/source/hash/preprocessing/output metadata.
+7. MCP tools must declare permission, side effects, confirmation behavior, and undo behavior.
+8. Experimental data belongs under `extensions`.
+```
+
+## Edit Graph v0.1 Required Sections
+
+```txt
+source
+profile
+basic
+tone
+color
+detail
+lens
+geometry
+masks
+metadata
+extensions
+```
+
+## Migration Policy
+
+```txt
+Every edit graph has `version`.
+v0.1 is version 1.
+Breaking schema changes increment version.
+Migration code must be deterministic and tested.
+Unknown fields must not be silently discarded.
+```
+
+## Validation Tests Required
+
+```txt
+[ ] edit graph serialization validates
+[ ] sidecar serialization validates
+[ ] plugin manifest rejects missing license
+[ ] model manifest rejects missing hash/license
+[ ] MCP tool schema rejects missing permission/side-effect declarations
+```
+
+---
+
+# v1.3 Clarifications
+
+## Sidecar `flags` vs Edit Graph `metadata`
+
+SilicaRAW intentionally stores rating/pick/reject/color-label information in more than one place, but each location has a different role.
+
+### Catalog `photo_flags`
+
+`photo_flags` in SQLite is the authoritative in-app source for current Library state.
+
+It is used for:
+
+```txt
+Library filtering
+Rating/reject/pick display
+Smart collections
+Culling workflows
+Fast queries
+```
+
+### Edit Graph `metadata`
+
+`edit_graph.metadata` is a portable snapshot included with the edit graph.
+
+It exists so an edit graph remains meaningful when exported, copied, or inspected outside the live catalog.
+
+It is not the primary query source inside the app.
+
+### Sidecar `flags`
+
+`sidecar.flags` is the latest portable mirror of catalog flags at the time the sidecar is written.
+
+It exists for:
+
+```txt
+Catalog rebuild from sidecars
+Recovery if catalog.db is lost
+Portable folder workflows
+Conflict detection
+```
+
+### Rebuild precedence
+
+When rebuilding a catalog from sidecars:
+
+```txt
+1. sidecar.flags wins if present and valid.
+2. edit_graph.metadata is fallback.
+3. missing flags default to rating 0, picked false, rejected false, color_label null.
+```
+
+This prevents Codex from inventing a separate meaning for `flags`.
+
+---
+
+## Schema Versioning Policy
+
+Current v0.1 schemas use:
+
+```json
+"version": { "const": 1 }
+```
+
+This is intentional.
+
+When a breaking schema change occurs, create a new schema file instead of modifying v1 in place.
+
+Recommended future naming:
+
+```txt
+schemas/edit_graph.v1.schema.json
+schemas/edit_graph.v2.schema.json
+schemas/sidecar.v1.schema.json
+schemas/sidecar.v2.schema.json
+```
+
+Current compatibility aliases may remain:
+
+```txt
+schemas/edit_graph.schema.json -> current stable schema
+schemas/sidecar.schema.json -> current stable schema
+```
+
+Migration rules:
+
+```txt
+- v1 edit graphs validate against version const 1.
+- v2 edit graphs validate against a separate v2 schema.
+- Migration code must explicitly convert v1 → v2.
+- Never loosen v1 schema silently to accept v2 fields.
+- Unknown experimental data belongs under `extensions`.
+```
+
+---
+
+## Intentionally Loose Fields
+
+Some schema fields are intentionally loose in v0.1 because their feature areas are later-stage or model-dependent.
+
+These include:
+
+```txt
+detail.mlx_denoise
+sidecar.edit_graph
+plugin/model input/output details
+MCP input_schema / output_schema
+mask.source extra properties
+extensions
+```
+
+Rules for Codex:
+
+```txt
+Do not fill these loose fields with invented final structures.
+Do not hard-code MLX denoise structure before MLX feature implementation.
+Do not create plugin/model/MCP sub-schemas unless the corresponding implementation task requires it.
+When a loose field becomes implementation-critical, update the relevant schema and docs first.
+```
+
+This is intentional flexibility, not an invitation to invent hidden formats.
+
+---
+
+# v1.4 Clarification — sidecar.flags Scope
+
+`sidecar.flags` is intentionally limited to portable culling and label state:
+
+```txt
+rating
+picked
+rejected
+color_label
+```
+
+It intentionally excludes:
+
+```txt
+edited
+exported
+```
+
+Reason:
+
+```txt
+edited is derived from edit graph state.
+exported is local catalog/export-history state.
+```
+
+If a future schema needs to persist exported workflow history in sidecars, it must be added as a separate versioned section, not silently added to `sidecar.flags`.

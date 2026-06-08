@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://silicaraw.local/schemas/mcp_tool_manifest.schema.json",
+  "title": "SilicaRAW MCP Tool Manifest v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "name",
+    "description",
+    "permission",
+    "requires_confirmation",
+    "side_effects",
+    "undoable",
+    "input_schema",
+    "output_schema"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "silica.mcp_tool"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "permission": {
+      "type": "string",
+      "enum": [
+        "read_only",
+        "review",
+        "edit",
+        "export"
+      ]
+    },
+    "requires_confirmation": {
+      "type": "boolean"
+    },
+    "side_effects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "undoable": {
+      "type": "boolean"
+    },
+    "input_schema": {
+      "type": "object"
+    },
+    "output_schema": {
+      "type": "object"
+    }
+  }
+}

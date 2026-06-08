@@ -1,0 +1,74 @@
+---
+title: SilicaRAW Wiki
+status: active
+audience: all
+updated: 2026-06-08
+source_of_truth: docs/00_INDEX.md
+---
+
+# SilicaRAW Wiki
+
+## Summary
+
+This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps people and agents understand the project, navigate the specifications, track decisions, and connect research notes without duplicating the authoritative documents.
+
+## How to Use This Wiki
+
+- Start with [Project Overview](overview/project.md) if you are new to SilicaRAW.
+- Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
+- Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
+- Check [Decision Records](decisions/index.md) before changing an accepted direction.
+- Check [Open Questions](questions/open-questions.md) before inventing answers.
+- Use [Conventions](conventions.md) when adding or editing wiki pages.
+
+## Sections
+
+### Overview
+
+- [Project](overview/project.md): product identity, current scope, and non-goals.
+- [Architecture](overview/architecture.md): high-level system boundaries and guardrails.
+- [Roadmap](overview/roadmap.md): current execution order and gate logic.
+- [Local DMG Distribution Plan](roadmaps/local-dmg-distribution-plan.md): phased plan for GitHub-hosted macOS DMG distribution.
+
+### Decisions
+
+- [Decision Index](decisions/index.md): accepted, proposed, and superseded decisions.
+- [ADR 0001: Monorepo Foundation](decisions/adr-0001-monorepo-foundation.md): initial Rust workspace and crate boundary decision.
+
+### Topics
+
+- [RAW Decoding](topics/raw-decoding.md)
+- [Metal Rendering](topics/metal-rendering.md)
+- [Color Management](topics/color-management.md)
+- [Data Safety](topics/data-safety.md)
+- [Edit Graph](topics/edit-graph.md)
+- [MLX](topics/mlx.md)
+- [Plugins and MCP](topics/plugins-and-mcp.md)
+
+### Sources
+
+- [Source Index](sources/index.md)
+- [Karpathy LLM Wiki](sources/karpathy-llm-wiki.md)
+- [karpathy/autoresearch](sources/karpathy-autoresearch.md)
+- [huggingface/ml-intern](sources/huggingface-ml-intern.md)
+
+### Risks and Questions
+
+- [Risk Index](risks/index.md)
+- [Architecture Risks](risks/architecture-risks.md)
+- [Open Questions](questions/open-questions.md)
+
+## Authoritative Sources
+
+The wiki is not the source of truth for schemas, product requirements, or implementation rules. Use these documents first when the details matter:
+
+- [Docs Index](../00_INDEX.md)
+- [Codex Handoff](../../codex/CODEX_HANDOFF.md)
+- [Agent Rules](../../codex/AGENT_RULES.md)
+- [Architecture Patch](../20_v1_1_Architecture_Patch.md)
+- [Schema Reference](../19_Schema_Reference.md)
+- [Edit Graph Schema](../../schemas/edit_graph.schema.json)
+
+## Notes for LLM Agents
+
+Read this page first, then read the smallest relevant set of linked pages. Do not treat wiki summaries as permission to bypass `codex/AGENT_RULES.md`, schema files, or explicit task scope.

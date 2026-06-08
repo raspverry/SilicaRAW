@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://silicaraw.local/schemas/sidecar.schema.json",
+  "title": "SilicaRAW Sidecar v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "app_version",
+    "photo",
+    "edit_graph",
+    "flags",
+    "sync",
+    "written_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "silica.sidecar"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "app_version": {
+      "type": "string"
+    },
+    "photo": {
+      "type": "object",
+      "required": [
+        "photo_id",
+        "original_path",
+        "file_name",
+        "fingerprint"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "photo_id": {
+          "type": "string"
+        },
+        "original_path": {
+          "type": "string"
+        },
+        "file_name": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "object"
+        }
+      }
+    },
+    "edit_graph": {
+      "type": "object"
+    },
+    "flags": {
+      "type": "object",
+      "description": "Current portable mirror of catalog photo_flags. Used for recovery/rebuild. See docs/19_Schema_Reference.md.",
+      "required": [
+        "rating",
+        "picked",
+        "rejected",
+        "color_label"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rating": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "picked": {
+          "type": "boolean"
+        },
+        "rejected": {
+          "type": "boolean"
+        },
+        "color_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "blue",
+            "purple",
+            null
+          ]
+        }
+      }
+    },
+    "sync": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "in_sync",
+            "catalog_newer",
+            "sidecar_newer",
+            "conflict",
+            "missing",
+            "disabled"
+          ]
+        },
+        "catalog_edit_state_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sidecar_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "written_at": {
+      "type": "string"
+    }
+  }
+}

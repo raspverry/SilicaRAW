@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+  "apps/desktop",
+  "crates/silica-core",
+  "crates/silica-catalog",
+  "crates/silica-storage",
+  "crates/silica-decode",
+  "crates/silica-render",
+  "crates/silica-edit",
+  "crates/silica-export",
+  "crates/silica-mlx",
+  "crates/silica-plugin",
+  "crates/silica-mcp",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+authors = ["SilicaRAW contributors"]
+

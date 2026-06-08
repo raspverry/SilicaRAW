@@ -1,0 +1,52 @@
+---
+title: Roadmap Overview
+status: active
+audience: all
+updated: 2026-06-08
+source_of_truth: docs/13_Development_Roadmap.md
+---
+
+# Roadmap Overview
+
+## Summary
+
+SilicaRAW should kill technical risk before adding product breadth. The early roadmap is dominated by feasibility spikes, repository foundation, guardrails, and schema-backed storage decisions.
+
+## Current Sequence
+
+The current implementation order starts with:
+
+1. Create monorepo structure.
+2. Add Tauri desktop shell.
+3. Add CI, formatting, linting, and test baseline.
+4. Add architecture guardrails.
+5. Spike Tauri + Metal viewer.
+6. Spike RAW decoder comparison.
+7. Spike color-managed preview/export.
+8. Spike SQLite catalog persistence.
+9. Spike MLX runtime.
+
+## Gate Logic
+
+- Gate A: architecture viability.
+- Gate B: editor viability.
+- Gate C: color and trust viability.
+- Public beta: final license, dependency inventory, sample asset license manifest, and data-safety confidence.
+
+## Current Status
+
+- Task 0101, monorepo foundation, has been implemented as a placeholder Rust workspace.
+- The Tauri shell should not be treated as settled until the Tauri + Metal spike records a path.
+- RAW decoder-dependent work should wait for the decoder spike or be explicitly tagged as blocked.
+
+## Links
+
+- [Development Roadmap](../../13_Development_Roadmap.md)
+- [Task Breakdown](../../14_Codex_Claude_Task_Breakdown.md)
+- [Issue List](../../../github/ISSUE_LIST.md)
+- [Architecture Risks](../risks/architecture-risks.md)
+
+## Notes for LLM Agents
+
+When choosing the next task, prefer the documented task order. Do not skip ahead to broad UI, RAW, Metal, MLX, plugin, or MCP implementation without explicit task scope.
+

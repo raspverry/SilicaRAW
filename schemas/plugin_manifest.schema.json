@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://silicaraw.local/schemas/plugin_manifest.schema.json",
+  "title": "SilicaRAW Plugin Manifest v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "plugin_id",
+    "name",
+    "description",
+    "author",
+    "license",
+    "plugin_version",
+    "minimum_silica_version",
+    "type",
+    "permissions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "silica.plugin"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "plugin_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "plugin_version": {
+      "type": "string"
+    },
+    "minimum_silica_version": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "preset_pack",
+        "export_preset",
+        "ai_model",
+        "workflow"
+      ]
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "entry": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "homepage": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repository": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

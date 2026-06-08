@@ -1,0 +1,155 @@
+{
+  "schema": "silica.edit_graph",
+  "version": 1,
+  "app_version": "0.1.0",
+  "source": {
+    "photo_id": "photo_01JABCDEFG1234567890",
+    "path": "/Users/user/Pictures/IMG_0001.CR3",
+    "fingerprint": {
+      "file_size": 45200121,
+      "modified_at": "2026-06-08T10:21:00Z",
+      "partial_hash": "sha256:partial-example",
+      "full_hash": null
+    }
+  },
+  "profile": {
+    "name": "silica_standard",
+    "input_profile": "camera_default",
+    "working_space": "linear_display_p3",
+    "camera_profile": null,
+    "decoder_backend": "core_image_raw"
+  },
+  "basic": {
+    "white_balance": "as_shot",
+    "temperature": 5200,
+    "tint": 6,
+    "exposure": 0.35,
+    "contrast": 8,
+    "highlights": -24,
+    "shadows": 22,
+    "whites": 10,
+    "blacks": -12,
+    "texture": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 12,
+    "saturation": 3
+  },
+  "tone": {
+    "curve_mode": "point",
+    "rgb_curve": [],
+    "red_curve": [],
+    "green_curve": [],
+    "blue_curve": []
+  },
+  "color": {
+    "hsl": {
+      "red": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "orange": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "yellow": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "green": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "aqua": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "blue": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "purple": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "magenta": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      }
+    },
+    "grading": {
+      "shadows": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "midtones": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "highlights": {
+        "hue": 0,
+        "saturation": 0,
+        "luminance": 0
+      },
+      "blending": 50,
+      "balance": 0
+    }
+  },
+  "detail": {
+    "sharpening": {
+      "amount": 0,
+      "radius": 1.0,
+      "detail": 25,
+      "masking": 0
+    },
+    "noise_reduction": {
+      "luminance": 0,
+      "detail": 50,
+      "contrast": 0,
+      "color": 25,
+      "color_detail": 50
+    },
+    "mlx_denoise": null
+  },
+  "lens": {
+    "profile_correction": false,
+    "profile_id": null,
+    "chromatic_aberration": false,
+    "distortion": 0,
+    "vignetting": 0
+  },
+  "geometry": {
+    "crop": null,
+    "rotation": 0,
+    "flip_horizontal": false,
+    "flip_vertical": false,
+    "transform": {
+      "vertical": 0,
+      "horizontal": 0,
+      "aspect": 0,
+      "scale": 100,
+      "x_offset": 0,
+      "y_offset": 0
+    }
+  },
+  "masks": [],
+  "metadata": {
+    "rating": 0,
+    "picked": false,
+    "rejected": false,
+    "color_label": null
+  },
+  "extensions": {},
+  "created_at": "2026-06-08T10:21:00Z",
+  "updated_at": "2026-06-08T10:21:00Z"
+}

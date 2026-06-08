@@ -1,0 +1,800 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://silicaraw.local/schemas/edit_graph.schema.json",
+  "title": "SilicaRAW Edit Graph v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "source",
+    "profile",
+    "basic",
+    "tone",
+    "color",
+    "detail",
+    "lens",
+    "geometry",
+    "masks",
+    "metadata",
+    "extensions",
+    "updated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "silica.edit_graph"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "app_version": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "photo_id",
+        "path",
+        "fingerprint"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "photo_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "object",
+          "required": [
+            "file_size",
+            "modified_at",
+            "partial_hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "file_size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "modified_at": {
+              "type": "string"
+            },
+            "partial_hash": {
+              "type": "string"
+            },
+            "full_hash": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": [
+        "name",
+        "input_profile",
+        "working_space"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "input_profile": {
+          "type": "string"
+        },
+        "working_space": {
+          "type": "string"
+        },
+        "camera_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decoder_backend": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "core_image_raw",
+            "libraw",
+            "embedded_preview",
+            "raster",
+            null
+          ]
+        }
+      }
+    },
+    "basic": {
+      "type": "object",
+      "required": [
+        "white_balance",
+        "temperature",
+        "tint",
+        "exposure",
+        "contrast",
+        "highlights",
+        "shadows",
+        "whites",
+        "blacks",
+        "texture",
+        "clarity",
+        "dehaze",
+        "vibrance",
+        "saturation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "white_balance": {
+          "type": "string",
+          "enum": [
+            "as_shot",
+            "auto",
+            "daylight",
+            "cloudy",
+            "shade",
+            "tungsten",
+            "fluorescent",
+            "flash",
+            "custom"
+          ]
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 1000,
+          "maximum": 50000
+        },
+        "tint": {
+          "type": "number",
+          "minimum": -150,
+          "maximum": 150
+        },
+        "exposure": {
+          "type": "number",
+          "minimum": -5,
+          "maximum": 5
+        },
+        "contrast": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "highlights": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "shadows": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "whites": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "blacks": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "texture": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "clarity": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "dehaze": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "vibrance": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        }
+      }
+    },
+    "tone": {
+      "type": "object",
+      "required": [
+        "curve_mode",
+        "rgb_curve",
+        "red_curve",
+        "green_curve",
+        "blue_curve"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "curve_mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "parametric",
+            "point"
+          ]
+        },
+        "rgb_curve": {
+          "$ref": "#/$defs/curve"
+        },
+        "red_curve": {
+          "$ref": "#/$defs/curve"
+        },
+        "green_curve": {
+          "$ref": "#/$defs/curve"
+        },
+        "blue_curve": {
+          "$ref": "#/$defs/curve"
+        }
+      }
+    },
+    "color": {
+      "type": "object",
+      "required": [
+        "hsl",
+        "grading"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hsl": {
+          "type": "object",
+          "required": [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "aqua",
+            "blue",
+            "purple",
+            "magenta"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "red": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "orange": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "yellow": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "green": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "aqua": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "blue": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "purple": {
+              "$ref": "#/$defs/hsl_channel"
+            },
+            "magenta": {
+              "$ref": "#/$defs/hsl_channel"
+            }
+          }
+        },
+        "grading": {
+          "type": "object",
+          "required": [
+            "shadows",
+            "midtones",
+            "highlights",
+            "blending",
+            "balance"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "shadows": {
+              "$ref": "#/$defs/color_wheel"
+            },
+            "midtones": {
+              "$ref": "#/$defs/color_wheel"
+            },
+            "highlights": {
+              "$ref": "#/$defs/color_wheel"
+            },
+            "blending": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "balance": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            }
+          }
+        }
+      }
+    },
+    "detail": {
+      "type": "object",
+      "required": [
+        "sharpening",
+        "noise_reduction",
+        "mlx_denoise"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sharpening": {
+          "type": "object",
+          "required": [
+            "amount",
+            "radius",
+            "detail",
+            "masking"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "amount": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 150
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 5
+            },
+            "detail": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "masking": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "noise_reduction": {
+          "type": "object",
+          "required": [
+            "luminance",
+            "detail",
+            "contrast",
+            "color",
+            "color_detail"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "luminance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "detail": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "contrast": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "color": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "color_detail": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "mlx_denoise": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    },
+    "lens": {
+      "type": "object",
+      "required": [
+        "profile_correction",
+        "chromatic_aberration",
+        "distortion",
+        "vignetting"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "profile_correction": {
+          "type": "boolean"
+        },
+        "profile_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "chromatic_aberration": {
+          "type": "boolean"
+        },
+        "distortion": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "vignetting": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "crop",
+        "rotation",
+        "flip_horizontal",
+        "flip_vertical",
+        "transform"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "crop": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height",
+            "angle",
+            "aspect"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "y": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "angle": {
+              "type": "number",
+              "minimum": -45,
+              "maximum": 45
+            },
+            "aspect": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "rotation": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "flip_horizontal": {
+          "type": "boolean"
+        },
+        "flip_vertical": {
+          "type": "boolean"
+        },
+        "transform": {
+          "type": "object",
+          "required": [
+            "vertical",
+            "horizontal",
+            "aspect",
+            "scale",
+            "x_offset",
+            "y_offset"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "vertical": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "horizontal": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "aspect": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "scale": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "x_offset": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "y_offset": {
+              "type": "number",
+              "minimum": -100,
+              "maximum": 100
+            }
+          }
+        }
+      }
+    },
+    "masks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mask"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "rating",
+        "picked",
+        "rejected",
+        "color_label"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rating": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "picked": {
+          "type": "boolean"
+        },
+        "rejected": {
+          "type": "boolean"
+        },
+        "color_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "blue",
+            "purple",
+            null
+          ]
+        }
+      }
+    },
+    "extensions": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "curve": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "hsl_channel": {
+      "type": "object",
+      "required": [
+        "hue",
+        "saturation",
+        "luminance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hue": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "luminance": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        }
+      }
+    },
+    "color_wheel": {
+      "type": "object",
+      "required": [
+        "hue",
+        "saturation",
+        "luminance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hue": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "luminance": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        }
+      }
+    },
+    "mask": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "name",
+        "enabled",
+        "invert",
+        "opacity",
+        "feather",
+        "source",
+        "local_adjustments"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "brush",
+            "linear_gradient",
+            "radial_gradient",
+            "subject",
+            "sky",
+            "background",
+            "color_range",
+            "luminance_range"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "invert": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "feather": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "manual",
+                "mlx",
+                "procedural"
+              ]
+            },
+            "ai_result_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cache_path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "local_adjustments": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}
