@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-3 | ADR 0005 deferred MLX from local alpha
+
+- Added ADR 0005 for MLX local-alpha deferral.
+- Recorded that `silica-mlx` remains a dependency-free boundary crate.
+- Corrected the Phase 3.5 roadmap location to ADR 0005 because ADR 0004 already exists.
+
 ## [2026-06-08] phase-3 | Spike 004 recorded SQLite persistence path
 
 - Added the SQLite catalog persistence spike report.

@@ -14,6 +14,8 @@ MLX is an intelligent editing/analysis layer, not the editor core.
 
 P0: No MLX required. Core editor must work without MLX.
 
+Local alpha status: ADR 0005 defers MLX runtime, model loading, inference, and model assets from the local DMG alpha. `silica-mlx` remains a boundary crate only until a later explicit runtime spike.
+
 P1:
 
 - Subject Mask
@@ -75,3 +77,5 @@ P3:
 GO WITH CONDITIONS.
 
 Need MLX runtime spike, model licensing policy, preprocessing specs, mask coordinate/texture spec, memory pressure strategy.
+
+After ADR 0005, these requirements remain later-stage and are not part of local DMG alpha.

@@ -51,6 +51,7 @@ License gate:
 - The first app can be useful without implementing the full v1 feature list.
 - Release planning must keep public-license readiness visible.
 - Agents must not add MLX/MCP/plugin/cloud/telemetry work while implementing local alpha unless the user explicitly changes scope.
+- ADR 0005 records the MLX-specific deferral in more detail.
 
 ## Alternatives Considered
 
@@ -63,9 +64,9 @@ License gate:
 - [Final Master Plan](../../18_Final_Master_Plan.md)
 - [Release and Distribution Plan](../../16_Release_Distribution_Plan.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
+- [ADR 0005: Defer MLX from Local Alpha](adr-0005-mlx-deferral-for-local-alpha.md)
 - [Open Questions](../questions/open-questions.md)
 
 ## Notes for LLM Agents
 
 Keep alpha work narrow. If a task needs a deferred feature, record a scope question instead of implementing it.
-

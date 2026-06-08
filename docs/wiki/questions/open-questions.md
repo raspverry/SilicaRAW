@@ -33,7 +33,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - What provisional project license will be selected before Gate A?
 - What final project license will be selected before public beta?
 - How will sample asset licenses be tracked?
-- How will model licenses be tracked if models are included?
+- How will model licenses be tracked if models are included after local alpha?
 
 ## Wiki
 
@@ -48,6 +48,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Spike 002 selected Core Image RAW primary with LibRaw deferred on 2026-06-08.
 - Spike 003 selected a linear Display P3-compatible working-space recommendation, sRGB default export, and Display P3 export support on 2026-06-08.
 - Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations on 2026-06-08.
+- ADR 0005 deferred MLX from local alpha on 2026-06-08.
 
 ## Links
 
@@ -58,6 +59,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
+- [ADR 0005: Defer MLX from Local Alpha](../decisions/adr-0005-mlx-deferral-for-local-alpha.md)
 - [Dependencies Policy](../../DEPENDENCIES.md)
 
 ## Notes for LLM Agents

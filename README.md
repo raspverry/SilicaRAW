@@ -11,6 +11,7 @@ This repository currently contains the monorepo foundation plus a minimal Tauri 
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
 - SQLite migration foundation for empty catalog schema and required indexes
+- MLX boundary crate is explicitly deferred from local alpha
 - Per-crate responsibility notes
 
 ## Workspace Layout

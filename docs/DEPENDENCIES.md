@@ -300,6 +300,7 @@ Risk notes: Model weights have separate licenses. Rust bindings may have separat
 Binary size impact: TBD
 Security notes: Model downloads must be opt-in, license/source/hash recorded.
 Verification source: MLX repository license; selected binding must be checked separately.
+Status after ADR 0005: deferred from local alpha. No MLX dependency, model loader, model asset, or inference runtime has been added.
 ```
 
 ## Prohibited Without Review

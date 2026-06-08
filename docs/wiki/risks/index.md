@@ -23,7 +23,7 @@ This section tracks project risks that affect sequencing, architecture, implemen
 - Color management correctness.
 - Data migration and original-file safety.
 - Large catalog performance.
-- MLX memory pressure.
+- MLX runtime and model safety, deferred from local alpha by ADR 0005.
 - Plugin and MCP permission safety.
 
 ## Links
@@ -36,4 +36,3 @@ This section tracks project risks that affect sequencing, architecture, implemen
 ## Notes for LLM Agents
 
 Risks are not blockers for all work. They are sequencing constraints. Do foundation tasks first, and do not build broad product features on top of unresolved spike risks.
-
