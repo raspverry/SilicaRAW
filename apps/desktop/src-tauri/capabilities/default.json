@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability for the minimal SilicaRAW shell. No application commands are exposed in Phase 2.",
+  "description": "Default capability for the SilicaRAW local library alpha shell. No plugin permissions are exposed.",
   "windows": [
     "main"
   ],

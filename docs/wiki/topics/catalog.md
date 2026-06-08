@@ -17,6 +17,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - `silica-catalog` owns the domain-facing local alpha schema contract.
 - `silica-storage` owns SQLite connection configuration, embedded migrations, and migration verification.
 - Phase 4.1 aligns `silica-storage` with the `silica-catalog` contract for schema version, required tables, required indexes, and the migration bookkeeping table.
+- Phase 4.2 adds local library folder create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -27,16 +28,18 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
+- Library create/open creates the selected library folder, `catalog.db`, and required support directories.
+- Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
+- Tests cover sibling original-directory preservation during create/open.
 
 ## Not Implemented Yet
 
-- Library folder create/open workflow.
 - Folder scanner and import records.
 - Photo fingerprinting and original hash protection.
 - Rating, pick, reject, and label commands.
 - Sidecar read/write and conflict handling.
 - Cache clear safety.
-- UI screens or Tauri commands for catalog workflows.
+- Broad catalog UI screens.
 - Plugin or MCP catalog access.
 
 ## Links
@@ -50,4 +53,4 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 
 ## Notes for LLM Agents
 
-Do not treat the migration foundation as library create/open, import, sidecar, cache, or UI behavior. Task 4.2 is the first place to add local library create/open behavior, and it must preserve original-file safety.
+Do not treat library create/open as import, sidecar, cache, or library grid behavior. Task 4.3 is the first place to add folder scanning and import records, and it must preserve original-file safety.

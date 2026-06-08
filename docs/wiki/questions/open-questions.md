@@ -50,6 +50,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations on 2026-06-08.
 - ADR 0005 deferred MLX from local alpha on 2026-06-08.
 - Phase 4.1 recorded the local alpha catalog schema contract in `silica-catalog` on 2026-06-08.
+- Phase 4.2 added local library create/open through Core, Storage, and the Tauri shell on 2026-06-08.
 
 ## Links
 

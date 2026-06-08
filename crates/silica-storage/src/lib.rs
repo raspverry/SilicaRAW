@@ -4,7 +4,11 @@
 //! This crate owns catalog schema creation but does not scan folders, import
 //! photos, mutate originals, write sidecars, or manage caches yet.
 
+use std::error::Error;
+use std::fmt;
+use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -62,6 +66,80 @@ pub const REQUIRED_TABLES: &[&str] = ALPHA_CATALOG_REQUIRED_TABLES;
 /// Required initial indexes from `docs/10_Data_Model_and_Storage_Specification.md`.
 pub const REQUIRED_INDEXES: &[&str] = ALPHA_CATALOG_REQUIRED_INDEXES;
 
+/// Catalog database filename inside a SilicaRAW library folder.
+pub const CATALOG_DATABASE_FILE: &str = "catalog.db";
+
+/// Stable local alpha library row id for single-library catalog databases.
+pub const LOCAL_LIBRARY_ID: &str = "local";
+
+/// Required support directories inside a SilicaRAW library folder.
+pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
+    "sidecars",
+    "thumbnails",
+    "previews",
+    "render-cache",
+    "ai-cache",
+    "exports",
+    "logs",
+    "backups",
+];
+
+/// Opened or newly created local library paths and schema state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalLibrary {
+    pub root_path: PathBuf,
+    pub catalog_path: PathBuf,
+    pub schema_version: i64,
+}
+
+/// Errors returned by local library create/open operations.
+#[derive(Debug)]
+pub enum LibraryStorageError {
+    Io(std::io::Error),
+    Sqlite(rusqlite::Error),
+    MissingCatalog(PathBuf),
+    NotDirectory(PathBuf),
+    InvalidPath(PathBuf),
+}
+
+impl fmt::Display for LibraryStorageError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(formatter, "filesystem error: {error}"),
+            Self::Sqlite(error) => write!(formatter, "sqlite error: {error}"),
+            Self::MissingCatalog(path) => {
+                write!(formatter, "missing catalog database at {}", path.display())
+            }
+            Self::NotDirectory(path) => write!(formatter, "not a directory: {}", path.display()),
+            Self::InvalidPath(path) => {
+                write!(formatter, "path is not valid UTF-8: {}", path.display())
+            }
+        }
+    }
+}
+
+impl Error for LibraryStorageError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Sqlite(error) => Some(error),
+            Self::MissingCatalog(_) | Self::NotDirectory(_) | Self::InvalidPath(_) => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for LibraryStorageError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+impl From<rusqlite::Error> for LibraryStorageError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Sqlite(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct Migration {
     version: i64,
@@ -88,6 +166,36 @@ pub fn open_catalog(path: impl AsRef<Path>) -> rusqlite::Result<Connection> {
     configure_connection(&connection)?;
     run_migrations(&mut connection)?;
     Ok(connection)
+}
+
+/// Create a local SilicaRAW library folder and initialize its catalog.
+pub fn create_local_library(
+    root_path: impl AsRef<Path>,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    fs::create_dir_all(root_path)?;
+    ensure_library_directories(root_path)?;
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    open_library_catalog(root_path, &catalog_path)
+}
+
+/// Open an existing local SilicaRAW library folder and migrate its catalog.
+pub fn open_local_library(
+    root_path: impl AsRef<Path>,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    ensure_library_directories(root_path)?;
+    open_library_catalog(root_path, &catalog_path)
 }
 
 /// Apply connection-local safety and durability settings.
@@ -143,6 +251,50 @@ pub fn catalog_object_exists(connection: &Connection, name: &str) -> rusqlite::R
         )
         .optional()
         .map(|result| result.is_some())
+}
+
+fn ensure_library_directories(root_path: &Path) -> Result<(), LibraryStorageError> {
+    for directory in REQUIRED_LIBRARY_DIRECTORIES {
+        fs::create_dir_all(root_path.join(directory))?;
+    }
+    Ok(())
+}
+
+fn open_library_catalog(
+    root_path: &Path,
+    catalog_path: &Path,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    let connection = open_catalog(catalog_path)?;
+    upsert_local_library_row(&connection, root_path)?;
+    let schema_version = current_schema_version(&connection)?;
+
+    Ok(LocalLibrary {
+        root_path: root_path.to_path_buf(),
+        catalog_path: catalog_path.to_path_buf(),
+        schema_version,
+    })
+}
+
+fn upsert_local_library_row(
+    connection: &Connection,
+    root_path: &Path,
+) -> Result<(), LibraryStorageError> {
+    let root_path = root_path
+        .to_str()
+        .ok_or_else(|| LibraryStorageError::InvalidPath(root_path.to_path_buf()))?;
+
+    connection.execute(
+        r#"
+        INSERT INTO libraries(id, root_path)
+        VALUES (?1, ?2)
+        ON CONFLICT(id) DO UPDATE SET
+          root_path = excluded.root_path,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![LOCAL_LIBRARY_ID, root_path],
+    )?;
+
+    Ok(())
 }
 
 fn ensure_migration_table(connection: &Connection) -> rusqlite::Result<()> {
@@ -511,6 +663,54 @@ mod tests {
         remove_catalog_files(&path);
     }
 
+    #[test]
+    fn creates_library_folder_with_catalog_and_support_directories() {
+        let root = unique_library_root("create");
+
+        {
+            let library = create_local_library(&root).expect("create local library");
+            assert_eq!(library.root_path, root);
+            assert_eq!(library.catalog_path, root.join(CATALOG_DATABASE_FILE));
+            assert_eq!(library.schema_version, CURRENT_SCHEMA_VERSION);
+            assert!(library.catalog_path.is_file());
+
+            for directory in REQUIRED_LIBRARY_DIRECTORIES {
+                assert!(
+                    root.join(directory).is_dir(),
+                    "missing library directory {directory}"
+                );
+            }
+        }
+
+        remove_library_root(&root);
+    }
+
+    #[test]
+    fn reopens_existing_library_without_recreating_original_photo_directory() {
+        let workspace = unique_library_root("workspace");
+        let original_dir = workspace.join("originals");
+        let original_file = original_dir.join("sample.dng");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        std::fs::create_dir_all(&original_dir).expect("create original directory");
+        std::fs::write(&original_file, b"original raw bytes").expect("write original sentinel");
+        let original_before = std::fs::read(&original_file).expect("read original before");
+
+        let created = create_local_library(&library_root).expect("create library");
+        let reopened = open_local_library(&library_root).expect("reopen library");
+
+        assert_eq!(reopened.root_path, created.root_path);
+        assert_eq!(reopened.catalog_path, created.catalog_path);
+        assert_eq!(reopened.schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(
+            std::fs::read(&original_file).expect("read original after"),
+            original_before
+        );
+        assert!(original_dir.is_dir());
+
+        remove_library_root(&workspace);
+    }
+
     fn unique_catalog_path(label: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -522,9 +722,24 @@ mod tests {
         ))
     }
 
+    fn unique_library_root(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "silicaraw-library-{label}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+
     fn remove_catalog_files(path: &Path) {
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{}", path.display(), suffix));
         }
+    }
+
+    fn remove_library_root(path: &Path) {
+        let _ = std::fs::remove_dir_all(path);
     }
 }

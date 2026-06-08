@@ -34,6 +34,19 @@ Use this section for unsigned developer DMGs generated before product workflows 
 - [ ] Artifact is clearly marked unsigned, ad-hoc, and developer-only.
 - [ ] Artifact is not published as a user-ready release.
 
+## Phase 4.2 Library Create/Open Smoke
+
+Use this section after local library create/open commands are available.
+
+- [ ] Enter a new local library folder path.
+- [ ] Create library succeeds.
+- [ ] `catalog.db` exists inside the selected library folder.
+- [ ] `sidecars/`, `thumbnails/`, `previews/`, `render-cache/`, `ai-cache/`, `exports/`, `logs/`, and `backups/` exist.
+- [ ] Quit and relaunch the app.
+- [ ] Open the same library path.
+- [ ] Reopen reports the same library root and catalog path.
+- [ ] A sibling original-photo test folder remains unchanged.
+
 ## Minimal Workflow
 
 This section applies only after the app implements the local alpha product workflows.
