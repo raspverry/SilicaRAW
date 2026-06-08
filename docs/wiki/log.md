@@ -17,6 +17,7 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 ## [2026-06-08] phase-0 | Repository baseline and alpha decisions
 
 - Initialized the project as a git repository.
+- Published the public GitHub repository at https://github.com/raspverry/SilicaRAW.
 - Hardened `.gitignore` for Rust outputs, local agent state, release scratch files, secrets, and editor state.
 - Added ADR 0002 for the local DMG distribution target.
 - Added ADR 0003 for the first Tauri shell and packaging spike path.
