@@ -6,6 +6,9 @@
 /target/
 *.rs.bk
 
+# Tauri generated schemas
+/apps/desktop/src-tauri/gen/
+
 # Local agent/tool state
 /.code-review-graph/
 /.serena/
@@ -47,4 +50,3 @@
 .vscode/
 *.swp
 *.swo
-

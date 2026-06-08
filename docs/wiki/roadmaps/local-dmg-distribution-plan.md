@@ -160,6 +160,16 @@ Local distribution is complete when:
 - A developer can run a basic SilicaRAW app locally.
 - The app can be bundled as `.app` and unsigned `.dmg` for internal testing.
 
+**Developer Artifact Note:** Phase 2 DMGs are unsigned/ad-hoc and developer-only. They validate packaging mechanics, not user-ready local distribution.
+
+Current Phase 2 commands:
+
+```bash
+cd apps/desktop/src-tauri
+cargo tauri build --no-bundle
+cargo tauri build --bundles app,dmg --ci --no-sign
+```
+
 ### Task 2.1: Choose App Shell Path for the First Packaging Spike
 
 - **Location:** `docs/wiki/decisions/adr-0003-app-shell-packaging-path.md`

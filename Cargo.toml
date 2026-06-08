@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-  "apps/desktop",
+  "apps/desktop/src-tauri",
   "crates/silica-core",
   "crates/silica-catalog",
   "crates/silica-storage",
@@ -19,4 +19,3 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
 authors = ["SilicaRAW contributors"]
-

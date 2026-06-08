@@ -31,7 +31,7 @@ App Shell
 
 ## Current Workspace Boundaries
 
-- `apps/desktop`: desktop app placeholder.
+- `apps/desktop`: minimal Tauri shell and packaging skeleton.
 - `crates/silica-core`: high-level coordination boundary.
 - `crates/silica-catalog`: catalog domain boundary.
 - `crates/silica-storage`: persistence boundary.
@@ -62,4 +62,3 @@ App Shell
 ## Notes for LLM Agents
 
 Do not collapse crate boundaries to simplify an early task. If a task needs a cross-boundary shortcut, stop and document the architecture question instead of silently changing the design.
-

@@ -1,8 +1,26 @@
 # silica-desktop
 
-Placeholder desktop application package for SilicaRAW.
+Minimal desktop application shell for SilicaRAW.
 
-This package exists to reserve the desktop app boundary. It does not include Tauri, UI screens, a Metal viewer, RAW decoding, MLX, plugin behavior, or MCP behavior.
+This package contains the Phase 2 Tauri shell and packaging skeleton only.
 
-The Tauri shell must only be added after the relevant architecture spike confirms the selected path.
+It does not include product UI screens, a Metal viewer, RAW decoding, MLX, plugin behavior, or MCP behavior.
 
+## Layout
+
+- `static/`: local static frontend served by Tauri without a dev server.
+- `src-tauri/`: Rust Tauri application crate and bundle configuration.
+
+## Validation
+
+From the repository root:
+
+```bash
+cargo build --workspace
+```
+
+From `apps/desktop/src-tauri` after installing `tauri-cli`:
+
+```bash
+cargo tauri build --no-bundle
+```

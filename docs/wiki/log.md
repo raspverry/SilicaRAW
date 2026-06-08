@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-2 | Desktop shell skeleton started
+
+- Replaced the desktop placeholder boundary with a minimal Tauri v2 shell under `apps/desktop/src-tauri`.
+- Added local static shell assets without a frontend dev server.
+- Added Phase 2 bundle metadata for app and DMG packaging validation.
+- Verified developer-only unsigned/ad-hoc `.app` and `.dmg` generation locally.
+
 ## [2026-06-08] governance | Git and PR workflow documented
 
 - Added the contributor-facing Git and PR workflow page.
