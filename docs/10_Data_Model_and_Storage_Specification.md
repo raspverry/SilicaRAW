@@ -119,7 +119,9 @@ Phase 4.3 adds non-recursive folder import records with path, file size, modifie
 
 Phase 4.4 adds catalog-authoritative rating, picked, rejected, and color label persistence in `photo_flags`, including default rows for imported photos and restart tests.
 
-Still needed: Rust edit graph types, sidecar flag mirroring, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
+Phase 5.2 adds Rust edit graph types and schema-aware validation in `silica-edit`.
+
+Still needed: edit graph storage wiring, sidecar flag mirroring, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
 
 ---
 

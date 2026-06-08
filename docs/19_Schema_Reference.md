@@ -60,12 +60,14 @@ Unknown fields must not be silently discarded.
 ## Validation Tests Required
 
 ```txt
-[ ] edit graph serialization validates
+[x] edit graph serialization validates in crates/silica-edit for Phase 5.2
 [ ] sidecar serialization validates
 [ ] plugin manifest rejects missing license
 [ ] model manifest rejects missing hash/license
 [ ] MCP tool schema rejects missing permission/side-effect declarations
 ```
+
+Phase 5.2 status: `crates/silica-edit` implements typed edit graph structures and validates the v0.1 schema marker, version, closed objects, enums, numeric ranges, mask adjustment numbers, and `extensions` placement. This is the schema/type boundary only; sidecar persistence and edit application are separate tasks.
 
 ---
 

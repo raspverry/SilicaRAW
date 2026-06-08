@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-09
 source_of_truth: none
 ---
 
@@ -13,6 +13,13 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-09] phase-5 | Edit graph types and validation added
+
+- Added typed Rust edit graph structures to `silica-edit`.
+- Added schema-aware validation for schema/version constants, enum shape, closed objects, numeric ranges, mask adjustment numbers, and `mlx_denoise` object/null shape.
+- Verified round-trip serialization against `schemas/edit_graph.example.json`.
+- Kept edit application, render integration, sidecar persistence, UI, RAW decoding, Metal viewer work, MLX, MCP, and plugin behavior out of scope.
 
 ## [2026-06-08] phase-5 | Preview readiness path added
 
