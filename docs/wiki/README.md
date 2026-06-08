@@ -18,9 +18,9 @@ The wiki is designed for contributors and agents. It gives orientation, records 
 
 - Main entry point: [index.md](index.md)
 - Maintenance rules: [conventions.md](conventions.md)
+- Git and PR workflow: [contributing/git-and-pr-workflow.md](contributing/git-and-pr-workflow.md)
 - Change history: [log.md](log.md)
 
 ## Boundary
 
 The wiki explains and connects project knowledge. It does not replace numbered specification documents, JSON schemas, agent rules, or task-specific acceptance criteria.
-

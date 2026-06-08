@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] governance | Git and PR workflow documented
+
+- Added the contributor-facing Git and PR workflow page.
+- Recorded the current branch model as GitHub Flow: protected `main`, short-lived task branches, PRs into `main`, squash merge, and release branches only for packaging preparation.
+- Clarified that a long-lived `dev` branch is not part of the project workflow unless a future ADR changes that decision.
+
 ## [2026-06-08] phase-1 | CI foundation started
 
 - Added GitHub Actions CI to run the project harness on `main` pushes and pull requests.

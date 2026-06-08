@@ -20,6 +20,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
 - Check [Open Questions](questions/open-questions.md) before inventing answers.
 - Use [Conventions](conventions.md) when adding or editing wiki pages.
+- Use [Git and PR Workflow](contributing/git-and-pr-workflow.md) before starting a new branch or pull request.
 
 ## Sections
 
@@ -44,6 +45,10 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Edit Graph](topics/edit-graph.md)
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)
+
+### Contributing
+
+- [Git and PR Workflow](contributing/git-and-pr-workflow.md): branch naming, PR flow, merge policy, and release branch rules.
 
 ### Sources
 
