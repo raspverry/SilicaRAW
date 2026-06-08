@@ -8,6 +8,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use rusqlite::{params, Connection, OptionalExtension};
+use silica_catalog::{
+    ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
+};
 
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-storage";
@@ -51,34 +54,13 @@ pub const SPIKE_004_STORAGE_GATE: StorageGate = StorageGate {
 };
 
 /// Current catalog schema version after all embedded migrations run.
-pub const CURRENT_SCHEMA_VERSION: i64 = 2;
+pub const CURRENT_SCHEMA_VERSION: i64 = ALPHA_CATALOG_SCHEMA_VERSION;
+
+/// Required initial tables from `docs/10_Data_Model_and_Storage_Specification.md`.
+pub const REQUIRED_TABLES: &[&str] = ALPHA_CATALOG_REQUIRED_TABLES;
 
 /// Required initial indexes from `docs/10_Data_Model_and_Storage_Specification.md`.
-pub const REQUIRED_INDEXES: &[&str] = &[
-    "idx_folders_library_id",
-    "idx_photos_library_id",
-    "idx_photos_folder_id",
-    "idx_photos_capture_time",
-    "idx_photos_imported_at",
-    "idx_photos_missing",
-    "idx_photos_unsupported",
-    "idx_photo_flags_rating",
-    "idx_photo_flags_rejected",
-    "idx_photo_flags_picked",
-    "idx_photo_flags_label",
-    "idx_collections_library_id",
-    "idx_collection_photos_photo_id",
-    "idx_edit_states_photo_id",
-    "idx_edit_states_photo_active",
-    "idx_edit_history_photo_id",
-    "idx_cache_records_photo_type",
-    "idx_cache_records_key",
-    "idx_ai_results_photo_task",
-    "idx_ai_results_model",
-    "idx_exports_photo_id",
-    "idx_action_log_actor",
-    "idx_action_log_created_at",
-];
+pub const REQUIRED_INDEXES: &[&str] = ALPHA_CATALOG_REQUIRED_INDEXES;
 
 #[derive(Debug, Clone, Copy)]
 struct Migration {
@@ -451,6 +433,13 @@ mod tests {
         assert!(catalog_object_exists(&connection, "libraries").expect("libraries table exists"));
         assert!(catalog_object_exists(&connection, "photos").expect("photos table exists"));
         assert!(catalog_object_exists(&connection, "schema_migrations").expect("migrations table"));
+
+        for table_name in REQUIRED_TABLES {
+            assert!(
+                catalog_object_exists(&connection, table_name).expect("table lookup"),
+                "missing required table {table_name}"
+            );
+        }
 
         for index_name in REQUIRED_INDEXES {
             assert!(

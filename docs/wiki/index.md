@@ -42,6 +42,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [RAW Decoding](topics/raw-decoding.md)
 - [Metal Rendering](topics/metal-rendering.md)
 - [Color Management](topics/color-management.md)
+- [Catalog](topics/catalog.md)
 - [Data Safety](topics/data-safety.md)
 - [Edit Graph](topics/edit-graph.md)
 - [MLX](topics/mlx.md)

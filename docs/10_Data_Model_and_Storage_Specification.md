@@ -111,6 +111,8 @@ GO WITH CONDITIONS.
 
 Spike 004 added the initial embedded SQLite migrations and required indexes to `silica-storage`.
 
+Phase 4.1 records the local alpha schema contract in `silica-catalog` and makes `silica-storage` verify migration output against that domain-facing contract.
+
 Still needed: Rust edit graph types, sidecar conflict UX, cache size policy, backup/checkpoint policy, and file-backed library create/open behavior.
 
 ---

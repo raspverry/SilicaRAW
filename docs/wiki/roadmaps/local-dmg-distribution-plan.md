@@ -309,6 +309,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Migration table records applied migrations.
 - **Validation:** Migration tests pass on empty and existing DB.
 
+**Status:** Completed on 2026-06-08. Spike 004 added the migration runner, initial schema, required indexes, and migration tests. Phase 4.1 then moved the domain-facing alpha schema contract into `silica-catalog` and made `silica-storage` verify migrations against that contract.
+
 ### Task 4.2: Implement Library Create/Open
 
 - **Location:** `crates/silica-core`, `crates/silica-storage`, `apps/desktop`

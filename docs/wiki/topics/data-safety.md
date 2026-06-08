@@ -17,6 +17,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Original photo files must never be modified by SilicaRAW.
 - Catalog state lives in SQLite through `silica-storage`.
 - Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations.
+- Phase 4.1 records the local alpha schema contract in `silica-catalog` and verifies `silica-storage` migrations against it.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -35,6 +36,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - [Schema Reference](../../19_Schema_Reference.md)
 - [Agent Rules](../../../codex/AGENT_RULES.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
+- [Catalog](catalog.md)
 
 ## Notes for LLM Agents
 

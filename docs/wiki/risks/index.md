@@ -16,6 +16,10 @@ This section tracks project risks that affect sequencing, architecture, implemen
 
 - [Architecture Risks](architecture-risks.md)
 
+## Related Topic Pages
+
+- [Catalog](../topics/catalog.md)
+
 ## Highest-Level Risks
 
 - Tauri + Metal viewer integration.
