@@ -2799,6 +2799,8 @@ version = "0.1.0"
 name = "silica-core"
 version = "0.1.0"
 dependencies = [
+ "silica-decode",
+ "silica-render",
  "silica-storage",
 ]
 
@@ -2845,6 +2847,9 @@ version = "0.1.0"
 [[package]]
 name = "silica-render"
 version = "0.1.0"
+dependencies = [
+ "silica-decode",
+]
 
 [[package]]
 name = "silica-storage"

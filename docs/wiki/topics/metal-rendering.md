@@ -17,6 +17,7 @@ Metal rendering is central to SilicaRAW's product identity. The app should be Me
 - Interactive preview and adjustment rendering must use a Metal render path.
 - Spike 001 recorded Path B: Tauri can host a native Metal view, but the viewer must be isolated behind a stronger AppKit/Metal bridge.
 - Tauri remains viable as the shell for now, but product viewer work must not proceed through a naive overlay.
+- Phase 5.1 adds preview readiness status only; it does not add the product Metal viewer.
 
 ## Blocked Work
 
@@ -25,6 +26,7 @@ Metal rendering is central to SilicaRAW's product identity. The app should be Me
 - Texture manager implementation.
 - Final viewer event ownership.
 - Full render loop coordination beyond the proof delegate.
+- Wiring M004/M005 preview surfaces to a real native viewer.
 
 ## Spike 001 Result
 
@@ -43,4 +45,4 @@ Metal rendering is central to SilicaRAW's product identity. The app should be Me
 
 ## Notes for LLM Agents
 
-Do not add a fake viewer or broad UI shell that assumes the Metal bridge is solved. Path B means the next viewer work must define the native AppKit/Metal bridge boundary first.
+Do not add a fake viewer or broad UI shell that assumes the Metal bridge is solved. Path B means the next viewer work must define the native AppKit/Metal bridge boundary first. Use M004/M005 as UI references only when an explicit viewer/UI task is active.

@@ -13,3 +13,5 @@ Phase 4.2 adds local library folder create/open helpers. These helpers create th
 Phase 4.3 adds a non-recursive folder import scanner. It records immediate child files by reference, stores file size, modified time, and partial hash, and marks unsupported extensions without crashing or copying originals.
 
 Phase 4.4 stores rating, picked, rejected, and color label values in SQLite `photo_flags`. Imported photos receive default flag rows, updates do not write sidecars yet, and restart tests verify the catalog values survive reopen.
+
+Phase 5.1 adds a typed photo preview candidate lookup. It reads only catalog fields needed for preview routing: photo id, file name, original path, and unsupported state.

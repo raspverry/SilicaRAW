@@ -40,6 +40,34 @@ impl From<silica_storage::LocalLibrary> for LibrarySession {
     }
 }
 
+/// Preview state exposed by the core command boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoPreviewStatus {
+    Ready,
+    BlockedByDecode,
+    Unsupported,
+}
+
+/// Preview session returned for one catalog photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoPreviewSession {
+    pub photo_id: String,
+    pub file_name: String,
+    pub source_path: String,
+    pub status: PhotoPreviewStatus,
+    pub message: String,
+}
+
+impl PhotoPreviewSession {
+    /// Compact status string for the minimal desktop shell entry point.
+    pub fn status_text(&self) -> String {
+        format!(
+            "Photo: {}\nFile: {}\nPreview: {:?}\nSource: {}\nMessage: {}",
+            self.photo_id, self.file_name, self.status, self.source_path, self.message
+        )
+    }
+}
+
 /// Errors returned by core command APIs.
 #[derive(Debug)]
 pub enum CoreError {
@@ -118,6 +146,35 @@ pub fn get_photo_flags(
     silica_storage::get_photo_flags(library_root_path, photo_id).map_err(CoreError::from)
 }
 
+/// Build the preview session for one catalog photo.
+pub fn open_photo_preview(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoPreviewSession>, CoreError> {
+    let candidate = match silica_storage::get_photo_preview_candidate(library_root_path, photo_id)
+        .map_err(CoreError::from)?
+    {
+        Some(candidate) => candidate,
+        None => return Ok(None),
+    };
+
+    let decode_plan = silica_decode::plan_preview_decode(&candidate.path, candidate.unsupported);
+    let render_plan = silica_render::plan_preview_render(decode_plan);
+    let status = match render_plan.status {
+        silica_render::PreviewRenderStatus::Ready => PhotoPreviewStatus::Ready,
+        silica_render::PreviewRenderStatus::BlockedByDecode => PhotoPreviewStatus::BlockedByDecode,
+        silica_render::PreviewRenderStatus::Unsupported => PhotoPreviewStatus::Unsupported,
+    };
+
+    Ok(Some(PhotoPreviewSession {
+        photo_id: candidate.photo_id,
+        file_name: candidate.file_name,
+        source_path: render_plan.source_path,
+        status,
+        message: render_plan.message,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,6 +243,71 @@ mod tests {
             .expect("flags row");
 
         assert_eq!(persisted, updated);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn opens_preview_session_with_ready_and_blocked_states() {
+        let workspace = unique_library_root("core-preview");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+        let raw_file = import_root.join("sample.dng");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&jpeg_file, b"jpeg placeholder bytes").expect("write jpeg");
+        std::fs::write(&raw_file, b"raw placeholder bytes").expect("write raw");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let jpeg_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("jpeg photo id");
+        let raw_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.dng'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("raw photo id");
+        let unsupported_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'notes.txt'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("unsupported photo id");
+
+        let jpeg_preview = open_photo_preview(&created.root_path, &jpeg_id)
+            .expect("open jpeg preview")
+            .expect("jpeg preview session");
+        assert_eq!(jpeg_preview.file_name, "sample.jpg");
+        assert_eq!(jpeg_preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(jpeg_preview.source_path, jpeg_file.display().to_string());
+
+        let raw_preview = open_photo_preview(&created.root_path, &raw_id)
+            .expect("open raw preview")
+            .expect("raw preview session");
+        assert_eq!(raw_preview.status, PhotoPreviewStatus::BlockedByDecode);
+        assert!(raw_preview.message.contains("Core Image RAW preview"));
+
+        let unsupported_preview = open_photo_preview(&created.root_path, &unsupported_id)
+            .expect("open unsupported preview")
+            .expect("unsupported preview session");
+        assert_eq!(unsupported_preview.status, PhotoPreviewStatus::Unsupported);
+
+        assert!(open_photo_preview(&created.root_path, "missing-photo")
+            .expect("missing preview lookup")
+            .is_none());
 
         remove_library_root(&workspace);
     }

@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-5 | Preview readiness path added
+
+- Added preview decode readiness routing to `silica-decode`.
+- Added render-side preview readiness planning to `silica-render`.
+- Added catalog preview candidate lookup, core preview session API, and a minimal Tauri preview status command.
+- Recorded that `MockupUI/` contains the target UI screens, while M004/M005 implementation remains a later explicit UI task.
+
 ## [2026-06-08] phase-4 | Photo flag persistence added
 
 - Added the local alpha photo flags contract to `silica-catalog`.

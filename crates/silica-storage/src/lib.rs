@@ -107,6 +107,15 @@ pub struct FolderImportSummary {
     pub candidates: Vec<ImportCandidate>,
 }
 
+/// Catalog row data needed to open a preview for one photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoPreviewCandidate {
+    pub photo_id: String,
+    pub file_name: String,
+    pub path: String,
+    pub unsupported: bool,
+}
+
 /// Errors returned by local library create/open operations.
 #[derive(Debug)]
 pub enum LibraryStorageError {
@@ -325,6 +334,38 @@ pub fn get_photo_flags(
         photo_flags_from_row(photo_id, rating, picked, rejected, color_label)
     })
     .transpose()
+}
+
+/// Read the catalog fields needed to decide whether a photo can open a preview.
+pub fn get_photo_preview_candidate(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoPreviewCandidate>, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    connection
+        .query_row(
+            r#"
+            SELECT id, file_name, path, unsupported
+            FROM photos
+            WHERE id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok(PhotoPreviewCandidate {
+                    photo_id: row.get(0)?,
+                    file_name: row.get(1)?,
+                    path: row.get(2)?,
+                    unsupported: sql_to_bool(row.get::<_, i64>(3)?),
+                })
+            },
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
 }
 
 /// Apply connection-local safety and durability settings.
@@ -1160,6 +1201,60 @@ mod tests {
             .expect("read persisted flags")
             .expect("persisted flags row");
         assert_eq!(persisted_flags, updated_flags);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn reads_photo_preview_candidates_from_catalog() {
+        let workspace = unique_library_root("preview-candidate");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let supported_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("supported photo id");
+        let unsupported_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'notes.txt'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("unsupported photo id");
+
+        let supported = get_photo_preview_candidate(&library.root_path, &supported_id)
+            .expect("read supported preview candidate")
+            .expect("supported preview candidate");
+        assert_eq!(supported.photo_id, supported_id);
+        assert_eq!(supported.file_name, "sample.jpg");
+        assert_eq!(supported.path, supported_file.display().to_string());
+        assert!(!supported.unsupported);
+
+        let unsupported = get_photo_preview_candidate(&library.root_path, &unsupported_id)
+            .expect("read unsupported preview candidate")
+            .expect("unsupported preview candidate");
+        assert_eq!(unsupported.file_name, "notes.txt");
+        assert!(unsupported.unsupported);
+
+        assert!(
+            get_photo_preview_candidate(&library.root_path, "missing-photo")
+                .expect("missing preview candidate lookup")
+                .is_none()
+        );
 
         remove_library_root(&workspace);
     }

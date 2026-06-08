@@ -29,6 +29,7 @@ The current implementation order starts with:
 11. Implement local library create/open.
 12. Implement folder import scanner.
 13. Implement rating, pick, reject, and color label persistence.
+14. Implement minimal preview path contract.
 
 ## Gate Logic
 
@@ -50,6 +51,7 @@ The current implementation order starts with:
 - Phase 4.2 adds local library create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
 - Phase 4.3 adds non-recursive folder import scanning with path, partial hash, unsupported-state, and original-preservation tests.
 - Phase 4.4 adds catalog-authoritative rating, pick, reject, and color label persistence through `photo_flags`, core APIs, and minimal Tauri commands.
+- Phase 5.1 adds a minimal preview readiness path: raster candidates can return ready-by-reference, unsupported entries return a clear state, and RAW entries remain blocked until fixture-backed Core Image probe work.
 
 ## Links
 

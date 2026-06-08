@@ -44,6 +44,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Color Management](topics/color-management.md)
 - [Catalog](topics/catalog.md)
 - [Data Safety](topics/data-safety.md)
+- [UI Mockups](topics/ui-mockups.md)
 - [Edit Graph](topics/edit-graph.md)
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)

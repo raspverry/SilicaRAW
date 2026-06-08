@@ -63,6 +63,13 @@ fn get_photo_flags(library_path: String, photo_id: String) -> Result<Option<Stri
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn open_photo_preview(library_path: String, photo_id: String) -> Result<Option<String>, String> {
+    silica_core::open_photo_preview(PathBuf::from(library_path), &photo_id)
+        .map(|preview| preview.map(|preview| preview.status_text()))
+        .map_err(|error| error.to_string())
+}
+
 fn photo_flags_status_text(
     photo_id: &str,
     rating: u8,
@@ -87,7 +94,8 @@ fn main() {
             create_library,
             open_library,
             set_photo_flags,
-            get_photo_flags
+            get_photo_flags,
+            open_photo_preview
         ])
         .run(tauri::generate_context!())
         .expect("failed to run SilicaRAW desktop shell");
@@ -143,6 +151,31 @@ mod tests {
             .expect("get flags command")
             .expect("flags row");
         assert_eq!(reopened, updated);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_opens_photo_preview_status() {
+        let workspace = unique_library_root("desktop-preview");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::open_photo_preview(library_root.display().to_string(), photo_id)
+            .expect("open preview command")
+            .expect("preview session");
+
+        assert!(preview.contains("File: sample.jpg"));
+        assert!(preview.contains("Preview: Ready"));
+        assert!(preview.contains("display-profile-aware"));
 
         remove_library_root(&workspace);
     }

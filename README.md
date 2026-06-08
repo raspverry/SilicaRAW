@@ -11,6 +11,7 @@ This repository currently contains the monorepo foundation, a minimal Tauri desk
 - Local library folder create/open path
 - Non-recursive folder import scanner for catalog candidates
 - Rating, pick, reject, and color label persistence in SQLite `photo_flags`
+- Minimal preview readiness path for raster candidates and clear RAW/unsupported states
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
 - SQLite migration foundation for empty catalog schema, required indexes, and catalog schema contract
@@ -61,6 +62,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 - Do not add RAW decoder behavior without explicit fixture-backed scope; Spike 002 selected Core Image primary and deferred LibRaw.
 - Do not turn the Metal spike into a product viewer without the Path B native bridge contract.
 - Do not claim color correctness without tagged fixtures and explicit color comparison evidence.
+- Treat `MockupUI/` as the high-fidelity UI target reference when implementing screens.
 - Do not expose raw SQLite access outside typed storage/core APIs.
 - Do not add MLX, MCP, plugin behavior, telemetry, cloud sync, or network upload by default.
 - Document every new dependency in `docs/DEPENDENCIES.md`.
