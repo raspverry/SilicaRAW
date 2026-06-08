@@ -24,11 +24,11 @@ Next evidence needed: dedicated AppKit/Metal viewer bridge contract, including l
 
 ### RAW Decoder Path
 
-Current status: unresolved.
+Current status: partially resolved by Spike 002. Core Image RAW is the first implementation target; LibRaw is deferred until fixture evidence proves a gap.
 
 Why it matters: decoder choice affects camera support, input profile, color pipeline, metadata, Apple ProRAW behavior, and distribution complexity.
 
-Next evidence needed: Spike 002 result selecting Core Image RAW primary, LibRaw primary, or hybrid.
+Next evidence needed: legal RAW fixture manifest and a macOS-only Core Image probe that records success/failure by fixture class.
 
 ### Color Pipeline Correctness
 
@@ -58,6 +58,7 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
+- [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [System Architecture](../../03_System_Architecture.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)

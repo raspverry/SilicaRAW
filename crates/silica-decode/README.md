@@ -2,7 +2,6 @@
 
 RAW decode abstraction boundary for SilicaRAW.
 
-This crate will eventually contain decoder-facing abstractions for comparing Core Image RAW, LibRaw, hybrid, and raster paths after the decoder spike selects a path.
+Spike 002 selected Core Image RAW primary with LibRaw deferred until legal fixtures expose a concrete coverage gap.
 
-Task 0101 only creates the crate boundary. No RAW decoding implementation is present yet.
-
+This crate currently records decoder gate metadata only. No RAW decoding implementation, Core Image binding, LibRaw binding, fixture loader, or image processing backend is present yet.

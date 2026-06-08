@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-3 | Spike 002 recorded RAW decoder path
+
+- Added the RAW decoder path spike report.
+- Recorded Core Image RAW primary with LibRaw deferred until legal fixtures prove a support gap.
+- Added `silica-decode` gate metadata without adding decoder dependencies or RAW decoding behavior.
+
 ## [2026-06-08] phase-3 | Spike 001 recorded Path B
 
 - Added the Tauri + native Metal viewer spike report.

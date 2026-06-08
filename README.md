@@ -53,7 +53,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 ## Guardrails
 
 - Do not modify original photo files.
-- Do not add RAW decoding before the decoder spike.
-- Do not add the Metal viewer before the Tauri + Metal spike.
+- Do not add RAW decoder behavior without explicit fixture-backed scope; Spike 002 selected Core Image primary and deferred LibRaw.
+- Do not turn the Metal spike into a product viewer without the Path B native bridge contract.
 - Do not add MLX, MCP, plugin behavior, telemetry, cloud sync, or network upload by default.
 - Document every new dependency in `docs/DEPENDENCIES.md`.
