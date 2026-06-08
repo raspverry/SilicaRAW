@@ -322,6 +322,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - No original photo directory is modified.
 - **Validation:** Integration test and manual restart test.
 
+**Status:** Completed on 2026-06-08. `silica-storage` can create/reopen a local library folder with `catalog.db` and support directories, `silica-core` exposes create/open APIs, and the Tauri shell has minimal create/open commands plus a path-based entry point. Tests verify reopen behavior and sibling original-directory preservation.
+
 ### Task 4.3: Implement Folder Import Scanner
 
 - **Location:** `crates/silica-catalog`, `crates/silica-storage`

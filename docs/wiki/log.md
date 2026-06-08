@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-4 | Library create/open path added
+
+- Added local library folder create/open helpers to `silica-storage`.
+- Added create/open APIs to `silica-core` and minimal Tauri commands in the desktop shell.
+- Updated the Catalog wiki topic and local DMG roadmap to mark Task 4.2 complete.
+
 ## [2026-06-08] phase-4 | Catalog migration foundation completed
 
 - Added the local alpha catalog schema contract to `silica-catalog`.

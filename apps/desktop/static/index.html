@@ -23,7 +23,7 @@
       }
 
       main {
-        width: min(420px, 42vw);
+        width: min(560px, 52vw);
       }
 
       h1 {
@@ -34,10 +34,71 @@
       }
 
       p {
-        margin: 0;
+        margin: 0 0 24px;
         color: #bbb5ad;
         font-size: 14px;
         line-height: 1.5;
+      }
+
+      form {
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        color: #d8d2ca;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #3a3d40;
+        border-radius: 6px;
+        background: #171a1d;
+        color: #f4f1ec;
+        font: inherit;
+        font-size: 14px;
+        padding: 11px 12px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 1px solid #50555a;
+        border-radius: 6px;
+        background: #252a2f;
+        color: #f4f1ec;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 650;
+        padding: 10px 14px;
+      }
+
+      button.primary {
+        border-color: #6fa7a1;
+        background: #2f615d;
+      }
+
+      button:disabled {
+        color: #8a8580;
+        background: #1c1f22;
+      }
+
+      output {
+        display: block;
+        min-height: 72px;
+        margin-top: 16px;
+        white-space: pre-wrap;
+        color: #cfc8bf;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.45;
       }
 
       @media (max-width: 760px) {
@@ -54,7 +115,55 @@
   <body>
     <main>
       <h1>SilicaRAW</h1>
-      <p>Local desktop shell for Phase 2 packaging validation.</p>
+      <p>Local library alpha.</p>
+      <form>
+        <label for="libraryPath">Library folder path</label>
+        <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false">
+        <div class="actions">
+          <button class="primary" id="createLibrary" type="button">Create Library</button>
+          <button id="openLibrary" type="button">Open Library</button>
+        </div>
+      </form>
+      <output id="status" aria-live="polite"></output>
     </main>
+    <script>
+      const pathInput = document.querySelector("#libraryPath");
+      const statusOutput = document.querySelector("#status");
+      const createButton = document.querySelector("#createLibrary");
+      const openButton = document.querySelector("#openLibrary");
+
+      const invoke = window.__TAURI__?.core?.invoke;
+
+      function setBusy(isBusy) {
+        createButton.disabled = isBusy;
+        openButton.disabled = isBusy;
+      }
+
+      async function runLibraryCommand(command) {
+        const path = pathInput.value.trim();
+        if (!path) {
+          statusOutput.value = "Enter a library folder path.";
+          return;
+        }
+
+        if (!invoke) {
+          statusOutput.value = "Desktop runtime unavailable.";
+          return;
+        }
+
+        setBusy(true);
+        statusOutput.value = "Working...";
+        try {
+          statusOutput.value = await invoke(command, { path });
+        } catch (error) {
+          statusOutput.value = String(error);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      createButton.addEventListener("click", () => runLibraryCommand("create_library"));
+      openButton.addEventListener("click", () => runLibraryCommand("open_library"));
+    </script>
   </body>
 </html>

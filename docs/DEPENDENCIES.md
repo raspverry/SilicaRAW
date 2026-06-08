@@ -46,6 +46,36 @@ Security notes: No runtime I/O or SQL access is added by the contract dependency
 Verification source: local workspace Cargo metadata and Phase 4.1 tests.
 ```
 
+```txt
+Name: silica-storage
+Version: workspace
+Purpose: Local library create/open persistence API.
+License: project internal
+Repository/Homepage: this repository
+Used by: crates/silica-core
+Why needed: Phase 4.2 routes local library create/open commands through Core while keeping SQLite details inside `silica-storage`.
+Alternatives considered: direct desktop-to-storage calls, duplicate filesystem/catalog logic in Core.
+Risk notes: Keep SQLite connection and migration details behind storage APIs. Do not expose raw database access through Core.
+Binary size impact: Internal workspace code only.
+Security notes: Core must preserve original-file safety and pass mutations through typed APIs.
+Verification source: local workspace Cargo metadata and Phase 4.2 core/storage tests.
+```
+
+```txt
+Name: silica-core
+Version: workspace
+Purpose: Desktop command boundary for local library create/open.
+License: project internal
+Repository/Homepage: this repository
+Used by: apps/desktop/src-tauri
+Why needed: Phase 4.2 exposes minimal Tauri commands through Core instead of letting the desktop shell call storage directly.
+Alternatives considered: desktop shell calling `silica-storage` directly.
+Risk notes: Keep app shell thin. Do not add RAW, Metal viewer, import scanner, plugin, MCP, or MLX behavior through this dependency.
+Binary size impact: Internal workspace code only.
+Security notes: Desktop commands accept local paths and must not mutate original photo folders.
+Verification source: local workspace Cargo metadata and Phase 4.2 desktop command test.
+```
+
 ### Tauri Runtime
 
 ```txt

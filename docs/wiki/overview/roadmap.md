@@ -26,6 +26,7 @@ The current implementation order starts with:
 8. Spike SQLite catalog persistence.
 9. Decide MLX deferral for local DMG alpha.
 10. Implement catalog migration foundation.
+11. Implement local library create/open.
 
 ## Gate Logic
 
@@ -44,6 +45,7 @@ The current implementation order starts with:
 - Spike 004 recorded Path A: `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes.
 - ADR 0005 defers MLX from local alpha; `silica-mlx` remains a dependency-free boundary crate.
 - Phase 4.1 records the local alpha catalog schema contract in `silica-catalog` and verifies `silica-storage` migrations against that contract.
+- Phase 4.2 adds local library create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
 
 ## Links
 

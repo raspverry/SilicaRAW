@@ -28,6 +28,7 @@ metal-host-spike = [
 tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
+silica-core = { path = "../../../crates/silica-core" }
 tauri = { version = "2.11.2", features = [] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

@@ -9,3 +9,5 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+silica-storage = { path = "../silica-storage" }

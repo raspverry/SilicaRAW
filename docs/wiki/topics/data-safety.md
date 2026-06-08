@@ -18,12 +18,14 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Catalog state lives in SQLite through `silica-storage`.
 - Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations.
 - Phase 4.1 records the local alpha schema contract in `silica-catalog` and verifies `silica-storage` migrations against it.
+- Phase 4.2 adds local library create/open without mutating sibling original photo directories.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
 ## Early Required Tests
 
 - SQLite migration safety. Spike 004 covers empty catalog creation, upgrade from migration 1 to latest, required index creation, and foreign key enforcement.
+- Library create/open safety. Phase 4.2 covers library support directory creation, catalog reopen, and sibling original-directory preservation.
 - Original hash protection.
 - Edit graph serialization.
 - Sidecar read/write.

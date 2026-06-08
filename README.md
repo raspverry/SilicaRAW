@@ -2,12 +2,13 @@
 
 SilicaRAW is an early-stage, open-source RAW photo editor for Apple Silicon.
 
-This repository currently contains the monorepo foundation plus a minimal Tauri desktop shell for local packaging validation. Product editing features are intentionally out of scope for this phase.
+This repository currently contains the monorepo foundation, a minimal Tauri desktop shell, and the first local library create/open path. Product editing features are intentionally still out of scope.
 
 ## Current Scope
 
 - Rust workspace root
 - Minimal Tauri desktop shell
+- Local library folder create/open path
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
 - SQLite migration foundation for empty catalog schema, required indexes, and catalog schema contract
