@@ -29,6 +29,10 @@ DEPENDENCIES. Dependency Policy
 
 - [SilicaRAW Wiki](wiki/index.md) — public, LLM-readable project knowledge layer
 
+## Spikes
+
+- [Spike 001: Tauri Metal Viewer](spikes/001-tauri-metal-viewer.md) — Phase 3.1 native `MTKView` proof and shell-path decision
+
 ## Schemas
 
 - schemas/edit_graph.schema.json

@@ -14,8 +14,8 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 
 ## Architecture
 
-- Which Spike 001 path will be recorded for Tauri + native Metal viewer integration?
-- If Tauri is unsuitable, when will the project switch planning to SwiftUI/AppKit shell plus Rust Core?
+- What exact bridge boundary should implement Spike 001 Path B for the native AppKit/Metal viewer?
+- Which physical mouse and trackpad checklist will graduate the viewer bridge from Path B to implementation-ready?
 - What architecture guardrail checks should be added after the monorepo foundation?
 
 ## RAW and Color
@@ -45,14 +45,19 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Should source ingestion remain manual, or should the project add simple lint/search tooling later?
 - What review process should promote wiki pages from `draft` to `active`?
 
+## Answered
+
+- Spike 001 recorded Path B for Tauri + native Metal viewer integration on 2026-06-08.
+- Tauri is not rejected by Spike 001, so no SwiftUI/AppKit shell switch is planned yet.
+
 ## Links
 
 - [Final Master Plan](../../18_Final_Master_Plan.md)
 - [Development Roadmap](../../13_Development_Roadmap.md)
 - [Architecture Risks](../risks/architecture-risks.md)
+- [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Dependencies Policy](../../DEPENDENCIES.md)
 
 ## Notes for LLM Agents
 
 If an implementation task depends on one of these questions, treat it as blocked unless the user explicitly scopes the task as a spike or decision record.
-

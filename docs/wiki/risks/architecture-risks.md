@@ -16,11 +16,11 @@ SilicaRAW's architecture is promising but gated by several technical decisions t
 
 ### Tauri + Metal Bridge
 
-Current status: unresolved.
+Current status: partially resolved by Spike 001 Path B.
 
 Why it matters: Metal-first editing is central to the product identity. If Tauri cannot host or coordinate a native Metal viewer cleanly, the shell strategy must change.
 
-Next evidence needed: Spike 001 result recorded as path A, B, or C.
+Next evidence needed: dedicated AppKit/Metal viewer bridge contract, including layout reservation, lifecycle ownership, and ownership boundaries between web controls and native viewer input.
 
 ### RAW Decoder Path
 
@@ -57,6 +57,7 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 ## Links
 
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
+- [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [System Architecture](../../03_System_Architecture.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)
@@ -66,5 +67,4 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 
 ## Notes for LLM Agents
 
-When a risk says "unresolved," do not write code that assumes it is solved. Add a spike result, ADR, or explicit task-scoped note first.
-
+When a risk says "unresolved" or "partially resolved," do not write code that assumes it is solved. Add a spike result, ADR, or explicit task-scoped note first.

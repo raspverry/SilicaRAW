@@ -86,8 +86,10 @@ Tauri + native Metal viewer feasibility spike. Must prove:
 - Metal output in app window
 - Resize works
 - Retina scaling works
+- Mouse/trackpad events map correctly
 - UI responsive
 - Render timing available
+- Metal render loop can be controlled from Rust/Core
 
 ## Performance Targets
 

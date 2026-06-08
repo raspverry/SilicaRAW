@@ -50,6 +50,10 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 
 - [Git and PR Workflow](contributing/git-and-pr-workflow.md): branch naming, PR flow, merge policy, and release branch rules.
 
+### Spikes
+
+- [Spike 001: Tauri Metal Viewer](../spikes/001-tauri-metal-viewer.md): Phase 3.1 native `MTKView` proof, input evidence, resize evidence, and shell-path decision.
+
 ### Sources
 
 - [Source Index](sources/index.md)

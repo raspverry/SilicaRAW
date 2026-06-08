@@ -78,6 +78,125 @@ Security notes: Use local build commands only. Do not add updater, signing, nota
 Verification source: `cargo info tauri-cli` for 2.11.2 metadata; Tauri v2 documentation at https://v2.tauri.app/.
 ```
 
+### Objective-C Runtime Bindings
+
+```txt
+Name: objc2
+Version: 0.6.4
+Purpose: Objective-C runtime interface for the macOS-only Spike 001 native view bridge.
+License: MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: Required to define a minimal MTKView subclass and retain the Metal delegate during the Tauri + native Metal viewer spike.
+Alternatives considered: Swift/AppKit spike code, raw Objective-C FFI, no native bridge spike.
+Risk notes: Keep isolated behind a non-default feature. Do not spread Objective-C runtime calls into product code without a follow-up bridge design.
+Binary size impact: No default app impact while the feature is disabled. Feature builds link native framework bridge code for the spike.
+Security notes: Uses local macOS runtime APIs only. Avoid exposing these handles to webview IPC or plugins.
+Verification source: `cargo info objc2` for 0.6.4 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+```
+
+### AppKit Bindings
+
+```txt
+Name: objc2-app-kit
+Version: 0.3.2
+Purpose: AppKit NSWindow, NSView, NSEvent, and autoresizing APIs for Spike 001.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: Required to access the Tauri window content view, attach a native MTKView, and log mouse/trackpad event routing.
+Alternatives considered: Swift/AppKit shim, raw Objective-C message sends only, Tauri webview-only proof.
+Risk notes: Feature-gated proof only. Event mapping from this spike does not finalize the product viewer architecture.
+Binary size impact: No default app impact while the feature is disabled. Spike builds link AppKit, already present on macOS.
+Security notes: Native view handles must remain internal and must not be exposed through IPC.
+Verification source: `cargo info objc2-app-kit` for 0.3.2 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+```
+
+### Foundation Bindings
+
+```txt
+Name: objc2-foundation
+Version: 0.3.2
+Purpose: Foundation NSObject and geometry types used by the Spike 001 AppKit/Metal bridge.
+License: MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: Required by AppKit and MetalKit wrapper types used in the native view proof.
+Alternatives considered: Raw CoreGraphics structs and raw Objective-C FFI.
+Risk notes: Keep scoped to platform bridge code. Do not introduce broader Foundation usage until a native bridge design is accepted.
+Binary size impact: No default app impact while the feature is disabled. Spike builds use macOS system frameworks.
+Security notes: No file, network, or user data access is introduced by this dependency.
+Verification source: `cargo info objc2-foundation` for 0.3.2 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+```
+
+### CoreGraphics Bindings
+
+```txt
+Name: objc2-core-graphics
+Version: 0.3.2
+Purpose: CoreGraphics framework linkage for Metal device creation during Spike 001.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: `objc2-metal` documents that `MTLCreateSystemDefaultDevice` requires CoreGraphics linkage.
+Alternatives considered: Manual `#[link(name = "CoreGraphics", kind = "framework")]` declaration.
+Risk notes: Linkage helper only for the spike; keep feature-gated.
+Binary size impact: No default app impact while the feature is disabled. CoreGraphics is a macOS system framework.
+Security notes: No image capture or display enumeration behavior is added by this use.
+Verification source: `cargo info objc2-core-graphics` for 0.3.2 metadata; `objc2-metal` crate note for `MTLCreateSystemDefaultDevice`.
+```
+
+### Metal Bindings
+
+```txt
+Name: objc2-metal
+Version: 0.3.2
+Purpose: Metal device, command queue, command buffer, drawable, and render pass APIs for Spike 001.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: Required to prove a native Metal render loop can present inside the Tauri app window.
+Alternatives considered: Metal-rs, raw Objective-C FFI, Swift shim.
+Risk notes: This spike only clears and presents an MTKView drawable. It is not the final renderer or shader pipeline.
+Binary size impact: No default app impact while the feature is disabled. Spike builds link the macOS Metal framework.
+Security notes: Do not accept untrusted shaders or GPU resources in this spike path.
+Verification source: `cargo info objc2-metal` for 0.3.2 metadata; Apple Metal documentation at https://developer.apple.com/documentation/metal.
+```
+
+### MetalKit Bindings
+
+```txt
+Name: objc2-metal-kit
+Version: 0.3.2
+Purpose: MTKView binding for the Spike 001 native Metal host proof.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: Required to attach a native Metal-backed view to the Tauri/AppKit window hierarchy.
+Alternatives considered: Direct CAMetalLayer bridge, Swift AppKit shim, full SwiftUI/AppKit shell.
+Risk notes: The proof validates host feasibility but does not finalize viewer layout, event ownership, or render engine architecture.
+Binary size impact: No default app impact while the feature is disabled. Spike builds link the macOS MetalKit framework.
+Security notes: Keep MTKView internals behind Rust native code and do not expose raw view/device handles to IPC.
+Verification source: `cargo info objc2-metal-kit` for 0.3.2 metadata; Apple MetalKit documentation at https://developer.apple.com/documentation/metalkit.
+```
+
+### QuartzCore Bindings
+
+```txt
+Name: objc2-quartz-core
+Version: 0.3.2
+Purpose: CAMetalLayer-related support used by the MetalKit Spike 001 bridge.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Why needed: Required by the selected MetalKit wrapper feature set for MTKView drawable/layer support.
+Alternatives considered: Avoid MetalKit and manage CAMetalLayer directly.
+Risk notes: Keep feature-gated until the native viewer bridge design is selected.
+Binary size impact: No default app impact while the feature is disabled. Spike builds link QuartzCore/CoreAnimation system frameworks.
+Security notes: No animation or screen capture behavior is added; usage is limited to Metal layer support.
+Verification source: `cargo info objc2-quartz-core` for 0.3.2 metadata; Apple QuartzCore documentation at https://developer.apple.com/documentation/quartzcore.
+```
+
 ### SQLite binding
 
 ```txt
