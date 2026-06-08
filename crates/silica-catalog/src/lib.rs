@@ -3,6 +3,9 @@
 //! Phase 4.1 records the local alpha catalog schema contract here so
 //! storage, import, and UI work can depend on one domain-facing shape.
 
+use std::error::Error;
+use std::fmt;
+
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-catalog";
 
@@ -100,6 +103,82 @@ pub struct ImportCandidate {
     pub unsupported: bool,
 }
 
+/// Highest rating value allowed by the local alpha catalog contract.
+pub const ALPHA_MAX_RATING: u8 = 5;
+
+/// Domain-facing culling and label flags for one photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoFlags {
+    pub photo_id: String,
+    pub rating: u8,
+    pub picked: bool,
+    pub rejected: bool,
+    pub color_label: Option<String>,
+}
+
+impl PhotoFlags {
+    /// Create validated photo flags for catalog persistence.
+    pub fn new(
+        photo_id: impl Into<String>,
+        rating: u8,
+        picked: bool,
+        rejected: bool,
+        color_label: Option<String>,
+    ) -> Result<Self, CatalogFlagError> {
+        let photo_id = photo_id.into();
+        if photo_id.is_empty() {
+            return Err(CatalogFlagError::EmptyPhotoId);
+        }
+        if rating > ALPHA_MAX_RATING {
+            return Err(CatalogFlagError::InvalidRating(rating));
+        }
+
+        let color_label = match color_label {
+            Some(label) => {
+                let label = label.trim().to_string();
+                if label.is_empty() {
+                    return Err(CatalogFlagError::EmptyColorLabel);
+                }
+                Some(label)
+            }
+            None => None,
+        };
+
+        Ok(Self {
+            photo_id,
+            rating,
+            picked,
+            rejected,
+            color_label,
+        })
+    }
+}
+
+/// Validation errors for catalog photo flags.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CatalogFlagError {
+    EmptyPhotoId,
+    InvalidRating(u8),
+    EmptyColorLabel,
+}
+
+impl fmt::Display for CatalogFlagError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyPhotoId => write!(formatter, "photo id must not be empty"),
+            Self::InvalidRating(rating) => {
+                write!(
+                    formatter,
+                    "rating must be between 0 and {ALPHA_MAX_RATING}: {rating}"
+                )
+            }
+            Self::EmptyColorLabel => write!(formatter, "color label must not be empty"),
+        }
+    }
+}
+
+impl Error for CatalogFlagError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,5 +244,29 @@ mod tests {
         assert!(candidate.unsupported);
         assert_eq!(candidate.file_name, "notes.txt");
         assert_eq!(candidate.partial_hash, "hash");
+    }
+
+    #[test]
+    fn validates_photo_flags_contract() {
+        let flags =
+            PhotoFlags::new("photo-1", 5, true, false, Some(" green ".to_string())).unwrap();
+
+        assert_eq!(flags.photo_id, "photo-1");
+        assert_eq!(flags.rating, 5);
+        assert!(flags.picked);
+        assert!(!flags.rejected);
+        assert_eq!(flags.color_label.as_deref(), Some("green"));
+        assert_eq!(
+            PhotoFlags::new("photo-1", 6, false, false, None),
+            Err(CatalogFlagError::InvalidRating(6))
+        );
+        assert_eq!(
+            PhotoFlags::new("", 0, false, false, None),
+            Err(CatalogFlagError::EmptyPhotoId)
+        );
+        assert_eq!(
+            PhotoFlags::new("photo-1", 0, false, false, Some(" ".to_string())),
+            Err(CatalogFlagError::EmptyColorLabel)
+        );
     }
 }

@@ -15,9 +15,10 @@ use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
 use rusqlite::{params, Connection, OptionalExtension};
+pub use silica_catalog::PhotoFlags;
 use silica_catalog::{
-    is_supported_photo_extension, ImportCandidate, ALPHA_CATALOG_REQUIRED_INDEXES,
-    ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
+    is_supported_photo_extension, CatalogFlagError, ImportCandidate,
+    ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
 };
 
 /// Stable crate name used by scaffold verification.
@@ -111,6 +112,7 @@ pub struct FolderImportSummary {
 pub enum LibraryStorageError {
     Io(std::io::Error),
     Sqlite(rusqlite::Error),
+    CatalogFlag(CatalogFlagError),
     MissingCatalog(PathBuf),
     NotDirectory(PathBuf),
     InvalidPath(PathBuf),
@@ -121,6 +123,7 @@ impl fmt::Display for LibraryStorageError {
         match self {
             Self::Io(error) => write!(formatter, "filesystem error: {error}"),
             Self::Sqlite(error) => write!(formatter, "sqlite error: {error}"),
+            Self::CatalogFlag(error) => write!(formatter, "catalog flag error: {error}"),
             Self::MissingCatalog(path) => {
                 write!(formatter, "missing catalog database at {}", path.display())
             }
@@ -137,6 +140,7 @@ impl Error for LibraryStorageError {
         match self {
             Self::Io(error) => Some(error),
             Self::Sqlite(error) => Some(error),
+            Self::CatalogFlag(error) => Some(error),
             Self::MissingCatalog(_) | Self::NotDirectory(_) | Self::InvalidPath(_) => None,
         }
     }
@@ -151,6 +155,12 @@ impl From<std::io::Error> for LibraryStorageError {
 impl From<rusqlite::Error> for LibraryStorageError {
     fn from(error: rusqlite::Error) -> Self {
         Self::Sqlite(error)
+    }
+}
+
+impl From<CatalogFlagError> for LibraryStorageError {
+    fn from(error: CatalogFlagError) -> Self {
+        Self::CatalogFlag(error)
     }
 }
 
@@ -242,6 +252,79 @@ pub fn import_folder(
         unsupported_files,
         candidates,
     })
+}
+
+/// Persist culling and label flags for a photo in the catalog.
+pub fn set_photo_flags(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl Into<String>,
+    rating: u8,
+    picked: bool,
+    rejected: bool,
+    color_label: Option<String>,
+) -> Result<PhotoFlags, LibraryStorageError> {
+    let flags = PhotoFlags::new(photo_id, rating, picked, rejected, color_label)?;
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+
+    connection.execute(
+        r#"
+        INSERT INTO photo_flags(photo_id, rating, picked, rejected, color_label, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
+        ON CONFLICT(photo_id) DO UPDATE SET
+          rating = excluded.rating,
+          picked = excluded.picked,
+          rejected = excluded.rejected,
+          color_label = excluded.color_label,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            flags.photo_id,
+            i64::from(flags.rating),
+            bool_to_sql(flags.picked),
+            bool_to_sql(flags.rejected),
+            flags.color_label,
+        ],
+    )?;
+
+    Ok(flags)
+}
+
+/// Read culling and label flags for a photo from the authoritative catalog row.
+pub fn get_photo_flags(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoFlags>, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let row = connection
+        .query_row(
+            r#"
+            SELECT photo_id, rating, picked, rejected, color_label
+            FROM photo_flags
+            WHERE photo_id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )
+        .optional()?;
+
+    row.map(|(photo_id, rating, picked, rejected, color_label)| {
+        photo_flags_from_row(photo_id, rating, picked, rejected, color_label)
+    })
+    .transpose()
 }
 
 /// Apply connection-local safety and durability settings.
@@ -430,10 +513,37 @@ fn record_import_candidates(
                 candidate.partial_hash,
             ],
         )?;
+
+        transaction.execute(
+            r#"
+            INSERT INTO photo_flags(photo_id)
+            VALUES (?1)
+            ON CONFLICT(photo_id) DO NOTHING
+            "#,
+            params![photo_id],
+        )?;
     }
 
     transaction.commit()?;
     Ok(())
+}
+
+fn photo_flags_from_row(
+    photo_id: String,
+    rating: i64,
+    picked: i64,
+    rejected: i64,
+    color_label: Option<String>,
+) -> Result<PhotoFlags, LibraryStorageError> {
+    let rating = u8::try_from(rating).unwrap_or(u8::MAX);
+    PhotoFlags::new(
+        photo_id,
+        rating,
+        sql_to_bool(picked),
+        sql_to_bool(rejected),
+        color_label,
+    )
+    .map_err(LibraryStorageError::from)
 }
 
 fn path_to_string(path: &Path) -> Result<String, LibraryStorageError> {
@@ -490,6 +600,10 @@ fn bool_to_sql(value: bool) -> i64 {
     } else {
         0
     }
+}
+
+fn sql_to_bool(value: i64) -> bool {
+    value != 0
 }
 
 fn ensure_migration_table(connection: &Connection) -> rusqlite::Result<()> {
@@ -973,6 +1087,79 @@ mod tests {
         );
         assert!(!library_root.join("sample.DNG").exists());
         assert!(!library_root.join("notes.txt").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn persists_photo_flags_across_library_reopen() {
+        let workspace = unique_library_root("flags");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.DNG'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+
+        let initial_flags = get_photo_flags(&library.root_path, &photo_id)
+            .expect("read initial flags")
+            .expect("default flags row");
+        assert_eq!(
+            initial_flags,
+            silica_catalog::PhotoFlags::new(photo_id.clone(), 0, false, false, None).unwrap()
+        );
+
+        let updated_flags = set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some(" green ".to_string()),
+        )
+        .expect("set flags");
+        assert_eq!(
+            updated_flags,
+            silica_catalog::PhotoFlags::new(
+                photo_id.clone(),
+                4,
+                true,
+                false,
+                Some("green".to_string())
+            )
+            .unwrap()
+        );
+
+        let (rating, picked, rejected, color_label): (i64, i64, i64, String) = connection
+            .query_row(
+                "SELECT rating, picked, rejected, color_label FROM photo_flags WHERE photo_id = ?1",
+                params![photo_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("authoritative photo_flags row");
+        assert_eq!(
+            (rating, picked, rejected, color_label.as_str()),
+            (4, 1, 0, "green")
+        );
+
+        drop(connection);
+        let reopened = open_local_library(&library_root).expect("reopen library");
+        let persisted_flags = get_photo_flags(&reopened.root_path, &updated_flags.photo_id)
+            .expect("read persisted flags")
+            .expect("persisted flags row");
+        assert_eq!(persisted_flags, updated_flags);
 
         remove_library_root(&workspace);
     }

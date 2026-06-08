@@ -17,4 +17,10 @@ Phase 4.3 adds the local alpha import candidate contract:
 - import candidate path/fingerprint fields
 - unsupported candidate state
 
+Phase 4.4 adds the local alpha photo flags contract:
+
+- rating range validation
+- picked and rejected state
+- optional color label normalization
+
 `silica-storage` owns SQLite execution and migration application. `silica-catalog` owns the domain-facing contract that later library create/open, import, culling, and query code should reference.

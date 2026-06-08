@@ -82,6 +82,42 @@ pub fn open_library(root_path: impl AsRef<Path>) -> Result<LibrarySession, CoreE
         .map_err(CoreError::from)
 }
 
+/// Scan a folder by reference through the core command boundary.
+pub fn import_folder(
+    library_root_path: impl AsRef<Path>,
+    folder_path: impl AsRef<Path>,
+) -> Result<silica_storage::FolderImportSummary, CoreError> {
+    silica_storage::import_folder(library_root_path, folder_path).map_err(CoreError::from)
+}
+
+/// Persist photo culling and label flags through the core command boundary.
+pub fn set_photo_flags(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl Into<String>,
+    rating: u8,
+    picked: bool,
+    rejected: bool,
+    color_label: Option<String>,
+) -> Result<silica_storage::PhotoFlags, CoreError> {
+    silica_storage::set_photo_flags(
+        library_root_path,
+        photo_id,
+        rating,
+        picked,
+        rejected,
+        color_label,
+    )
+    .map_err(CoreError::from)
+}
+
+/// Read photo culling and label flags through the core command boundary.
+pub fn get_photo_flags(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<silica_storage::PhotoFlags>, CoreError> {
+    silica_storage::get_photo_flags(library_root_path, photo_id).map_err(CoreError::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,6 +145,49 @@ mod tests {
         assert!(created.status_text().contains("catalog.db"));
 
         remove_library_root(&root);
+    }
+
+    #[test]
+    fn imports_and_persists_photo_flags_through_core() {
+        let workspace = unique_library_root("core-flags");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+
+        let created = create_library(&library_root).expect("create library through core");
+        let summary = import_folder(&created.root_path, &import_root).expect("import through core");
+        assert_eq!(summary.supported_files, 1);
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.DNG'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+
+        let updated = set_photo_flags(
+            &created.root_path,
+            photo_id,
+            3,
+            false,
+            true,
+            Some("red".to_string()),
+        )
+        .expect("set flags through core");
+
+        let reopened = open_library(&library_root).expect("reopen library through core");
+        let persisted = get_photo_flags(&reopened.root_path, &updated.photo_id)
+            .expect("read flags through core")
+            .expect("flags row");
+
+        assert_eq!(persisted, updated);
+
+        remove_library_root(&workspace);
     }
 
     fn unique_library_root(label: &str) -> PathBuf {

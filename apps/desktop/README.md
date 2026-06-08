@@ -2,9 +2,9 @@
 
 Minimal desktop application shell for SilicaRAW.
 
-This package contains the Tauri shell, packaging skeleton, and Phase 4.2 minimal local library create/open entry point.
+This package contains the Tauri shell, packaging skeleton, Phase 4.2 minimal local library create/open entry point, and Phase 4.4 photo flag command entry points.
 
-It does not include broad product UI screens, a Metal viewer, RAW decoding, import scanning, edit controls, MLX, plugin behavior, or MCP behavior.
+It does not include broad product UI screens, a Metal viewer, RAW decoding, edit controls, sidecar writing, MLX, plugin behavior, or MCP behavior.
 
 ## Layout
 

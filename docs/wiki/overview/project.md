@@ -18,7 +18,7 @@ AI, MLX, plugins, and MCP are secondary extensions. They should support the edit
 
 - The repository has planning documents, schemas, mockups, and a Rust workspace scaffold.
 - The project is not production-ready.
-- The app shell, initial catalog migration foundation, local library create/open path, and folder import scanner exist, but culling and editing workflows are not implemented yet.
+- The app shell, initial catalog migration foundation, local library create/open path, folder import scanner, and catalog-backed flag persistence exist, but visual culling and editing workflows are not implemented yet.
 - RAW decoding, the product Metal viewer bridge, color fixture proof, export, and local alpha UI workflows still require explicit implementation tasks.
 - MLX is deferred from local alpha by ADR 0005.
 
