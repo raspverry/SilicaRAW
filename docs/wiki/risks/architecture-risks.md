@@ -40,11 +40,11 @@ Next evidence needed: tagged raster fixtures, ICC embedding proof, Preview.app c
 
 ### Storage and Migration Safety
 
-Current status: partially resolved by Spike 004, Phase 4.1, and Phase 4.2. `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes, `silica-storage` verifies migration output against the `silica-catalog` alpha schema contract, and the app can create/reopen a local library folder.
+Current status: partially resolved by Spike 004, Phase 4.1, Phase 4.2, and Phase 4.3. `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes, `silica-storage` verifies migration output against the `silica-catalog` alpha schema contract, the app can create/reopen a local library folder, and storage can import a mixed folder by reference.
 
 Why it matters: catalog corruption, lost edits, or original mutation would undermine trust immediately.
 
-Next evidence needed: folder import and fingerprint tests, WAL backup/checkpoint policy, original hash protection tests, sidecar read/write tests, and cache clear safety tests.
+Next evidence needed: rating/pick/reject persistence, WAL backup/checkpoint policy, original full-hash protection tests, sidecar read/write tests, and cache clear safety tests.
 
 ### MLX Runtime and Model Safety
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-4 | Folder import scanner added
+
+- Added the local alpha import candidate contract and supported extension list to `silica-catalog`.
+- Added non-recursive folder import scanning to `silica-storage`.
+- Verified mixed supported/unsupported fixture import by reference without copying or mutating originals.
+
 ## [2026-06-08] phase-4 | Library create/open path added
 
 - Added local library folder create/open helpers to `silica-storage`.

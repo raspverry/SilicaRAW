@@ -27,6 +27,7 @@ The current implementation order starts with:
 9. Decide MLX deferral for local DMG alpha.
 10. Implement catalog migration foundation.
 11. Implement local library create/open.
+12. Implement folder import scanner.
 
 ## Gate Logic
 
@@ -46,6 +47,7 @@ The current implementation order starts with:
 - ADR 0005 defers MLX from local alpha; `silica-mlx` remains a dependency-free boundary crate.
 - Phase 4.1 records the local alpha catalog schema contract in `silica-catalog` and verifies `silica-storage` migrations against that contract.
 - Phase 4.2 adds local library create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
+- Phase 4.3 adds non-recursive folder import scanning with path, partial hash, unsupported-state, and original-preservation tests.
 
 ## Links
 
