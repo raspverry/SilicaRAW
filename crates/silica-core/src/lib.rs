@@ -6,6 +6,8 @@ use std::error::Error;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-core";
@@ -68,16 +70,64 @@ impl PhotoPreviewSession {
     }
 }
 
+/// Draft preview request returned while an exposure/contrast slider is moving.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoEditPreviewSession {
+    pub photo_id: String,
+    pub source_path: String,
+    pub status: PhotoPreviewStatus,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub message: String,
+}
+
+impl PhotoEditPreviewSession {
+    /// Compact status string for the minimal desktop shell entry point.
+    pub fn status_text(&self) -> String {
+        format!(
+            "Photo: {}\nPreview: {:?}\nSource: {}\nExposure: {}\nContrast: {}\nMessage: {}",
+            self.photo_id,
+            self.status,
+            self.source_path,
+            self.exposure,
+            self.contrast,
+            self.message
+        )
+    }
+}
+
+/// Persisted exposure/contrast edit returned on commit/release.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoEditCommit {
+    pub photo_id: String,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub persisted: bool,
+    pub message: String,
+}
+
+impl PhotoEditCommit {
+    /// Compact status string for the minimal desktop shell entry point.
+    pub fn status_text(&self) -> String {
+        format!(
+            "Photo: {}\nExposure: {}\nContrast: {}\nPersisted: {}\nMessage: {}",
+            self.photo_id, self.exposure, self.contrast, self.persisted, self.message
+        )
+    }
+}
+
 /// Errors returned by core command APIs.
 #[derive(Debug)]
 pub enum CoreError {
     Storage(silica_storage::LibraryStorageError),
+    EditGraph(silica_edit::EditGraphValidationError),
 }
 
 impl fmt::Display for CoreError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Storage(error) => write!(formatter, "{error}"),
+            Self::EditGraph(error) => write!(formatter, "{error}"),
         }
     }
 }
@@ -86,6 +136,7 @@ impl Error for CoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Storage(error) => Some(error),
+            Self::EditGraph(error) => Some(error),
         }
     }
 }
@@ -93,6 +144,12 @@ impl Error for CoreError {
 impl From<silica_storage::LibraryStorageError> for CoreError {
     fn from(error: silica_storage::LibraryStorageError) -> Self {
         Self::Storage(error)
+    }
+}
+
+impl From<silica_edit::EditGraphValidationError> for CoreError {
+    fn from(error: silica_edit::EditGraphValidationError) -> Self {
+        Self::EditGraph(error)
     }
 }
 
@@ -151,28 +208,118 @@ pub fn open_photo_preview(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
 ) -> Result<Option<PhotoPreviewSession>, CoreError> {
-    let candidate = match silica_storage::get_photo_preview_candidate(library_root_path, photo_id)
-        .map_err(CoreError::from)?
+    let (photo_id, file_name, render_plan) = match preview_render_plan(library_root_path, photo_id)?
+    {
+        Some(plan) => plan,
+        None => return Ok(None),
+    };
+
+    Ok(Some(PhotoPreviewSession {
+        photo_id,
+        file_name,
+        source_path: render_plan.source_path,
+        status: preview_status_from_render(render_plan.status),
+        message: render_plan.message,
+    }))
+}
+
+/// Build a draft exposure/contrast preview request without writing the catalog.
+pub fn preview_exposure_contrast_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    exposure: f64,
+    contrast: f64,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_exposure_contrast(
+        &graph,
+        exposure,
+        contrast,
+        current_timestamp_string(),
+    )?;
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let request = silica_render::plan_exposure_contrast_preview(
+        render_plan,
+        edited.basic.exposure.as_f64().unwrap_or(exposure),
+        edited.basic.contrast.as_f64().unwrap_or(contrast),
+    );
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        status: preview_status_from_render(request.status),
+        exposure: request.exposure,
+        contrast: request.contrast,
+        message: request.message,
+    }))
+}
+
+/// Persist an exposure/contrast edit on commit/release.
+pub fn commit_exposure_contrast_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    exposure: f64,
+    contrast: f64,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_exposure_contrast(
+        &graph,
+        exposure,
+        contrast,
+        current_timestamp_string(),
+    )?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id,
+        exposure,
+        contrast,
+        persisted: true,
+        message: "Exposure/contrast edit persisted on commit.".to_string(),
+    }))
+}
+
+fn preview_render_plan(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<(String, String, silica_render::PreviewRenderPlan)>, CoreError> {
+    let candidate = match silica_storage::get_photo_preview_candidate(library_root_path, photo_id)?
     {
         Some(candidate) => candidate,
         None => return Ok(None),
     };
-
     let decode_plan = silica_decode::plan_preview_decode(&candidate.path, candidate.unsupported);
     let render_plan = silica_render::plan_preview_render(decode_plan);
-    let status = match render_plan.status {
+    Ok(Some((candidate.photo_id, candidate.file_name, render_plan)))
+}
+
+fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> PhotoPreviewStatus {
+    match status {
         silica_render::PreviewRenderStatus::Ready => PhotoPreviewStatus::Ready,
         silica_render::PreviewRenderStatus::BlockedByDecode => PhotoPreviewStatus::BlockedByDecode,
         silica_render::PreviewRenderStatus::Unsupported => PhotoPreviewStatus::Unsupported,
-    };
+    }
+}
 
-    Ok(Some(PhotoPreviewSession {
-        photo_id: candidate.photo_id,
-        file_name: candidate.file_name,
-        source_path: render_plan.source_path,
-        status,
-        message: render_plan.message,
-    }))
+fn current_timestamp_string() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| format!("unix:{}", duration.as_secs()))
+        .unwrap_or_else(|_| "unix:0".to_string())
 }
 
 #[cfg(test)]
@@ -308,6 +455,74 @@ mod tests {
         assert!(open_photo_preview(&created.root_path, "missing-photo")
             .expect("missing preview lookup")
             .is_none());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn previews_without_write_and_commits_exposure_contrast_edit() {
+        let workspace = unique_library_root("core-edit-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&jpeg_file, b"jpeg placeholder bytes").expect("write jpeg");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        let edit_state_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM edit_states", [], |row| row.get(0))
+            .expect("count edit states");
+        assert_eq!(edit_state_count, 0);
+        drop(connection);
+
+        let preview = preview_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("preview edit")
+            .expect("preview edit request");
+
+        assert_eq!(preview.photo_id, photo_id);
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(preview.exposure, 0.5);
+        assert_eq!(preview.contrast, -8.0);
+        assert!(preview.message.contains("exposure/contrast"));
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let edit_state_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM edit_states", [], |row| row.get(0))
+            .expect("count edit states");
+        assert_eq!(
+            edit_state_count, 0,
+            "preview edit must not write edit_states"
+        );
+        drop(connection);
+
+        let committed = commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("committed edit");
+        assert_eq!(committed.photo_id, photo_id);
+        assert_eq!(committed.exposure, 0.5);
+        assert_eq!(committed.contrast, -8.0);
+        assert!(committed.persisted);
+
+        let reopened = open_library(&library_root).expect("reopen library through core");
+        let persisted = silica_storage::load_active_edit_graph_or_default(
+            &reopened.root_path,
+            &committed.photo_id,
+        )
+        .expect("load active graph")
+        .expect("active graph");
+        assert_eq!(persisted.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(persisted.basic.contrast.as_f64(), Some(-8.0));
 
         remove_library_root(&workspace);
     }

@@ -14,6 +14,14 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-09] phase-5 | Exposure and contrast edit flow added
+
+- Added default edit graph construction and validated exposure/contrast updates to `silica-edit`.
+- Added draft exposure/contrast preview request planning to `silica-render`.
+- Added active edit graph read/commit persistence in `silica-storage`.
+- Added `silica-core` and minimal Tauri command APIs that keep slider-preview updates out of SQLite and persist only on commit/release.
+- Kept product M005 UI screens, pixel rendering, sidecar writing, RAW decoding, Metal viewer work, MLX, MCP, and plugin behavior out of scope.
+
 ## [2026-06-09] phase-5 | Edit graph types and validation added
 
 - Added typed Rust edit graph structures to `silica-edit`.

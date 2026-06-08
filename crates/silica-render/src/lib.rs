@@ -85,6 +85,17 @@ pub struct PreviewRenderPlan {
     pub message: String,
 }
 
+/// Render request for a draft exposure/contrast preview update.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExposureContrastPreviewRequest {
+    pub source_path: String,
+    pub status: PreviewRenderStatus,
+    pub color_behavior: PreviewColorBehavior,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub message: String,
+}
+
 /// Build a local alpha render plan from a decode plan.
 pub fn plan_preview_render(decode_plan: PreviewDecodePlan) -> PreviewRenderPlan {
     let status = match decode_plan.status {
@@ -108,6 +119,31 @@ pub fn plan_preview_render(decode_plan: PreviewDecodePlan) -> PreviewRenderPlan 
         source_path: decode_plan.source_path,
         status,
         color_behavior: SPIKE_003_COLOR_GATE.preview,
+        message,
+    }
+}
+
+/// Build a render request for a draft exposure/contrast preview update.
+pub fn plan_exposure_contrast_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+) -> ExposureContrastPreviewRequest {
+    let message = match preview_plan.status {
+        PreviewRenderStatus::Ready => {
+            "Draft exposure/contrast preview request is ready.".to_string()
+        }
+        PreviewRenderStatus::BlockedByDecode | PreviewRenderStatus::Unsupported => {
+            preview_plan.message.clone()
+        }
+    };
+
+    ExposureContrastPreviewRequest {
+        source_path: preview_plan.source_path,
+        status: preview_plan.status,
+        color_behavior: preview_plan.color_behavior,
+        exposure,
+        contrast,
         message,
     }
 }
@@ -170,5 +206,25 @@ mod tests {
             unsupported_plan.status,
             super::PreviewRenderStatus::Unsupported
         );
+    }
+
+    #[test]
+    fn plans_exposure_contrast_preview_request_from_ready_preview() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+
+        let request = super::plan_exposure_contrast_preview(preview_plan, 0.5, -8.0);
+
+        assert_eq!(request.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(request.source_path, "/tmp/sample.jpg");
+        assert_eq!(request.exposure, 0.5);
+        assert_eq!(request.contrast, -8.0);
+        assert_eq!(
+            request.color_behavior,
+            super::PreviewColorBehavior::DisplayProfileAware
+        );
+        assert!(request.message.contains("exposure/contrast"));
     }
 }

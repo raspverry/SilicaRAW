@@ -2,7 +2,7 @@
 title: Data Safety
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-09
 source_of_truth: docs/10_Data_Model_and_Storage_Specification.md
 ---
 
@@ -21,6 +21,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Phase 4.2 adds local library create/open without mutating sibling original photo directories.
 - Phase 4.3 records imported folder files by reference and verifies mixed-file import does not copy or mutate originals.
 - Phase 4.4 persists culling flags in SQLite `photo_flags` and verifies they survive library reopen without touching originals or sidecars.
+- Phase 5.3 persists exposure/contrast edit graphs in SQLite `edit_states` on commit and verifies draft preview updates do not write edit state rows.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -30,6 +31,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Library create/open safety. Phase 4.2 covers library support directory creation, catalog reopen, and sibling original-directory preservation.
 - Folder import safety. Phase 4.3 covers mixed supported/unsupported fixture import by reference, partial hash recording, and original byte preservation.
 - Flag persistence safety. Phase 4.4 covers default `photo_flags` rows, catalog-authoritative updates, and restart persistence.
+- Exposure/contrast edit safety. Phase 5.3 covers draft preview updates without `edit_states` writes and commit/release persistence after library reopen.
 - Original hash protection.
 - Edit graph serialization.
 - Sidecar read/write.

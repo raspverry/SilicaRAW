@@ -19,6 +19,17 @@ pub const EDIT_GRAPH_SCHEMA: &str = "silica.edit_graph";
 /// Stable edit graph schema version for v0.1.
 pub const EDIT_GRAPH_VERSION: i64 = 1;
 
+/// Source fields needed to build a default edit graph for a catalog photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditGraphSource {
+    pub photo_id: String,
+    pub path: String,
+    pub file_size: i64,
+    pub modified_at: Option<String>,
+    pub partial_hash: Option<String>,
+    pub full_hash: Option<String>,
+}
+
 /// Typed representation of `schemas/edit_graph.schema.json`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -346,6 +357,148 @@ impl fmt::Display for EditGraphValidationError {
 }
 
 impl Error for EditGraphValidationError {}
+
+/// Build a schema-valid default edit graph without persisting it.
+pub fn default_edit_graph(source: EditGraphSource, updated_at: impl Into<String>) -> EditGraph {
+    let zero = || Number::from(0);
+    let default_hsl = || HslChannel {
+        hue: zero(),
+        saturation: zero(),
+        luminance: zero(),
+    };
+    let default_wheel = || ColorWheel {
+        hue: zero(),
+        saturation: zero(),
+        luminance: zero(),
+    };
+
+    EditGraph {
+        schema: EDIT_GRAPH_SCHEMA.to_string(),
+        version: EDIT_GRAPH_VERSION,
+        app_version: None,
+        source: Source {
+            photo_id: source.photo_id,
+            path: source.path,
+            fingerprint: SourceFingerprint {
+                file_size: source.file_size,
+                modified_at: source.modified_at.unwrap_or_else(|| "unknown".to_string()),
+                partial_hash: source.partial_hash.unwrap_or_default(),
+                full_hash: source.full_hash,
+            },
+        },
+        profile: Profile {
+            name: "silica_standard".to_string(),
+            input_profile: "camera_default".to_string(),
+            working_space: "linear_display_p3".to_string(),
+            camera_profile: None,
+            decoder_backend: None,
+        },
+        basic: BasicAdjustments {
+            white_balance: WhiteBalance::AsShot,
+            temperature: Number::from(5200),
+            tint: zero(),
+            exposure: zero(),
+            contrast: zero(),
+            highlights: zero(),
+            shadows: zero(),
+            whites: zero(),
+            blacks: zero(),
+            texture: zero(),
+            clarity: zero(),
+            dehaze: zero(),
+            vibrance: zero(),
+            saturation: zero(),
+        },
+        tone: ToneAdjustments {
+            curve_mode: CurveMode::None,
+            rgb_curve: Vec::new(),
+            red_curve: Vec::new(),
+            green_curve: Vec::new(),
+            blue_curve: Vec::new(),
+        },
+        color: ColorAdjustments {
+            hsl: HslAdjustments {
+                red: default_hsl(),
+                orange: default_hsl(),
+                yellow: default_hsl(),
+                green: default_hsl(),
+                aqua: default_hsl(),
+                blue: default_hsl(),
+                purple: default_hsl(),
+                magenta: default_hsl(),
+            },
+            grading: ColorGrading {
+                shadows: default_wheel(),
+                midtones: default_wheel(),
+                highlights: default_wheel(),
+                blending: Number::from(50),
+                balance: zero(),
+            },
+        },
+        detail: DetailAdjustments {
+            sharpening: Sharpening {
+                amount: zero(),
+                radius: Number::from_f64(1.0).expect("finite default radius"),
+                detail: Number::from(25),
+                masking: zero(),
+            },
+            noise_reduction: NoiseReduction {
+                luminance: zero(),
+                detail: Number::from(50),
+                contrast: zero(),
+                color: Number::from(25),
+                color_detail: Number::from(50),
+            },
+            mlx_denoise: None,
+        },
+        lens: LensAdjustments {
+            profile_correction: false,
+            profile_id: None,
+            chromatic_aberration: false,
+            distortion: zero(),
+            vignetting: zero(),
+        },
+        geometry: GeometryAdjustments {
+            crop: None,
+            rotation: zero(),
+            flip_horizontal: false,
+            flip_vertical: false,
+            transform: GeometryTransform {
+                vertical: zero(),
+                horizontal: zero(),
+                aspect: zero(),
+                scale: Number::from(100),
+                x_offset: zero(),
+                y_offset: zero(),
+            },
+        },
+        masks: Vec::new(),
+        metadata: EditMetadata {
+            rating: 0,
+            picked: false,
+            rejected: false,
+            color_label: None,
+        },
+        extensions: Map::new(),
+        created_at: None,
+        updated_at: updated_at.into(),
+    }
+}
+
+/// Return a draft graph with exposure and contrast adjusted, without persistence.
+pub fn apply_exposure_contrast(
+    graph: &EditGraph,
+    exposure: f64,
+    contrast: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.exposure = number_from_f64("basic.exposure", exposure)?;
+    edited.basic.contrast = number_from_f64("basic.contrast", contrast)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
 
 /// Validate JSON against the local alpha edit graph contract.
 pub fn validate_edit_graph_json(value: &Value) -> Result<(), EditGraphValidationError> {
@@ -675,6 +828,12 @@ fn number_as_f64(path: &str, value: &Number) -> Result<f64, EditGraphValidationE
         .ok_or_else(|| EditGraphValidationError::new(path, "must be a finite number"))
 }
 
+fn number_from_f64(path: &str, value: f64) -> Result<Number, EditGraphValidationError> {
+    Number::from_f64(value)
+        .filter(|_| value.is_finite())
+        .ok_or_else(|| EditGraphValidationError::new(path, "must be a finite number"))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -738,5 +897,51 @@ mod tests {
 
         let error = super::validate_edit_graph_json(&value).expect_err("invalid exposure");
         assert!(error.to_string().contains("basic.exposure"));
+    }
+
+    #[test]
+    fn builds_default_graph_and_applies_exposure_contrast() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: Some("unix:1".to_string()),
+                partial_hash: Some("partial-hash".to_string()),
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        assert_eq!(graph.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(graph.basic.contrast.as_f64(), Some(0.0));
+        assert_eq!(graph.source.photo_id, "photo-1");
+        super::validate_edit_graph(&graph).expect("default edit graph validates");
+
+        let edited = super::apply_exposure_contrast(&graph, 0.75, -12.0, "unix:3")
+            .expect("apply exposure and contrast");
+
+        assert_eq!(edited.basic.exposure.as_f64(), Some(0.75));
+        assert_eq!(edited.basic.contrast.as_f64(), Some(-12.0));
+        assert_eq!(edited.updated_at, "unix:3");
+        super::validate_edit_graph(&edited).expect("edited graph validates");
+    }
+
+    #[test]
+    fn rejects_out_of_range_exposure_contrast_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        assert!(super::apply_exposure_contrast(&graph, 8.0, 0.0, "unix:3").is_err());
+        assert!(super::apply_exposure_contrast(&graph, 0.0, 180.0, "unix:3").is_err());
     }
 }

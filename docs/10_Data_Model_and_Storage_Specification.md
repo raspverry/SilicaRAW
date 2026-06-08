@@ -121,7 +121,9 @@ Phase 4.4 adds catalog-authoritative rating, picked, rejected, and color label p
 
 Phase 5.2 adds Rust edit graph types and schema-aware validation in `silica-edit`.
 
-Still needed: edit graph storage wiring, sidecar flag mirroring, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
+Phase 5.3 adds active edit graph storage wiring for exposure/contrast commits. Draft preview updates do not write `edit_states`; commit/release writes the active graph.
+
+Still needed: broader edit graph storage workflows, sidecar flag mirroring, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
 
 ---
 

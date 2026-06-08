@@ -31,6 +31,7 @@ The current implementation order starts with:
 13. Implement rating, pick, reject, and color label persistence.
 14. Implement minimal preview path contract.
 15. Implement edit graph types and validation.
+16. Implement exposure and contrast edit flow.
 
 ## Gate Logic
 
@@ -54,6 +55,7 @@ The current implementation order starts with:
 - Phase 4.4 adds catalog-authoritative rating, pick, reject, and color label persistence through `photo_flags`, core APIs, and minimal Tauri commands.
 - Phase 5.1 adds a minimal preview readiness path: raster candidates can return ready-by-reference, unsupported entries return a clear state, and RAW entries remain blocked until fixture-backed Core Image probe work.
 - Phase 5.2 adds typed edit graph structures and schema-aware validation in `silica-edit`; edit application, render integration, sidecar persistence, and UI controls remain later tasks.
+- Phase 5.3 adds command/API-level exposure and contrast edit flow: draft preview requests do not write SQLite, while commit persists the active edit graph.
 
 ## Links
 

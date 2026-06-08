@@ -14,4 +14,6 @@ Phase 4.4 extends the command-facing boundary with folder import delegation and 
 
 Phase 5.1 adds a preview session API that reads a catalog photo, asks `silica-decode` for preview readiness, and asks `silica-render` for the render-side readiness state.
 
+Phase 5.3 adds exposure/contrast edit flow APIs. Draft preview updates validate an edited graph and return a render request without writing to SQLite; commit/release persists the final active edit graph through `silica-storage`.
+
 Core delegates SQLite and filesystem details to `silica-storage`. It does not decode RAW files, render pixels, write sidecars, expose plugins/MCP, or run MLX behavior.

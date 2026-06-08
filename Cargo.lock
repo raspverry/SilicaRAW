@@ -2800,6 +2800,7 @@ name = "silica-core"
 version = "0.1.0"
 dependencies = [
  "silica-decode",
+ "silica-edit",
  "silica-render",
  "silica-storage",
 ]
@@ -2860,7 +2861,9 @@ name = "silica-storage"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "serde_json",
  "silica-catalog",
+ "silica-edit",
 ]
 
 [[package]]
