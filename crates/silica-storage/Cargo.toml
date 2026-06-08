@@ -9,3 +9,6 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+rusqlite = { version = "0.40.1", default-features = false, features = ["bundled"] }
+

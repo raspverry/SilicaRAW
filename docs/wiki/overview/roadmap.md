@@ -40,6 +40,7 @@ The current implementation order starts with:
 - Spike 002 recorded Path A: Core Image RAW primary, with LibRaw deferred until legal fixtures prove a camera-support gap.
 - RAW decoder-dependent work remains tagged as `decoder-blocking` until real fixture-backed decoding exists.
 - Spike 003 recorded Path B: color-management direction is selected, but tagged color fixtures are still required before color correctness claims.
+- Spike 004 recorded Path A: `rusqlite` with bundled SQLite and embedded SQL migrations can create and upgrade an empty catalog with required indexes.
 
 ## Links
 
@@ -50,6 +51,7 @@ The current implementation order starts with:
 - [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
 - [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
+- [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 
 ## Notes for LLM Agents
 

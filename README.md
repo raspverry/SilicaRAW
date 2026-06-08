@@ -10,6 +10,7 @@ This repository currently contains the monorepo foundation plus a minimal Tauri 
 - Minimal Tauri desktop shell
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
+- SQLite migration foundation for empty catalog schema and required indexes
 - Per-crate responsibility notes
 
 ## Workspace Layout
@@ -56,5 +57,6 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 - Do not add RAW decoder behavior without explicit fixture-backed scope; Spike 002 selected Core Image primary and deferred LibRaw.
 - Do not turn the Metal spike into a product viewer without the Path B native bridge contract.
 - Do not claim color correctness without tagged fixtures and explicit color comparison evidence.
+- Do not expose raw SQLite access outside typed storage/core APIs.
 - Do not add MLX, MCP, plugin behavior, telemetry, cloud sync, or network upload by default.
 - Document every new dependency in `docs/DEPENDENCIES.md`.
