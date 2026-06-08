@@ -47,6 +47,19 @@ Use this section after local library create/open commands are available.
 - [ ] Reopen reports the same library root and catalog path.
 - [ ] A sibling original-photo test folder remains unchanged.
 
+## Phase 4.3 Folder Import Scanner Smoke
+
+Use this section after folder import scanner APIs are available.
+
+- [ ] Prepare a folder with at least one supported photo extension such as `.dng` or `.jpg`.
+- [ ] Include at least one unsupported file such as `.txt`.
+- [ ] Import scanner records both files in the catalog by original path.
+- [ ] Supported file has `unsupported = 0`.
+- [ ] Unsupported file has `unsupported = 1`.
+- [ ] File size, modified time, and partial hash are stored.
+- [ ] Original files remain in the source folder unchanged.
+- [ ] Original files are not copied into the library folder during import.
+
 ## Minimal Workflow
 
 This section applies only after the app implements the local alpha product workflows.

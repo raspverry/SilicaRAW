@@ -9,6 +9,7 @@ This repository currently contains the monorepo foundation, a minimal Tauri desk
 - Rust workspace root
 - Minimal Tauri desktop shell
 - Local library folder create/open path
+- Non-recursive folder import scanner for catalog candidates
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
 - SQLite migration foundation for empty catalog schema, required indexes, and catalog schema contract

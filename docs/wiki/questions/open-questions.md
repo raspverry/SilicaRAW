@@ -51,6 +51,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - ADR 0005 deferred MLX from local alpha on 2026-06-08.
 - Phase 4.1 recorded the local alpha catalog schema contract in `silica-catalog` on 2026-06-08.
 - Phase 4.2 added local library create/open through Core, Storage, and the Tauri shell on 2026-06-08.
+- Phase 4.3 added non-recursive folder import scanning and unsupported-file catalog records on 2026-06-08.
 
 ## Links
 

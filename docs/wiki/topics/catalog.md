@@ -18,6 +18,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - `silica-storage` owns SQLite connection configuration, embedded migrations, and migration verification.
 - Phase 4.1 aligns `silica-storage` with the `silica-catalog` contract for schema version, required tables, required indexes, and the migration bookkeeping table.
 - Phase 4.2 adds local library folder create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
+- Phase 4.3 adds non-recursive folder import scanning through `silica-catalog` and `silica-storage`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -31,11 +32,16 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
 - Tests cover sibling original-directory preservation during create/open.
+- Folder import records immediate child files by reference in `folders` and `photos`.
+- Import records include path, file size, modified time, partial hash, and unsupported state.
+- Tests cover mixed supported/unsupported fixture files and confirm originals are not copied or mutated.
 
 ## Not Implemented Yet
 
-- Folder scanner and import records.
-- Photo fingerprinting and original hash protection.
+- Recursive folder scanning.
+- Camera metadata extraction.
+- Thumbnail or preview generation during import.
+- Original full-hash protection behavior.
 - Rating, pick, reject, and label commands.
 - Sidecar read/write and conflict handling.
 - Cache clear safety.
@@ -53,4 +59,4 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 
 ## Notes for LLM Agents
 
-Do not treat library create/open as import, sidecar, cache, or library grid behavior. Task 4.3 is the first place to add folder scanning and import records, and it must preserve original-file safety.
+Do not treat folder import as RAW decoding, thumbnail generation, sidecar, cache, or library grid behavior. Task 4.4 is the first place to add rating, pick, and reject persistence.

@@ -7,13 +7,17 @@
 use std::error::Error;
 use std::fmt;
 use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
+use std::time::UNIX_EPOCH;
 
 use rusqlite::{params, Connection, OptionalExtension};
 use silica_catalog::{
-    ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
+    is_supported_photo_extension, ImportCandidate, ALPHA_CATALOG_REQUIRED_INDEXES,
+    ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
 };
 
 /// Stable crate name used by scaffold verification.
@@ -90,6 +94,16 @@ pub struct LocalLibrary {
     pub root_path: PathBuf,
     pub catalog_path: PathBuf,
     pub schema_version: i64,
+}
+
+/// Summary returned after importing a folder by reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderImportSummary {
+    pub folder_path: PathBuf,
+    pub scanned_files: usize,
+    pub supported_files: usize,
+    pub unsupported_files: usize,
+    pub candidates: Vec<ImportCandidate>,
 }
 
 /// Errors returned by local library create/open operations.
@@ -198,6 +212,38 @@ pub fn open_local_library(
     open_library_catalog(root_path, &catalog_path)
 }
 
+/// Scan a selected folder and record file candidates by reference.
+pub fn import_folder(
+    library_root_path: impl AsRef<Path>,
+    folder_path: impl AsRef<Path>,
+) -> Result<FolderImportSummary, LibraryStorageError> {
+    let library = open_local_library(library_root_path)?;
+    let folder_path = folder_path.as_ref();
+    if !folder_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
+    }
+
+    let mut candidates = scan_import_candidates(folder_path)?;
+    candidates.sort_by(|left, right| left.path.cmp(&right.path));
+
+    let mut connection = open_catalog(&library.catalog_path)?;
+    record_import_candidates(&mut connection, folder_path, &candidates)?;
+
+    let unsupported_files = candidates
+        .iter()
+        .filter(|candidate| candidate.unsupported)
+        .count();
+    let scanned_files = candidates.len();
+
+    Ok(FolderImportSummary {
+        folder_path: folder_path.to_path_buf(),
+        scanned_files,
+        supported_files: scanned_files - unsupported_files,
+        unsupported_files,
+        candidates,
+    })
+}
+
 /// Apply connection-local safety and durability settings.
 pub fn configure_connection(connection: &Connection) -> rusqlite::Result<()> {
     connection.busy_timeout(Duration::from_secs(5))?;
@@ -279,9 +325,7 @@ fn upsert_local_library_row(
     connection: &Connection,
     root_path: &Path,
 ) -> Result<(), LibraryStorageError> {
-    let root_path = root_path
-        .to_str()
-        .ok_or_else(|| LibraryStorageError::InvalidPath(root_path.to_path_buf()))?;
+    let root_path = path_to_string(root_path)?;
 
     connection.execute(
         r#"
@@ -295,6 +339,157 @@ fn upsert_local_library_row(
     )?;
 
     Ok(())
+}
+
+fn scan_import_candidates(folder_path: &Path) -> Result<Vec<ImportCandidate>, LibraryStorageError> {
+    let mut candidates = Vec::new();
+
+    for entry in fs::read_dir(folder_path)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        let metadata = entry.metadata()?;
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        let extension = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
+        let unsupported = !is_supported_photo_extension(extension);
+
+        candidates.push(ImportCandidate {
+            file_name,
+            path: path_to_string(&path)?,
+            file_size: metadata.len() as i64,
+            modified_at: modified_at_string(&metadata),
+            partial_hash: partial_file_hash(&path)?,
+            unsupported,
+        });
+    }
+
+    Ok(candidates)
+}
+
+fn record_import_candidates(
+    connection: &mut Connection,
+    folder_path: &Path,
+    candidates: &[ImportCandidate],
+) -> Result<(), LibraryStorageError> {
+    let folder_path = path_to_string(folder_path)?;
+    let folder_id = stable_catalog_id("folder", &folder_path);
+    let transaction = connection.transaction()?;
+
+    transaction.execute(
+        r#"
+        INSERT INTO folders(id, library_id, path, scanned_at, missing)
+        VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, 0)
+        ON CONFLICT(library_id, path) DO UPDATE SET
+          scanned_at = CURRENT_TIMESTAMP,
+          missing = 0
+        "#,
+        params![folder_id, LOCAL_LIBRARY_ID, folder_path],
+    )?;
+
+    for candidate in candidates {
+        let photo_id = stable_catalog_id("photo", &candidate.path);
+        transaction.execute(
+            r#"
+            INSERT INTO photos(
+              id,
+              library_id,
+              folder_id,
+              file_name,
+              path,
+              file_size,
+              modified_at,
+              missing,
+              unsupported,
+              partial_hash
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9)
+            ON CONFLICT(library_id, path) DO UPDATE SET
+              folder_id = excluded.folder_id,
+              file_name = excluded.file_name,
+              file_size = excluded.file_size,
+              modified_at = excluded.modified_at,
+              missing = 0,
+              unsupported = excluded.unsupported,
+              partial_hash = excluded.partial_hash
+            "#,
+            params![
+                photo_id,
+                LOCAL_LIBRARY_ID,
+                folder_id,
+                candidate.file_name,
+                candidate.path,
+                candidate.file_size,
+                candidate.modified_at,
+                bool_to_sql(candidate.unsupported),
+                candidate.partial_hash,
+            ],
+        )?;
+    }
+
+    transaction.commit()?;
+    Ok(())
+}
+
+fn path_to_string(path: &Path) -> Result<String, LibraryStorageError> {
+    path.to_str()
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| LibraryStorageError::InvalidPath(path.to_path_buf()))
+}
+
+fn modified_at_string(metadata: &fs::Metadata) -> Option<String> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| format!("unix:{}", duration.as_secs()))
+}
+
+fn partial_file_hash(path: &Path) -> Result<String, LibraryStorageError> {
+    const MAX_HASH_BYTES: usize = 64 * 1024;
+
+    let mut file = File::open(path)?;
+    let mut buffer = [0_u8; 8192];
+    let mut remaining = MAX_HASH_BYTES;
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+
+    while remaining > 0 {
+        let read_limit = remaining.min(buffer.len());
+        let read = file.read(&mut buffer[..read_limit])?;
+        if read == 0 {
+            break;
+        }
+
+        for byte in &buffer[..read] {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        remaining -= read;
+    }
+
+    Ok(format!("{hash:016x}"))
+}
+
+fn stable_catalog_id(prefix: &str, value: &str) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{prefix}-{hash:016x}")
+}
+
+fn bool_to_sql(value: bool) -> i64 {
+    if value {
+        1
+    } else {
+        0
+    }
 }
 
 fn ensure_migration_table(connection: &Connection) -> rusqlite::Result<()> {
@@ -707,6 +902,77 @@ mod tests {
             original_before
         );
         assert!(original_dir.is_dir());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn scans_mixed_folder_and_records_photo_candidates_by_reference() {
+        let workspace = unique_library_root("import");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        let supported_before = std::fs::read(&supported_file).expect("read supported before");
+        let unsupported_before = std::fs::read(&unsupported_file).expect("read unsupported before");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let summary = import_folder(&library.root_path, &import_root).expect("import folder");
+
+        assert_eq!(summary.scanned_files, 2);
+        assert_eq!(summary.supported_files, 1);
+        assert_eq!(summary.unsupported_files, 1);
+        assert_eq!(summary.candidates.len(), 2);
+        assert!(summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "sample.DNG" && !candidate.unsupported));
+        assert!(summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "notes.txt" && candidate.unsupported));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let imported_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photos", [], |row| row.get(0))
+            .expect("count photos");
+        assert_eq!(imported_count, 2);
+
+        let (path, file_size, unsupported, partial_hash): (String, i64, i64, String) = connection
+            .query_row(
+                "SELECT path, file_size, unsupported, partial_hash FROM photos WHERE file_name = 'sample.DNG'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("supported row");
+        assert_eq!(path, supported_file.display().to_string());
+        assert_eq!(file_size, supported_before.len() as i64);
+        assert_eq!(unsupported, 0);
+        assert!(!partial_hash.is_empty());
+
+        let unsupported: i64 = connection
+            .query_row(
+                "SELECT unsupported FROM photos WHERE file_name = 'notes.txt'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("unsupported row");
+        assert_eq!(unsupported, 1);
+
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read supported after"),
+            supported_before
+        );
+        assert_eq!(
+            std::fs::read(&unsupported_file).expect("read unsupported after"),
+            unsupported_before
+        );
+        assert!(!library_root.join("sample.DNG").exists());
+        assert!(!library_root.join("notes.txt").exists());
 
         remove_library_root(&workspace);
     }

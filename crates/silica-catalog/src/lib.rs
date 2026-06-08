@@ -76,6 +76,30 @@ pub const ALPHA_CATALOG_SCHEMA: CatalogSchemaContract = CatalogSchemaContract {
     required_indexes: ALPHA_CATALOG_REQUIRED_INDEXES,
 };
 
+/// File extensions accepted as supported photo candidates in the alpha scanner.
+pub const ALPHA_SUPPORTED_PHOTO_EXTENSIONS: &[&str] = &[
+    "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2", "pef", "srw", "raw", "jpg", "jpeg",
+    "tif", "tiff", "heic",
+];
+
+/// Return whether an extension is a supported local alpha photo candidate.
+pub fn is_supported_photo_extension(extension: &str) -> bool {
+    ALPHA_SUPPORTED_PHOTO_EXTENSIONS
+        .iter()
+        .any(|supported| extension.eq_ignore_ascii_case(supported))
+}
+
+/// Domain-facing import candidate recorded by the folder scanner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportCandidate {
+    pub file_name: String,
+    pub path: String,
+    pub file_size: i64,
+    pub modified_at: Option<String>,
+    pub partial_hash: String,
+    pub unsupported: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,5 +140,30 @@ mod tests {
         assert!(ALPHA_CATALOG_SCHEMA
             .required_indexes
             .contains(&"idx_action_log_created_at"));
+    }
+
+    #[test]
+    fn classifies_alpha_import_file_extensions() {
+        assert!(is_supported_photo_extension("DNG"));
+        assert!(is_supported_photo_extension("jpg"));
+        assert!(is_supported_photo_extension("RAF"));
+        assert!(!is_supported_photo_extension("txt"));
+        assert!(!is_supported_photo_extension(""));
+    }
+
+    #[test]
+    fn records_import_candidate_support_state() {
+        let candidate = ImportCandidate {
+            file_name: "notes.txt".to_string(),
+            path: "/tmp/notes.txt".to_string(),
+            file_size: 11,
+            modified_at: Some("2026-06-08T10:00:00Z".to_string()),
+            partial_hash: "hash".to_string(),
+            unsupported: true,
+        };
+
+        assert!(candidate.unsupported);
+        assert_eq!(candidate.file_name, "notes.txt");
+        assert_eq!(candidate.partial_hash, "hash");
     }
 }

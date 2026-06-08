@@ -115,7 +115,9 @@ Phase 4.1 records the local alpha schema contract in `silica-catalog` and makes 
 
 Phase 4.2 adds file-backed local library create/open behavior.
 
-Still needed: Rust edit graph types, sidecar conflict UX, cache size policy, backup/checkpoint policy, folder import fingerprints, and original hash protection behavior.
+Phase 4.3 adds non-recursive folder import records with path, file size, modified time, partial hash, and unsupported state.
+
+Still needed: Rust edit graph types, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
 
 ---
 

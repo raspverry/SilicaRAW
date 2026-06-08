@@ -335,6 +335,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Does not copy, delete, or mutate originals.
 - **Validation:** Test fixture folder with mixed files.
 
+**Status:** Completed on 2026-06-08. `silica-catalog` defines the alpha import candidate contract and supported extension list, and `silica-storage` records immediate child files by reference with file size, modified time, partial hash, and unsupported state. Tests use a mixed fixture folder and verify originals are not copied or mutated.
+
 ### Task 4.4: Implement Rating, Pick, Reject Persistence
 
 - **Location:** `crates/silica-catalog`, `apps/desktop`
