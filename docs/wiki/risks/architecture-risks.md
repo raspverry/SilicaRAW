@@ -32,11 +32,11 @@ Next evidence needed: legal RAW fixture manifest and a macOS-only Core Image pro
 
 ### Color Pipeline Correctness
 
-Current status: unresolved.
+Current status: partially resolved by Spike 003. Core Image/ColorSync-compatible color management and a linear Display P3 working-space recommendation are selected, but fixture proof is missing.
 
 Why it matters: silent preview/export color errors are release-blocking trust failures.
 
-Next evidence needed: color-managed preview/export spike with fixture class and reporting format.
+Next evidence needed: tagged raster fixtures, ICC embedding proof, Preview.app comparison, and golden-image tolerance policy.
 
 ### Storage and Migration Safety
 
@@ -59,6 +59,7 @@ Next evidence needed: manifest validation, permission layer, action log, and exp
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
+- [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
 - [System Architecture](../../03_System_Architecture.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)

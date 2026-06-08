@@ -113,6 +113,7 @@ Purpose: detail/noise/render stress
 Class F — Tagged raster images
 sRGB JPEG, Display P3 HEIC/JPEG, untagged JPEG
 Purpose: color management verification
+Status after Spike 003: required but not committed
 ```
 
 ## Preview Benchmark

@@ -20,7 +20,6 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 
 ## RAW and Color
 
-- What working color space will be selected after the color spike?
 - What fixture set will be legally usable for RAW and color testing?
 - What tolerance policy will be used for golden image tests?
 
@@ -49,6 +48,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Spike 001 recorded Path B for Tauri + native Metal viewer integration on 2026-06-08.
 - Tauri is not rejected by Spike 001, so no SwiftUI/AppKit shell switch is planned yet.
 - Spike 002 selected Core Image RAW primary with LibRaw deferred on 2026-06-08.
+- Spike 003 selected a linear Display P3-compatible working-space recommendation, sRGB default export, and Display P3 export support on 2026-06-08.
 
 ## Links
 
@@ -57,6 +57,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - [Architecture Risks](../risks/architecture-risks.md)
 - [Spike 001: Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Spike 002: RAW Decoder Path](../../spikes/002-raw-decoder.md)
+- [Spike 003: Color-Managed Preview and Export](../../spikes/003-color-managed-preview-export.md)
 - [Dependencies Policy](../../DEPENDENCIES.md)
 
 ## Notes for LLM Agents

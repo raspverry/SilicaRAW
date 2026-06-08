@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-3 | Spike 003 recorded color-management path
+
+- Added the color-managed preview/export spike report.
+- Recorded Core Image/ColorSync-compatible color management first, linear Display P3 working-space recommendation, sRGB default export, and Display P3 export support.
+- Recorded that tagged raster and RAW color fixtures are still missing, so color correctness remains unproven.
+
 ## [2026-06-08] phase-3 | Spike 002 recorded RAW decoder path
 
 - Added the RAW decoder path spike report.

@@ -10,25 +10,50 @@ source_of_truth: docs/09_Color_Management_Specification.md
 
 ## Summary
 
-Color management is a release-trust issue. A RAW editor can feel polished and still fail if preview or export color is silently wrong.
+Color management is a release-trust issue. Spike 003 selected the first implementation recommendation, but color correctness remains unproven until tagged fixtures exist.
 
 ## Current Stance
 
-- Color-managed preview and export require their own feasibility spike.
+- Spike 003 selected Core Image/ColorSync-compatible color management first.
+- The first working-space recommendation is linear Display P3-compatible RGB.
+- Preview should be display-profile aware.
+- Export should default to sRGB with ICC embedding and support Display P3 when explicitly selected.
 - Decoder-specific color assumptions must be documented.
-- Benchmark fixture classes should be used for color and render tests.
-- sRGB and Display P3 behavior must be verified explicitly.
+- Tagged color fixtures are still missing, so sRGB and Display P3 behavior is not yet proven.
 
 ## Blocked Work
 
-- Final working color space decision.
-- Export ICC behavior.
+- Fixture-backed color correctness claims.
+- ICC embedding proof.
 - Camera profile behavior.
 - Golden image tolerance policy.
 - Broad user-facing color claims.
 
+## Fixture Status
+
+Class F tagged raster fixtures are missing:
+
+```txt
+sRGB JPEG
+Display P3 HEIC/JPEG
+untagged JPEG
+```
+
+The repository currently contains app icons and UI mockup PNGs, not color-management fixtures.
+
+## Color-Dependent Tags
+
+```txt
+Color Baseline: color-blocking
+Preview Transform: color-blocking
+Export ICC: color-blocking
+Golden Images: color-dependent
+RAW Camera Profiles: decoder-dependent color-dependent
+```
+
 ## Links
 
+- [Spike 003 Report](../../spikes/003-color-managed-preview-export.md)
 - [Color Management Specification](../../09_Color_Management_Specification.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
@@ -36,5 +61,4 @@ Color management is a release-trust issue. A RAW editor can feel polished and st
 
 ## Notes for LLM Agents
 
-Do not claim color correctness from compile success. Color work needs fixture-based verification and explicit assumptions.
-
+Do not claim color correctness from Spike 003 or compile success. Spike 003 records an implementation direction, not fixture-backed color proof.

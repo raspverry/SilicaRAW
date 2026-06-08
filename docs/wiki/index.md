@@ -54,6 +54,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 
 - [Spike 001: Tauri Metal Viewer](../spikes/001-tauri-metal-viewer.md): Phase 3.1 native `MTKView` proof, input evidence, resize evidence, and shell-path decision.
 - [Spike 002: RAW Decoder Path](../spikes/002-raw-decoder.md): Phase 3.2 Core Image primary decision, LibRaw fallback status, and fixture gap.
+- [Spike 003: Color-Managed Preview and Export](../spikes/003-color-managed-preview-export.md): Phase 3.3 working-space recommendation, export color stance, and fixture gap.
 
 ### Sources
 

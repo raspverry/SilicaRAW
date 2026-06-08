@@ -129,6 +129,14 @@ Working color space decision recorded after spike.
 Benchmark fixture class used for color/render tests recorded.
 ```
 
+Spike 003 status:
+
+```txt
+Working color space recommendation recorded: linear Display P3-compatible RGB.
+Fixture class recorded: Class F tagged raster images.
+Gate C is not complete until legal fixtures, ICC proof, and tolerance policy exist.
+```
+
 ## Public Beta Gate now requires
 
 ```txt
