@@ -1,13 +1,14 @@
 # SilicaRAW
 
-SilicaRAW is an early planning-stage, open-source RAW photo editor for Apple Silicon.
+SilicaRAW is an early-stage, open-source RAW photo editor for Apple Silicon.
 
-This repository currently contains the monorepo foundation only. Product implementation is intentionally out of scope for this scaffold.
+This repository currently contains the monorepo foundation plus a minimal Tauri desktop shell for local packaging validation. Product editing features are intentionally out of scope for this phase.
 
 ## Current Scope
 
 - Rust workspace root
-- Desktop application placeholder
+- Minimal Tauri desktop shell
+- Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
 - Per-crate responsibility notes
 
@@ -15,7 +16,7 @@ This repository currently contains the monorepo foundation only. Product impleme
 
 ```txt
 apps/
-  desktop/          Placeholder desktop app package
+  desktop/          Minimal Tauri shell and packaging skeleton
 crates/
   silica-core/      Core coordination boundary
   silica-catalog/   Catalog domain boundary
@@ -38,9 +39,15 @@ The public, LLM-readable project wiki starts at [`docs/wiki/index.md`](docs/wiki
 ## Development
 
 ```bash
-cargo metadata --format-version 1 --no-deps
-cargo build --workspace
-cargo test --workspace
+scripts/harness/check.sh
+```
+
+Phase 2 desktop packaging checks:
+
+```bash
+cd apps/desktop/src-tauri
+cargo tauri build --no-bundle
+cargo tauri build --bundles app,dmg --ci --no-sign
 ```
 
 ## Guardrails

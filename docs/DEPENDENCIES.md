@@ -27,21 +27,55 @@ Verification source:
 
 These are expected but still require version-specific confirmation during implementation.
 
-### Tauri
+### Tauri Runtime
 
 ```txt
 Name: tauri
-Version: TBD
+Version: 2.11.2
 Purpose: Desktop application shell
-License: MIT or MIT/Apache-2.0 where applicable
+License: Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/tauri-apps/tauri
-Used by: apps/desktop
-Why needed: macOS desktop shell with Rust backend and web frontend
+Used by: apps/desktop/src-tauri
+Why needed: macOS desktop shell with Rust backend and local static frontend for the Phase 2 packaging spike.
 Alternatives considered: SwiftUI/AppKit shell, Electron
 Risk notes: Tauri + Metal viewer integration requires Spike 001. If it fails, prefer SwiftUI/AppKit shell + Rust Core.
-Binary size impact: Lower than Electron, verify actual build size.
+Binary size impact: Lower than Electron in principle; measure actual `.app` and `.dmg` after Phase 2 bundle output exists.
 Security notes: Use minimal permissions/capabilities. No network/telemetry by default.
-Verification source: Tauri repository license section.
+Verification source: `cargo info tauri` for 2.11.2 metadata; Tauri v2 documentation at https://v2.tauri.app/.
+```
+
+### Tauri Build
+
+```txt
+Name: tauri-build
+Version: 2.6.2
+Purpose: Tauri build-time code generation and configuration handling.
+License: Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/tauri-apps/tauri
+Used by: apps/desktop/src-tauri
+Why needed: Required build dependency for the Tauri application crate.
+Alternatives considered: None while Tauri is selected for the Phase 2 shell spike.
+Risk notes: Keep version compatible with the selected Tauri runtime and CLI.
+Binary size impact: Build-time only; no direct runtime bundle impact expected.
+Security notes: Build-time code generation should remain limited to the local Tauri config and capabilities.
+Verification source: `cargo info tauri-build` for 2.6.2 metadata; Tauri v2 documentation at https://v2.tauri.app/.
+```
+
+### Tauri CLI
+
+```txt
+Name: tauri-cli
+Version: 2.11.2
+Purpose: Local development command for `cargo tauri build --no-bundle` and bundle generation.
+License: Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/tauri-apps/tauri
+Used by: local developer machines and CI/release workflows when packaging is enabled.
+Why needed: Required to validate and produce Tauri app and DMG artifacts.
+Alternatives considered: npm `@tauri-apps/cli`, direct bundler invocation.
+Risk notes: Keep CLI version compatible with the selected Tauri runtime.
+Binary size impact: Development tool only; not bundled in the app.
+Security notes: Use local build commands only. Do not add updater, signing, notarization, or network publishing behavior in Phase 2.
+Verification source: `cargo info tauri-cli` for 2.11.2 metadata; Tauri v2 documentation at https://v2.tauri.app/.
 ```
 
 ### SQLite binding

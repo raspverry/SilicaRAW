@@ -1,0 +1,19 @@
+[package]
+name = "silica-desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "SilicaRAW desktop shell and packaging spike"
+default-run = "silica-desktop"
+publish = false
+
+[[bin]]
+name = "silica-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.2", features = [] }
