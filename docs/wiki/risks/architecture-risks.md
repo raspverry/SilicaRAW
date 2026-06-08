@@ -24,7 +24,7 @@ Next evidence needed: dedicated AppKit/Metal viewer bridge contract, including l
 
 ### RAW Decoder Path
 
-Current status: partially resolved by Spike 002. Core Image RAW is the first implementation target; LibRaw is deferred until fixture evidence proves a gap.
+Current status: partially resolved by Spike 002 and Phase 5.1. Core Image RAW is the first implementation target; LibRaw is deferred until fixture evidence proves a gap. Phase 5.1 adds RAW-blocked preview readiness, not RAW decoding.
 
 Why it matters: decoder choice affects camera support, input profile, color pipeline, metadata, Apple ProRAW behavior, and distribution complexity.
 
@@ -32,7 +32,7 @@ Next evidence needed: legal RAW fixture manifest and a macOS-only Core Image pro
 
 ### Color Pipeline Correctness
 
-Current status: partially resolved by Spike 003. Core Image/ColorSync-compatible color management and a linear Display P3 working-space recommendation are selected, but fixture proof is missing.
+Current status: partially resolved by Spike 003 and Phase 5.1. Core Image/ColorSync-compatible color management and a linear Display P3 working-space recommendation are selected, and preview readiness now carries display-profile-aware intent, but fixture proof is missing.
 
 Why it matters: silent preview/export color errors are release-blocking trust failures.
 

@@ -19,6 +19,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Preview should be display-profile aware.
 - Export should default to sRGB with ICC embedding and support Display P3 when explicitly selected.
 - Decoder-specific color assumptions must be documented.
+- Phase 5.1 records display-profile-aware preview readiness but does not prove color correctness.
 - Tagged color fixtures are still missing, so sRGB and Display P3 behavior is not yet proven.
 
 ## Blocked Work

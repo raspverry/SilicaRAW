@@ -73,6 +73,19 @@ Use this section after rating, pick, reject, and color label command APIs are av
 - [ ] Confirm the same `photo_flags` values are returned from the catalog.
 - [ ] Confirm no sidecar files are required for this persistence check yet.
 
+## Phase 5.1 Preview Readiness Smoke
+
+Use this section after preview status command APIs are available.
+
+- [ ] Import a folder with a `.jpg` candidate.
+- [ ] Open preview status for the `.jpg` catalog photo.
+- [ ] Confirm preview status is ready by reference.
+- [ ] Import or select an unsupported file.
+- [ ] Confirm preview status returns a clear unsupported state.
+- [ ] Import or select a RAW extension such as `.dng`.
+- [ ] Confirm preview status clearly says Core Image RAW preview is blocked until fixture-backed probe coverage exists.
+- [ ] Do not treat this as a Metal viewer, RAW decode, or color correctness smoke test.
+
 ## Minimal Workflow
 
 This section applies only after the app implements the local alpha product workflows.

@@ -3,6 +3,8 @@
 //! Spike 003 records the color-managed preview/export gate. This crate still
 //! does not render images, apply color transforms, or export files.
 
+use silica_decode::{PreviewDecodePlan, PreviewDecodeStatus};
+
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-render";
 
@@ -63,6 +65,53 @@ pub const SPIKE_003_COLOR_GATE: ColorGate = ColorGate {
 /// Tag used in docs and future issue labels for color-dependent work.
 pub const COLOR_BLOCKING_TAG: &str = "color-blocking";
 
+/// Render readiness state for the local alpha preview path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewRenderStatus {
+    /// Preview source can be opened by the current minimal surface.
+    Ready,
+    /// Preview is blocked before rendering because decode is not ready.
+    BlockedByDecode,
+    /// Preview is unsupported for this catalog entry.
+    Unsupported,
+}
+
+/// Render-side preview plan. This is a routing contract, not a Metal viewer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewRenderPlan {
+    pub source_path: String,
+    pub status: PreviewRenderStatus,
+    pub color_behavior: PreviewColorBehavior,
+    pub message: String,
+}
+
+/// Build a local alpha render plan from a decode plan.
+pub fn plan_preview_render(decode_plan: PreviewDecodePlan) -> PreviewRenderPlan {
+    let status = match decode_plan.status {
+        PreviewDecodeStatus::Ready => PreviewRenderStatus::Ready,
+        PreviewDecodeStatus::Unsupported => PreviewRenderStatus::Unsupported,
+        PreviewDecodeStatus::BlockedByMissingRawFixtureProbe => {
+            PreviewRenderStatus::BlockedByDecode
+        }
+    };
+
+    let message = match status {
+        PreviewRenderStatus::Ready => {
+            "Preview source is ready for a display-profile-aware surface.".to_string()
+        }
+        PreviewRenderStatus::Unsupported | PreviewRenderStatus::BlockedByDecode => {
+            decode_plan.message
+        }
+    };
+
+    PreviewRenderPlan {
+        source_path: decode_plan.source_path,
+        status,
+        color_behavior: SPIKE_003_COLOR_GATE.preview,
+        message,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -93,5 +142,33 @@ mod tests {
             super::ColorFixtureStatus::MissingTaggedRasterFixtures
         );
         assert_eq!(super::COLOR_BLOCKING_TAG, "color-blocking");
+    }
+
+    #[test]
+    fn plans_display_aware_preview_from_decode_plan() {
+        let decode_plan = silica_decode::plan_preview_decode("/tmp/sample.jpg", false);
+        let render_plan = super::plan_preview_render(decode_plan);
+
+        assert_eq!(render_plan.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(render_plan.source_path, "/tmp/sample.jpg");
+        assert_eq!(
+            render_plan.color_behavior,
+            super::PreviewColorBehavior::DisplayProfileAware
+        );
+        assert!(render_plan.message.contains("display-profile-aware"));
+
+        let raw_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.dng",
+            false,
+        ));
+        assert_eq!(raw_plan.status, super::PreviewRenderStatus::BlockedByDecode);
+        assert!(raw_plan.message.contains("Core Image RAW preview"));
+
+        let unsupported_plan =
+            super::plan_preview_render(silica_decode::plan_preview_decode("/tmp/notes.txt", true));
+        assert_eq!(
+            unsupported_plan.status,
+            super::PreviewRenderStatus::Unsupported
+        );
     }
 }

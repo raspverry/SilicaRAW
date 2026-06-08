@@ -10,4 +10,6 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies]
+silica-decode = { path = "../silica-decode" }
+silica-render = { path = "../silica-render" }
 silica-storage = { path = "../silica-storage" }

@@ -368,6 +368,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Decoder assumptions are documented.
 - **Validation:** Manual preview test with fixture classes.
 
+**Status:** Completed on 2026-06-08 as the minimal preview path contract. Raster candidates such as JPEG return a ready preview status by reference, unsupported catalog entries return a clear unsupported state, and RAW candidates return a Core Image RAW blocked state until fixture-backed probe coverage exists. The product Metal viewer, RAW decoding, color correctness proof, and M004/M005 UI screens remain later explicit tasks.
+
 ### Task 5.2: Implement Edit Graph Types and Validation
 
 - **Location:** `crates/silica-edit`, `schemas/edit_graph.schema.json`
