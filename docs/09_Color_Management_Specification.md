@@ -45,8 +45,8 @@ Input:
 
 Working:
 
-- Final choice requires spike
-- Candidate: linear Display P3-compatible wide gamut
+- Spike 003 recommendation: linear Display P3-compatible wide gamut
+- This is an implementation recommendation, not fixture-backed color proof yet
 - v0.1 may use linear extended sRGB/Core Image reference behavior for comparison
 
 Display:
@@ -88,6 +88,18 @@ Color-managed preview/export spike:
 - Embed ICC
 - Compare with Preview.app
 
+Spike 003 result:
+
+```txt
+Path B:
+Core Image/ColorSync-compatible color management first.
+Working-space recommendation: linear Display P3-compatible RGB.
+Preview: display-profile aware.
+Export default: sRGB with ICC embedding.
+Optional export: Display P3 with ICC embedding.
+Fixture execution: blocked because tagged color fixtures are missing.
+```
+
 ## Testing
 
 - Golden image tests
@@ -99,3 +111,5 @@ Color-managed preview/export spike:
 GO WITH CONDITIONS.
 
 Working color space and camera profile strategy need spike results.
+
+After Spike 003, the working-space recommendation is recorded, but fixture-backed color correctness is still required before product claims.

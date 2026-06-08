@@ -33,6 +33,7 @@ DEPENDENCIES. Dependency Policy
 
 - [Spike 001: Tauri Metal Viewer](spikes/001-tauri-metal-viewer.md) — Phase 3.1 native `MTKView` proof and shell-path decision
 - [Spike 002: RAW Decoder Path](spikes/002-raw-decoder.md) — Phase 3.2 decoder-path decision
+- [Spike 003: Color-Managed Preview and Export](spikes/003-color-managed-preview-export.md) — Phase 3.3 color-management recommendation and fixture gap
 
 ## Schemas
 

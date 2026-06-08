@@ -263,6 +263,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Known color limitations are documented.
 - **Validation:** Fixture-based report.
 
+**Status:** Completed on 2026-06-08 as Path B. Spike 003 selected Core Image/ColorSync-compatible color management first, recommended a linear Display P3-compatible working space, kept sRGB as default export, and recorded that tagged color fixtures are still missing.
+
 ### Task 3.4: Spike SQLite Catalog Persistence
 
 - **Location:** `crates/silica-storage`, `crates/silica-catalog`, `docs/spikes/004-sqlite-persistence.md`
