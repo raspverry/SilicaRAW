@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-1 | CI foundation started
+
+- Added GitHub Actions CI to run the project harness on `main` pushes and pull requests.
+- Added the GitHub PR template for local alpha safety and release blocker review.
+- Added early-alpha scope guardrails to keep MLX, MCP, plugin runtime, telemetry, analytics, cloud sync, and network upload out of Phase 1.
+
 ## [2026-06-08] phase-0 | Repository baseline and alpha decisions
 
 - Initialized the project as a git repository.
