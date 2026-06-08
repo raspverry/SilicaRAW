@@ -347,6 +347,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - SQLite `photo_flags` is authoritative inside the app.
 - **Validation:** Unit and restart integration tests.
 
+**Status:** Completed on 2026-06-08. `silica-catalog` defines validated photo flags, `silica-storage` creates default `photo_flags` rows for imported photos and persists updates, `silica-core` exposes command-facing APIs, and the minimal Tauri shell exposes flag read/write commands. Tests verify catalog-authoritative values survive reopen. Sidecar flag mirroring and product UI controls are still later tasks.
+
 ## Phase 5: Preview, Basic Edit, and Export MVP
 
 **Goal:** Make the local DMG alpha meaningfully usable as a photo editor.

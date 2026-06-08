@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-08] phase-4 | Photo flag persistence added
+
+- Added the local alpha photo flags contract to `silica-catalog`.
+- Added SQLite `photo_flags` default row creation, read APIs, and write APIs to `silica-storage`.
+- Added core and minimal Tauri command boundaries for rating, pick, reject, and color label persistence.
+- Verified flags survive local library reopen without sidecar or UI implementation.
+
 ## [2026-06-08] phase-4 | Folder import scanner added
 
 - Added the local alpha import candidate contract and supported extension list to `silica-catalog`.

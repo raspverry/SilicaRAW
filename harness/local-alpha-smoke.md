@@ -60,6 +60,19 @@ Use this section after folder import scanner APIs are available.
 - [ ] Original files remain in the source folder unchanged.
 - [ ] Original files are not copied into the library folder during import.
 
+## Phase 4.4 Photo Flags Persistence Smoke
+
+Use this section after rating, pick, reject, and color label command APIs are available.
+
+- [ ] Import at least one supported photo candidate.
+- [ ] Set rating to a non-zero value.
+- [ ] Set picked or rejected state.
+- [ ] Optionally set a color label.
+- [ ] Quit and relaunch the app.
+- [ ] Open the same library path.
+- [ ] Confirm the same `photo_flags` values are returned from the catalog.
+- [ ] Confirm no sidecar files are required for this persistence check yet.
+
 ## Minimal Workflow
 
 This section applies only after the app implements the local alpha product workflows.

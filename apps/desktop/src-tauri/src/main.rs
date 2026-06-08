@@ -17,6 +17,65 @@ fn open_library(path: String) -> Result<String, String> {
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn set_photo_flags(
+    library_path: String,
+    photo_id: String,
+    rating: u8,
+    picked: bool,
+    rejected: bool,
+    color_label: Option<String>,
+) -> Result<String, String> {
+    silica_core::set_photo_flags(
+        PathBuf::from(library_path),
+        photo_id,
+        rating,
+        picked,
+        rejected,
+        color_label,
+    )
+    .map(|flags| {
+        photo_flags_status_text(
+            &flags.photo_id,
+            flags.rating,
+            flags.picked,
+            flags.rejected,
+            flags.color_label.as_deref(),
+        )
+    })
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn get_photo_flags(library_path: String, photo_id: String) -> Result<Option<String>, String> {
+    silica_core::get_photo_flags(PathBuf::from(library_path), &photo_id)
+        .map(|flags| {
+            flags.map(|flags| {
+                photo_flags_status_text(
+                    &flags.photo_id,
+                    flags.rating,
+                    flags.picked,
+                    flags.rejected,
+                    flags.color_label.as_deref(),
+                )
+            })
+        })
+        .map_err(|error| error.to_string())
+}
+
+fn photo_flags_status_text(
+    photo_id: &str,
+    rating: u8,
+    picked: bool,
+    rejected: bool,
+    color_label: Option<&str>,
+) -> String {
+    format!(
+        "Photo: {photo_id}\nRating: {rating}\nPicked: {picked}\nRejected: {rejected}\nColor label: {}",
+        color_label.unwrap_or("none")
+    )
+}
+
 fn main() {
     let builder = tauri::Builder::default();
 
@@ -24,7 +83,12 @@ fn main() {
     let builder = builder.setup(metal_host_spike::install);
 
     builder
-        .invoke_handler(tauri::generate_handler![create_library, open_library])
+        .invoke_handler(tauri::generate_handler![
+            create_library,
+            open_library,
+            set_photo_flags,
+            get_photo_flags
+        ])
         .run(tauri::generate_context!())
         .expect("failed to run SilicaRAW desktop shell");
 }
@@ -46,6 +110,50 @@ mod tests {
         assert_eq!(opened, created);
 
         remove_library_root(&root);
+    }
+
+    #[test]
+    fn desktop_commands_set_and_get_photo_flags() {
+        let workspace = unique_library_root("desktop-flags");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let updated = super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            2,
+            true,
+            false,
+            Some("blue".to_string()),
+        )
+        .expect("set flags command");
+        assert!(updated.contains("Rating: 2"));
+        assert!(updated.contains("Picked: true"));
+        assert!(updated.contains("Color label: blue"));
+
+        let reopened = super::get_photo_flags(library_root.display().to_string(), photo_id)
+            .expect("get flags command")
+            .expect("flags row");
+        assert_eq!(reopened, updated);
+
+        remove_library_root(&workspace);
+    }
+
+    fn stable_catalog_id(prefix: &str, value: &str) -> String {
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for byte in value.as_bytes() {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        format!("{prefix}-{hash:016x}")
     }
 
     fn unique_library_root(label: &str) -> PathBuf {

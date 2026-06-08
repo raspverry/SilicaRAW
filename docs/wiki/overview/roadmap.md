@@ -28,6 +28,7 @@ The current implementation order starts with:
 10. Implement catalog migration foundation.
 11. Implement local library create/open.
 12. Implement folder import scanner.
+13. Implement rating, pick, reject, and color label persistence.
 
 ## Gate Logic
 
@@ -48,6 +49,7 @@ The current implementation order starts with:
 - Phase 4.1 records the local alpha catalog schema contract in `silica-catalog` and verifies `silica-storage` migrations against that contract.
 - Phase 4.2 adds local library create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
 - Phase 4.3 adds non-recursive folder import scanning with path, partial hash, unsupported-state, and original-preservation tests.
+- Phase 4.4 adds catalog-authoritative rating, pick, reject, and color label persistence through `photo_flags`, core APIs, and minimal Tauri commands.
 
 ## Links
 

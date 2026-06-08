@@ -10,6 +10,7 @@ This repository currently contains the monorepo foundation, a minimal Tauri desk
 - Minimal Tauri desktop shell
 - Local library folder create/open path
 - Non-recursive folder import scanner for catalog candidates
+- Rating, pick, reject, and color label persistence in SQLite `photo_flags`
 - Developer-only unsigned `.app` and `.dmg` packaging path
 - Core crate boundaries from the architecture documents
 - SQLite migration foundation for empty catalog schema, required indexes, and catalog schema contract

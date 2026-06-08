@@ -19,6 +19,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Phase 4.1 aligns `silica-storage` with the `silica-catalog` contract for schema version, required tables, required indexes, and the migration bookkeeping table.
 - Phase 4.2 adds local library folder create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
 - Phase 4.3 adds non-recursive folder import scanning through `silica-catalog` and `silica-storage`.
+- Phase 4.4 adds catalog-authoritative rating, picked, rejected, and color label persistence through `photo_flags`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -35,6 +36,9 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Folder import records immediate child files by reference in `folders` and `photos`.
 - Import records include path, file size, modified time, partial hash, and unsupported state.
 - Tests cover mixed supported/unsupported fixture files and confirm originals are not copied or mutated.
+- Imported photos receive default `photo_flags` rows.
+- Rating, picked, rejected, and color label updates are stored in SQLite `photo_flags`.
+- Restart tests cover flag persistence after reopening the local library.
 
 ## Not Implemented Yet
 
@@ -42,10 +46,10 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Camera metadata extraction.
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
-- Rating, pick, reject, and label commands.
 - Sidecar read/write and conflict handling.
+- Sidecar flag mirroring.
 - Cache clear safety.
-- Broad catalog UI screens.
+- Broad catalog UI screens and visual culling controls.
 - Plugin or MCP catalog access.
 
 ## Links
@@ -59,4 +63,4 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 
 ## Notes for LLM Agents
 
-Do not treat folder import as RAW decoding, thumbnail generation, sidecar, cache, or library grid behavior. Task 4.4 is the first place to add rating, pick, and reject persistence.
+Do not treat folder import or flag persistence as RAW decoding, thumbnail generation, sidecar writing, cache behavior, or library grid behavior. `photo_flags` is the live in-app authority until sidecar mirroring is implemented by an explicit later task.

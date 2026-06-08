@@ -117,7 +117,9 @@ Phase 4.2 adds file-backed local library create/open behavior.
 
 Phase 4.3 adds non-recursive folder import records with path, file size, modified time, partial hash, and unsupported state.
 
-Still needed: Rust edit graph types, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
+Phase 4.4 adds catalog-authoritative rating, picked, rejected, and color label persistence in `photo_flags`, including default rows for imported photos and restart tests.
+
+Still needed: Rust edit graph types, sidecar flag mirroring, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
 
 ---
 
