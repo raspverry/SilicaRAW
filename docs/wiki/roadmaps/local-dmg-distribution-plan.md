@@ -509,6 +509,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Commit persists final values.
 - **Validation:** Edit preview/commit smoke test and no-draft-write check.
 
+**Status:** Completed on 2026-06-09. Develop mode now has an M005-style MVP surface with selected photo context, preview readiness state, bottom filmstrip, Basic exposure and contrast `SrAdjustmentSlider` controls, manual numeric inputs, reset actions, draft dirty state, revert, and explicit commit. Slider and numeric input changes call the existing `preview_exposure_contrast_edit` path only for draft feedback, while `Commit Edit` is the only UI action wired to `commit_exposure_contrast_edit`. Static smoke mode mirrors the same local-alpha boundaries without claiming catalog persistence. This does not implement RAW decoding, real pixel rendering, Metal viewer output, masks, full tone/color/detail controls, or sidecar writing.
+
 ### Task 5.5.8: Implement Export Dialog MVP
 
 - **Location:** `apps/desktop/static/`, `MockupUI/M007_Export_Dialog.png`

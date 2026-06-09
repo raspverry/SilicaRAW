@@ -222,6 +222,23 @@ body {
   min-width: 0;
   overflow: hidden auto;
   background: var(--sr-surface-panel);
+  scrollbar-color: var(--sr-border-strong) transparent;
+}
+
+.sr-sidebar::-webkit-scrollbar,
+.sr-inspector::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sr-sidebar::-webkit-scrollbar-track,
+.sr-inspector::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sr-sidebar::-webkit-scrollbar-thumb,
+.sr-inspector::-webkit-scrollbar-thumb {
+  border-radius: var(--sr-radius-full);
+  background: var(--sr-border-strong);
 }
 
 .sr-sidebar {
@@ -1077,6 +1094,153 @@ progress::-webkit-progress-value {
   opacity: 0.58;
 }
 
+.sr-develop-mode {
+  display: block;
+  padding: 0;
+}
+
+.sr-develop-workbench {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--sr-space-md);
+  padding: var(--sr-space-lg);
+  overflow: hidden;
+}
+
+.sr-develop-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sr-space-lg);
+}
+
+.sr-develop-toolbar h1 {
+  margin: 0;
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-heading);
+  line-height: var(--sr-line-heading);
+}
+
+.sr-develop-toolbar p {
+  margin: var(--sr-space-2xs) 0 0;
+  overflow: hidden;
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-develop-preview {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-bg-primary);
+}
+
+.sr-develop-art {
+  position: absolute;
+  inset: var(--sr-space-lg);
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+}
+
+.sr-develop-status {
+  position: relative;
+  z-index: 1;
+  width: min(520px, calc(100% - 48px));
+  display: grid;
+  gap: var(--sr-space-sm);
+  justify-items: center;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-panel);
+  padding: var(--sr-space-xl);
+  text-align: center;
+}
+
+.sr-develop-status strong {
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-heading);
+}
+
+.sr-develop-status span {
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+}
+
+.sr-develop-preview[data-preview-status="ready"] .sr-develop-status {
+  align-self: end;
+  margin-bottom: var(--sr-space-lg);
+}
+
+.sr-develop-preview[data-preview-status="ready"] .sr-develop-art {
+  border-color: var(--sr-accent-system);
+}
+
+.sr-develop-preview[data-preview-status="blocked"] .sr-develop-art,
+.sr-develop-preview[data-preview-status="unsupported"] .sr-develop-art {
+  opacity: 0.46;
+}
+
+.sr-develop-preview[data-preview-status="blocked"] .sr-develop-status strong {
+  color: var(--sr-warning);
+}
+
+.sr-develop-preview[data-preview-status="unsupported"] .sr-develop-status strong {
+  color: var(--sr-danger);
+}
+
+.sr-develop-overlay {
+  position: absolute;
+  top: var(--sr-space-lg);
+  right: var(--sr-space-lg);
+  z-index: 1;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-panel);
+  color: var(--sr-text-secondary);
+  padding: var(--sr-space-sm) var(--sr-space-md);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+}
+
+.sr-develop-preview[data-dirty="true"] .sr-develop-overlay {
+  border-color: var(--sr-accent-silica-muted);
+  color: var(--sr-accent-silica);
+}
+
+.sr-develop-filmstrip {
+  min-height: 104px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 112px;
+  gap: var(--sr-space-sm);
+  overflow: auto hidden;
+  padding: var(--sr-space-sm) 0;
+  scrollbar-color: var(--sr-border-strong) transparent;
+}
+
+.sr-develop-filmstrip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.sr-develop-filmstrip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sr-develop-filmstrip::-webkit-scrollbar-thumb {
+  border-radius: var(--sr-radius-full);
+  background: var(--sr-border-strong);
+}
+
 .sr-viewer-mode {
   background:
     radial-gradient(circle at center, var(--sr-overlay-white-faint), transparent 42%),
@@ -1195,6 +1359,78 @@ progress::-webkit-progress-value {
   background: linear-gradient(90deg, var(--sr-border-default), var(--sr-text-tertiary));
 }
 
+.sr-develop-inspector {
+  gap: var(--sr-space-md);
+}
+
+.sr-adjustment-slider {
+  min-height: 74px;
+  display: grid;
+  gap: var(--sr-space-sm);
+}
+
+.sr-adjustment-header,
+.sr-adjustment-control,
+.sr-develop-commit-row,
+.sr-collapse-row {
+  display: grid;
+  align-items: center;
+  gap: var(--sr-space-sm);
+}
+
+.sr-adjustment-header,
+.sr-adjustment-control {
+  grid-template-columns: minmax(0, 1fr) 76px;
+}
+
+.sr-adjustment-header label {
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+  font-weight: 600;
+}
+
+.sr-adjustment-header input {
+  min-height: 32px;
+  padding: var(--sr-space-xs) var(--sr-space-sm);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-adjustment-control input[type="range"] {
+  accent-color: var(--sr-accent-system);
+}
+
+.sr-adjustment-control button {
+  min-height: 32px;
+  padding: var(--sr-space-xs) var(--sr-space-sm);
+}
+
+.sr-develop-commit-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.sr-develop-commit-row button {
+  min-width: 0;
+  padding-inline: var(--sr-space-sm);
+}
+
+.sr-collapse-row {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: start;
+  border-color: transparent;
+  background: transparent;
+  color: var(--sr-text-secondary);
+  padding: var(--sr-space-sm) 0;
+  text-align: left;
+}
+
+.sr-collapse-row::after {
+  content: ">";
+  color: var(--sr-text-tertiary);
+}
+
 .sr-statusbar {
   grid-area: status;
   display: grid;
@@ -1247,6 +1483,10 @@ progress::-webkit-progress-value {
 .sr-thumbnail-control input {
   width: 164px;
   accent-color: var(--sr-accent-system);
+}
+
+.app-frame[data-active-mode="develop"] .sr-thumbnail-control {
+  display: none;
 }
 
 .sr-zoom-track {

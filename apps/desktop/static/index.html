@@ -303,19 +303,31 @@
           </section>
         </section>
 
-        <section class="sr-mode-surface sr-viewer-mode" data-mode-panel="develop" aria-labelledby="developTitle" hidden>
-          <div class="sr-surface-header">
-            <div>
-              <h1 id="developTitle">Develop</h1>
-              <p>No photo selected</p>
+        <section class="sr-mode-surface sr-develop-mode" data-mode-panel="develop" aria-labelledby="developTitle" hidden>
+          <div class="sr-develop-workbench">
+            <div class="sr-develop-toolbar">
+              <div>
+                <h1 id="developTitle">Develop</h1>
+                <p id="developPhotoName">No photo selected</p>
+              </div>
+              <div class="sr-view-controls" aria-label="Develop preview controls">
+                <button type="button">Before</button>
+                <button type="button" class="is-active">After</button>
+                <button type="button">Split</button>
+              </div>
             </div>
-            <div class="sr-view-controls">
-              <button type="button">Before</button>
-              <button type="button" class="is-active">After</button>
-              <button type="button">Split</button>
+            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false">
+              <div class="sr-develop-art sr-thumb-art-a" id="developPreviewArt" aria-hidden="true"></div>
+              <div class="sr-develop-status">
+                <strong id="developPreviewStatus">No Preview</strong>
+                <span id="developPreviewMessage">Select a photo from the Library grid.</span>
+              </div>
+              <div class="sr-develop-overlay" aria-label="Develop edit state">
+                <span id="developEditState">Clean</span>
+              </div>
             </div>
+            <div class="sr-develop-filmstrip" id="developFilmstrip" aria-label="Develop filmstrip"></div>
           </div>
-          <div class="sr-viewer-placeholder" aria-label="Develop viewer placeholder"></div>
         </section>
 
         <section class="sr-mode-surface sr-viewer-mode" data-mode-panel="export" aria-labelledby="exportTitle" hidden>
@@ -348,12 +360,38 @@
           <button class="sr-inspector-action" id="pickSelectedPhoto" type="button">Pick</button>
           <button class="sr-inspector-action" id="rejectSelectedPhoto" type="button">Reject</button>
         </section>
-        <section class="sr-inspector-section" data-mode-panel="develop" hidden>
+        <section class="sr-inspector-section sr-develop-inspector" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Basic</div>
-          <div class="sr-adjust-row"><span>Exposure</span><span>0.00</span></div>
-          <div class="sr-adjust-track"></div>
-          <div class="sr-adjust-row"><span>Contrast</span><span>0</span></div>
-          <div class="sr-adjust-track"></div>
+          <div class="sr-adjustment-slider" data-adjustment="exposure">
+            <div class="sr-adjustment-header">
+              <label for="developExposureSlider">Exposure</label>
+              <input id="developExposureValue" type="number" min="-5" max="5" step="0.05" value="0.00" aria-label="Exposure value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developExposureSlider" type="range" min="-5" max="5" step="0.05" value="0" aria-label="Exposure">
+              <button id="developExposureReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="contrast">
+            <div class="sr-adjustment-header">
+              <label for="developContrastSlider">Contrast</label>
+              <input id="developContrastValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Contrast value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developContrastSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Contrast">
+              <button id="developContrastReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-develop-commit-row">
+            <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
+            <button id="developRevertEdit" type="button">Revert Draft</button>
+          </div>
+          <button class="sr-collapse-row" type="button">Tone</button>
+          <button class="sr-collapse-row" type="button">Color</button>
+          <button class="sr-collapse-row" type="button">Detail</button>
+          <button class="sr-collapse-row" type="button">Lens</button>
+          <button class="sr-collapse-row" type="button">Geometry</button>
+          <button class="sr-collapse-row" type="button">Mask</button>
         </section>
         <section class="sr-inspector-section" data-mode-panel="export" hidden>
           <div class="sr-panel-heading">Summary</div>
@@ -413,6 +451,13 @@
       const loupePhotoRating = document.querySelector("#loupePhotoRating");
       const loupePreviewMessage = document.querySelector("#loupePreviewMessage");
       const loupeFilmstrip = document.querySelector("#loupeFilmstrip");
+      const developPhotoName = document.querySelector("#developPhotoName");
+      const developPreviewSurface = document.querySelector("#developPreviewSurface");
+      const developPreviewArt = document.querySelector("#developPreviewArt");
+      const developPreviewStatus = document.querySelector("#developPreviewStatus");
+      const developPreviewMessage = document.querySelector("#developPreviewMessage");
+      const developFilmstrip = document.querySelector("#developFilmstrip");
+      const developEditState = document.querySelector("#developEditState");
       const libraryPhotoCount = document.querySelector("#libraryPhotoCount");
       const allPhotosCount = document.querySelector("#allPhotosCount");
       const selectedPhotoName = document.querySelector("#selectedPhotoName");
@@ -431,6 +476,14 @@
       const openLoupeButton = document.querySelector("#openLoupe");
       const loupeButtons = Array.from(document.querySelectorAll('[aria-label="Loupe"]'));
       const closeLoupeButton = document.querySelector("#closeLoupe");
+      const developExposureSlider = document.querySelector("#developExposureSlider");
+      const developExposureValue = document.querySelector("#developExposureValue");
+      const developExposureReset = document.querySelector("#developExposureReset");
+      const developContrastSlider = document.querySelector("#developContrastSlider");
+      const developContrastValue = document.querySelector("#developContrastValue");
+      const developContrastReset = document.querySelector("#developContrastReset");
+      const developCommitEdit = document.querySelector("#developCommitEdit");
+      const developRevertEdit = document.querySelector("#developRevertEdit");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
 
       const invoke = window.__TAURI__?.core?.invoke;
@@ -438,6 +491,8 @@
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let activeLibraryPath = "";
+      let developPreviewSequence = 0;
+      const developAdjustmentsByPhoto = new Map();
 
       function setStatus(message) {
         statusOutput.value = message;
@@ -477,6 +532,58 @@
         return `${"*".repeat(value)}${"-".repeat(5 - value)}`;
       }
 
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, Number(value) || 0));
+      }
+
+      function formatExposure(value) {
+        const number = clamp(value, -5, 5);
+        return number.toFixed(2);
+      }
+
+      function formatContrast(value) {
+        return String(Math.round(clamp(value, -100, 100)));
+      }
+
+      function selectedPhoto() {
+        return libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+      }
+
+      function developAdjustmentState(photoId) {
+        if (!developAdjustmentsByPhoto.has(photoId)) {
+          developAdjustmentsByPhoto.set(photoId, {
+            draftExposure: 0,
+            draftContrast: 0,
+            committedExposure: 0,
+            committedContrast: 0,
+          });
+        }
+        return developAdjustmentsByPhoto.get(photoId);
+      }
+
+      function isDevelopable(photo) {
+        return Boolean(photo && !photo.missing && !photo.unsupported);
+      }
+
+      function syncAdjustmentControls(state) {
+        developExposureSlider.value = formatExposure(state.draftExposure);
+        developExposureValue.value = formatExposure(state.draftExposure);
+        developContrastSlider.value = formatContrast(state.draftContrast);
+        developContrastValue.value = formatContrast(state.draftContrast);
+      }
+
+      function updateDevelopDirtyState(state) {
+        const isDirty = Boolean(
+          state
+          && (
+            Number(state.draftExposure) !== Number(state.committedExposure)
+            || Number(state.draftContrast) !== Number(state.committedContrast)
+          )
+        );
+        developPreviewSurface.dataset.dirty = String(isDirty);
+        developEditState.textContent = isDirty ? "Draft not committed" : "Clean";
+      }
+
       function cardState(photo) {
         if (photo.missing) {
           return { className: "", label: "Missing" };
@@ -513,6 +620,7 @@
 
         libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
         renderLoupeFilmstrip();
+        renderDevelopFilmstrip();
         selectPhoto(selectedPhotoId);
       }
 
@@ -559,19 +667,26 @@
 
       function selectPhoto(photoId) {
         selectedPhotoId = photoId;
-        const selected = libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+        const selected = selectedPhoto();
         Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
           card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
         });
         Array.from(loupeFilmstrip.querySelectorAll(".sr-filmstrip-card")).forEach((card) => {
           card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
         });
+        Array.from(developFilmstrip.querySelectorAll(".sr-filmstrip-card")).forEach((card) => {
+          card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
+        });
         selectedPhotoName.textContent = selected?.fileName ?? "None";
         selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+        syncDevelopSelection();
         if (!loupeSurface.hidden) {
           previewSelectedPhoto();
+        }
+        if (appFrame.dataset.activeMode === "develop") {
+          previewDevelopEdit();
         }
       }
 
@@ -594,9 +709,230 @@
         }));
       }
 
+      function renderDevelopFilmstrip() {
+        developFilmstrip.replaceChildren(...libraryPhotos.map((photo, index) => {
+          const card = document.createElement("button");
+          card.className = "sr-filmstrip-card";
+          card.type = "button";
+          card.dataset.photoId = photo.photoId;
+          card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
+          card.classList.toggle("is-rejected", photo.rejected);
+          const art = document.createElement("span");
+          art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
+          art.setAttribute("aria-hidden", "true");
+          const name = document.createElement("span");
+          name.textContent = photo.fileName;
+          card.append(art, name);
+          card.addEventListener("click", () => selectPhoto(photo.photoId));
+          return card;
+        }));
+      }
+
       function parsePreviewField(message, label) {
         const match = message.match(new RegExp(`^${label}:\\s*(.+)$`, "m"));
         return match ? match[1] : "";
+      }
+
+      function localDevelopPreviewPlan(photo, state) {
+        if (!photo) {
+          return { status: "No Preview", message: "Select a photo from the Library grid." };
+        }
+        if (photo.missing) {
+          return { status: "BlockedByDecode", message: "Source file is missing from its referenced path." };
+        }
+        if (photo.unsupported) {
+          return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
+        }
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}.`;
+        if (["JPG", "JPEG", "PNG", "HEIC", "TIF", "TIFF"].includes((photo.fileType || "").toUpperCase())) {
+          return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
+        }
+        return {
+          status: "BlockedByDecode",
+          message: `Edit graph draft is valid, but RAW preview pixels are blocked until decode is implemented. ${summary}`,
+        };
+      }
+
+      function renderDevelopPreviewState(preview) {
+        const normalized = preview.status === "Ready"
+          ? "ready"
+          : preview.status === "Unsupported"
+            ? "unsupported"
+            : "blocked";
+        developPreviewSurface.dataset.previewStatus = normalized;
+        developPreviewStatus.textContent = preview.status === "BlockedByDecode"
+          ? "Blocked by Decode"
+          : preview.status === "Ready"
+            ? "Preview Ready"
+            : preview.status || "No Preview";
+        developPreviewMessage.textContent = preview.message || "No preview session.";
+      }
+
+      function syncDevelopSelection() {
+        const photo = selectedPhoto();
+        developPhotoName.textContent = photo?.fileName ?? "No photo selected";
+        developPreviewArt.className = `sr-develop-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
+        const disabled = !isDevelopable(photo);
+        [
+          developExposureSlider,
+          developExposureValue,
+          developExposureReset,
+          developContrastSlider,
+          developContrastValue,
+          developContrastReset,
+          developCommitEdit,
+          developRevertEdit,
+        ].forEach((control) => {
+          control.disabled = disabled;
+        });
+        const state = photo ? developAdjustmentState(photo.photoId) : {
+          draftExposure: 0,
+          draftContrast: 0,
+          committedExposure: 0,
+          committedContrast: 0,
+        };
+        syncAdjustmentControls(state);
+        updateDevelopDirtyState(state);
+        renderDevelopPreviewState(localDevelopPreviewPlan(photo, state));
+      }
+
+      async function previewDevelopEdit() {
+        const photo = selectedPhoto();
+        if (!photo) {
+          syncDevelopSelection();
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        syncAdjustmentControls(state);
+        updateDevelopDirtyState(state);
+
+        if (!isDevelopable(photo)) {
+          renderDevelopPreviewState(localDevelopPreviewPlan(photo, state));
+          return;
+        }
+
+        if (!activeLibraryPath || !invoke) {
+          renderDevelopPreviewState(localDevelopPreviewPlan(photo, state));
+          setStatus("Develop draft updated locally; desktop runtime is required to persist edits.");
+          return;
+        }
+
+        const sequence = ++developPreviewSequence;
+        try {
+          const message = await invoke("preview_exposure_contrast_edit", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+            exposure: state.draftExposure,
+            contrast: state.draftContrast,
+          });
+          if (sequence !== developPreviewSequence) {
+            return;
+          }
+          if (!message) {
+            renderDevelopPreviewState({ status: "No Preview", message: "Catalog photo was not found." });
+            setStatus("Develop preview unavailable.");
+            return;
+          }
+          renderDevelopPreviewState({
+            status: parsePreviewField(message, "Preview"),
+            message: parsePreviewField(message, "Message"),
+          });
+          setStatus(message);
+        } catch (error) {
+          renderDevelopPreviewState({ status: "No Preview", message: String(error) });
+          setStatus(String(error));
+        }
+      }
+
+      async function commitDevelopEdit() {
+        const photo = selectedPhoto();
+        if (!isDevelopable(photo)) {
+          setStatus("Select a supported catalog photo before committing Develop edits.");
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+
+        if (!activeLibraryPath || !invoke) {
+          state.committedExposure = state.draftExposure;
+          state.committedContrast = state.draftContrast;
+          updateDevelopDirtyState(state);
+          setStatus("Static Develop draft marked clean; desktop runtime is required for catalog persistence.");
+          return;
+        }
+
+        setBusy(true);
+        try {
+          const message = await invoke("commit_exposure_contrast_edit", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+            exposure: state.draftExposure,
+            contrast: state.draftContrast,
+          });
+          if (!message) {
+            setStatus("Develop edit was not committed because the catalog photo was not found.");
+            return;
+          }
+          state.committedExposure = state.draftExposure;
+          state.committedContrast = state.draftContrast;
+          updateDevelopDirtyState(state);
+          setStatus(message);
+        } catch (error) {
+          setStatus(String(error));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      function revertDevelopDraft() {
+        const photo = selectedPhoto();
+        if (!photo) {
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        state.draftExposure = state.committedExposure;
+        state.draftContrast = state.committedContrast;
+        syncAdjustmentControls(state);
+        updateDevelopDirtyState(state);
+        previewDevelopEdit();
+      }
+
+      function updateDevelopAdjustment(kind, value) {
+        const photo = selectedPhoto();
+        if (!photo) {
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        if (kind === "exposure") {
+          state.draftExposure = clamp(value, -5, 5);
+        } else {
+          state.draftContrast = Math.round(clamp(value, -100, 100));
+        }
+        previewDevelopEdit();
+      }
+
+      function resetDevelopAdjustment(kind) {
+        updateDevelopAdjustment(kind, 0);
+      }
+
+      function stepDevelopAdjustment(kind, event) {
+        if (!["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp"].includes(event.key)) {
+          return;
+        }
+        if (!event.altKey && !event.shiftKey) {
+          return;
+        }
+        event.preventDefault();
+        const photo = selectedPhoto();
+        if (!photo) {
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        const direction = ["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1;
+        const step = kind === "exposure"
+          ? event.shiftKey ? 0.25 : 0.01
+          : event.shiftKey ? 10 : 1;
+        const current = kind === "exposure" ? state.draftExposure : state.draftContrast;
+        updateDevelopAdjustment(kind, current + direction * step);
       }
 
       function localPreviewPlan(photo) {
@@ -773,6 +1109,10 @@
         if (mode !== "library" || appFrame.dataset.libraryState !== "welcome") {
           setStatus(`Mode: ${mode[0].toUpperCase()}${mode.slice(1)}`);
         }
+        if (mode === "develop") {
+          syncDevelopSelection();
+          previewDevelopEdit();
+        }
       }
 
       function setLibraryState(state) {
@@ -790,6 +1130,19 @@
         pickSelectedButton.disabled = isBusy;
         rejectSelectedButton.disabled = isBusy;
         openLoupeButton.disabled = isBusy;
+        const developDisabled = isBusy || !isDevelopable(selectedPhoto());
+        [
+          developExposureSlider,
+          developExposureValue,
+          developExposureReset,
+          developContrastSlider,
+          developContrastValue,
+          developContrastReset,
+          developCommitEdit,
+          developRevertEdit,
+        ].forEach((control) => {
+          control.disabled = developDisabled;
+        });
       }
 
       async function runLibraryCommand(command) {
@@ -875,6 +1228,28 @@
         button.addEventListener("click", openLoupeView);
       });
       closeLoupeButton.addEventListener("click", closeLoupeView);
+      developExposureSlider.addEventListener("input", () => updateDevelopAdjustment("exposure", developExposureSlider.value));
+      developExposureSlider.addEventListener("dblclick", () => resetDevelopAdjustment("exposure"));
+      developExposureSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("exposure", event));
+      developExposureValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developExposureValue.value)) {
+          updateDevelopAdjustment("exposure", developExposureValue.value);
+        }
+      });
+      developExposureValue.addEventListener("dblclick", () => resetDevelopAdjustment("exposure"));
+      developContrastSlider.addEventListener("input", () => updateDevelopAdjustment("contrast", developContrastSlider.value));
+      developContrastSlider.addEventListener("dblclick", () => resetDevelopAdjustment("contrast"));
+      developContrastSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("contrast", event));
+      developContrastValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developContrastValue.value)) {
+          updateDevelopAdjustment("contrast", developContrastValue.value);
+        }
+      });
+      developContrastValue.addEventListener("dblclick", () => resetDevelopAdjustment("contrast"));
+      developExposureReset.addEventListener("click", () => resetDevelopAdjustment("exposure"));
+      developContrastReset.addEventListener("click", () => resetDevelopAdjustment("contrast"));
+      developCommitEdit.addEventListener("click", commitDevelopEdit);
+      developRevertEdit.addEventListener("click", revertDevelopDraft);
       thumbnailSizeInput.addEventListener("input", () => {
         libraryGrid.style.setProperty("--sr-thumb-min", `${thumbnailSizeInput.value}px`);
         libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${thumbnailSizeInput.value}px, 1fr))`;

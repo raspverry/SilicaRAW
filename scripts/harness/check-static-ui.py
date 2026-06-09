@@ -107,6 +107,19 @@ def main():
         "loupePreviewMessage",
         "loupeFitMode",
         "loupeFilmstrip",
+        "developPhotoName",
+        "developPreviewSurface",
+        "developPreviewStatus",
+        "developExposureSlider",
+        "developExposureValue",
+        "developExposureReset",
+        "developContrastSlider",
+        "developContrastValue",
+        "developContrastReset",
+        "developCommitEdit",
+        "developRevertEdit",
+        "developFilmstrip",
+        "developEditState",
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)
@@ -146,6 +159,8 @@ def main():
             ".sr-main-surface",
             ".sr-inspector",
             ".sr-statusbar",
+            ".sr-develop-workbench",
+            ".sr-adjustment-slider",
         ]:
             require(selector in css, f"app-frame.css missing {selector}", failures)
         require("@media" in css, "app-frame.css must define responsive behavior", failures)
@@ -154,6 +169,29 @@ def main():
             "app-frame.css must consume color tokens instead of raw color literals",
             failures,
         )
+
+    exposure_slider = parser.ids.get("developExposureSlider", {})
+    require(exposure_slider.get("type") == "range", "#developExposureSlider must be a range input", failures)
+    require(exposure_slider.get("min") == "-5", "#developExposureSlider min must match edit graph exposure", failures)
+    require(exposure_slider.get("max") == "5", "#developExposureSlider max must match edit graph exposure", failures)
+    require(exposure_slider.get("step") == "0.05", "#developExposureSlider step must support precise exposure edits", failures)
+
+    contrast_slider = parser.ids.get("developContrastSlider", {})
+    require(contrast_slider.get("type") == "range", "#developContrastSlider must be a range input", failures)
+    require(contrast_slider.get("min") == "-100", "#developContrastSlider min must match edit graph contrast", failures)
+    require(contrast_slider.get("max") == "100", "#developContrastSlider max must match edit graph contrast", failures)
+    require(contrast_slider.get("step") == "1", "#developContrastSlider step must support integer contrast edits", failures)
+
+    require(
+        parser.ids.get("developExposureValue", {}).get("type") == "number",
+        "#developExposureValue must be a manual numeric input",
+        failures,
+    )
+    require(
+        parser.ids.get("developContrastValue", {}).get("type") == "number",
+        "#developContrastValue must be a manual numeric input",
+        failures,
+    )
 
     require(BASE_CSS.is_file(), "missing styles/base.css", failures)
     if BASE_CSS.is_file():
