@@ -225,7 +225,7 @@ def main():
         in source,
         "open library button must call runLibraryCommand(\"open_library\")",
         failures,
-    )
+        )
     for marker in [
         "const dialogApi = window.__TAURI__?.dialog",
         "async function chooseDirectoryPath",
@@ -236,6 +236,14 @@ def main():
         "Path selection canceled.",
     ]:
         require(marker in source, f"native path picker marker missing: {marker}", failures)
+    for marker in [
+        "thumbnailPath",
+        "thumbnailBytes",
+        "renderThumbnailArt",
+        "URL.createObjectURL",
+        "sr-thumb-image",
+    ]:
+        require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",

@@ -16,6 +16,8 @@ pub use silica_storage::LibraryPhotoGridItem;
 pub use silica_storage::PhotoFlags;
 
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
+const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
+const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
 
 /// Local library session returned by core commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,6 +233,7 @@ pub fn list_library_photos_json(library_root_path: impl AsRef<Path>) -> Result<S
                 "fileName": photo.file_name,
                 "path": photo.path,
                 "fileType": photo.file_type,
+                "thumbnailPath": photo.thumbnail_path,
                 "missing": photo.missing,
                 "unsupported": photo.unsupported,
                 "rating": photo.rating,
@@ -248,6 +251,8 @@ pub fn list_library_photos_json(library_root_path: impl AsRef<Path>) -> Result<S
 pub fn list_library_photos(
     library_root_path: impl AsRef<Path>,
 ) -> Result<Vec<silica_storage::LibraryPhotoGridItem>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    ensure_jpeg_thumbnail_cache(library_root_path)?;
     silica_storage::list_library_photos(library_root_path).map_err(CoreError::from)
 }
 
@@ -453,6 +458,86 @@ fn preview_render_plan(
     Ok(Some((candidate.photo_id, candidate.file_name, render_plan)))
 }
 
+fn ensure_jpeg_thumbnail_cache(library_root_path: &Path) -> Result<(), CoreError> {
+    let photos = silica_storage::list_library_photos(library_root_path)?;
+    let thumbnail_root = library_root_path.join("thumbnails");
+    std::fs::create_dir_all(&thumbnail_root)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)?;
+
+    for photo in photos
+        .iter()
+        .filter(|photo| is_jpeg_thumbnail_candidate(photo))
+    {
+        let source_path = PathBuf::from(&photo.path);
+        if !source_path.is_file() {
+            continue;
+        }
+
+        let cache_key = thumbnail_cache_key(photo, &source_path);
+        if has_fresh_jpeg_thumbnail_cache(photo, &cache_key, &thumbnail_root) {
+            continue;
+        }
+
+        let output_path = thumbnail_root.join(format!("{}.jpg", photo.photo_id));
+        let result =
+            match silica_export::write_jpeg_thumbnail(silica_export::JpegThumbnailRequest {
+                source_path: source_path.clone(),
+                output_path: output_path.clone(),
+                max_edge: LOCAL_ALPHA_THUMBNAIL_MAX_EDGE,
+                quality: LOCAL_ALPHA_THUMBNAIL_QUALITY,
+            }) {
+                Ok(result) => result,
+                Err(silica_export::ExportError::Image(_)) => continue,
+                Err(error) => return Err(CoreError::from(error)),
+            };
+        let byte_size = i64::try_from(result.bytes_written).unwrap_or(i64::MAX);
+        silica_storage::record_thumbnail_cache(
+            library_root_path,
+            &photo.photo_id,
+            cache_key,
+            &result.output_path,
+            byte_size,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn has_fresh_jpeg_thumbnail_cache(
+    photo: &silica_storage::LibraryPhotoGridItem,
+    cache_key: &str,
+    thumbnail_root: &Path,
+) -> bool {
+    if photo.thumbnail_cache_key.as_deref() != Some(cache_key) {
+        return false;
+    }
+
+    let Some(thumbnail_path) = photo.thumbnail_path.as_ref() else {
+        return false;
+    };
+    let thumbnail_path = Path::new(thumbnail_path);
+    thumbnail_path.starts_with(thumbnail_root) && thumbnail_path.is_file()
+}
+
+fn is_jpeg_thumbnail_candidate(photo: &silica_storage::LibraryPhotoGridItem) -> bool {
+    !photo.missing && !photo.unsupported && matches!(photo.file_type.as_str(), "JPG" | "JPEG")
+}
+
+fn thumbnail_cache_key(photo: &silica_storage::LibraryPhotoGridItem, source_path: &Path) -> String {
+    let metadata = std::fs::metadata(source_path).ok();
+    let file_size = metadata.as_ref().map(std::fs::Metadata::len).unwrap_or(0);
+    let modified = metadata
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "thumbnail:v1:{}:{}:{}:{}",
+        photo.photo_id, photo.path, file_size, modified
+    )
+}
+
 fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> PhotoPreviewStatus {
     match status {
         silica_render::PreviewRenderStatus::Ready => PhotoPreviewStatus::Ready,
@@ -600,6 +685,85 @@ mod tests {
         assert!(rows.iter().any(|row| {
             row["fileName"] == "notes.txt" && row["fileType"] == "TXT" && row["unsupported"] == true
         }));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn creates_jpeg_thumbnail_cache_for_grid_without_mutating_original() {
+        let workspace = unique_library_root("core-thumbnail-grid");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+        let raw_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&raw_file, b"supported raw candidate").expect("write raw candidate");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        let original_hash = file_hash(&jpeg_file);
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+
+        let rows = list_library_photos(&created.root_path).expect("list grid rows");
+
+        let jpeg = rows
+            .iter()
+            .find(|row| row.file_name == "sample.jpg")
+            .expect("jpeg grid row");
+        let thumbnail_path = PathBuf::from(
+            jpeg.thumbnail_path
+                .as_ref()
+                .expect("jpeg row exposes thumbnail path"),
+        );
+        assert!(thumbnail_path.starts_with(created.root_path.join("thumbnails")));
+        assert!(thumbnail_path.is_file());
+        let decoded = image::ImageReader::open(&thumbnail_path)
+            .expect("open thumbnail")
+            .with_guessed_format()
+            .expect("guess thumbnail format")
+            .decode()
+            .expect("decode thumbnail");
+        assert!(decoded.width() <= 320);
+        assert!(decoded.height() <= 320);
+        assert_original_hash(&jpeg_file, &original_hash, "thumbnail cache generation");
+
+        let raw = rows
+            .iter()
+            .find(|row| row.file_name == "sample.DNG")
+            .expect("raw grid row");
+        assert!(raw.thumbnail_path.is_none());
+        let unsupported = rows
+            .iter()
+            .find(|row| row.file_name == "notes.txt")
+            .expect("unsupported grid row");
+        assert!(unsupported.thumbnail_path.is_none());
+
+        let cached_rows = list_library_photos(&created.root_path).expect("list cached grid rows");
+        let cached_jpeg = cached_rows
+            .iter()
+            .find(|row| row.file_name == "sample.jpg")
+            .expect("cached jpeg grid row");
+        assert_eq!(
+            cached_jpeg.thumbnail_path.as_deref(),
+            jpeg.thumbnail_path.as_deref()
+        );
+        assert_eq!(
+            cached_jpeg.thumbnail_cache_key.as_deref(),
+            jpeg.thumbnail_cache_key.as_deref()
+        );
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let cache_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM cache_records WHERE cache_type = 'thumbnail'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count thumbnail cache rows");
+        assert_eq!(cache_count, 1);
 
         remove_library_root(&workspace);
     }

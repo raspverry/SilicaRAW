@@ -626,6 +626,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Original files are not modified.
 - **Validation:** Thumbnail cache test, UI smoke, original hash protection, and harness pass.
 
+**Status:** Completed on 2026-06-09. JPEG/JPG grid listing now generates disposable JPEG thumbnail files under each library `thumbnails/` directory, records them in `cache_records` with cache type `thumbnail`, reuses a fresh cache when the source fingerprint is unchanged, and exposes `thumbnailPath` through storage/core plus `thumbnailBytes` through the desktop command response so the static frontend can render real grid and filmstrip pixels via Blob URLs without broadening Tauri asset protocol scope. RAW, missing, and unsupported rows retain placeholder/blocked states, corrupt JPEG bytes do not break the whole grid, and tests verify thumbnail generation does not mutate originals. The existing `image` dependency documentation was updated for this thumbnail use.
+
 ### Task 5.6.5: Real JPEG Loupe Preview MVP
 
 - **Location:** `crates/silica-core`, `apps/desktop/static/`, `crates/silica-storage`
