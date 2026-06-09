@@ -16,7 +16,9 @@
           <span class="sr-window-dot sr-window-dot-yellow"></span>
           <span class="sr-window-dot sr-window-dot-green"></span>
         </div>
-        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar">[]</button>
+        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar">
+          <span class="sr-glyph sr-glyph-sidebar" aria-hidden="true"></span>
+        </button>
         <div class="sr-toolbar-title">SilicaRAW</div>
         <nav class="sr-mode-switcher" id="modeNavigation" aria-label="Primary modes">
           <button id="modeLibrary" type="button" data-mode="library" aria-pressed="true">Library</button>
@@ -25,10 +27,16 @@
         </nav>
         <div class="sr-toolbar-actions" aria-label="Toolbar actions">
           <input class="sr-search" type="search" aria-label="Search photos" placeholder="Search">
-          <button class="sr-icon-button" type="button" aria-label="Grid view">##</button>
-          <button class="sr-icon-button" type="button" aria-label="Inspector">i</button>
+          <button class="sr-icon-button" type="button" aria-label="Grid view">
+            <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
+          </button>
+          <button class="sr-icon-button" type="button" aria-label="Inspector">
+            <span class="sr-glyph sr-glyph-panel" aria-hidden="true"></span>
+          </button>
           <button class="primary sr-export-action" type="button">Export</button>
-          <button class="sr-icon-button" type="button" aria-label="Settings">*</button>
+          <button class="sr-icon-button" type="button" aria-label="Settings">
+            <span class="sr-glyph sr-glyph-settings" aria-hidden="true"></span>
+          </button>
         </div>
       </header>
 
@@ -63,7 +71,9 @@
               <p>All Photos - 0</p>
             </div>
             <div class="sr-view-controls" aria-label="Library view controls">
-              <button type="button" class="sr-icon-button" aria-label="Grid">##</button>
+              <button type="button" class="sr-icon-button" aria-label="Grid">
+                <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
+              </button>
               <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
             </div>
           </div>
@@ -151,11 +161,17 @@
       </aside>
 
       <footer class="sr-statusbar" id="bottomStatus">
+        <div class="sr-status-left">Local alpha</div>
         <div class="sr-bottom-controls" aria-label="Bottom view controls">
-          <button class="sr-icon-button" type="button" aria-label="Grid">##</button>
+          <button class="sr-icon-button" type="button" aria-label="Grid">
+            <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
+          </button>
           <button class="sr-icon-button" type="button" aria-label="Loupe">1:1</button>
         </div>
-        <output id="appStatus" aria-live="polite">No library open</output>
+        <div class="sr-status-right">
+          <output id="appStatus" aria-live="polite">No library open</output>
+          <div class="sr-zoom-track" aria-hidden="true"></div>
+        </div>
       </footer>
     </div>
     <script>
