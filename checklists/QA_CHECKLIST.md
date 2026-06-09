@@ -1,5 +1,66 @@
 # QA Checklist
 
+## Task 6.2 Original Safety QA Record
+
+Status: automated core hash QA added on 2026-06-09. Manual DMG-installed execution is recorded with Task 6.3 when a release candidate artifact exists.
+
+Automated validation command:
+
+```bash
+cargo test -p silica-core local_alpha_workflow_preserves_original_file_hash
+```
+
+Automated coverage:
+
+- [x] Creates a disposable local library.
+- [x] Creates a generated local JPEG fixture outside the library folder.
+- [x] Records the original fixture hash before import.
+- [x] Imports by reference.
+- [x] Applies rating and Pick state.
+- [x] Opens preview/loupe through the core preview path.
+- [x] Runs draft exposure/contrast preview.
+- [x] Commits exposure/contrast edit state.
+- [x] Exports JPEG sRGB to a separate output folder.
+- [x] Simulates cache clearing by deleting current disposable cache directories: `thumbnails`, `previews`, `render-cache`, and `ai-cache`.
+- [x] Reopens the local library.
+- [x] Verifies original file hash is unchanged after import, flag updates, preview, draft edit, committed edit, export, simulated cache clear, and restart/reopen.
+- [x] Verifies exported JPEG output path differs from the original source path.
+
+Current cache note:
+
+- [x] The local alpha does not yet expose a product cache-clear command or UI. The automated QA simulates the current cache safety surface by deleting disposable library cache directories only.
+
+Manual QA record:
+
+- Tester:
+- Date:
+- Git commit:
+- Artifact type: `local build` / `developer unsigned DMG` / `signed notarized DMG`
+- macOS version:
+- Machine model:
+- Source sample folder:
+- Source file hash before workflow:
+- Source file hash after workflow:
+- Export output path:
+- Result: `pass` / `fail`
+
+Manual checklist:
+
+- [ ] Import a folder by reference.
+- [ ] Confirm UI states originals stay in place or are not modified.
+- [ ] Rate, Pick, and Reject at least one photo.
+- [ ] Open preview/loupe.
+- [ ] Apply exposure/contrast and commit.
+- [ ] Export JPEG sRGB to a separate output folder.
+- [ ] Confirm export output path differs from the original source path.
+- [ ] Clear cache if a cache-clear product control exists; otherwise record `not implemented in current alpha`.
+- [ ] Quit and relaunch the app.
+- [ ] Reopen the library and confirm edits/flags persist.
+- [ ] Recompute the original source file hash and confirm it matches the pre-workflow hash.
+- [ ] Confirm no exported file overwrote an original source path.
+
+## General QA Backlog
+
 - [ ] Import 1,000 mixed images
 - [ ] Rate/reject 100 photos
 - [ ] Edit 20 RAW files

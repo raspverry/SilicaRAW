@@ -22,6 +22,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Phase 4.3 records imported folder files by reference and verifies mixed-file import does not copy or mutate originals.
 - Phase 4.4 persists culling flags in SQLite `photo_flags` and verifies they survive library reopen without touching originals or sidecars.
 - Phase 5.3 persists exposure/contrast edit graphs in SQLite `edit_states` on commit and verifies draft preview updates do not write edit state rows.
+- Phase 6.2 adds a core workflow hash QA that verifies one original fixture hash stays unchanged across import by reference, culling flags, preview, draft edit, committed edit, JPEG sRGB export, simulated cache-directory clearing, and library reopen.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -32,10 +33,10 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Folder import safety. Phase 4.3 covers mixed supported/unsupported fixture import by reference, partial hash recording, and original byte preservation.
 - Flag persistence safety. Phase 4.4 covers default `photo_flags` rows, catalog-authoritative updates, and restart persistence.
 - Exposure/contrast edit safety. Phase 5.3 covers draft preview updates without `edit_states` writes and commit/release persistence after library reopen.
-- Original hash protection.
+- Original hash protection. Phase 6.2 covers the connected local alpha workflow with an automated generated-fixture hash test in `silica-core`.
 - Edit graph serialization.
 - Sidecar read/write.
-- Cache clear safety.
+- Cache clear safety. Phase 6.2 simulates the currently scoped cache safety surface by deleting disposable library cache directories because no product cache-clear command exists yet.
 
 ## Links
 
