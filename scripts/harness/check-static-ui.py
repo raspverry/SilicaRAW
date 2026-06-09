@@ -71,6 +71,13 @@ def main():
         "rightInspector",
         "bottomStatus",
         "appStatus",
+        "welcomeScreen",
+        "welcomeStatus",
+        "libraryPath",
+        "openLibrary",
+        "createLibrary",
+        "openRecent",
+        "openSampleProject",
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)
@@ -79,6 +86,11 @@ def main():
     require(
         app_frame.get("data-active-mode") == "library",
         "#appFrame must default to data-active-mode=\"library\"",
+        failures,
+    )
+    require(
+        app_frame.get("data-library-state") == "welcome",
+        "#appFrame must default to data-library-state=\"welcome\"",
         failures,
     )
 
