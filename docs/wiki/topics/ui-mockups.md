@@ -39,10 +39,21 @@ catalog photo -> active/default edit graph -> draft exposure/contrast render req
 
 It does not implement the M005 screen, product sliders, actual pixel rendering, or final viewer interaction behavior.
 
+## Phase 5.5 Relationship
+
+Phase 5.5 is the first UI MVP vertical slice. It uses `MockupUI/` as the visual and information-structure target for the connected local alpha workflow:
+
+```txt
+M001 welcome -> M003 library grid -> M004 preview/loupe -> M005 develop -> M007 export
+```
+
+Task 5.5.1 establishes the token and source hierarchy baseline before screen implementation begins. Later Task 5.5 subtasks should inspect the relevant mockup before editing UI code.
+
 ## Links
 
 - [Mockup Manifest](../../../MockupUI/MANIFEST.md)
 - [Screen Inventory](../../06_Screen_Inventory_and_Wireframe_Specification.md)
+- [UI MVP Baseline](ui-mvp-baseline.md)
 - [Metal Rendering](metal-rendering.md)
 - [Color Management](color-management.md)
 
