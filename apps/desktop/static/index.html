@@ -760,6 +760,8 @@
             draftContrast: 0,
             committedExposure: 0,
             committedContrast: 0,
+            readbackLoaded: false,
+            readbackLibraryPath: "",
           });
         }
         return developAdjustmentsByPhoto.get(photoId);
@@ -786,6 +788,27 @@
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
         developEditState.textContent = isDirty ? "Draft not committed" : "Clean";
+      }
+
+      function editStateNumber(value, fallback) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : fallback;
+      }
+
+      function applyPersistedDevelopState(photoId, editState) {
+        const state = developAdjustmentState(photoId);
+        state.committedExposure = editStateNumber(editState?.exposure, 0);
+        state.committedContrast = editStateNumber(editState?.contrast, 0);
+        state.draftExposure = state.committedExposure;
+        state.draftContrast = state.committedContrast;
+        state.readbackLoaded = true;
+        state.readbackLibraryPath = activeLibraryPath || "";
+
+        if (photoId === selectedPhotoId) {
+          syncAdjustmentControls(state);
+          updateDevelopDirtyState(state);
+          renderDevelopPreviewState(localDevelopPreviewPlan(selectedPhoto(), state));
+        }
       }
 
       function cardState(photo) {
@@ -981,7 +1004,7 @@
           previewSelectedPhoto();
         }
         if (appFrame.dataset.activeMode === "develop") {
-          previewDevelopEdit();
+          readPersistedDevelopState(selected).then(() => previewDevelopEdit());
         }
       }
 
@@ -1174,10 +1197,58 @@
           draftContrast: 0,
           committedExposure: 0,
           committedContrast: 0,
+          readbackLoaded: false,
+          readbackLibraryPath: "",
         };
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         renderDevelopPreviewState(localDevelopPreviewPlan(photo, state));
+      }
+
+      async function readPersistedDevelopState(photo, options = {}) {
+        if (!photo) {
+          return false;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        const libraryPath = activeLibraryPath || "";
+        if (!options.force && state.readbackLoaded && state.readbackLibraryPath === libraryPath) {
+          return false;
+        }
+        if (!isDevelopable(photo) || !libraryPath || !invoke) {
+          state.readbackLoaded = true;
+          state.readbackLibraryPath = libraryPath;
+          return false;
+        }
+
+        const readbackPhotoId = photo.photoId;
+        try {
+          const response = await invoke("get_photo_edit_state", {
+            libraryPath,
+            photoId: readbackPhotoId,
+          });
+          if (selectedPhotoId !== readbackPhotoId) {
+            return false;
+          }
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Develop edit state readback failed."));
+            return false;
+          }
+          if (!response.data) {
+            setStatus("Develop edit state was not found for the selected catalog photo.");
+            return false;
+          }
+          applyPersistedDevelopState(readbackPhotoId, {
+            exposure: response.data.exposure,
+            contrast: response.data.contrast,
+            persisted: response.data.persisted,
+            message: response.data.message,
+          });
+          setStatus(responseMessage(response, "Restored committed edit state."));
+          return true;
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "Develop edit state readback failed."));
+          return false;
+        }
       }
 
       async function previewDevelopEdit() {
@@ -1251,6 +1322,8 @@
         if (!activeLibraryPath || !invoke) {
           state.committedExposure = state.draftExposure;
           state.committedContrast = state.draftContrast;
+          state.readbackLoaded = true;
+          state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
           setStatus("Static Develop draft marked clean; desktop runtime is required for catalog persistence.");
           return;
@@ -1272,8 +1345,13 @@
             setStatus("Develop edit was not committed because the catalog photo was not found.");
             return;
           }
-          state.committedExposure = state.draftExposure;
-          state.committedContrast = state.draftContrast;
+          state.committedExposure = editStateNumber(response.data.exposure, state.draftExposure);
+          state.committedContrast = editStateNumber(response.data.contrast, state.draftContrast);
+          state.draftExposure = state.committedExposure;
+          state.draftContrast = state.committedContrast;
+          state.readbackLoaded = true;
+          state.readbackLibraryPath = activeLibraryPath || "";
+          syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
           setStatus(responseMessage(response));
         } catch (error) {
@@ -1536,7 +1614,7 @@
         }
         if (mode === "develop") {
           syncDevelopSelection();
-          previewDevelopEdit();
+          readPersistedDevelopState(selectedPhoto()).then(() => previewDevelopEdit());
         }
         if (mode === "export") {
           openExportDialog();

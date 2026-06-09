@@ -2,7 +2,7 @@
 title: Local DMG Distribution Plan
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-10
 source_of_truth: docs/16_Release_Distribution_Plan.md
 ---
 
@@ -666,6 +666,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Develop sliders and edited/clean state match catalog state after library reopen.
   - Restart/reopen UI validation no longer relies on in-memory JavaScript state.
 - **Validation:** Core/desktop command tests, UI restart smoke, and harness pass.
+
+**Status:** Completed on 2026-06-10. `silica-storage` now exposes a read-only active edit graph lookup separate from default draft creation, `silica-core` returns a `PhotoEditState` with committed exposure/contrast and `persisted` status, and the desktop shell exposes `get_photo_edit_state` through the structured command envelope. The Develop UI reads that command when entering Develop or selecting a photo, applies persisted exposure/contrast to sliders and clean/dirty state, and marks the per-library readback as loaded so reopen validation is catalog-backed rather than memory-only.
 
 ### Task 5.6.8: Product Cache Clear Command and Maintenance UI
 

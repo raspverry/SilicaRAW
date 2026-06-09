@@ -592,8 +592,8 @@ pub fn get_photo_preview_candidate(
         .map_err(LibraryStorageError::from)
 }
 
-/// Load the active edit graph for a photo, or build a default draft without writing it.
-pub fn load_active_edit_graph_or_default(
+/// Load the active committed edit graph for a photo without creating a default draft.
+pub fn load_active_edit_graph(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
 ) -> Result<Option<silica_edit::EditGraph>, LibraryStorageError> {
@@ -601,10 +601,10 @@ pub fn load_active_edit_graph_or_default(
         return Err(CatalogFlagError::EmptyPhotoId.into());
     }
 
-    let library = open_local_library(library_root_path)?;
+    let library = open_existing_library_for_read(library_root_path)?;
     let connection = open_catalog(&library.catalog_path)?;
 
-    if let Some(json) = connection
+    connection
         .query_row(
             r#"
             SELECT edit_graph_json
@@ -617,11 +617,26 @@ pub fn load_active_edit_graph_or_default(
             |row| row.get::<_, String>(0),
         )
         .optional()?
-    {
-        let graph: silica_edit::EditGraph = serde_json::from_str(&json)?;
-        silica_edit::validate_edit_graph(&graph)?;
+        .map(|json| {
+            let graph: silica_edit::EditGraph = serde_json::from_str(&json)?;
+            silica_edit::validate_edit_graph(&graph)?;
+            Ok(graph)
+        })
+        .transpose()
+}
+
+/// Load the active edit graph for a photo, or build a default draft without writing it.
+pub fn load_active_edit_graph_or_default(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<silica_edit::EditGraph>, LibraryStorageError> {
+    let library_root_path = library_root_path.as_ref();
+    if let Some(graph) = load_active_edit_graph(library_root_path, photo_id)? {
         return Ok(Some(graph));
     }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
 
     let source = connection
         .query_row(

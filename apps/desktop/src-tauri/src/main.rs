@@ -109,6 +109,13 @@ enum DesktopCommandData {
         persisted: bool,
         message: String,
     },
+    EditState {
+        photo_id: String,
+        exposure: f64,
+        contrast: f64,
+        persisted: bool,
+        message: String,
+    },
     Export {
         photo_id: String,
         source_path: String,
@@ -132,6 +139,7 @@ impl DesktopCommandData {
             Self::PhotoPreview { .. } => "photoPreview",
             Self::EditPreview { .. } => "editPreview",
             Self::EditCommit { .. } => "editCommit",
+            Self::EditState { .. } => "editState",
             Self::Export { .. } => "export",
         }
     }
@@ -463,6 +471,34 @@ fn commit_exposure_contrast_edit(
 }
 
 #[tauri::command]
+fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_edit_state";
+    match silica_core::get_photo_edit_state(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(state)) => DesktopCommandResponse::ok(
+            command,
+            state.message.clone(),
+            DesktopCommandData::EditState {
+                photo_id: state.photo_id,
+                exposure: state.exposure,
+                contrast: state.contrast,
+                persisted: state.persisted,
+                message: state.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn export_photo_jpeg_srgb(
     library_path: String,
     photo_id: String,
@@ -554,6 +590,7 @@ fn main() {
             open_photo_preview,
             preview_exposure_contrast_edit,
             commit_exposure_contrast_edit,
+            get_photo_edit_state,
             export_photo_jpeg_srgb
         ])
         .run(tauri::generate_context!())
@@ -821,13 +858,30 @@ mod tests {
 
         let committed = super::commit_exposure_contrast_edit(
             library_root.display().to_string(),
-            photo_id,
+            photo_id.clone(),
             0.5,
             -8.0,
         );
         assert!(committed.ok);
         match response_data(&committed) {
             super::DesktopCommandData::EditCommit {
+                exposure,
+                contrast,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*exposure, 0.5);
+                assert_eq!(*contrast, -8.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let restored =
+            super::get_photo_edit_state(library_root.display().to_string(), photo_id.clone());
+        assert!(restored.ok);
+        match response_data(&restored) {
+            super::DesktopCommandData::EditState {
                 exposure,
                 contrast,
                 persisted,

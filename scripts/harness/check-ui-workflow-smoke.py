@@ -17,6 +17,7 @@ ALLOWED_COMMANDS = {
     "open_photo_preview",
     "preview_exposure_contrast_edit",
     "commit_exposure_contrast_edit",
+    "get_photo_edit_state",
     "export_photo_jpeg_srgb",
 }
 
@@ -89,6 +90,7 @@ WORKFLOW_STEPS = [
             "developEditState",
         ],
         "commands": [
+            "get_photo_edit_state",
             "preview_exposure_contrast_edit",
             "commit_exposure_contrast_edit",
         ],
@@ -258,6 +260,13 @@ def main():
         "sr-develop-image",
     ]:
         require(marker in source, f"real develop preview marker missing: {marker}", failures)
+    for marker in [
+        "readPersistedDevelopState",
+        "get_photo_edit_state",
+        "readbackLoaded",
+        "Restored committed edit state.",
+    ]:
+        require(marker in source, f"persisted develop readback marker missing: {marker}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",
