@@ -47,6 +47,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [UI Mockups](topics/ui-mockups.md)
 - [UI MVP Baseline](topics/ui-mvp-baseline.md)
 - [UI Visual and Responsive QA](topics/ui-visual-responsive-qa.md)
+- [Product Alpha Runtime Completion](topics/product-alpha-runtime-completion.md)
 - [Edit Graph](topics/edit-graph.md)
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)

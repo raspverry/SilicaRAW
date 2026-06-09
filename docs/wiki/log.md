@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-09] phase-5.6 | Product alpha runtime completion planned
+
+- Added the Product Alpha Runtime Completion topic.
+- Inserted Phase 5.6 before clean-Mac install QA in the local DMG distribution plan.
+- Recorded that Phase 5.5 is a screen/command-wiring milestone, while Phase 5.6 is the installed-app readiness pass for real JPEG/JPG pixels, native/selectable paths, persisted edit-state UI readback, cache clear, legal fixtures, and runtime smoke.
+- Narrowed the guaranteed installed-alpha visible photo path to JPEG/JPG until additional raster codecs are explicitly implemented and tested.
+
 ## [2026-06-09] phase-5.5 | UI MVP baseline started
 
 - Added Task 5.5 as a UI MVP vertical slice before local install QA.

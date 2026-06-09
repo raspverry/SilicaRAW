@@ -20,6 +20,8 @@ Library grid -> Develop exposure/contrast -> Export JPEG sRGB dialog
 
 This is a visual and responsive QA pass only. It does not add real image pixels, thumbnail cache generation, RAW decoding, Metal rendering, native folder picking, or export formats beyond JPEG sRGB.
 
+This page remains the record for the static Phase 5.5 pass. It is not the final Phase 6 readiness gate. Phase 5.6.12 reruns visual/responsive QA after real JPEG/JPG thumbnails, loupe preview, Develop preview, path UX, cache UI, and demo-state cleanup are implemented.
+
 ## Method
 
 Local static UI server:
@@ -81,4 +83,5 @@ The CSS fix:
 
 - [UI MVP Baseline](ui-mvp-baseline.md)
 - [UI Mockups](ui-mockups.md)
+- [Product Alpha Runtime Completion](product-alpha-runtime-completion.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)

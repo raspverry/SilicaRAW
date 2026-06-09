@@ -16,6 +16,8 @@ Task 5.5 adds the product UI vertical slice that must exist before local install
 create/open library -> import by reference -> browse grid -> cull -> develop exposure/contrast -> export JPEG sRGB
 ```
 
+Phase 5.5 is a screen and command-wiring milestone, not the final installed-app readiness gate. Phase 5.6 follows it to replace placeholder/static behavior with the product runtime behaviors required before clean-Mac DMG QA.
+
 ## Source Hierarchy
 
 Use these sources in this order when implementing UI:
@@ -209,7 +211,8 @@ UI QA should happen in vertical slices, not after every future screen exists.
 
 1. First QA the connected core workflow through M001/M003/M005/M007-level screens.
 2. Then verify responsive variants for M003, M005, and M007.
-3. Then expand secondary screens such as preferences, mask active, and AI review.
+3. Then complete Phase 5.6 runtime behavior: real JPEG/JPG pixels, native/selectable paths, persisted edit-state readback, cache clearing, fixture generation, and installed/runtime smoke.
+4. Then expand secondary screens such as preferences, mask active, and AI review when they are explicitly scoped.
 
 Minimum UI MVP checks:
 
@@ -224,4 +227,5 @@ Minimum UI MVP checks:
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [UI Mockups](ui-mockups.md)
 - [UI Visual and Responsive QA](ui-visual-responsive-qa.md)
+- [Product Alpha Runtime Completion](product-alpha-runtime-completion.md)
 - [Metal Rendering](metal-rendering.md)

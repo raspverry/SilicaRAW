@@ -49,11 +49,16 @@ M001 welcome -> M003 library grid -> M004 preview/loupe -> M005 develop -> M007 
 
 Task 5.5.1 establishes the token and source hierarchy baseline before screen implementation begins. Later Task 5.5 subtasks should inspect the relevant mockup before editing UI code.
 
+## Phase 5.6 Relationship
+
+Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders with product runtime behavior. M001, M002, M003, M004, M005, M007, M008-minimal, and M009 remain the relevant visual references for the local alpha. M006 mask active and M010 AI Review remain out of scope until mask and AI/MLX work are explicitly scheduled.
+
 ## Links
 
 - [Mockup Manifest](../../../MockupUI/MANIFEST.md)
 - [Screen Inventory](../../06_Screen_Inventory_and_Wireframe_Specification.md)
 - [UI MVP Baseline](ui-mvp-baseline.md)
+- [Product Alpha Runtime Completion](product-alpha-runtime-completion.md)
 - [Metal Rendering](metal-rendering.md)
 - [Color Management](color-management.md)
 
