@@ -20,6 +20,7 @@ pub use silica_catalog::PhotoFlags;
 use silica_catalog::{
     is_supported_photo_extension, CatalogFlagError, ImportCandidate,
     ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
+    ALPHA_MAX_RATING,
 };
 
 /// Stable crate name used by scaffold verification.
@@ -115,6 +116,21 @@ pub struct PhotoPreviewCandidate {
     pub file_name: String,
     pub path: String,
     pub unsupported: bool,
+}
+
+/// Catalog row data needed by the Library grid MVP.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryPhotoGridItem {
+    pub photo_id: String,
+    pub file_name: String,
+    pub path: String,
+    pub file_type: String,
+    pub missing: bool,
+    pub unsupported: bool,
+    pub rating: u8,
+    pub picked: bool,
+    pub rejected: bool,
+    pub color_label: Option<String>,
 }
 
 /// Catalog export row written after an export completes.
@@ -289,6 +305,35 @@ pub fn import_folder(
         unsupported_files,
         candidates,
     })
+}
+
+/// List imported catalog photos for the Library grid without touching originals.
+pub fn list_library_photos(
+    library_root_path: impl AsRef<Path>,
+) -> Result<Vec<LibraryPhotoGridItem>, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+          photos.id,
+          photos.file_name,
+          photos.path,
+          photos.missing,
+          photos.unsupported,
+          photo_flags.rating,
+          photo_flags.picked,
+          photo_flags.rejected,
+          photo_flags.color_label
+        FROM photos
+        LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+        ORDER BY photos.file_name ASC, photos.path ASC
+        "#,
+    )?;
+    let rows = statement.query_map([], library_photo_grid_item_from_row)?;
+
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(LibraryStorageError::from)
 }
 
 /// Persist culling and label flags for a photo in the catalog.
@@ -811,6 +856,35 @@ fn photo_flags_from_row(
         color_label,
     )
     .map_err(LibraryStorageError::from)
+}
+
+fn library_photo_grid_item_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<LibraryPhotoGridItem> {
+    let photo_id: String = row.get(0)?;
+    let file_name: String = row.get(1)?;
+    let path: String = row.get(2)?;
+    let file_type = Path::new(&path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    let rating = u8::try_from(row.get::<_, Option<i64>>(5)?.unwrap_or(0))
+        .unwrap_or(0)
+        .min(ALPHA_MAX_RATING);
+
+    Ok(LibraryPhotoGridItem {
+        photo_id,
+        file_name,
+        path,
+        file_type,
+        missing: sql_to_bool(row.get::<_, i64>(3)?),
+        unsupported: sql_to_bool(row.get::<_, i64>(4)?),
+        rating,
+        picked: sql_to_bool(row.get::<_, Option<i64>>(6)?.unwrap_or(0)),
+        rejected: sql_to_bool(row.get::<_, Option<i64>>(7)?.unwrap_or(0)),
+        color_label: row.get(8)?,
+    })
 }
 
 fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRecord> {
@@ -1370,6 +1444,59 @@ mod tests {
         );
         assert!(!library_root.join("sample.DNG").exists());
         assert!(!library_root.join("notes.txt").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn lists_library_photo_grid_items_with_flags_and_states() {
+        let workspace = unique_library_root("grid-items");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let supported_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            supported_id.clone(),
+            4,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set grid flags");
+
+        let items = list_library_photos(&library.root_path).expect("list library photos");
+
+        assert_eq!(items.len(), 2);
+        let supported = items
+            .iter()
+            .find(|item| item.file_name == "sample.DNG")
+            .expect("supported grid item");
+        assert_eq!(supported.photo_id, supported_id);
+        assert_eq!(supported.file_type, "DNG");
+        assert_eq!(supported.rating, 4);
+        assert!(supported.picked);
+        assert!(!supported.rejected);
+        assert_eq!(supported.color_label.as_deref(), Some("green"));
+        assert!(!supported.missing);
+        assert!(!supported.unsupported);
+
+        let unsupported = items
+            .iter()
+            .find(|item| item.file_name == "notes.txt")
+            .expect("unsupported grid item");
+        assert_eq!(unsupported.file_type, "TXT");
+        assert!(unsupported.unsupported);
+        assert_eq!(unsupported.rating, 0);
 
         remove_library_root(&workspace);
     }

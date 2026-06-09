@@ -132,6 +132,17 @@ Task 5.5.4 adds the M009 import progress structure inside the Library workbench:
 - Static progress rows are placeholders until real progress events are explicitly scoped.
 - Pause, cancel, recursive import, import history persistence, and native folder picking remain future work.
 
+## Task 5.5.5 Library Grid
+
+Task 5.5.5 replaces the placeholder grid with the M003 Library Grid MVP:
+
+- The grid renders imported catalog rows from the desktop `list_library_photos` command.
+- Selected photo, rating, pick, reject, missing, and unsupported states are visible in the grid or inspector.
+- Rating, Pick, and Reject inspector actions route through the existing `set_photo_flags` command.
+- Empty and loading states are represented without copying or decoding originals.
+- Static thumbnail art remains a UI placeholder until real thumbnail cache generation and virtualization are scoped.
+- Loupe opening, full metadata population, advanced filters, and real histogram values remain future work.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.

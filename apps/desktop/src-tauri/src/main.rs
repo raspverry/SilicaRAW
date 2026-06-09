@@ -33,6 +33,12 @@ fn import_folder(library_path: String, folder_path: String) -> Result<String, St
 }
 
 #[tauri::command]
+fn list_library_photos(library_path: String) -> Result<String, String> {
+    silica_core::list_library_photos_json(PathBuf::from(library_path))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn set_photo_flags(
     library_path: String,
     photo_id: String,
@@ -158,6 +164,7 @@ fn main() {
             create_library,
             open_library,
             import_folder,
+            list_library_photos,
             set_photo_flags,
             get_photo_flags,
             open_photo_preview,
@@ -249,6 +256,45 @@ mod tests {
         assert!(imported.contains("Unsupported: 1"));
         assert!(supported_file.is_file());
         assert!(unsupported_file.is_file());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_lists_library_photos_for_grid() {
+        let workspace = unique_library_root("desktop-grid");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id,
+            4,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set grid flags");
+
+        let grid = super::list_library_photos(library_root.display().to_string())
+            .expect("list library photos command");
+
+        assert!(grid.contains("\"fileName\":\"sample.DNG\""));
+        assert!(grid.contains("\"fileName\":\"notes.txt\""));
+        assert!(grid.contains("\"unsupported\":true"));
+        assert!(grid.contains("\"rating\":4"));
+        assert!(grid.contains("\"picked\":true"));
+        assert!(grid.contains("\"colorLabel\":\"green\""));
 
         remove_library_root(&workspace);
     }

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SilicaRAW</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="./styles/tokens.css">
     <link rel="stylesheet" href="./styles/base.css">
     <link rel="stylesheet" href="./styles/app-frame.css">
@@ -44,7 +45,7 @@
       <aside class="sr-sidebar" id="leftSidebar" aria-label="Left sidebar">
         <section class="sr-sidebar-section" data-mode-panel="library">
           <div class="sr-panel-heading">Library</div>
-          <button class="sr-sidebar-item is-active" type="button"><span>All Photos</span><span>0</span></button>
+          <button class="sr-sidebar-item is-active" type="button"><span>All Photos</span><span id="allPhotosCount">0</span></button>
           <button class="sr-sidebar-item" type="button"><span>Recent Imports</span><span id="recentImportCount">0</span></button>
           <button class="sr-sidebar-item" type="button"><span>Favorites</span><span>0</span></button>
           <button class="sr-sidebar-item" type="button"><span>Rejected</span><span>0</span></button>
@@ -122,7 +123,7 @@
             <div class="sr-surface-header">
               <div>
                 <h1 id="libraryTitle">Library</h1>
-                <p>All Photos - 0</p>
+                <p id="gridStateNote">Catalog grid waits for a local library.</p>
               </div>
               <div class="sr-view-controls" aria-label="Library view controls">
                 <button class="primary" id="showImportPanel" type="button">Import Photos</button>
@@ -132,7 +133,7 @@
                 <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
               </div>
             </div>
-            <section class="sr-import-panel" id="importPanel" aria-labelledby="importTitle">
+            <section class="sr-import-panel" id="importPanel" aria-labelledby="importTitle" hidden>
               <div class="sr-import-shell">
                 <div class="sr-import-header">
                   <div>
@@ -185,13 +186,94 @@
                 </div>
               </div>
             </section>
-            <div class="sr-grid-placeholder" aria-label="Library grid placeholder">
-              <div class="sr-photo-tile"></div>
-              <div class="sr-photo-tile"></div>
-              <div class="sr-photo-tile"></div>
-              <div class="sr-photo-tile"></div>
-              <div class="sr-photo-tile"></div>
-              <div class="sr-photo-tile"></div>
+            <div class="sr-library-grid-shell" aria-label="Library grid surface">
+              <div class="sr-grid-toolbar" aria-label="Library grid filters">
+                <div>
+                  <strong>All Photos</strong>
+                  <span id="gridPhotoSubtitle">Preview catalog rows</span>
+                </div>
+                <div class="sr-grid-tools">
+                  <button type="button">All Files</button>
+                  <button type="button" aria-label="Minimum rating">*****</button>
+                  <button type="button">Capture Time</button>
+                </div>
+              </div>
+              <div class="sr-grid-state" id="gridLoadingState" hidden>
+                <strong>Loading catalog photos</strong>
+                <span>Reading imported references from the local catalog.</span>
+              </div>
+              <div class="sr-grid-state" id="gridEmptyState" hidden>
+                <strong>No imported photos</strong>
+                <span>Import a folder by reference to populate this grid.</span>
+              </div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite">
+                <button class="sr-photo-card is-selected" type="button" data-photo-id="demo-001" data-rating="5" data-picked="true" data-rejected="false" data-color-label="green" data-file-name="DSC_1042.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1042.CR3">
+                  <span class="sr-thumb-art sr-thumb-art-a" aria-hidden="true"></span>
+                  <span class="sr-file-badge">CR3</span>
+                  <span class="sr-card-state sr-card-state-pick">Pick</span>
+                  <span class="sr-card-footer"><span>DSC_1042.CR3</span><span>*****</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-002" data-rating="4" data-picked="false" data-rejected="false" data-color-label="blue" data-file-name="DSC_1043.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1043.CR3">
+                  <span class="sr-thumb-art sr-thumb-art-b" aria-hidden="true"></span>
+                  <span class="sr-file-badge">CR3</span>
+                  <span class="sr-card-footer"><span>DSC_1043.CR3</span><span>****-</span></span>
+                </button>
+                <button class="sr-photo-card is-rejected" type="button" data-photo-id="demo-003" data-rating="2" data-picked="false" data-rejected="true" data-color-label="red" data-file-name="DSC_1044.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1044.CR3">
+                  <span class="sr-thumb-art sr-thumb-art-c" aria-hidden="true"></span>
+                  <span class="sr-file-badge">CR3</span>
+                  <span class="sr-card-state sr-card-state-reject">Reject</span>
+                  <span class="sr-card-footer"><span>DSC_1044.CR3</span><span>**---</span></span>
+                </button>
+                <button class="sr-photo-card is-unsupported" type="button" data-photo-id="demo-004" data-rating="0" data-picked="false" data-rejected="false" data-color-label="" data-file-name="notes.txt" data-file-type="TXT" data-path="/Volumes/Photography/Tokyo/notes.txt">
+                  <span class="sr-thumb-art sr-thumb-art-d" aria-hidden="true"></span>
+                  <span class="sr-file-badge">TXT</span>
+                  <span class="sr-card-state">Unsupported</span>
+                  <span class="sr-card-footer"><span>notes.txt</span><span>-----</span></span>
+                </button>
+                <button class="sr-photo-card is-missing" type="button" data-photo-id="demo-005" data-rating="3" data-picked="false" data-rejected="false" data-color-label="yellow" data-file-name="DSC_1045.ARW" data-file-type="ARW" data-path="/Volumes/Photography/Tokyo/DSC_1045.ARW">
+                  <span class="sr-thumb-art sr-thumb-art-e" aria-hidden="true"></span>
+                  <span class="sr-file-badge">ARW</span>
+                  <span class="sr-card-state">Missing</span>
+                  <span class="sr-card-footer"><span>DSC_1045.ARW</span><span>***--</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-006" data-rating="5" data-picked="false" data-rejected="false" data-color-label="purple" data-file-name="DSC_1046.RAW" data-file-type="RAW" data-path="/Volumes/Photography/Tokyo/DSC_1046.RAW">
+                  <span class="sr-thumb-art sr-thumb-art-f" aria-hidden="true"></span>
+                  <span class="sr-file-badge">RAW</span>
+                  <span class="sr-card-footer"><span>DSC_1046.RAW</span><span>*****</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-007" data-rating="4" data-picked="false" data-rejected="false" data-color-label="orange" data-file-name="DSC_1047.NEF" data-file-type="NEF" data-path="/Volumes/Photography/Tokyo/DSC_1047.NEF">
+                  <span class="sr-thumb-art sr-thumb-art-g" aria-hidden="true"></span>
+                  <span class="sr-file-badge">NEF</span>
+                  <span class="sr-card-footer"><span>DSC_1047.NEF</span><span>****-</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-008" data-rating="3" data-picked="false" data-rejected="false" data-color-label="cyan" data-file-name="DSC_1048.DNG" data-file-type="DNG" data-path="/Volumes/Photography/Tokyo/DSC_1048.DNG">
+                  <span class="sr-thumb-art sr-thumb-art-h" aria-hidden="true"></span>
+                  <span class="sr-file-badge">DNG</span>
+                  <span class="sr-card-footer"><span>DSC_1048.DNG</span><span>***--</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-009" data-rating="5" data-picked="true" data-rejected="false" data-color-label="green" data-file-name="DSC_1049.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1049.CR3">
+                  <span class="sr-thumb-art sr-thumb-art-a" aria-hidden="true"></span>
+                  <span class="sr-file-badge">CR3</span>
+                  <span class="sr-card-state sr-card-state-pick">Pick</span>
+                  <span class="sr-card-footer"><span>DSC_1049.CR3</span><span>*****</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-010" data-rating="4" data-picked="false" data-rejected="false" data-color-label="orange" data-file-name="DSC_1050.ARW" data-file-type="ARW" data-path="/Volumes/Photography/Tokyo/DSC_1050.ARW">
+                  <span class="sr-thumb-art sr-thumb-art-b" aria-hidden="true"></span>
+                  <span class="sr-file-badge">ARW</span>
+                  <span class="sr-card-footer"><span>DSC_1050.ARW</span><span>****-</span></span>
+                </button>
+                <button class="sr-photo-card is-rejected" type="button" data-photo-id="demo-011" data-rating="1" data-picked="false" data-rejected="true" data-color-label="red" data-file-name="DSC_1051.NEF" data-file-type="NEF" data-path="/Volumes/Photography/Tokyo/DSC_1051.NEF">
+                  <span class="sr-thumb-art sr-thumb-art-c" aria-hidden="true"></span>
+                  <span class="sr-file-badge">NEF</span>
+                  <span class="sr-card-state sr-card-state-reject">Reject</span>
+                  <span class="sr-card-footer"><span>DSC_1051.NEF</span><span>*----</span></span>
+                </button>
+                <button class="sr-photo-card" type="button" data-photo-id="demo-012" data-rating="3" data-picked="false" data-rejected="false" data-color-label="blue" data-file-name="DSC_1052.RAF" data-file-type="RAF" data-path="/Volumes/Photography/Tokyo/DSC_1052.RAF">
+                  <span class="sr-thumb-art sr-thumb-art-f" aria-hidden="true"></span>
+                  <span class="sr-file-badge">RAF</span>
+                  <span class="sr-card-footer"><span>DSC_1052.RAF</span><span>***--</span></span>
+                </button>
+              </div>
             </div>
           </section>
         </section>
@@ -236,9 +318,10 @@
         </section>
         <section class="sr-inspector-section" data-mode-panel="library">
           <div class="sr-panel-heading">Quick Review</div>
-          <div class="sr-rating-row" aria-label="Rating">-----</div>
-          <button class="sr-inspector-action" type="button">Pick</button>
-          <button class="sr-inspector-action" type="button">Reject</button>
+          <div class="sr-rating-row" id="selectedPhotoRating" aria-label="Selected photo rating">-----</div>
+          <button class="sr-inspector-action" id="rateSelectedPhoto" type="button">Rate 5</button>
+          <button class="sr-inspector-action" id="pickSelectedPhoto" type="button">Pick</button>
+          <button class="sr-inspector-action" id="rejectSelectedPhoto" type="button">Reject</button>
         </section>
         <section class="sr-inspector-section" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Basic</div>
@@ -254,13 +337,13 @@
         </section>
         <section class="sr-inspector-section">
           <div class="sr-panel-heading">Metadata</div>
-          <div class="sr-metadata-row"><span>File</span><span>None</span></div>
+          <div class="sr-metadata-row"><span>File</span><span id="selectedPhotoName">None</span></div>
           <div class="sr-metadata-row"><span>Type</span><span>Catalog</span></div>
         </section>
       </aside>
 
       <footer class="sr-statusbar" id="bottomStatus">
-        <div class="sr-status-left">Local alpha</div>
+        <div class="sr-status-left"><span>Local alpha</span><span id="libraryPhotoCount">0 photos</span></div>
         <div class="sr-bottom-controls" aria-label="Bottom view controls">
           <button class="sr-icon-button" type="button" aria-label="Grid">
             <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
@@ -269,7 +352,10 @@
         </div>
         <div class="sr-status-right">
           <output id="appStatus" aria-live="polite">No library open</output>
-          <div class="sr-zoom-track" aria-hidden="true"></div>
+          <label class="sr-thumbnail-control" for="thumbnailSize">
+            <span>Thumbnail Size</span>
+            <input id="thumbnailSize" type="range" min="132" max="220" value="168">
+          </label>
         </div>
       </footer>
     </div>
@@ -289,6 +375,16 @@
       const importedCount = document.querySelector("#importedCount");
       const unsupportedCount = document.querySelector("#unsupportedCount");
       const importErrorCount = document.querySelector("#importErrorCount");
+      const libraryGrid = document.querySelector("#libraryGrid");
+      const gridEmptyState = document.querySelector("#gridEmptyState");
+      const gridLoadingState = document.querySelector("#gridLoadingState");
+      const gridStateNote = document.querySelector("#gridStateNote");
+      const gridPhotoSubtitle = document.querySelector("#gridPhotoSubtitle");
+      const libraryPhotoCount = document.querySelector("#libraryPhotoCount");
+      const allPhotosCount = document.querySelector("#allPhotosCount");
+      const selectedPhotoName = document.querySelector("#selectedPhotoName");
+      const selectedPhotoRating = document.querySelector("#selectedPhotoRating");
+      const recentImportCount = document.querySelector("#recentImportCount");
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
       const openRecentButton = document.querySelector("#openRecent");
@@ -296,8 +392,15 @@
       const viewImportErrorsButton = document.querySelector("#viewImportErrors");
       const showImportPanelButton = document.querySelector("#showImportPanel");
       const minimizeImportButton = document.querySelector("#minimizeImport");
+      const rateSelectedButton = document.querySelector("#rateSelectedPhoto");
+      const pickSelectedButton = document.querySelector("#pickSelectedPhoto");
+      const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
+      const thumbnailSizeInput = document.querySelector("#thumbnailSize");
 
       const invoke = window.__TAURI__?.core?.invoke;
+      const initialGridPhotos = Array.from(document.querySelectorAll(".sr-photo-card")).map(photoFromCard);
+      let libraryPhotos = initialGridPhotos;
+      let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let activeLibraryPath = "";
 
       function setStatus(message) {
@@ -315,6 +418,178 @@
       function readImportNumber(message, label) {
         const match = message.match(new RegExp(`${label}:\\s*(\\d+)`));
         return match ? match[1] : "0";
+      }
+
+      function photoFromCard(card) {
+        return {
+          photoId: card.dataset.photoId,
+          fileName: card.dataset.fileName,
+          path: card.dataset.path,
+          fileType: card.dataset.fileType,
+          missing: card.classList.contains("is-missing"),
+          unsupported: card.classList.contains("is-unsupported"),
+          rating: Number(card.dataset.rating || 0),
+          picked: card.dataset.picked === "true",
+          rejected: card.dataset.rejected === "true",
+          colorLabel: card.dataset.colorLabel || null,
+          artClass: Array.from(card.querySelector(".sr-thumb-art")?.classList ?? []).find((className) => className.startsWith("sr-thumb-art-")) ?? "sr-thumb-art-a",
+        };
+      }
+
+      function stars(rating) {
+        const value = Math.max(0, Math.min(5, Number(rating) || 0));
+        return `${"*".repeat(value)}${"-".repeat(5 - value)}`;
+      }
+
+      function cardState(photo) {
+        if (photo.missing) {
+          return { className: "", label: "Missing" };
+        }
+        if (photo.unsupported) {
+          return { className: "", label: "Unsupported" };
+        }
+        if (photo.rejected) {
+          return { className: "sr-card-state-reject", label: "Reject" };
+        }
+        if (photo.picked) {
+          return { className: "sr-card-state-pick", label: "Pick" };
+        }
+        return null;
+      }
+
+      function renderLibraryGrid(photos) {
+        libraryPhotos = photos;
+        const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
+        selectedPhotoId = selectedExists ? selectedPhotoId : libraryPhotos[0]?.photoId ?? "";
+
+        libraryPhotoCount.textContent = `${libraryPhotos.length} photos`;
+        allPhotosCount.textContent = String(libraryPhotos.length);
+        recentImportCount.textContent = String(libraryPhotos.length);
+        gridPhotoSubtitle.textContent = libraryPhotos.length
+          ? `${libraryPhotos.length} catalog rows`
+          : "No catalog rows";
+        gridStateNote.textContent = libraryPhotos.length
+          ? "Imported photos are displayed by catalog reference."
+          : "Import a folder by reference to populate the grid.";
+        gridLoadingState.hidden = true;
+        gridEmptyState.hidden = libraryPhotos.length !== 0;
+        libraryGrid.hidden = libraryPhotos.length === 0;
+
+        libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
+        selectPhoto(selectedPhotoId);
+      }
+
+      function createPhotoCard(photo, index) {
+        const state = cardState(photo);
+        const card = document.createElement("button");
+        card.className = "sr-photo-card";
+        card.type = "button";
+        card.dataset.photoId = photo.photoId;
+        card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
+        card.classList.toggle("is-rejected", photo.rejected);
+        card.classList.toggle("is-missing", photo.missing);
+        card.classList.toggle("is-unsupported", photo.unsupported);
+        card.addEventListener("click", () => selectPhoto(photo.photoId));
+
+        const art = document.createElement("span");
+        art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
+        art.setAttribute("aria-hidden", "true");
+        card.append(art);
+
+        const badge = document.createElement("span");
+        badge.className = "sr-file-badge";
+        badge.textContent = photo.fileType || "FILE";
+        card.append(badge);
+
+        if (state) {
+          const stateBadge = document.createElement("span");
+          stateBadge.className = `sr-card-state ${state.className}`.trim();
+          stateBadge.textContent = state.label;
+          card.append(stateBadge);
+        }
+
+        const footer = document.createElement("span");
+        footer.className = "sr-card-footer";
+        const name = document.createElement("span");
+        name.textContent = photo.fileName;
+        const rating = document.createElement("span");
+        rating.textContent = stars(photo.rating);
+        footer.append(name, rating);
+        card.append(footer);
+
+        return card;
+      }
+
+      function selectPhoto(photoId) {
+        selectedPhotoId = photoId;
+        const selected = libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+        Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
+          card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
+        });
+        selectedPhotoName.textContent = selected?.fileName ?? "None";
+        selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+      }
+
+      async function loadLibraryGrid() {
+        if (!activeLibraryPath || !invoke) {
+          renderLibraryGrid(libraryPhotos);
+          return;
+        }
+
+        gridLoadingState.hidden = false;
+        gridEmptyState.hidden = true;
+        setStatus("Loading catalog photos...");
+        try {
+          const message = await invoke("list_library_photos", { libraryPath: activeLibraryPath });
+          renderLibraryGrid(JSON.parse(message));
+          setStatus("Library grid loaded.");
+        } catch (error) {
+          gridLoadingState.hidden = true;
+          setStatus(String(error));
+        }
+      }
+
+      async function applySelectedFlags(patch) {
+        const selected = libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+        if (!selected) {
+          setStatus("Select a photo before culling.");
+          return;
+        }
+
+        const next = { ...selected, ...patch };
+        if (patch.picked) {
+          next.rejected = false;
+        }
+        if (patch.rejected) {
+          next.picked = false;
+        }
+
+        if (activeLibraryPath && invoke) {
+          setBusy(true);
+          try {
+            const message = await invoke("set_photo_flags", {
+              libraryPath: activeLibraryPath,
+              photoId: next.photoId,
+              rating: next.rating,
+              picked: next.picked,
+              rejected: next.rejected,
+              colorLabel: next.colorLabel,
+            });
+            setStatus(message);
+          } catch (error) {
+            setStatus(String(error));
+            setBusy(false);
+            return;
+          } finally {
+            setBusy(false);
+          }
+        } else {
+          setStatus("Desktop runtime unavailable; updated local grid preview.");
+        }
+
+        renderLibraryGrid(libraryPhotos.map((photo) => {
+          return photo.photoId === next.photoId ? next : photo;
+        }));
       }
 
       function setMode(mode) {
@@ -341,6 +616,9 @@
         createButton.disabled = isBusy;
         openButton.disabled = isBusy;
         startImportButton.disabled = isBusy;
+        rateSelectedButton.disabled = isBusy;
+        pickSelectedButton.disabled = isBusy;
+        rejectSelectedButton.disabled = isBusy;
       }
 
       async function runLibraryCommand(command) {
@@ -362,6 +640,7 @@
           activeLibraryPath = path;
           setLibraryState("open");
           setStatus(message);
+          await loadLibraryGrid();
         } catch (error) {
           setStatus(String(error));
         } finally {
@@ -402,6 +681,7 @@
           importErrorCount.textContent = "0";
           setImportProgress(100, "Completed");
           setStatus(message);
+          await loadLibraryGrid();
         } catch (error) {
           importErrorCount.textContent = "1";
           setImportProgress(100, "Needs Review");
@@ -417,6 +697,13 @@
       createButton.addEventListener("click", () => runLibraryCommand("create_library"));
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
       startImportButton.addEventListener("click", runImportCommand);
+      rateSelectedButton.addEventListener("click", () => applySelectedFlags({ rating: 5 }));
+      pickSelectedButton.addEventListener("click", () => applySelectedFlags({ picked: true }));
+      rejectSelectedButton.addEventListener("click", () => applySelectedFlags({ rejected: true }));
+      thumbnailSizeInput.addEventListener("input", () => {
+        libraryGrid.style.setProperty("--sr-thumb-min", `${thumbnailSizeInput.value}px`);
+        libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${thumbnailSizeInput.value}px, 1fr))`;
+      });
       viewImportErrorsButton.addEventListener("click", () => {
         setStatus("Unsupported and failed files will be reviewable after import.");
       });
@@ -435,6 +722,7 @@
           setStatus("Recent library path selected.");
         });
       });
+      renderLibraryGrid(initialGridPhotos);
     </script>
   </body>
 </html>

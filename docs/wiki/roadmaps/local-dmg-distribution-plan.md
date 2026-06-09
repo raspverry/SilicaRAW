@@ -483,6 +483,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Empty, loading, missing, and unsupported states are represented.
 - **Validation:** Grid smoke test and culling persistence check.
 
+**Status:** Completed on 2026-06-09. The Library workbench now renders an M003-style catalog grid with selected-card state, file type badges, rating rows, pick/reject/missing/unsupported state badges, empty/loading states, bottom photo count, and a thumbnail-size control. A thin `list_library_photos` command now reads catalog rows through storage/core and returns JSON for the desktop grid, while rating, pick, and reject inspector actions reuse the existing `set_photo_flags` command path. Real thumbnail generation, virtualized scrolling, native preview opening, advanced filters, and populated metadata/histogram values remain later scoped work.
+
 ### Task 5.5.6: Implement Preview/Loupe MVP
 
 - **Location:** `apps/desktop/static/`, `MockupUI/M004_Library_Loupe.png`
