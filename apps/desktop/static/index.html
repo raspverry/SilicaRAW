@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="./styles/app-frame.css">
   </head>
   <body>
-    <div class="app-frame" id="appFrame" data-active-mode="library">
+    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome">
       <header class="sr-toolbar" id="appToolbar" role="banner">
         <div class="sr-window-cluster" aria-hidden="true">
           <span class="sr-window-dot sr-window-dot-red"></span>
@@ -33,6 +33,7 @@
           <button class="sr-icon-button" type="button" aria-label="Inspector">
             <span class="sr-glyph sr-glyph-panel" aria-hidden="true"></span>
           </button>
+          <button class="sr-fit-action" type="button">Fit</button>
           <button class="primary sr-export-action" type="button">Export</button>
           <button class="sr-icon-button" type="button" aria-label="Settings">
             <span class="sr-glyph sr-glyph-settings" aria-hidden="true"></span>
@@ -64,37 +65,81 @@
       </aside>
 
       <main class="sr-main-surface" id="mainSurface" tabindex="-1">
-        <section class="sr-mode-surface" data-mode-panel="library" aria-labelledby="libraryTitle">
-          <div class="sr-surface-header">
-            <div>
-              <h1 id="libraryTitle">Library</h1>
-              <p>All Photos - 0</p>
-            </div>
-            <div class="sr-view-controls" aria-label="Library view controls">
-              <button type="button" class="sr-icon-button" aria-label="Grid">
-                <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
-              </button>
-              <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
-            </div>
-          </div>
-          <section class="sr-library-start" aria-label="Library setup">
-            <form class="sr-library-form">
-              <label for="libraryPath">Library folder path</label>
-              <div class="sr-path-row">
-                <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false">
-                <button class="primary" id="createLibrary" type="button">Create</button>
-                <button id="openLibrary" type="button">Open</button>
+        <section class="sr-mode-surface sr-library-mode" data-mode-panel="library" aria-labelledby="libraryTitle">
+          <section class="sr-welcome-screen" id="welcomeScreen" data-library-state-panel="welcome" aria-labelledby="welcomeTitle">
+            <div class="sr-welcome-content">
+              <div class="sr-welcome-mark" aria-hidden="true">
+                <span class="sr-welcome-sun"></span>
+                <span class="sr-welcome-line sr-welcome-line-a"></span>
+                <span class="sr-welcome-line sr-welcome-line-b"></span>
               </div>
-            </form>
+              <h1 id="welcomeTitle">SilicaRAW</h1>
+              <p>Open-source RAW photo editor for Apple Silicon</p>
+              <form class="sr-welcome-form">
+                <label for="libraryPath">Library folder path</label>
+                <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Library">
+                <button class="sr-system-action" id="openLibrary" type="button">Open Folder</button>
+                <button id="createLibrary" type="button">Create Library</button>
+                <button id="openRecent" type="button">Open Recent</button>
+                <button id="openSampleProject" type="button" disabled>Open Sample Project</button>
+              </form>
+              <output class="sr-welcome-status" id="welcomeStatus" aria-live="polite">Enter a local library folder path to begin.</output>
+              <div class="sr-welcome-tags" aria-label="Product traits">
+                <span>Built for macOS</span>
+                <span>Metal-first</span>
+                <span>Local-first</span>
+              </div>
+              <section class="sr-recent-libraries" aria-label="Recent libraries">
+                <div class="sr-recent-header">
+                  <h2>Recent Libraries</h2>
+                  <button type="button">View All</button>
+                </div>
+                <button class="sr-recent-row" type="button" data-recent-path="/Users/you/Pictures/Library/Tokyo Street Walk">
+                  <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
+                  <span><strong>Tokyo Street Walk</strong><small>/Users/you/Pictures/Library/Tokyo Street Walk</small></span>
+                  <time>Today, 10:42 AM</time>
+                </button>
+                <button class="sr-recent-row" type="button" data-recent-path="/Users/you/Pictures/Library/Cafe Reviews">
+                  <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
+                  <span><strong>Cafe Reviews</strong><small>/Users/you/Pictures/Library/Cafe Reviews</small></span>
+                  <time>Yesterday, 6:31 PM</time>
+                </button>
+                <button class="sr-recent-row" type="button" data-recent-path="/Users/you/Pictures/Library/Portrait Session">
+                  <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
+                  <span><strong>Portrait Session</strong><small>/Users/you/Pictures/Library/Portrait Session</small></span>
+                  <time>May 11, 2024, 9:17 AM</time>
+                </button>
+              </section>
+            </div>
+            <nav class="sr-welcome-footer" aria-label="Welcome links">
+              <button type="button">Documentation</button>
+              <button type="button">Keyboard Shortcuts</button>
+              <button type="button">Preferences</button>
+            </nav>
           </section>
-          <div class="sr-grid-placeholder" aria-label="Library grid placeholder">
-            <div class="sr-photo-tile"></div>
-            <div class="sr-photo-tile"></div>
-            <div class="sr-photo-tile"></div>
-            <div class="sr-photo-tile"></div>
-            <div class="sr-photo-tile"></div>
-            <div class="sr-photo-tile"></div>
-          </div>
+
+          <section class="sr-library-workbench" data-library-state-panel="open" hidden aria-labelledby="libraryTitle">
+            <div class="sr-surface-header">
+              <div>
+                <h1 id="libraryTitle">Library</h1>
+                <p>All Photos - 0</p>
+              </div>
+              <div class="sr-view-controls" aria-label="Library view controls">
+                <button type="button" class="sr-icon-button" aria-label="Grid">
+                  <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
+              </div>
+            </div>
+            <div class="sr-grid-placeholder" aria-label="Library grid placeholder">
+              <div class="sr-photo-tile"></div>
+              <div class="sr-photo-tile"></div>
+              <div class="sr-photo-tile"></div>
+              <div class="sr-photo-tile"></div>
+              <div class="sr-photo-tile"></div>
+              <div class="sr-photo-tile"></div>
+            </div>
+          </section>
         </section>
 
         <section class="sr-mode-surface sr-viewer-mode" data-mode-panel="develop" aria-labelledby="developTitle" hidden>
@@ -178,12 +223,21 @@
       const appFrame = document.querySelector("#appFrame");
       const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
       const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
+      const libraryStatePanels = Array.from(document.querySelectorAll("[data-library-state-panel]"));
+      const recentButtons = Array.from(document.querySelectorAll("[data-recent-path]"));
       const pathInput = document.querySelector("#libraryPath");
       const statusOutput = document.querySelector("#appStatus");
+      const welcomeStatus = document.querySelector("#welcomeStatus");
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
+      const openRecentButton = document.querySelector("#openRecent");
 
       const invoke = window.__TAURI__?.core?.invoke;
+
+      function setStatus(message) {
+        statusOutput.value = message;
+        welcomeStatus.value = message;
+      }
 
       function setMode(mode) {
         appFrame.dataset.activeMode = mode;
@@ -193,7 +247,16 @@
         modePanels.forEach((panel) => {
           panel.hidden = panel.dataset.modePanel !== mode;
         });
-        statusOutput.value = `Mode: ${mode[0].toUpperCase()}${mode.slice(1)}`;
+        if (mode !== "library" || appFrame.dataset.libraryState !== "welcome") {
+          setStatus(`Mode: ${mode[0].toUpperCase()}${mode.slice(1)}`);
+        }
+      }
+
+      function setLibraryState(state) {
+        appFrame.dataset.libraryState = state;
+        libraryStatePanels.forEach((panel) => {
+          panel.hidden = panel.dataset.libraryStatePanel !== state;
+        });
       }
 
       function setBusy(isBusy) {
@@ -204,21 +267,23 @@
       async function runLibraryCommand(command) {
         const path = pathInput.value.trim();
         if (!path) {
-          statusOutput.value = "Enter a library folder path.";
+          setStatus("Enter a library folder path.");
           return;
         }
 
         if (!invoke) {
-          statusOutput.value = "Desktop runtime unavailable.";
+          setStatus("Desktop runtime unavailable.");
           return;
         }
 
         setBusy(true);
-        statusOutput.value = "Working...";
+        setStatus("Working...");
         try {
-          statusOutput.value = await invoke(command, { path });
+          const message = await invoke(command, { path });
+          setLibraryState("open");
+          setStatus(message);
         } catch (error) {
-          statusOutput.value = String(error);
+          setStatus(String(error));
         } finally {
           setBusy(false);
         }
@@ -229,6 +294,13 @@
       });
       createButton.addEventListener("click", () => runLibraryCommand("create_library"));
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
+      openRecentButton.addEventListener("click", () => setStatus("Select a recent library below."));
+      recentButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          pathInput.value = button.dataset.recentPath;
+          setStatus("Recent library path selected.");
+        });
+      });
     </script>
   </body>
 </html>

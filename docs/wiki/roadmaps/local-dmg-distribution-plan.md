@@ -457,6 +457,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Screen matches M001 information structure.
 - **Validation:** Tauri command smoke test through the UI.
 
+**Status:** Completed on 2026-06-09. Library mode now defaults to an M001-style welcome state with full-width welcome content, Open Folder, Create Library, Open Recent affordance, disabled sample project affordance, recent library rows, inline status output, and existing Tauri `open_library` / `create_library` command wiring. The welcome state hides the sidebar, inspector, and bottom status bar to match the first-launch mockup; successful Tauri command completion switches the app frame to the normal library workbench state. Native folder picking, real recent-library persistence, and sample project loading remain outside this task.
+
 ### Task 5.5.4: Implement Import Flow UI
 
 - **Location:** `apps/desktop/static/`, `MockupUI/M009_Import_Progress.png`

@@ -109,6 +109,18 @@ Design consistency rules for every Task 5.5 screen:
 - Do not add raw color literals to screen CSS; add semantic tokens first.
 - Do not use decorative gradients, emoji icons, or one-off typography.
 
+## Task 5.5.3 Welcome State
+
+Task 5.5.3 adds the M001 first-launch state inside Library mode:
+
+- The app frame defaults to `data-library-state="welcome"`.
+- Welcome hides left sidebar, right inspector, and bottom status chrome while preserving the shared toolbar.
+- Open Folder and Create Library use the existing Tauri `open_library` and `create_library` command names.
+- A path field remains visible until a native folder picker is introduced by a later scoped task.
+- Open Recent is an affordance that selects a displayed recent path in the static shell.
+- Open Sample Project is visible but disabled until sample project support is explicitly scoped.
+- Successful Tauri command completion switches the app frame to `data-library-state="open"`.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.

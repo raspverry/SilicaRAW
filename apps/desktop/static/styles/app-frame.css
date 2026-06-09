@@ -17,6 +17,19 @@ body {
   background: var(--sr-bg-primary);
 }
 
+.app-frame[data-active-mode="library"][data-library-state="welcome"] {
+  grid-template:
+    "toolbar" 60px
+    "main" minmax(0, 1fr)
+    / minmax(0, 1fr);
+}
+
+.app-frame[data-active-mode="library"][data-library-state="welcome"] .sr-sidebar,
+.app-frame[data-active-mode="library"][data-library-state="welcome"] .sr-inspector,
+.app-frame[data-active-mode="library"][data-library-state="welcome"] .sr-statusbar {
+  display: none;
+}
+
 .sr-toolbar {
   grid-area: toolbar;
   display: grid;
@@ -117,7 +130,8 @@ body {
 }
 
 .sr-glyph-sidebar,
-.sr-glyph-panel {
+.sr-glyph-panel,
+.sr-glyph-folder {
   border: 1px solid currentColor;
   border-radius: 2px;
 }
@@ -167,8 +181,40 @@ body {
   background: currentColor;
 }
 
+.sr-glyph-folder {
+  width: 20px;
+  height: 14px;
+}
+
+.sr-glyph-folder::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 2px;
+  width: 9px;
+  height: 5px;
+  border: 1px solid currentColor;
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+}
+
 .sr-export-action {
   min-height: 32px;
+}
+
+.sr-fit-action {
+  display: none;
+  min-height: 36px;
+}
+
+.app-frame[data-active-mode="develop"] .sr-fit-action,
+.app-frame[data-active-mode="library"][data-library-state="welcome"] .sr-fit-action {
+  display: inline-grid;
+}
+
+.app-frame[data-active-mode="library"][data-library-state="welcome"] .sr-search,
+.app-frame[data-active-mode="library"][data-library-state="welcome"] .sr-export-action {
+  display: none;
 }
 
 .sr-sidebar,
@@ -270,8 +316,222 @@ body {
   padding: var(--sr-space-lg);
 }
 
-.sr-mode-surface[data-mode-panel="library"] {
-  grid-template-rows: auto auto minmax(0, 1fr);
+.sr-library-mode {
+  display: block;
+  padding: 0;
+}
+
+.sr-library-workbench {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--sr-space-lg);
+  padding: var(--sr-space-lg);
+}
+
+.sr-welcome-screen {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  padding: var(--sr-space-3xl) var(--sr-space-xl) var(--sr-space-2xl);
+  background: var(--sr-bg-primary);
+}
+
+.sr-welcome-content {
+  align-self: center;
+  width: min(668px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: var(--sr-space-lg);
+}
+
+.sr-welcome-mark {
+  position: relative;
+  width: 160px;
+  height: 116px;
+  border: 1px solid var(--sr-border-strong);
+  border-radius: var(--sr-radius-lg);
+  background: var(--sr-bg-secondary);
+}
+
+.sr-welcome-sun,
+.sr-welcome-line {
+  position: absolute;
+  display: block;
+}
+
+.sr-welcome-sun {
+  top: var(--sr-space-lg);
+  right: var(--sr-space-lg);
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--sr-border-strong);
+  border-radius: var(--sr-radius-full);
+}
+
+.sr-welcome-line {
+  height: 2px;
+  border-radius: var(--sr-radius-full);
+  background: var(--sr-border-strong);
+  transform-origin: left center;
+}
+
+.sr-welcome-line-a {
+  left: 18px;
+  bottom: 34px;
+  width: 84px;
+  transform: rotate(-42deg);
+}
+
+.sr-welcome-line-b {
+  left: 70px;
+  bottom: 36px;
+  width: 84px;
+  transform: rotate(40deg);
+}
+
+.sr-welcome-content h1 {
+  margin: var(--sr-space-sm) 0 0;
+  color: var(--sr-text-primary);
+  font-size: 54px;
+  line-height: 1;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.sr-welcome-content p {
+  margin: 0;
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-body);
+}
+
+.sr-welcome-form {
+  width: min(320px, 100%);
+  display: grid;
+  gap: var(--sr-space-sm);
+}
+
+.sr-welcome-form label {
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-caption);
+}
+
+.sr-welcome-form button,
+.sr-system-action {
+  width: 100%;
+  min-height: 42px;
+}
+
+.sr-system-action {
+  border-color: var(--sr-accent-system);
+  background: var(--sr-accent-system);
+  color: var(--sr-accent-on-system);
+}
+
+.sr-system-action:hover:not(:disabled) {
+  background: var(--sr-accent-system-hover);
+}
+
+.sr-welcome-status {
+  min-height: var(--sr-line-control);
+  margin: 0;
+  color: var(--sr-text-tertiary);
+  text-align: center;
+}
+
+.sr-welcome-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sr-space-sm) var(--sr-space-lg);
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-control);
+}
+
+.sr-recent-libraries {
+  width: min(668px, 100%);
+  display: grid;
+  margin-top: var(--sr-space-lg);
+  overflow: hidden;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-panel);
+}
+
+.sr-recent-header,
+.sr-recent-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sr-space-md);
+}
+
+.sr-recent-header {
+  padding: var(--sr-space-md) var(--sr-space-lg);
+}
+
+.sr-recent-header h2 {
+  margin: 0;
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-body);
+  line-height: var(--sr-line-body);
+}
+
+.sr-recent-header button {
+  min-height: auto;
+  border: 0;
+  background: transparent;
+  color: var(--sr-accent-system);
+  padding: 0;
+}
+
+.sr-recent-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 60px;
+  border-width: 1px 0 0;
+  border-color: var(--sr-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  padding: var(--sr-space-sm) var(--sr-space-lg);
+  text-align: left;
+}
+
+.sr-recent-row span:nth-child(2) {
+  display: grid;
+  gap: var(--sr-space-2xs);
+  min-width: 0;
+}
+
+.sr-recent-row strong,
+.sr-recent-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-recent-row strong {
+  color: var(--sr-text-primary);
+}
+
+.sr-recent-row small,
+.sr-recent-row time {
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-control);
+}
+
+.sr-welcome-footer {
+  display: flex;
+  gap: var(--sr-space-xl);
+  justify-content: center;
+}
+
+.sr-welcome-footer button {
+  min-height: auto;
+  border: 0;
+  background: transparent;
+  color: var(--sr-text-secondary);
+  padding: 0;
 }
 
 .sr-surface-header {
