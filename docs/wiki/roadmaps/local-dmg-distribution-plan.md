@@ -547,6 +547,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Export and Develop dialogs/panels remain usable at compact width.
 - **Validation:** Screenshot review and recorded QA notes.
 
+**Status:** Completed on 2026-06-09. Browser QA covered Library grid, Develop, and Export dialog at `1280x800`, `1440x900`, and `1728x965` against the M003/M005/M007 compact and large mockup families. The pass found and fixed a 1280px toolbar density issue where the mode switcher could visually collide with the search/actions region. After the CSS fix, horizontal overflow is false, visible clipping candidates are zero, toolbar mode/action overlap is zero, and Export/Develop remain usable at compact width. Recorded notes are in [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md).
+
 ## Phase 6: Local Install QA
 
 **Goal:** Verify the app behaves correctly when installed from DMG, not only when run from the build tree.

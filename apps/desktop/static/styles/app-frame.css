@@ -81,7 +81,8 @@ body {
   justify-self: center;
   display: grid;
   grid-template-columns: repeat(3, minmax(96px, 1fr));
-  min-width: 320px;
+  width: min(320px, 100%);
+  min-width: 0;
   padding: var(--sr-space-xs);
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-md);
@@ -1658,7 +1659,7 @@ progress::-webkit-progress-value {
   }
 
   .sr-mode-switcher {
-    min-width: 276px;
+    width: min(276px, 100%);
   }
 
   .sr-photo-grid {
@@ -1687,6 +1688,17 @@ progress::-webkit-progress-value {
   }
 }
 
+@media (max-width: 1439px) {
+  .sr-mode-switcher {
+    width: min(264px, 100%);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sr-search {
+    width: min(132px, 12vw);
+  }
+}
+
 @media (min-width: 1280px) {
   .app-frame {
     grid-template-columns: 248px minmax(0, 1fr) 304px;
@@ -1704,7 +1716,7 @@ progress::-webkit-progress-value {
   }
 
   .sr-mode-switcher {
-    min-width: 344px;
+    width: min(320px, 100%);
   }
 }
 
@@ -1720,5 +1732,9 @@ progress::-webkit-progress-value {
 
   .sr-photo-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .sr-mode-switcher {
+    width: min(344px, 100%);
   }
 }
