@@ -23,7 +23,13 @@ ALLOWED_COMMANDS = {
 WORKFLOW_STEPS = [
     {
         "name": "open-or-create-library",
-        "ids": ["libraryPath", "openLibrary", "createLibrary", "welcomeStatus"],
+        "ids": [
+            "libraryPath",
+            "chooseLibraryPath",
+            "openLibrary",
+            "createLibrary",
+            "welcomeStatus",
+        ],
         "commands": ["open_library", "create_library"],
         "text": ["Open Folder", "Create Library"],
     },
@@ -32,6 +38,7 @@ WORKFLOW_STEPS = [
         "ids": [
             "importPanel",
             "importFolderPath",
+            "chooseImportFolderPath",
             "startImport",
             "importStatus",
             "importSafetyNote",
@@ -94,6 +101,7 @@ WORKFLOW_STEPS = [
             "openExportDialog",
             "exportDialog",
             "exportOutputPath",
+            "chooseExportOutputPath",
             "runJpegExport",
             "exportStatus",
             "exportSafetyNote",
@@ -218,6 +226,16 @@ def main():
         "open library button must call runLibraryCommand(\"open_library\")",
         failures,
     )
+    for marker in [
+        "const dialogApi = window.__TAURI__?.dialog",
+        "async function chooseDirectoryPath",
+        "async function chooseExportPath",
+        "chooseDirectoryPath(\"library\")",
+        "chooseDirectoryPath(\"import\")",
+        "chooseExportPath()",
+        "Path selection canceled.",
+    ]:
+        require(marker in source, f"native path picker marker missing: {marker}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",

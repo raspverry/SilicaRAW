@@ -78,7 +78,10 @@
               <p>Open-source RAW photo editor for Apple Silicon</p>
               <form class="sr-welcome-form">
                 <label for="libraryPath">Library folder path</label>
-                <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Library">
+                <div class="sr-path-picker-row">
+                  <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Library">
+                  <button class="sr-path-picker-button" id="chooseLibraryPath" type="button">Choose...</button>
+                </div>
                 <button class="sr-system-action" id="openLibrary" type="button">Open Folder</button>
                 <button id="createLibrary" type="button">Create Library</button>
                 <button id="openRecent" type="button">Open Recent</button>
@@ -147,6 +150,7 @@
                   <label for="importFolderPath">Folder path</label>
                   <div class="sr-import-path-row">
                     <input id="importFolderPath" name="importFolderPath" autocomplete="off" spellcheck="false" placeholder="/Volumes/Photography/2025 Spring Trip">
+                    <button class="sr-path-picker-button" id="chooseImportFolderPath" type="button">Choose Folder</button>
                     <button class="primary" id="startImport" type="button">Import by Reference</button>
                   </div>
                 </form>
@@ -438,7 +442,10 @@
             <section class="sr-export-settings" aria-label="Export settings">
               <div class="sr-export-setting-row">
                 <label for="exportOutputPath">Output Path</label>
-                <input id="exportOutputPath" type="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Exports/photo.jpg">
+                <div class="sr-path-picker-row sr-export-path-picker">
+                  <input id="exportOutputPath" type="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Exports/photo.jpg">
+                  <button class="sr-path-picker-button" id="chooseExportOutputPath" type="button">Choose...</button>
+                </div>
               </div>
               <div class="sr-export-fixed-grid" aria-label="JPEG sRGB settings">
                 <label for="exportFormat">Format</label>
@@ -515,6 +522,8 @@
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
       const openRecentButton = document.querySelector("#openRecent");
+      const chooseLibraryPathButton = document.querySelector("#chooseLibraryPath");
+      const chooseImportFolderPathButton = document.querySelector("#chooseImportFolderPath");
       const startImportButton = document.querySelector("#startImport");
       const viewImportErrorsButton = document.querySelector("#viewImportErrors");
       const showImportPanelButton = document.querySelector("#showImportPanel");
@@ -542,12 +551,14 @@
       const exportSelectedPhotoName = document.querySelector("#exportSelectedPhotoName");
       const exportSelectedInline = document.querySelector("#exportSelectedInline");
       const exportOutputPath = document.querySelector("#exportOutputPath");
+      const chooseExportOutputPathButton = document.querySelector("#chooseExportOutputPath");
       const exportStatus = document.querySelector("#exportStatus");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
 
       const invoke = window.__TAURI__?.core?.invoke;
+      const dialogApi = window.__TAURI__?.dialog;
       const initialGridPhotos = Array.from(document.querySelectorAll(".sr-photo-card")).map(photoFromCard);
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
@@ -583,6 +594,96 @@
 
       function commandFailed(response) {
         return !response || response.ok === false;
+      }
+
+      function dialogPathValue(selection) {
+        if (!selection) {
+          return "";
+        }
+        if (Array.isArray(selection)) {
+          return dialogPathValue(selection[0]);
+        }
+        if (typeof selection === "string") {
+          return selection;
+        }
+        if (typeof selection === "object" && selection.path) {
+          return selection.path;
+        }
+        return String(selection);
+      }
+
+      async function chooseDirectoryPath(kind) {
+        const isLibrary = kind === "library";
+        const targetInput = isLibrary ? pathInput : importPathInput;
+        const statusMessage = isLibrary ? "Choose a library folder." : "Choose a folder to import by reference.";
+
+        if (!dialogApi?.open) {
+          setStatus("Native path picker unavailable. Enter the path manually.");
+          targetInput.focus();
+          return;
+        }
+
+        setStatus(statusMessage);
+        try {
+          const selection = await dialogApi.open({
+            directory: true,
+            multiple: false,
+          });
+          const selectedPath = dialogPathValue(selection);
+          if (!selectedPath) {
+            setStatus("Path selection canceled.");
+            return;
+          }
+          targetInput.value = selectedPath;
+          if (isLibrary) {
+            setStatus("Library folder path selected.");
+          } else {
+            setImportProgress(0, "Ready");
+            setStatus("Import folder path selected.");
+          }
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "Path selection failed."));
+        }
+      }
+
+      async function chooseExportPath() {
+        if (!dialogApi?.save) {
+          exportStatus.value = "Native path picker unavailable. Enter the output path manually.";
+          setStatus(exportStatus.value);
+          exportOutputPath.focus();
+          return;
+        }
+
+        exportStatus.value = "Choose a JPEG output path.";
+        setStatus(exportStatus.value);
+        try {
+          const selection = await dialogApi.save({
+            filters: [
+              {
+                name: "JPEG",
+                extensions: ["jpg", "jpeg"],
+              },
+            ],
+          });
+          const selectedPath = dialogPathValue(selection);
+          if (!selectedPath) {
+            exportStatus.value = "Path selection canceled.";
+            setStatus(exportStatus.value);
+            return;
+          }
+          exportOutputPath.value = selectedPath;
+          exportOutputPath.dataset.autofilled = "false";
+          syncExportDialog();
+          if (exportOutputLooksUnsafe(selectedPhoto(), selectedPath)) {
+            setStatus(exportStatus.value);
+            return;
+          }
+          exportStatus.value = "JPEG output path selected.";
+          setStatus(exportStatus.value);
+        } catch (error) {
+          exportStatus.value = responseErrorMessage(error, "Export path selection failed.");
+          setStatus(exportStatus.value);
+        }
       }
 
       function photoFromCard(card) {
@@ -841,6 +942,7 @@
         const unsafeOutput = exportOutputLooksUnsafe(photo, exportOutputPath.value.trim());
         const disabled = !hasPhoto || !isRasterExportCandidate(photo) || unsafeOutput;
         runJpegExportButton.disabled = disabled;
+        chooseExportOutputPathButton.disabled = !hasPhoto || !isRasterExportCandidate(photo);
         if (!hasPhoto) {
           exportStatus.value = "Select a photo before exporting.";
         } else if (unsafeOutput) {
@@ -1351,6 +1453,8 @@
       function setBusy(isBusy) {
         createButton.disabled = isBusy;
         openButton.disabled = isBusy;
+        chooseLibraryPathButton.disabled = isBusy;
+        chooseImportFolderPathButton.disabled = isBusy;
         startImportButton.disabled = isBusy;
         rateSelectedButton.disabled = isBusy;
         pickSelectedButton.disabled = isBusy;
@@ -1370,6 +1474,7 @@
           control.disabled = developDisabled;
         });
         runJpegExportButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
+        chooseExportOutputPathButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
       }
 
       async function runLibraryCommand(command) {
@@ -1455,8 +1560,10 @@
       modeButtons.forEach((button) => {
         button.addEventListener("click", () => setMode(button.dataset.mode));
       });
+      chooseLibraryPathButton.addEventListener("click", () => chooseDirectoryPath("library"));
       createButton.addEventListener("click", () => runLibraryCommand("create_library"));
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
+      chooseImportFolderPathButton.addEventListener("click", () => chooseDirectoryPath("import"));
       startImportButton.addEventListener("click", runImportCommand);
       rateSelectedButton.addEventListener("click", () => applySelectedFlags({ rating: 5 }));
       pickSelectedButton.addEventListener("click", () => applySelectedFlags({ picked: true }));
@@ -1493,6 +1600,7 @@
       });
       closeExportDialogButton.addEventListener("click", closeExportDialog);
       cancelExportButton.addEventListener("click", closeExportDialog);
+      chooseExportOutputPathButton.addEventListener("click", () => chooseExportPath());
       runJpegExportButton.addEventListener("click", runJpegExport);
       exportOutputPath.addEventListener("input", () => {
         exportOutputPath.dataset.autofilled = "false";

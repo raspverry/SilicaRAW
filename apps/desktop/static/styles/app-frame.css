@@ -442,6 +442,22 @@ body {
   min-height: 42px;
 }
 
+.sr-path-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sr-space-sm);
+  min-width: 0;
+}
+
+.sr-path-picker-button {
+  min-width: 112px;
+  white-space: nowrap;
+}
+
+.sr-path-picker-row .sr-path-picker-button {
+  width: auto;
+}
+
 .sr-system-action {
   border-color: var(--sr-accent-system);
   background: var(--sr-accent-system);
@@ -664,7 +680,7 @@ body {
 
 .sr-import-path-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: var(--sr-space-sm);
 }
 
@@ -1366,6 +1382,10 @@ progress::-webkit-progress-value {
   min-height: 36px;
 }
 
+.sr-export-path-picker {
+  min-width: 0;
+}
+
 .sr-export-fixed-grid input[readonly] {
   color: var(--sr-text-secondary);
 }
@@ -1685,6 +1705,18 @@ progress::-webkit-progress-value {
 
   .sr-export-preview-card {
     grid-row: 1 / span 5;
+  }
+}
+
+@media (max-width: 960px) {
+  .sr-path-picker-row,
+  .sr-import-path-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-path-picker-button,
+  .sr-import-path-row button {
+    width: 100%;
   }
 }
 

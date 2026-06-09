@@ -611,6 +611,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Any new dependency is documented in `docs/DEPENDENCIES.md`.
 - **Validation:** Desktop command/UI smoke and harness pass.
 
+**Status:** Completed on 2026-06-09. The desktop shell now initializes `tauri-plugin-dialog` with minimal `dialog:allow-open` and `dialog:allow-save` capability permissions, and the static frontend exposes native path picker buttons for library folder, import folder, and JPEG export output path selection. Picker cancel is handled as `Path selection canceled.` rather than a command error, selected paths flow into the existing create/open/import/export command inputs, and the UI workflow smoke harness now rejects missing native path picker affordances. The new dependency is recorded in [Dependencies](../../DEPENDENCIES.md).
+
 ### Task 5.6.4: Real JPEG Thumbnail Cache MVP
 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `apps/desktop/static/`
