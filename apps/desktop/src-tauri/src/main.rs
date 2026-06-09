@@ -18,6 +18,21 @@ fn open_library(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn import_folder(library_path: String, folder_path: String) -> Result<String, String> {
+    silica_core::import_folder(PathBuf::from(library_path), PathBuf::from(folder_path))
+        .map(|summary| {
+            format!(
+                "Imported folder: {}\nScanned: {}\nSupported: {}\nUnsupported: {}\nOriginal files unchanged: true",
+                summary.folder_path.display(),
+                summary.scanned_files,
+                summary.supported_files,
+                summary.unsupported_files
+            )
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn set_photo_flags(
     library_path: String,
     photo_id: String,
@@ -142,6 +157,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             create_library,
             open_library,
+            import_folder,
             set_photo_flags,
             get_photo_flags,
             open_photo_preview,
@@ -203,6 +219,36 @@ mod tests {
             .expect("get flags command")
             .expect("flags row");
         assert_eq!(reopened, updated);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_imports_folder_by_reference() {
+        let workspace = unique_library_root("desktop-import");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        std::fs::write(&unsupported_file, b"not a photo").expect("write unsupported");
+
+        silica_core::create_library(&library_root).expect("create library");
+
+        let imported = super::import_folder(
+            library_root.display().to_string(),
+            import_root.display().to_string(),
+        )
+        .expect("import folder command");
+
+        assert!(imported.contains("Imported folder:"));
+        assert!(imported.contains("Scanned: 2"));
+        assert!(imported.contains("Supported: 1"));
+        assert!(imported.contains("Unsupported: 1"));
+        assert!(supported_file.is_file());
+        assert!(unsupported_file.is_file());
 
         remove_library_root(&workspace);
     }
