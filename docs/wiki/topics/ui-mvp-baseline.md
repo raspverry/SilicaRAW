@@ -68,8 +68,9 @@ Task 5.5.1 starts the static frontend token baseline:
 
 ```txt
 apps/desktop/static/styles/
-├─ tokens.css
-└─ base.css
+|- tokens.css
+|- base.css
+`- app-frame.css
 ```
 
 Rules:
@@ -78,6 +79,18 @@ Rules:
 - Hard-coded visual values outside token/base/component definitions should be treated as review findings.
 - The current static shell may remain minimal until Task 5.5.2 adds the app frame.
 - Tauri command calls should use the configured global API, `window.__TAURI__.core.invoke`, while `app.withGlobalTauri` remains enabled in `tauri.conf.json`.
+
+## Task 5.5.2 App Frame
+
+Task 5.5.2 establishes the global shell used by later UI slices:
+
+- Top toolbar with macOS-style window affordance space, compact actions, and Library/Develop/Export mode navigation.
+- Left sidebar, central work surface, right inspector, and bottom status bar regions.
+- Mode panels for Library, Develop, and Export in each region, with inactive panels using the native `hidden` attribute.
+- Visible navigation state through `aria-pressed` and `data-active-mode`.
+- Existing create/open library command wiring preserved in the Library mode panel.
+
+This task intentionally stops at frame and navigation structure. The Welcome screen, import flow, populated library grid, loupe, Develop controls, and Export dialog are implemented in later Task 5.5 slices.
 
 ## QA Strategy
 

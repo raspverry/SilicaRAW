@@ -2,7 +2,7 @@
 title: Local DMG Distribution Plan
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-09
 source_of_truth: docs/16_Release_Distribution_Plan.md
 ---
 
@@ -443,6 +443,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - No screen content is hidden under native viewer proof layers.
   - Navigation state is visible and keyboard reachable.
 - **Validation:** Static app smoke test and screenshot check at 1280px and 1440px.
+
+**Status:** Completed on 2026-06-09. The static desktop shell now has the shared app frame from the UI MVP baseline: top toolbar, Library/Develop/Export mode navigation, left sidebar, central work surface, right inspector, and bottom status bar. Mode switching updates `data-active-mode`, `aria-pressed`, visible sidebar/main/inspector panels, and the status output without implementing the deeper Welcome, Import, Grid, Develop, or Export dialog workflows. The create/open library command buttons remain wired to the existing Tauri commands.
 
 ### Task 5.5.3: Implement Welcome and Library Open/Create UI
 
