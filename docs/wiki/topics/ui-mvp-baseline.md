@@ -92,6 +92,23 @@ Task 5.5.2 establishes the global shell used by later UI slices:
 
 This task intentionally stops at frame and navigation structure. The Welcome screen, import flow, populated library grid, loupe, Develop controls, and Export dialog are implemented in later Task 5.5 slices.
 
+## Visual Parity Gate
+
+Mockup parity is evaluated in two layers:
+
+- Frame parity: toolbar height, mode navigation, sidebar width, inspector width, bottom status area, tokenized colors, focus states, and shared spacing/type rhythm.
+- Screen parity: populated content, command states, photo thumbnails, filmstrip, Develop sliders, and Export dialog details.
+
+Task 5.5.2 must pass frame parity before later screen tasks proceed. It does not need to pass full screen parity against M003, M005, or M007 because those screenshots include populated grid, loupe/develop viewer, filmstrip, and export dialog work from later tasks.
+
+Design consistency rules for every Task 5.5 screen:
+
+- Use the existing `tokens.css`, `base.css`, and `app-frame.css` scales before introducing new component values.
+- Preserve the 8pt spacing rhythm except for documented 1px borders and fixed app chrome.
+- Keep toolbar, sidebar, inspector, and bottom status sizing consistent across modes unless a mode-specific mockup explicitly differs.
+- Do not add raw color literals to screen CSS; add semantic tokens first.
+- Do not use decorative gradients, emoji icons, or one-off typography.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.
