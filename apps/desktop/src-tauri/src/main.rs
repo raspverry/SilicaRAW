@@ -527,7 +527,7 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
 }
 
 fn main() {
-    let builder = tauri::Builder::default();
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
 
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
     let builder = builder.setup(metal_host_spike::install);

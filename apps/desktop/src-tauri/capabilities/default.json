@@ -1,9 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability for the SilicaRAW local library alpha shell. No plugin permissions are exposed.",
+  "description": "Default capability for the SilicaRAW local library alpha shell.",
   "windows": [
     "main"
   ],
-  "permissions": []
+  "permissions": [
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
 }

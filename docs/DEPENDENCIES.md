@@ -140,6 +140,23 @@ Security notes: Build-time code generation should remain limited to the local Ta
 Verification source: `cargo info tauri-build` for 2.6.2 metadata; Tauri v2 documentation at https://v2.tauri.app/.
 ```
 
+### Tauri Dialog Plugin
+
+```txt
+Name: tauri-plugin-dialog
+Version: 2.7.1
+Purpose: Native macOS folder and save-file dialogs for the local alpha path picker workflow.
+License: Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/tauri-apps/plugins-workspace
+Used by: apps/desktop/src-tauri in Phase 5.6.3
+Why needed: Lets installed-alpha users choose a library folder, import folder, and JPEG export output path without typing absolute paths.
+Alternatives considered: manual text-only path entry, custom HTML file inputs, Rust-only blocking dialogs behind custom commands
+Risk notes: Keep capability permissions limited to `dialog:allow-open` and `dialog:allow-save`; do not broaden to unrelated message dialogs unless the product needs them.
+Binary size impact: Adds the Tauri dialog plugin and its runtime file dialog support; measure final `.app` and `.dmg` size during Phase 6 packaging QA.
+Security notes: Dialog selection only fills existing path fields. File/catalog mutation remains behind typed Rust commands that preserve original files.
+Verification source: `cargo info tauri-plugin-dialog` for 2.7.1 metadata; Tauri v2 dialog plugin documentation at https://v2.tauri.app/plugin/dialog/.
+```
+
 ### Tauri CLI
 
 ```txt

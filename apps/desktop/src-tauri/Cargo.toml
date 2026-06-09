@@ -31,6 +31,7 @@ tauri-build = { version = "2.6.2", features = [] }
 silica-core = { path = "../../../crates/silica-core" }
 serde = { version = "1.0.228", features = ["derive"] }
 tauri = { version = "2.11.2", features = [] }
+tauri-plugin-dialog = { version = "2.7.1", default-features = false }
 
 [dev-dependencies]
 image = { version = "=0.25.6", default-features = false, features = ["jpeg"] }
