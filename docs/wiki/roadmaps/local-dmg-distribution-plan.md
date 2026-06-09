@@ -578,6 +578,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Original file hashes are unchanged after import, edit, export, cache clear, and restart.
 - **Validation:** Automated hash test and manual QA record.
 
+**Status:** Completed on 2026-06-09. Added `silica-core` automated original-safety hash QA for the connected local alpha workflow. The generated fixture test records an original JPEG hash, imports by reference, updates culling flags, opens preview, runs draft exposure/contrast preview, commits the edit, exports JPEG sRGB to a separate output path, deletes current disposable cache directories, reopens the library, and verifies the original hash remains unchanged after each stage. The current alpha has no product cache-clear command, so cache clear is represented by deleting `thumbnails`, `previews`, `render-cache`, and `ai-cache` under the disposable test library. Manual QA record fields were added to [QA Checklist](../../../checklists/QA_CHECKLIST.md).
+
 ### Task 6.3: Run Clean-Mac DMG Test
 
 - **Location:** release candidate artifact

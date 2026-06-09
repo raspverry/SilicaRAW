@@ -804,6 +804,101 @@ mod tests {
         remove_library_root(&workspace);
     }
 
+    #[test]
+    fn local_alpha_workflow_preserves_original_file_hash() {
+        let workspace = unique_library_root("core-original-safety");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+        assert_original_hash(&jpeg_file, &original_hash, "import by reference");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        set_photo_flags(
+            &created.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set flags through core");
+        assert_original_hash(&jpeg_file, &original_hash, "rating and pick update");
+
+        let preview = open_photo_preview(&created.root_path, &photo_id)
+            .expect("open preview")
+            .expect("preview session");
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_original_hash(&jpeg_file, &original_hash, "preview open");
+
+        preview_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("preview edit")
+            .expect("preview edit request");
+        assert_original_hash(&jpeg_file, &original_hash, "draft edit preview");
+
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("edit commit");
+        assert_original_hash(&jpeg_file, &original_hash, "edit commit");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+        assert_eq!(exported.source_path, jpeg_file.display().to_string());
+        assert_eq!(exported.output_path, output_path);
+        assert!(exported.output_path.is_file());
+        assert_ne!(exported.output_path, jpeg_file);
+        assert_original_hash(&jpeg_file, &original_hash, "JPEG sRGB export");
+
+        simulate_cache_clear(&created.root_path);
+        assert_original_hash(&jpeg_file, &original_hash, "cache directory clear");
+
+        let reopened = open_library(&library_root).expect("reopen library through core");
+        assert_original_hash(&jpeg_file, &original_hash, "library restart and reopen");
+
+        let flags = get_photo_flags(&reopened.root_path, &photo_id)
+            .expect("read flags")
+            .expect("flags row");
+        assert_eq!(flags.rating, 5);
+        assert!(flags.picked);
+        assert!(!flags.rejected);
+
+        let persisted =
+            silica_storage::load_active_edit_graph_or_default(&reopened.root_path, &photo_id)
+                .expect("load active graph")
+                .expect("active graph");
+        assert_eq!(persisted.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(persisted.basic.contrast.as_f64(), Some(-8.0));
+
+        let latest = silica_storage::get_latest_export_record(&reopened.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        assert_eq!(
+            latest.output_path,
+            exported.output_path.display().to_string()
+        );
+
+        remove_library_root(&workspace);
+    }
+
     fn unique_library_root(label: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -817,6 +912,34 @@ mod tests {
 
     fn remove_library_root(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn file_hash(path: &Path) -> String {
+        let bytes = std::fs::read(path).expect("read file for hash");
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for byte in bytes {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        format!("{hash:016x}")
+    }
+
+    fn assert_original_hash(path: &Path, expected_hash: &str, stage: &str) {
+        assert_eq!(
+            file_hash(path),
+            expected_hash,
+            "original file hash changed after {stage}"
+        );
+    }
+
+    fn simulate_cache_clear(library_root: &Path) {
+        for directory in ["thumbnails", "previews", "render-cache", "ai-cache"] {
+            let path = library_root.join(directory);
+            std::fs::create_dir_all(&path).expect("create cache directory");
+            std::fs::write(path.join("sentinel.cache"), b"disposable cache bytes")
+                .expect("write cache sentinel");
+            std::fs::remove_dir_all(&path).expect("remove cache directory");
+        }
     }
 
     fn write_source_jpeg(path: &Path) {
