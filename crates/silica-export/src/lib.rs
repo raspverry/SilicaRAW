@@ -53,6 +53,17 @@ pub struct JpegThumbnailRequest {
     pub quality: u8,
 }
 
+/// Request to create a disposable adjusted JPEG preview for Develop.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JpegDevelopPreviewRequest {
+    pub source_path: PathBuf,
+    pub output_path: PathBuf,
+    pub max_edge: u32,
+    pub quality: u8,
+    pub exposure: f64,
+    pub contrast: f64,
+}
+
 /// Result returned after a JPEG thumbnail is written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JpegThumbnailResult {
@@ -209,6 +220,49 @@ pub fn write_jpeg_thumbnail(
     })
 }
 
+/// Write a disposable adjusted JPEG preview for the Develop surface.
+pub fn write_jpeg_develop_preview(
+    request: JpegDevelopPreviewRequest,
+) -> Result<JpegThumbnailResult, ExportError> {
+    if paths_match(&request.source_path, &request.output_path)? {
+        return Err(ExportError::SameSourceAndOutput(request.output_path));
+    }
+    if !(1..=100).contains(&request.quality) {
+        return Err(ExportError::InvalidQuality(request.quality));
+    }
+    if request.max_edge == 0 {
+        return Err(ExportError::InvalidThumbnailEdge(request.max_edge));
+    }
+    if !request.exposure.is_finite() || !request.contrast.is_finite() {
+        return Err(ExportError::NonFiniteAdjustment);
+    }
+
+    let decoded = image::ImageReader::open(&request.source_path)?
+        .with_guessed_format()?
+        .decode()?;
+    let mut rgb = decoded
+        .thumbnail(request.max_edge, request.max_edge)
+        .to_rgb8();
+    apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+
+    let mut output = File::create(&request.output_path)?;
+    let mut encoder =
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut output, request.quality);
+    encoder.encode(
+        rgb.as_raw(),
+        rgb.width(),
+        rgb.height(),
+        image::ExtendedColorType::Rgb8,
+    )?;
+    drop(output);
+
+    Ok(JpegThumbnailResult {
+        bytes_written: fs::metadata(&request.output_path)?.len(),
+        output_path: request.output_path,
+        format: ExportImageFormat::Jpeg,
+    })
+}
+
 fn paths_match(source_path: &PathBuf, output_path: &PathBuf) -> Result<bool, ExportError> {
     if source_path == output_path {
         return Ok(true);
@@ -337,6 +391,48 @@ mod tests {
             .expect("decode thumbnail");
         assert!(decoded.width() <= 2);
         assert!(decoded.height() <= 2);
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_adjusted_jpeg_preview_without_mutating_original() {
+        let root = unique_export_root("develop-preview");
+        let source_path = root.join("source.jpg");
+        let neutral_path = root.join("previews").join("source-neutral.jpg");
+        let adjusted_path = root.join("previews").join("source-adjusted.jpg");
+        std::fs::create_dir_all(neutral_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 1.0,
+            contrast: 20.0,
+        })
+        .expect("write adjusted preview");
+
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
 
         remove_export_root(&root);
     }

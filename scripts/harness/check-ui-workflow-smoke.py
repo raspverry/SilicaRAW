@@ -251,6 +251,13 @@ def main():
         "sr-loupe-image",
     ]:
         require(marker in source, f"real loupe preview marker missing: {marker}", failures)
+    for marker in [
+        "developPreviewBytes",
+        "developObjectUrls",
+        "renderDevelopPreviewImage",
+        "sr-develop-image",
+    ]:
+        require(marker in source, f"real develop preview marker missing: {marker}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",

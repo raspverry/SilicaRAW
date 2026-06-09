@@ -20,6 +20,7 @@ const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
 const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
 const LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY: u8 = 88;
 const LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE: u32 = 2048;
+const LOCAL_ALPHA_DEVELOP_PREVIEW_QUALITY: u8 = 86;
 
 /// Local library session returned by core commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +86,7 @@ impl PhotoPreviewSession {
 pub struct PhotoEditPreviewSession {
     pub photo_id: String,
     pub source_path: String,
+    pub develop_preview_bytes: Option<Vec<u8>>,
     pub status: PhotoPreviewStatus,
     pub exposure: f64,
     pub contrast: f64,
@@ -344,14 +346,36 @@ pub fn preview_exposure_contrast_edit(
         edited.basic.exposure.as_f64().unwrap_or(exposure),
         edited.basic.contrast.as_f64().unwrap_or(contrast),
     );
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+        )?
+    } else {
+        None
+    };
 
     Ok(Some(PhotoEditPreviewSession {
         photo_id,
         source_path: request.source_path,
-        status: preview_status_from_render(request.status),
+        develop_preview_bytes,
+        status,
         exposure: request.exposure,
         contrast: request.contrast,
-        message: request.message,
+        message,
     }))
 }
 
@@ -522,6 +546,43 @@ fn ensure_jpeg_loupe_preview_cache(
         &result.output_path,
         byte_size,
     )?;
+    std::fs::read(result.output_path)
+        .map(Some)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)
+}
+
+fn write_jpeg_develop_preview_bytes(
+    library_root_path: &Path,
+    photo_id: &str,
+    source_path: &str,
+    exposure: f64,
+    contrast: f64,
+) -> Result<Option<Vec<u8>>, CoreError> {
+    let source_path = PathBuf::from(source_path);
+    if !is_jpeg_path(&source_path) || !source_path.is_file() {
+        return Ok(None);
+    }
+
+    let preview_root = library_root_path.join("previews");
+    std::fs::create_dir_all(&preview_root)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)?;
+    let output_path = preview_root.join(format!("develop-{photo_id}.jpg"));
+    let result =
+        match silica_export::write_jpeg_develop_preview(silica_export::JpegDevelopPreviewRequest {
+            source_path,
+            output_path,
+            max_edge: LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE,
+            quality: LOCAL_ALPHA_DEVELOP_PREVIEW_QUALITY,
+            exposure,
+            contrast,
+        }) {
+            Ok(result) => result,
+            Err(silica_export::ExportError::Image(_)) => return Ok(None),
+            Err(error) => return Err(CoreError::from(error)),
+        };
+
     std::fs::read(result.output_path)
         .map(Some)
         .map_err(silica_storage::LibraryStorageError::from)
@@ -959,8 +1020,9 @@ mod tests {
         let jpeg_file = import_root.join("sample.jpg");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&jpeg_file, b"jpeg placeholder bytes").expect("write jpeg");
+        write_source_jpeg(&jpeg_file);
 
+        let original_hash = file_hash(&jpeg_file);
         let created = create_library(&library_root).expect("create library through core");
         import_folder(&created.root_path, &import_root).expect("import through core");
 
@@ -987,6 +1049,11 @@ mod tests {
         assert_eq!(preview.exposure, 0.5);
         assert_eq!(preview.contrast, -8.0);
         assert!(preview.message.contains("exposure/contrast"));
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert_original_hash(&jpeg_file, &original_hash, "develop preview generation");
 
         let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
         let edit_state_count: i64 = connection

@@ -654,6 +654,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - RAW candidates may keep valid edit graph state while preview pixels remain decode-blocked.
 - **Validation:** Draft/no-write test, visual/runtime smoke, edit persistence test, and harness pass.
 
+**Status:** Completed on 2026-06-09. JPEG/JPG Develop preview now writes disposable adjusted JPEG preview bytes from the current exposure/contrast draft without persisting edit state until commit, returns `developPreviewBytes` through the desktop preview command, and renders those bytes as a Blob-backed `.sr-develop-image` inside the existing Develop surface. RAW candidates still keep valid draft edit graph routing while preview pixels remain decode-blocked, commit still persists the active edit graph, and tests verify draft/no-write behavior, original-file safety, desktop response bytes, UI smoke markers, and DOM image containment.
+
 ### Task 5.6.7: Persisted Edit-State Readback in UI
 
 - **Location:** `crates/silica-core`, `apps/desktop/src-tauri/src/main.rs`, `apps/desktop/static/index.html`

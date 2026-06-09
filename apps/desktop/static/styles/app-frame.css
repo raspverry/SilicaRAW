@@ -1200,6 +1200,20 @@ progress::-webkit-progress-value {
   border-radius: var(--sr-radius-sm);
 }
 
+.sr-develop-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: calc(100% - var(--sr-space-2xl));
+  max-height: calc(100% - var(--sr-space-2xl));
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-bg-primary);
+  transform: translate(-50%, -50%);
+}
+
 .sr-develop-status {
   position: relative;
   z-index: 1;
@@ -1232,6 +1246,10 @@ progress::-webkit-progress-value {
 
 .sr-develop-preview[data-preview-status="ready"] .sr-develop-art {
   border-color: var(--sr-accent-system);
+}
+
+.sr-develop-preview[data-has-preview-image="true"] .sr-develop-art {
+  opacity: 0;
 }
 
 .sr-develop-preview[data-preview-status="blocked"] .sr-develop-art,
