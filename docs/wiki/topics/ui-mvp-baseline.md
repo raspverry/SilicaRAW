@@ -192,6 +192,17 @@ Task 5.5.9 adds a lightweight static harness for the connected local alpha UI wo
 - It intentionally avoids browser automation and new dependencies so the check can run locally and in CI as part of the existing harness.
 - It does not require MLX, MCP, plugin runtime, cloud, telemetry, RAW decoding, or Metal rendering.
 
+## Task 5.5.10 Visual and Responsive QA
+
+Task 5.5.10 checks the implemented M003/M005/M007 surfaces against their compact and large mockup families:
+
+- Browser QA covers Library grid, Develop, and Export dialog at `1280x800`, `1440x900`, and `1728x965`.
+- The pass checks horizontal overflow, visible control/text clipping, toolbar mode/action overlap, photo-first hierarchy, and Export/Develop compact usability.
+- The 1280px toolbar density issue was fixed by allowing the mode switcher and search field to shrink before they collide.
+- Real image pixels and thumbnail cache generation remain outside this static UI QA task.
+
+See [UI Visual and Responsive QA](ui-visual-responsive-qa.md) for the recorded notes.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.
@@ -212,4 +223,5 @@ Minimum UI MVP checks:
 
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [UI Mockups](ui-mockups.md)
+- [UI Visual and Responsive QA](ui-visual-responsive-qa.md)
 - [Metal Rendering](metal-rendering.md)
