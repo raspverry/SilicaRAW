@@ -45,7 +45,7 @@
         <section class="sr-sidebar-section" data-mode-panel="library">
           <div class="sr-panel-heading">Library</div>
           <button class="sr-sidebar-item is-active" type="button"><span>All Photos</span><span>0</span></button>
-          <button class="sr-sidebar-item" type="button"><span>Recent Imports</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button"><span>Recent Imports</span><span id="recentImportCount">0</span></button>
           <button class="sr-sidebar-item" type="button"><span>Favorites</span><span>0</span></button>
           <button class="sr-sidebar-item" type="button"><span>Rejected</span><span>0</span></button>
           <div class="sr-panel-heading sr-panel-heading-spaced">Folders</div>
@@ -125,12 +125,66 @@
                 <p>All Photos - 0</p>
               </div>
               <div class="sr-view-controls" aria-label="Library view controls">
+                <button class="primary" id="showImportPanel" type="button">Import Photos</button>
                 <button type="button" class="sr-icon-button" aria-label="Grid">
                   <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
                 </button>
                 <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
               </div>
             </div>
+            <section class="sr-import-panel" id="importPanel" aria-labelledby="importTitle">
+              <div class="sr-import-shell">
+                <div class="sr-import-header">
+                  <div>
+                    <h2 id="importTitle">Import Photos</h2>
+                    <p id="importSafetyNote">Original files will stay in place. SilicaRAW records references only.</p>
+                  </div>
+                  <button id="minimizeImport" type="button">Minimize</button>
+                </div>
+
+                <form class="sr-import-form">
+                  <label for="importFolderPath">Folder path</label>
+                  <div class="sr-import-path-row">
+                    <input id="importFolderPath" name="importFolderPath" autocomplete="off" spellcheck="false" placeholder="/Volumes/Photography/2025 Spring Trip">
+                    <button class="primary" id="startImport" type="button">Import by Reference</button>
+                  </div>
+                </form>
+
+                <div class="sr-import-overall">
+                  <div class="sr-import-metric">
+                    <span>Overall Progress</span>
+                    <strong id="importProgressLabel">Ready</strong>
+                  </div>
+                  <progress id="importProgress" max="100" value="0">0%</progress>
+                  <output id="importStatus" aria-live="polite">Choose a folder to scan without copying originals.</output>
+                </div>
+
+                <div class="sr-import-steps" aria-label="Import steps">
+                  <div class="sr-import-step">
+                    <span>Scanning files</span>
+                    <progress max="100" value="0"></progress>
+                    <output>Pending</output>
+                  </div>
+                  <div class="sr-import-step">
+                    <span>Reading metadata</span>
+                    <progress max="100" value="0"></progress>
+                    <output>Pending</output>
+                  </div>
+                  <div class="sr-import-step">
+                    <span>Detecting unsupported files</span>
+                    <progress max="100" value="0"></progress>
+                    <output>Pending</output>
+                  </div>
+                </div>
+
+                <div class="sr-import-summary" id="importSummary" aria-label="Import summary">
+                  <div><span>Imported</span><strong id="importedCount">0</strong></div>
+                  <div><span>Unsupported</span><strong id="unsupportedCount">0</strong></div>
+                  <div><span>Errors</span><strong id="importErrorCount">0</strong></div>
+                  <button id="viewImportErrors" type="button">View Errors</button>
+                </div>
+              </div>
+            </section>
             <div class="sr-grid-placeholder" aria-label="Library grid placeholder">
               <div class="sr-photo-tile"></div>
               <div class="sr-photo-tile"></div>
@@ -226,17 +280,41 @@
       const libraryStatePanels = Array.from(document.querySelectorAll("[data-library-state-panel]"));
       const recentButtons = Array.from(document.querySelectorAll("[data-recent-path]"));
       const pathInput = document.querySelector("#libraryPath");
+      const importPathInput = document.querySelector("#importFolderPath");
       const statusOutput = document.querySelector("#appStatus");
       const welcomeStatus = document.querySelector("#welcomeStatus");
+      const importStatus = document.querySelector("#importStatus");
+      const importProgress = document.querySelector("#importProgress");
+      const importProgressLabel = document.querySelector("#importProgressLabel");
+      const importedCount = document.querySelector("#importedCount");
+      const unsupportedCount = document.querySelector("#unsupportedCount");
+      const importErrorCount = document.querySelector("#importErrorCount");
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
       const openRecentButton = document.querySelector("#openRecent");
+      const startImportButton = document.querySelector("#startImport");
+      const viewImportErrorsButton = document.querySelector("#viewImportErrors");
+      const showImportPanelButton = document.querySelector("#showImportPanel");
+      const minimizeImportButton = document.querySelector("#minimizeImport");
 
       const invoke = window.__TAURI__?.core?.invoke;
+      let activeLibraryPath = "";
 
       function setStatus(message) {
         statusOutput.value = message;
         welcomeStatus.value = message;
+        importStatus.value = message;
+      }
+
+      function setImportProgress(value, label) {
+        importProgress.value = value;
+        importProgress.textContent = `${value}%`;
+        importProgressLabel.textContent = label;
+      }
+
+      function readImportNumber(message, label) {
+        const match = message.match(new RegExp(`${label}:\\s*(\\d+)`));
+        return match ? match[1] : "0";
       }
 
       function setMode(mode) {
@@ -262,6 +340,7 @@
       function setBusy(isBusy) {
         createButton.disabled = isBusy;
         openButton.disabled = isBusy;
+        startImportButton.disabled = isBusy;
       }
 
       async function runLibraryCommand(command) {
@@ -280,9 +359,52 @@
         setStatus("Working...");
         try {
           const message = await invoke(command, { path });
+          activeLibraryPath = path;
           setLibraryState("open");
           setStatus(message);
         } catch (error) {
+          setStatus(String(error));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function runImportCommand() {
+        const folderPath = importPathInput.value.trim();
+        if (!folderPath) {
+          setStatus("Enter an import folder path.");
+          setImportProgress(0, "Ready");
+          return;
+        }
+
+        if (!activeLibraryPath) {
+          setStatus("Open or create a library before importing.");
+          setImportProgress(0, "Waiting");
+          return;
+        }
+
+        if (!invoke) {
+          setStatus("Desktop runtime unavailable.");
+          setImportProgress(0, "Blocked");
+          return;
+        }
+
+        setBusy(true);
+        setStatus("Importing by reference...");
+        setImportProgress(45, "Scanning");
+        try {
+          const message = await invoke("import_folder", {
+            libraryPath: activeLibraryPath,
+            folderPath,
+          });
+          importedCount.textContent = readImportNumber(message, "Supported");
+          unsupportedCount.textContent = readImportNumber(message, "Unsupported");
+          importErrorCount.textContent = "0";
+          setImportProgress(100, "Completed");
+          setStatus(message);
+        } catch (error) {
+          importErrorCount.textContent = "1";
+          setImportProgress(100, "Needs Review");
           setStatus(String(error));
         } finally {
           setBusy(false);
@@ -294,6 +416,18 @@
       });
       createButton.addEventListener("click", () => runLibraryCommand("create_library"));
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
+      startImportButton.addEventListener("click", runImportCommand);
+      viewImportErrorsButton.addEventListener("click", () => {
+        setStatus("Unsupported and failed files will be reviewable after import.");
+      });
+      showImportPanelButton.addEventListener("click", () => {
+        document.querySelector("#importPanel").hidden = false;
+        setStatus("Import panel ready.");
+      });
+      minimizeImportButton.addEventListener("click", () => {
+        document.querySelector("#importPanel").hidden = true;
+        setStatus("Import panel minimized.");
+      });
       openRecentButton.addEventListener("click", () => setStatus("Select a recent library below."));
       recentButtons.forEach((button) => {
         button.addEventListener("click", () => {

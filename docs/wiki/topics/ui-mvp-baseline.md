@@ -121,6 +121,17 @@ Task 5.5.3 adds the M001 first-launch state inside Library mode:
 - Open Sample Project is visible but disabled until sample project support is explicitly scoped.
 - Successful Tauri command completion switches the app frame to `data-library-state="open"`.
 
+## Task 5.5.4 Import Flow
+
+Task 5.5.4 adds the M009 import progress structure inside the Library workbench:
+
+- Import runs by reference through the Tauri `import_folder` command.
+- The UI keeps the original-file safety statement visible before import starts.
+- Import progress appears as a modal-style panel over the library surface, not as a page layout that resizes the grid.
+- Unsupported and error counts are always visible, with a View Errors affordance.
+- Static progress rows are placeholders until real progress events are explicitly scoped.
+- Pause, cancel, recursive import, import history persistence, and native folder picking remain future work.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.

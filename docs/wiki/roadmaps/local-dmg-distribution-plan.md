@@ -470,6 +470,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Unsupported file count and errors are visible.
 - **Validation:** Import a mixed folder and verify catalog rows without copying originals.
 
+**Status:** Completed on 2026-06-09. Library workbench now exposes an M009-style import-by-reference flow with an import folder path, original-file safety note, overall progress, step status rows, unsupported/error summary, View Errors affordance, and a modal-style progress panel over the library surface. The Tauri shell now exposes a thin `import_folder` command that delegates to `silica_core::import_folder` and returns scanned/supported/unsupported counts while preserving source files. Native folder picking, pause/cancel/minimized background jobs, recursive import, real progress events, persisted import history, and populated grid rendering remain later scoped work.
+
 ### Task 5.5.5: Implement Library Grid MVP
 
 - **Location:** `apps/desktop/static/`, `MockupUI/M003_Library_Grid_populated.png`

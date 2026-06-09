@@ -78,6 +78,14 @@ def main():
         "createLibrary",
         "openRecent",
         "openSampleProject",
+        "importPanel",
+        "importFolderPath",
+        "startImport",
+        "importStatus",
+        "importProgress",
+        "importSummary",
+        "unsupportedCount",
+        "viewImportErrors",
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)
