@@ -155,6 +155,19 @@ Task 5.5.6 adds the M004 Loupe MVP inside Library mode:
 - The bottom filmstrip mirrors the current grid selection and keeps M004 navigation visible.
 - Real image pixels, Metal output, RAW decoding, full metadata, and Develop edits remain future work.
 
+## Task 5.5.7 Develop Panel
+
+Task 5.5.7 adds the M005 Develop Panel MVP:
+
+- Develop mode uses the selected Library photo as its editing context.
+- The center surface shows preview readiness, selected file name, Before/After/Split controls, and a bottom filmstrip.
+- The right inspector exposes Basic exposure and contrast controls using the `SrAdjustmentSlider` anatomy: label, range, numeric input, reset, keyboard adjustment, and default reset.
+- Draft slider and numeric input changes call only the preview path.
+- `Commit Edit` is the explicit persistence action for final exposure and contrast values.
+- Unsupported and missing files disable Develop edit controls rather than implying an editable preview.
+- RAW candidates may accept a valid edit graph draft while still showing blocked decode preview state.
+- Real image pixels, Metal output, RAW decoding, masks, full tone/color/detail controls, and sidecar writing remain future work.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.
