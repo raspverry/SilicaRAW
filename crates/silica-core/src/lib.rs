@@ -128,6 +128,26 @@ impl PhotoEditCommit {
     }
 }
 
+/// Current committed exposure/contrast edit state for a catalog photo.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoEditState {
+    pub photo_id: String,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub persisted: bool,
+    pub message: String,
+}
+
+impl PhotoEditState {
+    /// Compact status string for the minimal desktop shell entry point.
+    pub fn status_text(&self) -> String {
+        format!(
+            "Photo: {}\nExposure: {}\nContrast: {}\nPersisted: {}\nMessage: {}",
+            self.photo_id, self.exposure, self.contrast, self.persisted, self.message
+        )
+    }
+}
+
 /// Completed JPEG sRGB export returned through the core boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoExportSession {
@@ -406,6 +426,37 @@ pub fn commit_exposure_contrast_edit(
         contrast,
         persisted: true,
         message: "Exposure/contrast edit persisted on commit.".to_string(),
+    }))
+}
+
+/// Read the current exposure/contrast edit state without mutating the catalog.
+pub fn get_photo_edit_state(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoEditState>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    if let Some(graph) = silica_storage::load_active_edit_graph(library_root_path, photo_id)? {
+        return Ok(Some(PhotoEditState {
+            photo_id: graph.source.photo_id,
+            exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
+            contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
+            persisted: true,
+            message: "Restored committed edit state.".to_string(),
+        }));
+    }
+
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+
+    Ok(Some(PhotoEditState {
+        photo_id: graph.source.photo_id,
+        exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
+        persisted: false,
+        message: "Default clean edit state loaded.".to_string(),
     }))
 }
 
@@ -1055,6 +1106,13 @@ mod tests {
             .is_some_and(|bytes| bytes.len() > 2));
         assert_original_hash(&jpeg_file, &original_hash, "develop preview generation");
 
+        let default_edit_state = get_photo_edit_state(&created.root_path, &photo_id)
+            .expect("read default edit state")
+            .expect("default edit state");
+        assert_eq!(default_edit_state.exposure, 0.0);
+        assert_eq!(default_edit_state.contrast, 0.0);
+        assert!(!default_edit_state.persisted);
+
         let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
         let edit_state_count: i64 = connection
             .query_row("SELECT COUNT(*) FROM edit_states", [], |row| row.get(0))
@@ -1082,6 +1140,13 @@ mod tests {
         .expect("active graph");
         assert_eq!(persisted.basic.exposure.as_f64(), Some(0.5));
         assert_eq!(persisted.basic.contrast.as_f64(), Some(-8.0));
+
+        let restored = get_photo_edit_state(&reopened.root_path, &committed.photo_id)
+            .expect("read restored edit state")
+            .expect("restored edit state");
+        assert_eq!(restored.exposure, 0.5);
+        assert_eq!(restored.contrast, -8.0);
+        assert!(restored.persisted);
 
         remove_library_root(&workspace);
     }
