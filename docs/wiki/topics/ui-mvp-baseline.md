@@ -182,6 +182,16 @@ Task 5.5.8 adds the M007 Export Dialog MVP:
 - RAW, missing, and unsupported candidates show blocked states instead of implying exportable pixels.
 - Native folder picking, multi-photo export, export presets, alternate formats, resizing, metadata policy editing, real image pixels, RAW decoding, Metal output, and sidecar writing remain future work.
 
+## Task 5.5.9 UI Workflow Smoke Harness
+
+Task 5.5.9 adds a lightweight static harness for the connected local alpha UI workflow:
+
+- `scripts/harness/check.sh` runs `scripts/harness/check-ui-workflow-smoke.py` after the static UI contract check.
+- The smoke harness verifies the path `open/create library -> import by reference -> grid/cull -> loupe -> develop -> export`.
+- It checks required element IDs, Tauri command wiring, import-by-reference copy safety text, Develop exposure/contrast bounds, locked JPEG sRGB export settings, static runtime messaging, and the guard that blocks exporting over the referenced original source path.
+- It intentionally avoids browser automation and new dependencies so the check can run locally and in CI as part of the existing harness.
+- It does not require MLX, MCP, plugin runtime, cloud, telemetry, RAW decoding, or Metal rendering.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.
