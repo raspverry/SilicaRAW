@@ -597,6 +597,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Existing Rust command tests cover the response shape.
 - **Validation:** Desktop command tests, static UI contract, and harness pass.
 
+**Status:** Completed on 2026-06-09. Desktop Tauri commands now return structured `ok` / `data` / `error` response envelopes instead of parse-only status strings. The frontend reads stable response fields for library, import, grid, culling, preview, Develop preview/commit, and JPEG export flows, and the UI workflow smoke harness rejects legacy command string parsing helpers. `serde` is now a direct desktop dependency for response serialization and is recorded in [Dependencies](../../DEPENDENCIES.md).
+
 ### Task 5.6.3: Native Path Picker UX
 
 - **Location:** `apps/desktop/src-tauri`, `apps/desktop/static/`, `docs/DEPENDENCIES.md` if a Tauri plugin is added
