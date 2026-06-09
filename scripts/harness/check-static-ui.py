@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+from html.parser import HTMLParser
+from pathlib import Path
+import re
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[2]
+INDEX = ROOT / "apps/desktop/static/index.html"
+BASE_CSS = ROOT / "apps/desktop/static/styles/base.css"
+APP_FRAME_CSS = ROOT / "apps/desktop/static/styles/app-frame.css"
+
+
+class StaticUiParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+        self.ids = {}
+        self.styles = 0
+        self.mode_buttons = {}
+        self._current_button_mode = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "style":
+            self.styles += 1
+        if tag == "link" and attrs.get("rel") == "stylesheet":
+            self.links.append(attrs.get("href", ""))
+        if "id" in attrs:
+            self.ids[attrs["id"]] = attrs
+        if tag == "button" and "data-mode" in attrs:
+            self._current_button_mode = attrs["data-mode"]
+            self.mode_buttons[attrs["data-mode"]] = {"attrs": attrs, "text": ""}
+
+    def handle_data(self, data):
+        if self._current_button_mode:
+            self.mode_buttons[self._current_button_mode]["text"] += data
+
+    def handle_endtag(self, tag):
+        if tag == "button":
+            self._current_button_mode = None
+
+
+def require(condition, message, failures):
+    if not condition:
+        failures.append(message)
+
+
+def main():
+    parser = StaticUiParser()
+    parser.feed(INDEX.read_text(encoding="utf-8"))
+    failures = []
+
+    require(parser.styles == 0, "index.html must not use inline <style> blocks", failures)
+    for href in [
+        "./styles/tokens.css",
+        "./styles/base.css",
+        "./styles/app-frame.css",
+    ]:
+        require(href in parser.links, f"index.html must link {href}", failures)
+
+    required_ids = [
+        "appFrame",
+        "appToolbar",
+        "modeNavigation",
+        "modeLibrary",
+        "modeDevelop",
+        "modeExport",
+        "leftSidebar",
+        "mainSurface",
+        "rightInspector",
+        "bottomStatus",
+        "appStatus",
+    ]
+    for element_id in required_ids:
+        require(element_id in parser.ids, f"missing #{element_id}", failures)
+
+    app_frame = parser.ids.get("appFrame", {})
+    require(
+        app_frame.get("data-active-mode") == "library",
+        "#appFrame must default to data-active-mode=\"library\"",
+        failures,
+    )
+
+    expected_modes = {"library": "Library", "develop": "Develop", "export": "Export"}
+    for mode, label in expected_modes.items():
+        button = parser.mode_buttons.get(mode)
+        require(button is not None, f"missing mode button for {mode}", failures)
+        if button:
+            require(
+                button["attrs"].get("aria-pressed") in {"true", "false"},
+                f"{mode} mode button needs aria-pressed",
+                failures,
+            )
+            require(label in button["text"], f"{mode} mode button label must include {label}", failures)
+
+    require(APP_FRAME_CSS.is_file(), "missing styles/app-frame.css", failures)
+    if APP_FRAME_CSS.is_file():
+        css = APP_FRAME_CSS.read_text(encoding="utf-8")
+        for selector in [
+            ".app-frame",
+            ".sr-toolbar",
+            ".sr-mode-switcher",
+            ".sr-sidebar",
+            ".sr-main-surface",
+            ".sr-inspector",
+            ".sr-statusbar",
+        ]:
+            require(selector in css, f"app-frame.css missing {selector}", failures)
+        require("@media" in css, "app-frame.css must define responsive behavior", failures)
+        require(
+            re.search(r"#[0-9a-fA-F]{3,8}|rgba?\(", css) is None,
+            "app-frame.css must consume color tokens instead of raw color literals",
+            failures,
+        )
+
+    require(BASE_CSS.is_file(), "missing styles/base.css", failures)
+    if BASE_CSS.is_file():
+        css = BASE_CSS.read_text(encoding="utf-8")
+        require("[hidden]" in css, "base.css must preserve native hidden behavior", failures)
+
+    if failures:
+        for failure in failures:
+            print(f"static-ui check failed: {failure}", file=sys.stderr)
+        return 1
+
+    print("static UI contract ok")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

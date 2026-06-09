@@ -6,28 +6,179 @@
     <title>SilicaRAW</title>
     <link rel="stylesheet" href="./styles/tokens.css">
     <link rel="stylesheet" href="./styles/base.css">
+    <link rel="stylesheet" href="./styles/app-frame.css">
   </head>
   <body>
-    <main>
-      <h1>SilicaRAW</h1>
-      <p>Local library alpha.</p>
-      <form>
-        <label for="libraryPath">Library folder path</label>
-        <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false">
-        <div class="actions">
-          <button class="primary" id="createLibrary" type="button">Create Library</button>
-          <button id="openLibrary" type="button">Open Library</button>
+    <div class="app-frame" id="appFrame" data-active-mode="library">
+      <header class="sr-toolbar" id="appToolbar" role="banner">
+        <div class="sr-window-cluster" aria-hidden="true">
+          <span class="sr-window-dot sr-window-dot-red"></span>
+          <span class="sr-window-dot sr-window-dot-yellow"></span>
+          <span class="sr-window-dot sr-window-dot-green"></span>
         </div>
-      </form>
-      <output id="status" aria-live="polite"></output>
-    </main>
+        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar">[]</button>
+        <div class="sr-toolbar-title">SilicaRAW</div>
+        <nav class="sr-mode-switcher" id="modeNavigation" aria-label="Primary modes">
+          <button id="modeLibrary" type="button" data-mode="library" aria-pressed="true">Library</button>
+          <button id="modeDevelop" type="button" data-mode="develop" aria-pressed="false">Develop</button>
+          <button id="modeExport" type="button" data-mode="export" aria-pressed="false">Export</button>
+        </nav>
+        <div class="sr-toolbar-actions" aria-label="Toolbar actions">
+          <input class="sr-search" type="search" aria-label="Search photos" placeholder="Search">
+          <button class="sr-icon-button" type="button" aria-label="Grid view">##</button>
+          <button class="sr-icon-button" type="button" aria-label="Inspector">i</button>
+          <button class="primary sr-export-action" type="button">Export</button>
+          <button class="sr-icon-button" type="button" aria-label="Settings">*</button>
+        </div>
+      </header>
+
+      <aside class="sr-sidebar" id="leftSidebar" aria-label="Left sidebar">
+        <section class="sr-sidebar-section" data-mode-panel="library">
+          <div class="sr-panel-heading">Library</div>
+          <button class="sr-sidebar-item is-active" type="button"><span>All Photos</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button"><span>Recent Imports</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button"><span>Favorites</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button"><span>Rejected</span><span>0</span></button>
+          <div class="sr-panel-heading sr-panel-heading-spaced">Folders</div>
+          <button class="sr-sidebar-item" type="button"><span>Local Library</span><span>0</span></button>
+        </section>
+        <section class="sr-sidebar-section" data-mode-panel="develop" hidden>
+          <div class="sr-panel-heading">Presets</div>
+          <button class="sr-preset-row is-active" type="button"><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
+          <button class="sr-preset-row" type="button"><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
+          <button class="sr-preset-row" type="button"><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
+        </section>
+        <section class="sr-sidebar-section" data-mode-panel="export" hidden>
+          <div class="sr-panel-heading">Export</div>
+          <button class="sr-sidebar-item is-active" type="button"><span>JPEG sRGB</span><span>Ready</span></button>
+          <button class="sr-sidebar-item" type="button"><span>Recent Exports</span><span>0</span></button>
+        </section>
+      </aside>
+
+      <main class="sr-main-surface" id="mainSurface" tabindex="-1">
+        <section class="sr-mode-surface" data-mode-panel="library" aria-labelledby="libraryTitle">
+          <div class="sr-surface-header">
+            <div>
+              <h1 id="libraryTitle">Library</h1>
+              <p>All Photos - 0</p>
+            </div>
+            <div class="sr-view-controls" aria-label="Library view controls">
+              <button type="button" class="sr-icon-button" aria-label="Grid">##</button>
+              <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
+            </div>
+          </div>
+          <section class="sr-library-start" aria-label="Library setup">
+            <form class="sr-library-form">
+              <label for="libraryPath">Library folder path</label>
+              <div class="sr-path-row">
+                <input id="libraryPath" name="libraryPath" autocomplete="off" spellcheck="false">
+                <button class="primary" id="createLibrary" type="button">Create</button>
+                <button id="openLibrary" type="button">Open</button>
+              </div>
+            </form>
+          </section>
+          <div class="sr-grid-placeholder" aria-label="Library grid placeholder">
+            <div class="sr-photo-tile"></div>
+            <div class="sr-photo-tile"></div>
+            <div class="sr-photo-tile"></div>
+            <div class="sr-photo-tile"></div>
+            <div class="sr-photo-tile"></div>
+            <div class="sr-photo-tile"></div>
+          </div>
+        </section>
+
+        <section class="sr-mode-surface sr-viewer-mode" data-mode-panel="develop" aria-labelledby="developTitle" hidden>
+          <div class="sr-surface-header">
+            <div>
+              <h1 id="developTitle">Develop</h1>
+              <p>No photo selected</p>
+            </div>
+            <div class="sr-view-controls">
+              <button type="button">Before</button>
+              <button type="button" class="is-active">After</button>
+              <button type="button">Split</button>
+            </div>
+          </div>
+          <div class="sr-viewer-placeholder" aria-label="Develop viewer placeholder"></div>
+        </section>
+
+        <section class="sr-mode-surface sr-viewer-mode" data-mode-panel="export" aria-labelledby="exportTitle" hidden>
+          <div class="sr-surface-header">
+            <div>
+              <h1 id="exportTitle">Export</h1>
+              <p>JPEG sRGB</p>
+            </div>
+          </div>
+          <div class="sr-export-placeholder">
+            <div class="sr-export-panel">
+              <h2>Export Photos</h2>
+              <div class="sr-export-row"><span>Format</span><strong>JPEG</strong></div>
+              <div class="sr-export-row"><span>Color Space</span><strong>sRGB</strong></div>
+              <div class="sr-export-row"><span>Quality</span><strong>90</strong></div>
+              <div class="sr-safety-note">Original files will not be modified.</div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="sr-inspector" id="rightInspector" aria-label="Right inspector">
+        <section class="sr-inspector-section">
+          <div class="sr-histogram" aria-label="Histogram placeholder"></div>
+        </section>
+        <section class="sr-inspector-section" data-mode-panel="library">
+          <div class="sr-panel-heading">Quick Review</div>
+          <div class="sr-rating-row" aria-label="Rating">-----</div>
+          <button class="sr-inspector-action" type="button">Pick</button>
+          <button class="sr-inspector-action" type="button">Reject</button>
+        </section>
+        <section class="sr-inspector-section" data-mode-panel="develop" hidden>
+          <div class="sr-panel-heading">Basic</div>
+          <div class="sr-adjust-row"><span>Exposure</span><span>0.00</span></div>
+          <div class="sr-adjust-track"></div>
+          <div class="sr-adjust-row"><span>Contrast</span><span>0</span></div>
+          <div class="sr-adjust-track"></div>
+        </section>
+        <section class="sr-inspector-section" data-mode-panel="export" hidden>
+          <div class="sr-panel-heading">Summary</div>
+          <div class="sr-export-row"><span>Format</span><strong>JPEG</strong></div>
+          <div class="sr-export-row"><span>Color</span><strong>sRGB</strong></div>
+        </section>
+        <section class="sr-inspector-section">
+          <div class="sr-panel-heading">Metadata</div>
+          <div class="sr-metadata-row"><span>File</span><span>None</span></div>
+          <div class="sr-metadata-row"><span>Type</span><span>Catalog</span></div>
+        </section>
+      </aside>
+
+      <footer class="sr-statusbar" id="bottomStatus">
+        <div class="sr-bottom-controls" aria-label="Bottom view controls">
+          <button class="sr-icon-button" type="button" aria-label="Grid">##</button>
+          <button class="sr-icon-button" type="button" aria-label="Loupe">1:1</button>
+        </div>
+        <output id="appStatus" aria-live="polite">No library open</output>
+      </footer>
+    </div>
     <script>
+      const appFrame = document.querySelector("#appFrame");
+      const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
+      const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
       const pathInput = document.querySelector("#libraryPath");
-      const statusOutput = document.querySelector("#status");
+      const statusOutput = document.querySelector("#appStatus");
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
 
       const invoke = window.__TAURI__?.core?.invoke;
+
+      function setMode(mode) {
+        appFrame.dataset.activeMode = mode;
+        modeButtons.forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+        });
+        modePanels.forEach((panel) => {
+          panel.hidden = panel.dataset.modePanel !== mode;
+        });
+        statusOutput.value = `Mode: ${mode[0].toUpperCase()}${mode.slice(1)}`;
+      }
 
       function setBusy(isBusy) {
         createButton.disabled = isBusy;
@@ -57,6 +208,9 @@
         }
       }
 
+      modeButtons.forEach((button) => {
+        button.addEventListener("click", () => setMode(button.dataset.mode));
+      });
       createButton.addEventListener("click", () => runLibraryCommand("create_library"));
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
     </script>
