@@ -34,6 +34,7 @@ The current implementation order starts with:
 16. Implement exposure and contrast edit flow.
 17. Implement JPEG sRGB export.
 18. Establish UI MVP baseline and then implement the connected UI vertical slice.
+19. Complete the product alpha runtime loop before clean-Mac install QA: real JPEG/JPG pixels, native/selectable paths, persisted UI readback, cache clear, fixture generation, and installed/runtime smoke.
 
 ## Gate Logic
 
@@ -59,7 +60,8 @@ The current implementation order starts with:
 - Phase 5.2 adds typed edit graph structures and schema-aware validation in `silica-edit`; edit application, render integration, sidecar persistence, and UI controls remain later tasks.
 - Phase 5.3 adds command/API-level exposure and contrast edit flow: draft preview requests do not write SQLite, while commit persists the active edit graph.
 - Phase 5.4 adds command/API-level JPEG sRGB export with original overwrite protection and catalog export records.
-- Phase 5.5 starts the UI MVP vertical slice. Task 5.5.1 records the baseline and tokenizes the static shell; product screens begin in Task 5.5.2.
+- Phase 5.5 completed the UI MVP vertical slice as screen structure plus command wiring. It is not the final installed-app readiness gate because several surfaces still use placeholder pixels, typed paths, string command parsing, and static/demo state.
+- Phase 5.6 is now the required Product Alpha Runtime Completion pass before Phase 6 clean-Mac install QA. Its first task records the runtime gap audit and narrows the installed-alpha guaranteed visible photo path to JPEG/JPG until additional codecs are explicitly implemented and tested.
 
 ## Links
 
@@ -74,6 +76,7 @@ The current implementation order starts with:
 - [ADR 0005: Defer MLX from Local Alpha](../decisions/adr-0005-mlx-deferral-for-local-alpha.md)
 - [Catalog](../topics/catalog.md)
 - [UI MVP Baseline](../topics/ui-mvp-baseline.md)
+- [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md)
 
 ## Notes for LLM Agents
 

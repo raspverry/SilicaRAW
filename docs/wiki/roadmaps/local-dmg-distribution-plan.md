@@ -549,19 +549,189 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 
 **Status:** Completed on 2026-06-09. Browser QA covered Library grid, Develop, and Export dialog at `1280x800`, `1440x900`, and `1728x965` against the M003/M005/M007 compact and large mockup families. The pass found and fixed a 1280px toolbar density issue where the mode switcher could visually collide with the search/actions region. After the CSS fix, horizontal overflow is false, visible clipping candidates are zero, toolbar mode/action overlap is zero, and Export/Develop remain usable at compact width. Recorded notes are in [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md).
 
-## Phase 6: Local Install QA
+## Phase 5.6: Product Alpha Runtime Completion
 
-**Goal:** Verify the app behaves correctly when installed from DMG, not only when run from the build tree.
+**Goal:** Turn the Phase 5.5 screen/command-wired UI into a usable local alpha app before install QA.
+
+Phase 5.5 proved screen structure and command paths. It did not prove a real installed photo-editing loop because important surfaces still rely on typed paths, string command parsing, static demo state, placeholder thumbnails/previews, and QA-simulated cache clearing. Phase 5.6 is the product runtime completion pass.
+
+**Installed-alpha capability contract:**
+
+- JPEG/JPG originals are the first fully supported visible photo path for grid thumbnails, loupe preview, Develop preview, persisted exposure/contrast, and JPEG sRGB export.
+- RAW files may be imported only as clearly decode-blocked catalog entries until RAW decoding is explicitly implemented.
+- Unsupported files must never look editable or exportable.
+- PNG, TIFF, HEIC, and other raster formats are not guaranteed installed-alpha edit/export inputs until codec support, UI behavior, and tests are explicitly added.
+- Original source files must remain unmodified.
 
 **Demo/Validation:**
 
-- DMG install test passes on a clean Apple Silicon Mac.
+- A tester can use the installed app to create/open a library, import JPEG/JPG originals by reference, see real thumbnails, open a real loupe preview, visibly adjust exposure/contrast, commit the edit, export JPEG sRGB, clear disposable caches, restart, reopen, and see persisted state.
+- The same workflow is covered by a connected runtime smoke path before clean-Mac DMG QA begins.
+- Phase 6 clean-Mac install QA does not start until this phase is complete.
+
+See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md) for the runtime gap audit.
+
+### Task 5.6.1: Runtime Gap Audit and Alpha Capability Contract
+
+- **Location:** `docs/wiki/topics/product-alpha-runtime-completion.md`, `docs/wiki/roadmaps/local-dmg-distribution-plan.md`
+- **Description:** Record the product/runtime gaps found after Phase 5.5 and define the exact installed-alpha capability contract before more runtime work begins.
+- **Dependencies:** Task 5.5.10
+- **Acceptance Criteria:**
+  - Phase 5.6 is atomized before implementation continues.
+  - The installed-alpha visible photo path is scoped to JPEG/JPG until more codecs are proven.
+  - Missing product runtime behavior is separated from Phase 6 packaging QA.
+  - Phase 6 dependencies are updated so clean-Mac QA waits for Phase 5.6.
+- **Validation:** Markdown link check and harness pass.
+
+**Status:** Completed on 2026-06-09. Added the Phase 5.6 runtime gap audit and alpha capability contract in [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md), inserted Tasks 5.6.1 through 5.6.12 into this roadmap, and clarified that Phase 6 clean-Mac QA resumes only after the product runtime loop is complete.
+
+### Task 5.6.2: Structured Desktop Command Responses
+
+- **Location:** `apps/desktop/src-tauri/src/main.rs`, `apps/desktop/static/index.html`, `crates/silica-core`
+- **Description:** Replace command status strings and frontend regex parsing with structured success/error response envelopes.
+- **Dependencies:** Task 5.6.1
+- **Acceptance Criteria:**
+  - Library, import, grid, culling, preview, edit, export, and future cache commands return typed/JSON-shaped data instead of parse-only strings.
+  - Frontend uses fields, not regex, to update UI state.
+  - Error responses expose stable kind, message, and relevant path/photo context.
+  - Existing Rust command tests cover the response shape.
+- **Validation:** Desktop command tests, static UI contract, and harness pass.
+
+### Task 5.6.3: Native Path Picker UX
+
+- **Location:** `apps/desktop/src-tauri`, `apps/desktop/static/`, `docs/DEPENDENCIES.md` if a Tauri plugin is added
+- **Description:** Add native or product-grade selectable path affordances for library create/open, import folder, and export output path.
+- **Dependencies:** Task 5.6.2
+- **Acceptance Criteria:**
+  - Users do not need to type absolute paths for the main installed-alpha workflow.
+  - Cancel is distinct from error.
+  - Selected paths flow into the existing create/open/import/export commands.
+  - Any new dependency is documented in `docs/DEPENDENCIES.md`.
+- **Validation:** Desktop command/UI smoke and harness pass.
+
+### Task 5.6.4: Real JPEG Thumbnail Cache MVP
+
+- **Location:** `crates/silica-storage`, `crates/silica-core`, `apps/desktop/static/`
+- **Description:** Generate and render real JPEG/JPG thumbnails for supported imported originals.
+- **Dependencies:** Task 5.6.2
+- **Acceptance Criteria:**
+  - JPEG/JPG catalog rows expose a safe thumbnail asset or encoded preview field.
+  - Thumbnail files live under the library `thumbnails/` directory.
+  - `cache_records` or equivalent catalog state records disposable thumbnail cache metadata.
+  - RAW/unsupported entries keep clear blocked/unsupported placeholders.
+  - Original files are not modified.
+- **Validation:** Thumbnail cache test, UI smoke, original hash protection, and harness pass.
+
+### Task 5.6.5: Real JPEG Loupe Preview MVP
+
+- **Location:** `crates/silica-core`, `apps/desktop/static/`, `crates/silica-storage`
+- **Description:** Show real JPEG/JPG preview pixels in the Loupe view.
+- **Dependencies:** Task 5.6.4
+- **Acceptance Criteria:**
+  - Opening Loupe for JPEG/JPG displays the selected original or generated preview image.
+  - RAW candidates show decode-blocked state without implying RAW decoding.
+  - Missing/unsupported candidates show clear blocked states.
+  - Preview cache data is disposable.
+- **Validation:** Preview UI smoke, cache/original safety test, and harness pass.
+
+### Task 5.6.6: Real JPEG Develop Preview MVP
+
+- **Location:** `crates/silica-core`, `crates/silica-render`, `apps/desktop/static/`
+- **Description:** Make exposure/contrast changes visibly affect JPEG/JPG Develop preview pixels before commit.
+- **Dependencies:** Task 5.6.5
+- **Acceptance Criteria:**
+  - Exposure/contrast slider changes update the visible Develop preview for JPEG/JPG.
+  - Draft preview updates remain non-persistent until commit.
+  - Commit persists the active edit graph.
+  - RAW candidates may keep valid edit graph state while preview pixels remain decode-blocked.
+- **Validation:** Draft/no-write test, visual/runtime smoke, edit persistence test, and harness pass.
+
+### Task 5.6.7: Persisted Edit-State Readback in UI
+
+- **Location:** `crates/silica-core`, `apps/desktop/src-tauri/src/main.rs`, `apps/desktop/static/index.html`
+- **Description:** Expose committed active edit state to the frontend and restore Develop controls after open/reopen.
+- **Dependencies:** Task 5.6.6
+- **Acceptance Criteria:**
+  - The frontend can read committed exposure/contrast for the selected photo.
+  - Develop sliders and edited/clean state match catalog state after library reopen.
+  - Restart/reopen UI validation no longer relies on in-memory JavaScript state.
+- **Validation:** Core/desktop command tests, UI restart smoke, and harness pass.
+
+### Task 5.6.8: Product Cache Clear Command and Maintenance UI
+
+- **Location:** `crates/silica-storage`, `crates/silica-core`, `apps/desktop/src-tauri/src/main.rs`, `apps/desktop/static/`, `MockupUI/M008_Preferences_Appearance.png`
+- **Description:** Add a safe cache-clear product path and minimal maintenance UI.
+- **Dependencies:** Tasks 5.6.4, 5.6.5, 5.6.6
+- **Acceptance Criteria:**
+  - Cache clear deletes only disposable cache directories such as `thumbnails`, `previews`, `render-cache`, and `ai-cache`.
+  - Catalog, edit state, export records, sidecars, backups, logs, and original source files are preserved.
+  - Cache directories are recreated after clear.
+  - UI labels make the destructive scope precise.
+- **Validation:** Automated cache-clear/original hash test, UI smoke, and harness pass.
+
+### Task 5.6.9: Remove Fake Demo State and Harden Culling UX
+
+- **Location:** `apps/desktop/static/`, `crates/silica-core`
+- **Description:** Remove hardcoded demo recents/grid assumptions and make minimal culling controls usable.
+- **Dependencies:** Task 5.6.7
+- **Acceptance Criteria:**
+  - Clean launch shows a real empty/recent state, not fictional hardcoded project rows.
+  - Rating can be set from 0 through 5.
+  - Pick/reject can be toggled and remain mutually coherent.
+  - Dead controls are hidden, disabled with clear reason, or wired to real behavior.
+  - Alpha copy accurately states blocked RAW/Metal/AI capabilities.
+- **Validation:** Static UI contract, culling persistence test, visual QA spot check, and harness pass.
+
+### Task 5.6.10: Legal QA Fixture Generator and Installed-App Preflight
+
+- **Location:** `scripts/harness/`, `checklists/`, `docs/wiki/topics/product-alpha-runtime-completion.md`
+- **Description:** Add repeatable local fixtures and a developer installed-app preflight before clean-Mac testing.
+- **Dependencies:** Task 5.6.9
+- **Acceptance Criteria:**
+  - Fixture generator creates legal JPEG/JPG supported samples, unsupported files, and optional RAW-blocked placeholders without committing user photos.
+  - Fixture metadata includes expected source hashes.
+  - Developer preflight records app artifact, macOS version, fixture path, hash results, and known limitations.
+  - Temporary artifacts are ignored by git.
+- **Validation:** Fixture generator check, docs link check, and harness pass.
+
+### Task 5.6.11: Connected Runtime UI Smoke
+
+- **Location:** `scripts/harness/`, `apps/desktop/`, `checklists/`
+- **Description:** Add a repeatable smoke path against the actual desktop runtime rather than static HTML inspection only.
+- **Dependencies:** Task 5.6.10
+- **Acceptance Criteria:**
+  - Smoke covers create/open library, import, grid, rating/pick/reject, loupe, Develop edit, export, cache clear, reopen, and original hash check.
+  - The smoke path clearly separates local developer runtime from clean-Mac DMG execution.
+  - It does not require MLX, MCP, plugin runtime, cloud, telemetry, RAW decoding, or Metal rendering.
+- **Validation:** Runtime smoke and harness pass.
+
+### Task 5.6.12: Final Visual and Responsive QA Refresh
+
+- **Location:** `MockupUI/`, `apps/desktop/static/`, `docs/wiki/topics/ui-visual-responsive-qa.md`
+- **Description:** Re-run visual/responsive QA after real pixels, native/selectable path UX, cache UI, and demo-state cleanup are present.
+- **Dependencies:** Task 5.6.11
+- **Acceptance Criteria:**
+  - M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces remain visually coherent.
+  - Real thumbnails/previews do not create overflow, clipping, or text overlap.
+  - The UI remains usable at compact, standard, and large desktop widths.
+  - Final QA notes explicitly supersede the static-only Phase 5.5 visual pass as the Phase 6 readiness gate.
+- **Validation:** Screenshot review, DOM overflow/clipping checks, runtime smoke, and harness pass.
+
+## Phase 6: Local Install QA
+
+**Goal:** Verify the completed product alpha runtime behaves correctly when installed from DMG, not only when run from the build tree.
+
+Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created useful preparatory checklists and original-safety automation, but clean-Mac execution waits for Phase 5.6.
+
+**Demo/Validation:**
+
+- DMG install test passes on a clean Apple Silicon Mac after Phase 5.6 is complete.
 
 ### Task 6.1: Add Install Smoke Test Checklist
 
 - **Location:** `checklists/LOCAL_DMG_INSTALL_CHECKLIST.md`
 - **Description:** Add a checklist for installing from DMG and running the local alpha workflow.
-- **Dependencies:** Phase 5
+- **Dependencies:** Phase 5.6 for execution; checklist authoring was completed earlier.
 - **Acceptance Criteria:**
   - Includes mount DMG, drag app, launch from `/Applications`, import folder, edit, export, restart.
   - Includes offline launch check.
@@ -573,7 +743,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 
 - **Location:** `checklists/QA_CHECKLIST.md`, test fixtures
 - **Description:** Verify local alpha workflow does not mutate original source files.
-- **Dependencies:** Phase 5
+- **Dependencies:** Phase 5.6 for manual installed-app execution; automated core safety was completed earlier.
 - **Acceptance Criteria:**
   - Original file hashes are unchanged after import, edit, export, cache clear, and restart.
 - **Validation:** Automated hash test and manual QA record.
@@ -584,7 +754,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 
 - **Location:** release candidate artifact
 - **Description:** Install the DMG on a Mac that did not build the app.
-- **Dependencies:** Task 6.1
+- **Dependencies:** Phase 5.6, Task 6.1, Task 6.2
 - **Acceptance Criteria:**
   - App launches from `/Applications`.
   - No missing bundled resources.
