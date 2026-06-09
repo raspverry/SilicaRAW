@@ -567,6 +567,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Includes offline launch check.
 - **Validation:** Checklist is executed manually.
 
+**Status:** Completed on 2026-06-09. Added [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) for developer unsigned DMGs and later signed/notarized release candidates. The checklist records artifact metadata, mount and drag-to-`/Applications` install steps, launch from `/Applications`, offline launch, local library create/open, import by reference, grid culling, preview/loupe, exposure/contrast edit commit, JPEG sRGB export, restart persistence, and a quick original-file hash spot check. Manual execution remains a later QA step.
+
 ### Task 6.2: Run Original Safety QA
 
 - **Location:** `checklists/QA_CHECKLIST.md`, test fixtures
