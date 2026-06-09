@@ -143,6 +143,18 @@ Task 5.5.5 replaces the placeholder grid with the M003 Library Grid MVP:
 - Static thumbnail art remains a UI placeholder until real thumbnail cache generation and virtualization are scoped.
 - Loupe opening, full metadata population, advanced filters, and real histogram values remain future work.
 
+## Task 5.5.6 Preview/Loupe
+
+Task 5.5.6 adds the M004 Loupe MVP inside Library mode:
+
+- Loupe opens from the currently selected Library grid photo.
+- Runtime preview state uses the existing desktop `open_photo_preview` command.
+- JPEG/raster candidates render the ready preview surface.
+- RAW candidates render the blocked decode state and must not imply RAW decoding is implemented.
+- Unsupported catalog entries render a clear unsupported state.
+- The bottom filmstrip mirrors the current grid selection and keeps M004 navigation visible.
+- Real image pixels, Metal output, RAW decoding, full metadata, and Develop edits remain future work.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.

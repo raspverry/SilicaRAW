@@ -496,6 +496,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Unsupported files show a clear unsupported state.
 - **Validation:** Preview status smoke test with JPEG, RAW placeholder, and unsupported file.
 
+**Status:** Completed on 2026-06-09. The Library workbench now has an M004-style Loupe view that opens from the selected grid photo, displays file name, rating, fit controls, preview readiness status, and a bottom filmstrip. The Loupe uses the existing `open_photo_preview` command path when running inside Tauri and falls back to the same local alpha readiness rules for static UI smoke checks. JPEG/raster candidates show the ready preview surface, RAW candidates show the blocked decode state, and unsupported entries show an unsupported state. This does not implement RAW decoding, real pixel rendering, Metal viewer output, full metadata, or Develop edits.
+
 ### Task 5.5.7: Implement Develop Panel MVP
 
 - **Location:** `apps/desktop/static/`, `MockupUI/M005_Develop_default.png`
