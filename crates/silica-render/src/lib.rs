@@ -96,6 +96,18 @@ pub struct ExposureContrastPreviewRequest {
     pub message: String,
 }
 
+/// Render-side export request for the local alpha JPEG sRGB path.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JpegSrgbExportRenderRequest {
+    pub source_path: String,
+    pub output_path: String,
+    pub color_behavior: ExportColorBehavior,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub quality: u8,
+    pub message: String,
+}
+
 /// Build a local alpha render plan from a decode plan.
 pub fn plan_preview_render(decode_plan: PreviewDecodePlan) -> PreviewRenderPlan {
     let status = match decode_plan.status {
@@ -145,6 +157,25 @@ pub fn plan_exposure_contrast_preview(
         exposure,
         contrast,
         message,
+    }
+}
+
+/// Build a render-side request for exporting an edited raster source as sRGB JPEG.
+pub fn plan_jpeg_srgb_export(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    JpegSrgbExportRenderRequest {
+        source_path: source_path.into(),
+        output_path: output_path.into(),
+        color_behavior: SPIKE_003_COLOR_GATE.export,
+        exposure,
+        contrast,
+        quality,
+        message: "JPEG sRGB export request is ready.".to_string(),
     }
 }
 
@@ -226,5 +257,22 @@ mod tests {
             super::PreviewColorBehavior::DisplayProfileAware
         );
         assert!(request.message.contains("exposure/contrast"));
+    }
+
+    #[test]
+    fn plans_jpeg_srgb_export_request() {
+        let request =
+            super::plan_jpeg_srgb_export("/tmp/original.jpg", "/tmp/exported.jpg", 0.5, -8.0, 90);
+
+        assert_eq!(request.source_path, "/tmp/original.jpg");
+        assert_eq!(request.output_path, "/tmp/exported.jpg");
+        assert_eq!(request.exposure, 0.5);
+        assert_eq!(request.contrast, -8.0);
+        assert_eq!(request.quality, 90);
+        assert_eq!(
+            request.color_behavior,
+            super::ExportColorBehavior::SrgbDefaultDisplayP3Supported
+        );
+        assert!(request.message.contains("JPEG sRGB export"));
     }
 }

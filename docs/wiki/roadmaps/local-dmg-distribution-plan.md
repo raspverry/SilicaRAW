@@ -407,6 +407,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Export record is stored in catalog.
 - **Validation:** Original hash protection test and exported JPEG inspection.
 
+**Status:** Completed on 2026-06-09 as a command/API-level local alpha export path. `silica-export` decodes an already-rendered raster source, applies persisted exposure/contrast values on the CPU, writes a separate JPEG output at fixed local-alpha quality, and refuses to overwrite the original source path. `silica-render` records the JPEG sRGB export request contract, `silica-storage` stores the export row and marks `photo_flags.exported`, `silica-core` orchestrates edit state, export, and catalog recording, and the minimal Tauri shell exposes an export command. This task does not implement RAW decoding, Metal rendering, UI export screens, broad color fixture validation, Display P3 export, MLX/MCP/plugin behavior, or auto-update/distribution changes.
+
 ## Phase 6: Local Install QA
 
 **Goal:** Verify the app behaves correctly when installed from DMG, not only when run from the build tree.

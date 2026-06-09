@@ -117,6 +117,15 @@ pub struct PhotoPreviewCandidate {
     pub unsupported: bool,
 }
 
+/// Catalog export row written after an export completes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportRecord {
+    pub id: String,
+    pub photo_id: String,
+    pub output_path: String,
+    pub export_settings_json: String,
+}
+
 /// Errors returned by local library create/open operations.
 #[derive(Debug)]
 pub enum LibraryStorageError {
@@ -484,6 +493,84 @@ pub fn commit_edit_graph(
     Ok(graph)
 }
 
+/// Record a completed export and mark the source photo as exported.
+pub fn record_export(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+    export_settings_json: impl AsRef<str>,
+) -> Result<ExportRecord, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let output_path = path_to_string(output_path.as_ref())?;
+    let export_settings_json = export_settings_json.as_ref().to_string();
+    serde_json::from_str::<serde_json::Value>(&export_settings_json)?;
+
+    let library = open_local_library(library_root_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let export_id = stable_catalog_id("export", &format!("{photo_id}\n{output_path}"));
+
+    let transaction = connection.transaction()?;
+    transaction.execute(
+        r#"
+        INSERT INTO exports(id, photo_id, output_path, export_settings_json, created_at)
+        VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          output_path = excluded.output_path,
+          export_settings_json = excluded.export_settings_json,
+          created_at = CURRENT_TIMESTAMP
+        "#,
+        params![export_id, photo_id, output_path, export_settings_json],
+    )?;
+    transaction.execute(
+        r#"
+        INSERT INTO photo_flags(photo_id, exported, updated_at)
+        VALUES (?1, 1, CURRENT_TIMESTAMP)
+        ON CONFLICT(photo_id) DO UPDATE SET
+          exported = 1,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![photo_id],
+    )?;
+    transaction.commit()?;
+
+    Ok(ExportRecord {
+        id: export_id,
+        photo_id: photo_id.to_string(),
+        output_path,
+        export_settings_json,
+    })
+}
+
+/// Read the most recent export record for one photo.
+pub fn get_latest_export_record(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<ExportRecord>, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    connection
+        .query_row(
+            r#"
+            SELECT id, photo_id, output_path, export_settings_json
+            FROM exports
+            WHERE photo_id = ?1
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            "#,
+            params![photo_id],
+            export_record_from_row,
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
+}
+
 /// Apply connection-local safety and durability settings.
 pub fn configure_connection(connection: &Connection) -> rusqlite::Result<()> {
     connection.busy_timeout(Duration::from_secs(5))?;
@@ -724,6 +811,15 @@ fn photo_flags_from_row(
         color_label,
     )
     .map_err(LibraryStorageError::from)
+}
+
+fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRecord> {
+    Ok(ExportRecord {
+        id: row.get(0)?,
+        photo_id: row.get(1)?,
+        output_path: row.get(2)?,
+        export_settings_json: row.get(3)?,
+    })
 }
 
 fn path_to_string(path: &Path) -> Result<String, LibraryStorageError> {
@@ -1454,6 +1550,68 @@ mod tests {
 
         let connection = open_catalog(&reopened.catalog_path).expect("open reopened catalog");
         assert_eq!(count_edit_states(&connection), 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn records_export_and_marks_photo_exported() {
+        let workspace = unique_library_root("export-record");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let output_path = workspace.join("Exports").join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create export directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let record = record_export(
+            &library.root_path,
+            &photo_id,
+            &output_path,
+            r#"{"format":"jpeg","color_profile":"srgb"}"#,
+        )
+        .expect("record export");
+
+        assert_eq!(record.photo_id, photo_id);
+        assert_eq!(record.output_path, output_path.display().to_string());
+        assert!(record.export_settings_json.contains("\"jpeg\""));
+
+        let connection = open_catalog(&library.catalog_path).expect("reopen catalog");
+        let export_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM exports", [], |row| row.get(0))
+            .expect("count exports");
+        assert_eq!(export_count, 1);
+
+        let exported: i64 = connection
+            .query_row(
+                "SELECT exported FROM photo_flags WHERE photo_id = ?1",
+                params![record.photo_id],
+                |row| row.get(0),
+            )
+            .expect("exported flag");
+        assert_eq!(exported, 1);
+        drop(connection);
+
+        let latest = get_latest_export_record(&library.root_path, &record.photo_id)
+            .expect("read latest export")
+            .expect("latest export row");
+        assert_eq!(latest, record);
 
         remove_library_root(&workspace);
     }

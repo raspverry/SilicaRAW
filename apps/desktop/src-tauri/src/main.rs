@@ -104,6 +104,21 @@ fn commit_exposure_contrast_edit(
     .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn export_photo_jpeg_srgb(
+    library_path: String,
+    photo_id: String,
+    output_path: String,
+) -> Result<Option<String>, String> {
+    silica_core::export_photo_jpeg_srgb(
+        PathBuf::from(library_path),
+        &photo_id,
+        PathBuf::from(output_path),
+    )
+    .map(|export| export.map(|export| export.status_text()))
+    .map_err(|error| error.to_string())
+}
+
 fn photo_flags_status_text(
     photo_id: &str,
     rating: u8,
@@ -131,7 +146,8 @@ fn main() {
             get_photo_flags,
             open_photo_preview,
             preview_exposure_contrast_edit,
-            commit_exposure_contrast_edit
+            commit_exposure_contrast_edit,
+            export_photo_jpeg_srgb
         ])
         .run(tauri::generate_context!())
         .expect("failed to run SilicaRAW desktop shell");
@@ -257,6 +273,42 @@ mod tests {
         remove_library_root(&workspace);
     }
 
+    #[test]
+    fn desktop_command_exports_photo_jpeg_srgb() {
+        let workspace = unique_library_root("desktop-export");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        silica_core::commit_exposure_contrast_edit(&library_root, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("committed edit");
+
+        let export = super::export_photo_jpeg_srgb(
+            library_root.display().to_string(),
+            photo_id,
+            output_path.display().to_string(),
+        )
+        .expect("export command")
+        .expect("export status");
+
+        assert!(export.contains("Format: jpeg"));
+        assert!(export.contains("Color: srgb"));
+        assert!(output_path.is_file());
+
+        remove_library_root(&workspace);
+    }
+
     fn stable_catalog_id(prefix: &str, value: &str) -> String {
         let mut hash = 0xcbf2_9ce4_8422_2325_u64;
         for byte in value.as_bytes() {
@@ -279,5 +331,18 @@ mod tests {
 
     fn remove_library_root(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn write_source_jpeg(path: &Path) {
+        let image = image::RgbImage::from_fn(2, 2, |x, y| {
+            if (x + y) % 2 == 0 {
+                image::Rgb([64, 128, 192])
+            } else {
+                image::Rgb([192, 128, 64])
+            }
+        });
+        image
+            .save_with_format(path, image::ImageFormat::Jpeg)
+            .expect("write source jpeg");
     }
 }

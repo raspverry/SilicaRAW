@@ -12,6 +12,8 @@ use std::time::UNIX_EPOCH;
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-core";
 
+const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
+
 /// Local library session returned by core commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibrarySession {
@@ -116,11 +118,41 @@ impl PhotoEditCommit {
     }
 }
 
+/// Completed JPEG sRGB export returned through the core boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoExportSession {
+    pub photo_id: String,
+    pub source_path: String,
+    pub output_path: PathBuf,
+    pub format: String,
+    pub color_profile: String,
+    pub bytes_written: u64,
+    pub export_record_id: String,
+    pub message: String,
+}
+
+impl PhotoExportSession {
+    /// Compact status string for the minimal desktop shell entry point.
+    pub fn status_text(&self) -> String {
+        format!(
+            "Photo: {}\nExport: {}\nFormat: {}\nColor: {}\nBytes: {}\nMessage: {}",
+            self.photo_id,
+            self.output_path.display(),
+            self.format,
+            self.color_profile,
+            self.bytes_written,
+            self.message
+        )
+    }
+}
+
 /// Errors returned by core command APIs.
 #[derive(Debug)]
 pub enum CoreError {
     Storage(silica_storage::LibraryStorageError),
     EditGraph(silica_edit::EditGraphValidationError),
+    Export(silica_export::ExportError),
+    ExportBlocked(String),
 }
 
 impl fmt::Display for CoreError {
@@ -128,6 +160,8 @@ impl fmt::Display for CoreError {
         match self {
             Self::Storage(error) => write!(formatter, "{error}"),
             Self::EditGraph(error) => write!(formatter, "{error}"),
+            Self::Export(error) => write!(formatter, "{error}"),
+            Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
         }
     }
 }
@@ -137,6 +171,8 @@ impl Error for CoreError {
         match self {
             Self::Storage(error) => Some(error),
             Self::EditGraph(error) => Some(error),
+            Self::Export(error) => Some(error),
+            Self::ExportBlocked(_) => None,
         }
     }
 }
@@ -150,6 +186,12 @@ impl From<silica_storage::LibraryStorageError> for CoreError {
 impl From<silica_edit::EditGraphValidationError> for CoreError {
     fn from(error: silica_edit::EditGraphValidationError) -> Self {
         Self::EditGraph(error)
+    }
+}
+
+impl From<silica_export::ExportError> for CoreError {
+    fn from(error: silica_export::ExportError) -> Self {
+        Self::Export(error)
     }
 }
 
@@ -293,6 +335,76 @@ pub fn commit_exposure_contrast_edit(
     }))
 }
 
+/// Export one edited catalog photo as a JPEG sRGB file and record the export.
+pub fn export_photo_jpeg_srgb(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+) -> Result<Option<PhotoExportSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let output_path = output_path.as_ref();
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    if render_plan.status != silica_render::PreviewRenderStatus::Ready {
+        return Err(CoreError::ExportBlocked(render_plan.message));
+    }
+
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, &photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let exposure = graph.basic.exposure.as_f64().unwrap_or(0.0);
+    let contrast = graph.basic.contrast.as_f64().unwrap_or(0.0);
+    let render_request = silica_render::plan_jpeg_srgb_export(
+        render_plan.source_path.clone(),
+        output_path.display().to_string(),
+        exposure,
+        contrast,
+        LOCAL_ALPHA_JPEG_QUALITY,
+    );
+
+    let export_result = silica_export::export_jpeg_srgb(silica_export::JpegSrgbExportRequest {
+        source_path: PathBuf::from(&render_request.source_path),
+        output_path: output_path.to_path_buf(),
+        exposure: render_request.exposure,
+        contrast: render_request.contrast,
+        quality: render_request.quality,
+    })?;
+    let format = export_format_string(export_result.format).to_string();
+    let color_profile = export_color_profile_string(export_result.color_profile).to_string();
+    let settings_json = serde_json::json!({
+        "format": format,
+        "color_profile": color_profile,
+        "quality": render_request.quality,
+        "exposure": render_request.exposure,
+        "contrast": render_request.contrast,
+        "source_path": render_request.source_path,
+        "output_path": render_request.output_path,
+    })
+    .to_string();
+    let export_record = silica_storage::record_export(
+        library_root_path,
+        &photo_id,
+        &export_result.output_path,
+        settings_json,
+    )?;
+
+    Ok(Some(PhotoExportSession {
+        photo_id,
+        source_path: render_plan.source_path,
+        output_path: export_result.output_path,
+        format,
+        color_profile,
+        bytes_written: export_result.bytes_written,
+        export_record_id: export_record.id,
+        message: "JPEG sRGB export completed.".to_string(),
+    }))
+}
+
 fn preview_render_plan(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
@@ -312,6 +424,18 @@ fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> Pho
         silica_render::PreviewRenderStatus::Ready => PhotoPreviewStatus::Ready,
         silica_render::PreviewRenderStatus::BlockedByDecode => PhotoPreviewStatus::BlockedByDecode,
         silica_render::PreviewRenderStatus::Unsupported => PhotoPreviewStatus::Unsupported,
+    }
+}
+
+fn export_format_string(format: silica_export::ExportImageFormat) -> &'static str {
+    match format {
+        silica_export::ExportImageFormat::Jpeg => "jpeg",
+    }
+}
+
+fn export_color_profile_string(profile: silica_export::ExportColorProfile) -> &'static str {
+    match profile {
+        silica_export::ExportColorProfile::Srgb => "srgb",
     }
 }
 
@@ -527,6 +651,83 @@ mod tests {
         remove_library_root(&workspace);
     }
 
+    #[test]
+    fn exports_edited_photo_to_jpeg_srgb_and_records_catalog_row() {
+        let workspace = unique_library_root("core-export");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("edit commit");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+
+        assert_eq!(exported.photo_id, photo_id);
+        assert_eq!(exported.output_path, output_path);
+        assert_eq!(exported.format, "jpeg");
+        assert_eq!(exported.color_profile, "srgb");
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
+
+        let decoded = image::ImageReader::open(&exported.output_path)
+            .expect("open exported jpeg")
+            .with_guessed_format()
+            .expect("guess exported format")
+            .decode()
+            .expect("decode exported jpeg");
+        assert_eq!(decoded.width(), 2);
+        assert_eq!(decoded.height(), 2);
+
+        let latest =
+            silica_storage::get_latest_export_record(&created.root_path, &exported.photo_id)
+                .expect("read latest export")
+                .expect("latest export");
+        assert_eq!(latest.id, exported.export_record_id);
+        assert!(latest.export_settings_json.contains("\"srgb\""));
+
+        let flags = get_photo_flags(&created.root_path, &exported.photo_id)
+            .expect("read flags")
+            .expect("flags row");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let exported_flag: i64 = connection
+            .query_row(
+                "SELECT exported FROM photo_flags WHERE photo_id = ?1",
+                [&flags.photo_id],
+                |row| row.get(0),
+            )
+            .expect("exported flag");
+        assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
     fn unique_library_root(label: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -540,5 +741,18 @@ mod tests {
 
     fn remove_library_root(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn write_source_jpeg(path: &Path) {
+        let image = image::RgbImage::from_fn(2, 2, |x, y| {
+            if (x + y) % 2 == 0 {
+                image::Rgb([64, 128, 192])
+            } else {
+                image::Rgb([192, 128, 64])
+            }
+        });
+        image
+            .save_with_format(path, image::ImageFormat::Jpeg)
+            .expect("write source jpeg");
     }
 }
