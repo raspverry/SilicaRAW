@@ -120,6 +120,22 @@ def main():
         "developRevertEdit",
         "developFilmstrip",
         "developEditState",
+        "openExportDialog",
+        "exportDialog",
+        "closeExportDialog",
+        "exportSelectedPhotoName",
+        "exportOutputPath",
+        "runJpegExport",
+        "cancelExport",
+        "exportStatus",
+        "exportSafetyNote",
+        "exportFormat",
+        "exportColorSpace",
+        "exportQuality",
+        "exportSummaryFormat",
+        "exportSummaryColor",
+        "exportSummaryQuality",
+        "exportSummaryFile",
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)
@@ -161,6 +177,8 @@ def main():
             ".sr-statusbar",
             ".sr-develop-workbench",
             ".sr-adjustment-slider",
+            ".sr-export-dialog",
+            ".sr-export-dialog-panel",
         ]:
             require(selector in css, f"app-frame.css missing {selector}", failures)
         require("@media" in css, "app-frame.css must define responsive behavior", failures)
@@ -190,6 +208,27 @@ def main():
     require(
         parser.ids.get("developContrastValue", {}).get("type") == "number",
         "#developContrastValue must be a manual numeric input",
+        failures,
+    )
+
+    require(
+        parser.ids.get("exportOutputPath", {}).get("type") == "text",
+        "#exportOutputPath must be a text input for local alpha output paths",
+        failures,
+    )
+    require(
+        parser.ids.get("exportFormat", {}).get("value") == "JPEG",
+        "#exportFormat must lock the MVP to JPEG",
+        failures,
+    )
+    require(
+        parser.ids.get("exportColorSpace", {}).get("value") == "sRGB",
+        "#exportColorSpace must lock the MVP to sRGB",
+        failures,
+    )
+    require(
+        parser.ids.get("exportQuality", {}).get("value") == "90",
+        "#exportQuality must expose local-alpha JPEG quality",
         failures,
     )
 

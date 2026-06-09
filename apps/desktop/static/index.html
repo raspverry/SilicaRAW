@@ -35,7 +35,7 @@
             <span class="sr-glyph sr-glyph-panel" aria-hidden="true"></span>
           </button>
           <button class="sr-fit-action" type="button">Fit</button>
-          <button class="primary sr-export-action" type="button">Export</button>
+          <button class="primary sr-export-action" id="openExportDialog" type="button">Export</button>
           <button class="sr-icon-button" type="button" aria-label="Settings">
             <span class="sr-glyph sr-glyph-settings" aria-hidden="true"></span>
           </button>
@@ -330,19 +330,22 @@
           </div>
         </section>
 
-        <section class="sr-mode-surface sr-viewer-mode" data-mode-panel="export" aria-labelledby="exportTitle" hidden>
+        <section class="sr-mode-surface sr-export-mode" data-mode-panel="export" aria-labelledby="exportTitle" hidden>
           <div class="sr-surface-header">
             <div>
               <h1 id="exportTitle">Export</h1>
-              <p>JPEG sRGB</p>
+              <p>JPEG sRGB local alpha export</p>
             </div>
+            <button class="primary" type="button" data-open-export-dialog>Export Selected</button>
           </div>
           <div class="sr-export-placeholder">
-            <div class="sr-export-panel">
+            <div class="sr-export-panel sr-export-landing-panel">
               <h2>Export Photos</h2>
+              <div class="sr-export-row"><span>Selected</span><strong id="exportSelectedInline">None</strong></div>
               <div class="sr-export-row"><span>Format</span><strong>JPEG</strong></div>
               <div class="sr-export-row"><span>Color Space</span><strong>sRGB</strong></div>
               <div class="sr-export-row"><span>Quality</span><strong>90</strong></div>
+              <button class="primary" type="button" data-open-export-dialog>Configure Export</button>
               <div class="sr-safety-note">Original files will not be modified.</div>
             </div>
           </div>
@@ -421,6 +424,52 @@
           </label>
         </div>
       </footer>
+
+      <section class="sr-export-dialog" id="exportDialog" role="dialog" aria-modal="true" aria-labelledby="exportDialogTitle" hidden>
+        <div class="sr-export-dialog-panel">
+          <header class="sr-export-dialog-header">
+            <div>
+              <h2 id="exportDialogTitle">Export Photos</h2>
+              <p><span id="exportSelectedPhotoName">No photo selected</span></p>
+            </div>
+            <button class="sr-icon-button" id="closeExportDialog" type="button" aria-label="Close export dialog">x</button>
+          </header>
+          <div class="sr-export-dialog-body">
+            <section class="sr-export-settings" aria-label="Export settings">
+              <div class="sr-export-setting-row">
+                <label for="exportOutputPath">Output Path</label>
+                <input id="exportOutputPath" type="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Exports/photo.jpg">
+              </div>
+              <div class="sr-export-fixed-grid" aria-label="JPEG sRGB settings">
+                <label for="exportFormat">Format</label>
+                <input id="exportFormat" type="text" value="JPEG" readonly>
+                <label for="exportColorSpace">Color Space</label>
+                <input id="exportColorSpace" type="text" value="sRGB" readonly>
+                <label for="exportQuality">Quality</label>
+                <input id="exportQuality" type="number" value="90" min="90" max="90" readonly>
+              </div>
+              <div class="sr-export-safety" id="exportSafetyNote">
+                Original files will not be modified. SilicaRAW writes a separate JPEG sRGB file to the output path.
+              </div>
+              <output id="exportStatus" aria-live="polite">Enter an output path, then export the selected photo.</output>
+            </section>
+            <aside class="sr-export-summary" aria-label="Export summary">
+              <div class="sr-export-preview-card">
+                <span class="sr-thumb-art sr-thumb-art-a" id="exportPreviewArt" aria-hidden="true"></span>
+              </div>
+              <h3>Summary</h3>
+              <div class="sr-export-row"><span>Format</span><strong id="exportSummaryFormat">JPEG</strong></div>
+              <div class="sr-export-row"><span>Color Space</span><strong id="exportSummaryColor">sRGB</strong></div>
+              <div class="sr-export-row"><span>Quality</span><strong id="exportSummaryQuality">90</strong></div>
+              <div class="sr-export-row"><span>File</span><strong id="exportSummaryFile">None</strong></div>
+            </aside>
+          </div>
+          <footer class="sr-export-dialog-footer">
+            <button id="cancelExport" type="button">Cancel</button>
+            <button class="primary" id="runJpegExport" type="button">Export JPEG</button>
+          </footer>
+        </div>
+      </section>
     </div>
     <script>
       const appFrame = document.querySelector("#appFrame");
@@ -484,6 +533,18 @@
       const developContrastReset = document.querySelector("#developContrastReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
+      const exportDialog = document.querySelector("#exportDialog");
+      const openExportDialogButton = document.querySelector("#openExportDialog");
+      const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
+      const closeExportDialogButton = document.querySelector("#closeExportDialog");
+      const cancelExportButton = document.querySelector("#cancelExport");
+      const runJpegExportButton = document.querySelector("#runJpegExport");
+      const exportSelectedPhotoName = document.querySelector("#exportSelectedPhotoName");
+      const exportSelectedInline = document.querySelector("#exportSelectedInline");
+      const exportOutputPath = document.querySelector("#exportOutputPath");
+      const exportStatus = document.querySelector("#exportStatus");
+      const exportSummaryFile = document.querySelector("#exportSummaryFile");
+      const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
 
       const invoke = window.__TAURI__?.core?.invoke;
@@ -547,6 +608,30 @@
 
       function selectedPhoto() {
         return libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+      }
+
+      function selectedPhotoBaseName(photo) {
+        if (!photo?.fileName) {
+          return "SilicaRAW-export";
+        }
+        return photo.fileName.replace(/\.[^.]+$/, "") || "SilicaRAW-export";
+      }
+
+      function defaultExportPath(photo) {
+        return `/Users/you/Pictures/Exports/${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
+      }
+
+      function isRasterExportCandidate(photo) {
+        return Boolean(
+          photo
+          && !photo.missing
+          && !photo.unsupported
+          && ["JPG", "JPEG", "PNG", "HEIC", "TIF", "TIFF"].includes((photo.fileType || "").toUpperCase())
+        );
+      }
+
+      function exportOutputLooksUnsafe(photo, outputPath) {
+        return Boolean(photo?.path && outputPath && photo.path === outputPath);
       }
 
       function developAdjustmentState(photoId) {
@@ -682,6 +767,7 @@
         loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         syncDevelopSelection();
+        syncExportDialog();
         if (!loupeSurface.hidden) {
           previewSelectedPhoto();
         }
@@ -731,6 +817,97 @@
       function parsePreviewField(message, label) {
         const match = message.match(new RegExp(`^${label}:\\s*(.+)$`, "m"));
         return match ? match[1] : "";
+      }
+
+      function syncExportDialog() {
+        const photo = selectedPhoto();
+        const hasPhoto = Boolean(photo);
+        exportSelectedPhotoName.textContent = photo?.fileName ?? "No photo selected";
+        exportSelectedInline.textContent = photo?.fileName ?? "None";
+        exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg` : "None";
+        exportPreviewArt.className = `sr-thumb-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
+        if (photo && (!exportOutputPath.value || exportOutputPath.dataset.autofilled === "true")) {
+          exportOutputPath.value = defaultExportPath(photo);
+          exportOutputPath.dataset.autofilled = "true";
+        }
+        const unsafeOutput = exportOutputLooksUnsafe(photo, exportOutputPath.value.trim());
+        const disabled = !hasPhoto || !isRasterExportCandidate(photo) || unsafeOutput;
+        runJpegExportButton.disabled = disabled;
+        if (!hasPhoto) {
+          exportStatus.value = "Select a photo before exporting.";
+        } else if (unsafeOutput) {
+          exportStatus.value = "Output path must differ from the original source path.";
+        } else if (photo.missing) {
+          exportStatus.value = "Export blocked because the referenced original is missing.";
+        } else if (photo.unsupported) {
+          exportStatus.value = "Export blocked because this file type is unsupported.";
+        } else if (!isRasterExportCandidate(photo)) {
+          exportStatus.value = "Export blocked until RAW decode produces ready raster pixels.";
+        } else {
+          exportStatus.value = "Enter an output path, then export the selected photo.";
+        }
+      }
+
+      function openExportDialog() {
+        syncExportDialog();
+        exportDialog.hidden = false;
+        exportOutputPath.focus();
+      }
+
+      function closeExportDialog() {
+        exportDialog.hidden = true;
+        setStatus("Export dialog closed.");
+      }
+
+      async function runJpegExport() {
+        const photo = selectedPhoto();
+        const outputPath = exportOutputPath.value.trim();
+        if (!isRasterExportCandidate(photo)) {
+          syncExportDialog();
+          setStatus(exportStatus.value);
+          return;
+        }
+        if (!outputPath) {
+          exportStatus.value = "Enter an output path before exporting.";
+          setStatus(exportStatus.value);
+          return;
+        }
+        if (exportOutputLooksUnsafe(photo, outputPath)) {
+          exportStatus.value = "Output path must differ from the original source path.";
+          setStatus(exportStatus.value);
+          return;
+        }
+
+        if (!activeLibraryPath || !invoke) {
+          exportStatus.value = "Static export smoke passed; desktop runtime writes the JPEG and catalog record.";
+          setStatus(exportStatus.value);
+          return;
+        }
+
+        setBusy(true);
+        exportStatus.value = "Exporting JPEG sRGB...";
+        setStatus(exportStatus.value);
+        try {
+          const message = await invoke("export_photo_jpeg_srgb", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+            outputPath,
+          });
+          if (!message) {
+            exportStatus.value = "Catalog photo was not found.";
+            setStatus(exportStatus.value);
+            return;
+          }
+          const exportedPath = parsePreviewField(message, "Export");
+          exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
+          exportStatus.value = parsePreviewField(message, "Message") || "JPEG sRGB export completed.";
+          setStatus(message);
+        } catch (error) {
+          exportStatus.value = String(error);
+          setStatus(String(error));
+        } finally {
+          setBusy(false);
+        }
       }
 
       function localDevelopPreviewPlan(photo, state) {
@@ -1113,6 +1290,9 @@
           syncDevelopSelection();
           previewDevelopEdit();
         }
+        if (mode === "export") {
+          openExportDialog();
+        }
       }
 
       function setLibraryState(state) {
@@ -1143,6 +1323,7 @@
         ].forEach((control) => {
           control.disabled = developDisabled;
         });
+        runJpegExportButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
       }
 
       async function runLibraryCommand(command) {
@@ -1250,6 +1431,17 @@
       developContrastReset.addEventListener("click", () => resetDevelopAdjustment("contrast"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
+      openExportDialogButton.addEventListener("click", openExportDialog);
+      exportDialogButtons.forEach((button) => {
+        button.addEventListener("click", openExportDialog);
+      });
+      closeExportDialogButton.addEventListener("click", closeExportDialog);
+      cancelExportButton.addEventListener("click", closeExportDialog);
+      runJpegExportButton.addEventListener("click", runJpegExport);
+      exportOutputPath.addEventListener("input", () => {
+        exportOutputPath.dataset.autofilled = "false";
+        syncExportDialog();
+      });
       thumbnailSizeInput.addEventListener("input", () => {
         libraryGrid.style.setProperty("--sr-thumb-min", `${thumbnailSizeInput.value}px`);
         libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${thumbnailSizeInput.value}px, 1fr))`;

@@ -522,6 +522,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Export success/error state is visible.
 - **Validation:** Export smoke test, exported JPEG inspection, and catalog export record check.
 
+**Status:** Completed on 2026-06-09. Export mode now opens an M007-style Export Photos dialog for the selected catalog photo. The dialog accepts a local output path, locks the local-alpha settings to JPEG, sRGB, and quality 90, shows a non-destructive original-file safety note, validates that the output path differs from the referenced original, and surfaces ready, blocked, success, and error states. Runtime export uses the existing `export_photo_jpeg_srgb` command, while static smoke mode shows that the desktop runtime is required to write the JPEG and catalog export record. This does not add native folder picking, multi-photo export, presets, alternate formats, Display P3, resizing, metadata policy editing, RAW decoding, Metal rendering, or sidecar writing.
+
 ### Task 5.5.9: Add UI Workflow Smoke Harness
 
 - **Location:** `scripts/harness/`, `apps/desktop/static/`, test docs
