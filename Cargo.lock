@@ -2843,6 +2843,7 @@ dependencies = [
  "objc2-metal",
  "objc2-metal-kit",
  "objc2-quartz-core",
+ "serde",
  "silica-core",
  "tauri",
  "tauri-build",

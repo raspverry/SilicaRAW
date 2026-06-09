@@ -319,8 +319,8 @@ Version: 1.0.228
 Purpose: Derive-backed typed serialization and deserialization.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/serde-rs/serde
-Used by: crates/silica-edit in Phase 5.2; expected later for silica-storage, silica-plugin, and silica-mcp when their schema-backed JSON tasks are reached.
-Why needed: typed serialization/deserialization for the edit graph JSON schema boundary.
+Used by: crates/silica-edit in Phase 5.2 and apps/desktop/src-tauri in Phase 5.6.2; expected later for silica-storage, silica-plugin, and silica-mcp when their schema-backed JSON tasks are reached.
+Why needed: typed serialization/deserialization for the edit graph JSON schema boundary and structured Tauri command response envelopes.
 Alternatives considered: manual JSON parsing, schemars-only workflows
 Risk notes: Schema-aware validation is still required; serde derives alone are not full JSON Schema validation.
 Binary size impact: Low/typical Rust ecosystem dependency.

@@ -1,41 +1,296 @@
 #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
 mod metal_host_spike;
 
+use serde::Serialize;
 use std::path::PathBuf;
 
-#[tauri::command]
-fn create_library(path: String) -> Result<String, String> {
-    silica_core::create_library(PathBuf::from(path))
-        .map(|session| session.status_text())
-        .map_err(|error| error.to_string())
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopCommandResponse {
+    ok: bool,
+    command: &'static str,
+    message: String,
+    data: Option<DesktopCommandData>,
+    error: Option<DesktopCommandError>,
+}
+
+impl DesktopCommandResponse {
+    fn ok(command: &'static str, message: impl Into<String>, data: DesktopCommandData) -> Self {
+        Self {
+            ok: true,
+            command,
+            message: message.into(),
+            data: Some(data),
+            error: None,
+        }
+    }
+
+    fn empty(command: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            ok: true,
+            command,
+            message: message.into(),
+            data: None,
+            error: None,
+        }
+    }
+
+    fn error(
+        command: &'static str,
+        error: silica_core::CoreError,
+        context: DesktopCommandContext,
+    ) -> Self {
+        let kind = core_error_kind(&error).to_string();
+        let message = error.to_string();
+        Self {
+            ok: false,
+            command,
+            message: message.clone(),
+            data: None,
+            error: Some(DesktopCommandError {
+                kind,
+                message,
+                context,
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    tag = "kind",
+    rename_all_fields = "camelCase"
+)]
+enum DesktopCommandData {
+    LibrarySession {
+        root_path: String,
+        catalog_path: String,
+        schema_version: i64,
+    },
+    ImportSummary {
+        folder_path: String,
+        scanned_files: usize,
+        supported_files: usize,
+        unsupported_files: usize,
+        originals_unchanged: bool,
+    },
+    PhotoGrid {
+        photos: Vec<DesktopPhotoGridItem>,
+    },
+    PhotoFlags {
+        photo_id: String,
+        rating: u8,
+        picked: bool,
+        rejected: bool,
+        color_label: Option<String>,
+    },
+    PhotoPreview {
+        photo_id: String,
+        file_name: String,
+        source_path: String,
+        status: &'static str,
+        message: String,
+    },
+    EditPreview {
+        photo_id: String,
+        source_path: String,
+        status: &'static str,
+        exposure: f64,
+        contrast: f64,
+        message: String,
+    },
+    EditCommit {
+        photo_id: String,
+        exposure: f64,
+        contrast: f64,
+        persisted: bool,
+        message: String,
+    },
+    Export {
+        photo_id: String,
+        source_path: String,
+        output_path: String,
+        format: String,
+        color_profile: String,
+        bytes_written: u64,
+        export_record_id: String,
+        message: String,
+    },
+}
+
+impl DesktopCommandData {
+    #[cfg(test)]
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::LibrarySession { .. } => "librarySession",
+            Self::ImportSummary { .. } => "importSummary",
+            Self::PhotoGrid { .. } => "photoGrid",
+            Self::PhotoFlags { .. } => "photoFlags",
+            Self::PhotoPreview { .. } => "photoPreview",
+            Self::EditPreview { .. } => "editPreview",
+            Self::EditCommit { .. } => "editCommit",
+            Self::Export { .. } => "export",
+        }
+    }
+
+    #[cfg(test)]
+    fn root_path(&self) -> Option<String> {
+        match self {
+            Self::LibrarySession { root_path, .. } => Some(root_path.clone()),
+            _ => None,
+        }
+    }
+
+    #[cfg(test)]
+    fn catalog_path(&self) -> Option<String> {
+        match self {
+            Self::LibrarySession { catalog_path, .. } => Some(catalog_path.clone()),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopPhotoGridItem {
+    photo_id: String,
+    file_name: String,
+    path: String,
+    file_type: String,
+    missing: bool,
+    unsupported: bool,
+    rating: u8,
+    picked: bool,
+    rejected: bool,
+    color_label: Option<String>,
+}
+
+impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
+    fn from(photo: silica_core::LibraryPhotoGridItem) -> Self {
+        Self {
+            photo_id: photo.photo_id,
+            file_name: photo.file_name,
+            path: photo.path,
+            file_type: photo.file_type,
+            missing: photo.missing,
+            unsupported: photo.unsupported,
+            rating: photo.rating,
+            picked: photo.picked,
+            rejected: photo.rejected,
+            color_label: photo.color_label,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopCommandContext {
+    library_path: Option<String>,
+    folder_path: Option<String>,
+    output_path: Option<String>,
+    photo_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopCommandError {
+    kind: String,
+    message: String,
+    context: DesktopCommandContext,
 }
 
 #[tauri::command]
-fn open_library(path: String) -> Result<String, String> {
-    silica_core::open_library(PathBuf::from(path))
-        .map(|session| session.status_text())
-        .map_err(|error| error.to_string())
+fn create_library(path: String) -> DesktopCommandResponse {
+    let command = "create_library";
+    match silica_core::create_library(PathBuf::from(&path)) {
+        Ok(session) => DesktopCommandResponse::ok(
+            command,
+            format!("Library created: {}", session.root_path.display()),
+            library_session_data(session),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
-fn import_folder(library_path: String, folder_path: String) -> Result<String, String> {
-    silica_core::import_folder(PathBuf::from(library_path), PathBuf::from(folder_path))
-        .map(|summary| {
+fn open_library(path: String) -> DesktopCommandResponse {
+    let command = "open_library";
+    match silica_core::open_library(PathBuf::from(&path)) {
+        Ok(session) => DesktopCommandResponse::ok(
+            command,
+            format!("Library opened: {}", session.root_path.display()),
+            library_session_data(session),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn import_folder(library_path: String, folder_path: String) -> DesktopCommandResponse {
+    let command = "import_folder";
+    match silica_core::import_folder(PathBuf::from(&library_path), PathBuf::from(&folder_path)) {
+        Ok(summary) => DesktopCommandResponse::ok(
+            command,
             format!(
-                "Imported folder: {}\nScanned: {}\nSupported: {}\nUnsupported: {}\nOriginal files unchanged: true",
-                summary.folder_path.display(),
-                summary.scanned_files,
-                summary.supported_files,
-                summary.unsupported_files
-            )
-        })
-        .map_err(|error| error.to_string())
+                "Imported {} supported file(s) by reference; originals unchanged.",
+                summary.supported_files
+            ),
+            DesktopCommandData::ImportSummary {
+                folder_path: summary.folder_path.display().to_string(),
+                scanned_files: summary.scanned_files,
+                supported_files: summary.supported_files,
+                unsupported_files: summary.unsupported_files,
+                originals_unchanged: true,
+            },
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                folder_path: Some(folder_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
-fn list_library_photos(library_path: String) -> Result<String, String> {
-    silica_core::list_library_photos_json(PathBuf::from(library_path))
-        .map_err(|error| error.to_string())
+fn list_library_photos(library_path: String) -> DesktopCommandResponse {
+    let command = "list_library_photos";
+    match silica_core::list_library_photos(PathBuf::from(&library_path)) {
+        Ok(photos) => {
+            let photos = photos.into_iter().map(DesktopPhotoGridItem::from).collect();
+            DesktopCommandResponse::ok(
+                command,
+                "Library grid loaded.",
+                DesktopCommandData::PhotoGrid { photos },
+            )
+        }
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
@@ -46,49 +301,77 @@ fn set_photo_flags(
     picked: bool,
     rejected: bool,
     color_label: Option<String>,
-) -> Result<String, String> {
-    silica_core::set_photo_flags(
-        PathBuf::from(library_path),
-        photo_id,
+) -> DesktopCommandResponse {
+    let command = "set_photo_flags";
+    match silica_core::set_photo_flags(
+        PathBuf::from(&library_path),
+        photo_id.clone(),
         rating,
         picked,
         rejected,
         color_label,
-    )
-    .map(|flags| {
-        photo_flags_status_text(
-            &flags.photo_id,
-            flags.rating,
-            flags.picked,
-            flags.rejected,
-            flags.color_label.as_deref(),
-        )
-    })
-    .map_err(|error| error.to_string())
+    ) {
+        Ok(flags) => {
+            DesktopCommandResponse::ok(command, "Photo flags updated.", photo_flags_data(flags))
+        }
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
-fn get_photo_flags(library_path: String, photo_id: String) -> Result<Option<String>, String> {
-    silica_core::get_photo_flags(PathBuf::from(library_path), &photo_id)
-        .map(|flags| {
-            flags.map(|flags| {
-                photo_flags_status_text(
-                    &flags.photo_id,
-                    flags.rating,
-                    flags.picked,
-                    flags.rejected,
-                    flags.color_label.as_deref(),
-                )
-            })
-        })
-        .map_err(|error| error.to_string())
+fn get_photo_flags(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_flags";
+    match silica_core::get_photo_flags(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(flags)) => {
+            DesktopCommandResponse::ok(command, "Photo flags loaded.", photo_flags_data(flags))
+        }
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
-fn open_photo_preview(library_path: String, photo_id: String) -> Result<Option<String>, String> {
-    silica_core::open_photo_preview(PathBuf::from(library_path), &photo_id)
-        .map(|preview| preview.map(|preview| preview.status_text()))
-        .map_err(|error| error.to_string())
+fn open_photo_preview(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "open_photo_preview";
+    match silica_core::open_photo_preview(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::PhotoPreview {
+                photo_id: preview.photo_id,
+                file_name: preview.file_name,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
@@ -97,15 +380,37 @@ fn preview_exposure_contrast_edit(
     photo_id: String,
     exposure: f64,
     contrast: f64,
-) -> Result<Option<String>, String> {
-    silica_core::preview_exposure_contrast_edit(
-        PathBuf::from(library_path),
+) -> DesktopCommandResponse {
+    let command = "preview_exposure_contrast_edit";
+    match silica_core::preview_exposure_contrast_edit(
+        PathBuf::from(&library_path),
         &photo_id,
         exposure,
         contrast,
-    )
-    .map(|preview| preview.map(|preview| preview.status_text()))
-    .map_err(|error| error.to_string())
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
@@ -114,15 +419,36 @@ fn commit_exposure_contrast_edit(
     photo_id: String,
     exposure: f64,
     contrast: f64,
-) -> Result<Option<String>, String> {
-    silica_core::commit_exposure_contrast_edit(
-        PathBuf::from(library_path),
+) -> DesktopCommandResponse {
+    let command = "commit_exposure_contrast_edit";
+    match silica_core::commit_exposure_contrast_edit(
+        PathBuf::from(&library_path),
         &photo_id,
         exposure,
         contrast,
-    )
-    .map(|commit| commit.map(|commit| commit.status_text()))
-    .map_err(|error| error.to_string())
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
 #[tauri::command]
@@ -130,27 +456,74 @@ fn export_photo_jpeg_srgb(
     library_path: String,
     photo_id: String,
     output_path: String,
-) -> Result<Option<String>, String> {
-    silica_core::export_photo_jpeg_srgb(
-        PathBuf::from(library_path),
+) -> DesktopCommandResponse {
+    let command = "export_photo_jpeg_srgb";
+    match silica_core::export_photo_jpeg_srgb(
+        PathBuf::from(&library_path),
         &photo_id,
-        PathBuf::from(output_path),
-    )
-    .map(|export| export.map(|export| export.status_text()))
-    .map_err(|error| error.to_string())
+        PathBuf::from(&output_path),
+    ) {
+        Ok(Some(export)) => DesktopCommandResponse::ok(
+            command,
+            export.message.clone(),
+            DesktopCommandData::Export {
+                photo_id: export.photo_id,
+                source_path: export.source_path,
+                output_path: export.output_path.display().to_string(),
+                format: export.format,
+                color_profile: export.color_profile,
+                bytes_written: export.bytes_written,
+                export_record_id: export.export_record_id,
+                message: export.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                output_path: Some(output_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
 }
 
-fn photo_flags_status_text(
-    photo_id: &str,
-    rating: u8,
-    picked: bool,
-    rejected: bool,
-    color_label: Option<&str>,
-) -> String {
-    format!(
-        "Photo: {photo_id}\nRating: {rating}\nPicked: {picked}\nRejected: {rejected}\nColor label: {}",
-        color_label.unwrap_or("none")
-    )
+fn library_session_data(session: silica_core::LibrarySession) -> DesktopCommandData {
+    DesktopCommandData::LibrarySession {
+        root_path: session.root_path.display().to_string(),
+        catalog_path: session.catalog_path.display().to_string(),
+        schema_version: session.schema_version,
+    }
+}
+
+fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
+    DesktopCommandData::PhotoFlags {
+        photo_id: flags.photo_id,
+        rating: flags.rating,
+        picked: flags.picked,
+        rejected: flags.rejected,
+        color_label: flags.color_label,
+    }
+}
+
+fn preview_status_text(status: silica_core::PhotoPreviewStatus) -> &'static str {
+    match status {
+        silica_core::PhotoPreviewStatus::Ready => "Ready",
+        silica_core::PhotoPreviewStatus::BlockedByDecode => "BlockedByDecode",
+        silica_core::PhotoPreviewStatus::Unsupported => "Unsupported",
+    }
+}
+
+fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
+    match error {
+        silica_core::CoreError::Storage(_) => "storage",
+        silica_core::CoreError::EditGraph(_) => "editGraph",
+        silica_core::CoreError::Export(_) => "export",
+        silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
+    }
 }
 
 fn main() {
@@ -185,12 +558,37 @@ mod tests {
     fn desktop_commands_create_and_open_library() {
         let root = unique_library_root("desktop");
 
-        let created = super::create_library(root.display().to_string()).expect("create library");
-        let opened = super::open_library(root.display().to_string()).expect("open library");
+        let created = super::create_library(root.display().to_string());
+        let opened = super::open_library(root.display().to_string());
 
-        assert!(created.contains("Library:"));
-        assert!(created.contains("catalog.db"));
-        assert_eq!(opened, created);
+        assert!(created.ok);
+        assert!(created.error.is_none());
+        assert_eq!(created.command, "create_library");
+        assert_eq!(response_data(&created).kind(), "librarySession");
+        assert_eq!(
+            response_data(&created).root_path(),
+            Some(root.display().to_string())
+        );
+        assert!(created.message.contains("Library created"));
+
+        assert!(opened.ok);
+        assert_eq!(opened.command, "open_library");
+        assert_eq!(response_data(&opened).kind(), "librarySession");
+        assert_eq!(
+            response_data(&opened).catalog_path(),
+            response_data(&created).catalog_path()
+        );
+
+        let missing = super::open_library(root.join("missing").display().to_string());
+        assert!(!missing.ok);
+        assert_eq!(missing.command, "open_library");
+        let error = missing.error.as_ref().expect("structured error");
+        assert_eq!(error.kind, "storage");
+        assert_eq!(
+            error.context.library_path,
+            Some(root.join("missing").display().to_string())
+        );
+        assert!(error.message.contains("not a directory"));
 
         remove_library_root(&root);
     }
@@ -216,16 +614,25 @@ mod tests {
             true,
             false,
             Some("blue".to_string()),
-        )
-        .expect("set flags command");
-        assert!(updated.contains("Rating: 2"));
-        assert!(updated.contains("Picked: true"));
-        assert!(updated.contains("Color label: blue"));
+        );
+        assert!(updated.ok);
+        match response_data(&updated) {
+            super::DesktopCommandData::PhotoFlags {
+                rating,
+                picked,
+                color_label,
+                ..
+            } => {
+                assert_eq!(*rating, 2);
+                assert!(*picked);
+                assert_eq!(color_label.as_deref(), Some("blue"));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
-        let reopened = super::get_photo_flags(library_root.display().to_string(), photo_id)
-            .expect("get flags command")
-            .expect("flags row");
-        assert_eq!(reopened, updated);
+        let reopened = super::get_photo_flags(library_root.display().to_string(), photo_id);
+        assert!(reopened.ok);
+        assert_eq!(response_data(&reopened), response_data(&updated));
 
         remove_library_root(&workspace);
     }
@@ -247,13 +654,24 @@ mod tests {
         let imported = super::import_folder(
             library_root.display().to_string(),
             import_root.display().to_string(),
-        )
-        .expect("import folder command");
+        );
 
-        assert!(imported.contains("Imported folder:"));
-        assert!(imported.contains("Scanned: 2"));
-        assert!(imported.contains("Supported: 1"));
-        assert!(imported.contains("Unsupported: 1"));
+        assert!(imported.ok);
+        match response_data(&imported) {
+            super::DesktopCommandData::ImportSummary {
+                scanned_files,
+                supported_files,
+                unsupported_files,
+                originals_unchanged,
+                ..
+            } => {
+                assert_eq!(*scanned_files, 2);
+                assert_eq!(*supported_files, 1);
+                assert_eq!(*unsupported_files, 1);
+                assert!(*originals_unchanged);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
         assert!(supported_file.is_file());
         assert!(unsupported_file.is_file());
 
@@ -276,25 +694,31 @@ mod tests {
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
 
         let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
-        super::set_photo_flags(
+        let flags = super::set_photo_flags(
             library_root.display().to_string(),
             photo_id,
             4,
             true,
             false,
             Some("green".to_string()),
-        )
-        .expect("set grid flags");
+        );
+        assert!(flags.ok);
 
-        let grid = super::list_library_photos(library_root.display().to_string())
-            .expect("list library photos command");
-
-        assert!(grid.contains("\"fileName\":\"sample.DNG\""));
-        assert!(grid.contains("\"fileName\":\"notes.txt\""));
-        assert!(grid.contains("\"unsupported\":true"));
-        assert!(grid.contains("\"rating\":4"));
-        assert!(grid.contains("\"picked\":true"));
-        assert!(grid.contains("\"colorLabel\":\"green\""));
+        let grid = super::list_library_photos(library_root.display().to_string());
+        assert!(grid.ok);
+        match response_data(&grid) {
+            super::DesktopCommandData::PhotoGrid { photos } => {
+                assert_eq!(photos.len(), 2);
+                assert!(photos.iter().any(|photo| photo.file_name == "sample.DNG"
+                    && photo.rating == 4
+                    && photo.picked
+                    && photo.color_label.as_deref() == Some("green")));
+                assert!(photos
+                    .iter()
+                    .any(|photo| photo.file_name == "notes.txt" && photo.unsupported));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
         remove_library_root(&workspace);
     }
@@ -313,13 +737,22 @@ mod tests {
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
 
         let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
-        let preview = super::open_photo_preview(library_root.display().to_string(), photo_id)
-            .expect("open preview command")
-            .expect("preview session");
+        let preview = super::open_photo_preview(library_root.display().to_string(), photo_id);
 
-        assert!(preview.contains("File: sample.jpg"));
-        assert!(preview.contains("Preview: Ready"));
-        assert!(preview.contains("display-profile-aware"));
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::PhotoPreview {
+                file_name,
+                status,
+                message,
+                ..
+            } => {
+                assert_eq!(file_name, "sample.jpg");
+                assert_eq!(*status, "Ready");
+                assert!(message.contains("display-profile-aware"));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
         remove_library_root(&workspace);
     }
@@ -343,24 +776,42 @@ mod tests {
             photo_id.clone(),
             0.5,
             -8.0,
-        )
-        .expect("preview edit command")
-        .expect("preview edit request");
-        assert!(preview.contains("Preview: Ready"));
-        assert!(preview.contains("Exposure: 0.5"));
-        assert!(preview.contains("Contrast: -8"));
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                exposure,
+                contrast,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*exposure, 0.5);
+                assert_eq!(*contrast, -8.0);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
         let committed = super::commit_exposure_contrast_edit(
             library_root.display().to_string(),
             photo_id,
             0.5,
             -8.0,
-        )
-        .expect("commit edit command")
-        .expect("committed edit");
-        assert!(committed.contains("Persisted: true"));
-        assert!(committed.contains("Exposure: 0.5"));
-        assert!(committed.contains("Contrast: -8"));
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                exposure,
+                contrast,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*exposure, 0.5);
+                assert_eq!(*contrast, -8.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
         remove_library_root(&workspace);
     }
@@ -390,15 +841,29 @@ mod tests {
             library_root.display().to_string(),
             photo_id,
             output_path.display().to_string(),
-        )
-        .expect("export command")
-        .expect("export status");
+        );
 
-        assert!(export.contains("Format: jpeg"));
-        assert!(export.contains("Color: srgb"));
+        assert!(export.ok);
+        match response_data(&export) {
+            super::DesktopCommandData::Export {
+                format,
+                color_profile,
+                output_path: actual_output_path,
+                ..
+            } => {
+                assert_eq!(format, "jpeg");
+                assert_eq!(color_profile, "srgb");
+                assert_eq!(actual_output_path, &output_path.display().to_string());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
         assert!(output_path.is_file());
 
         remove_library_root(&workspace);
+    }
+
+    fn response_data(response: &super::DesktopCommandResponse) -> &super::DesktopCommandData {
+        response.data.as_ref().expect("response data")
     }
 
     fn stable_catalog_id(prefix: &str, value: &str) -> String {

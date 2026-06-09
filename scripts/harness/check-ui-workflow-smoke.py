@@ -181,6 +181,31 @@ def main():
         "open/create library workflow must delegate selected command into Tauri invoke",
         failures,
     )
+    for forbidden in [
+        "parsePreviewField",
+        "readImportNumber",
+        "JSON.parse(message)",
+        "const message = await invoke",
+    ]:
+        require(
+            forbidden not in source,
+            f"UI runtime commands must use structured response fields, not {forbidden}",
+            failures,
+        )
+    for marker in [
+        "responseMessage",
+        "responseErrorMessage",
+        "commandFailed",
+        "response.data?.photos",
+        "response.data?.supportedFiles",
+        "response.data.outputPath",
+        "response.data.status",
+    ]:
+        require(
+            marker in source,
+            f"structured command response marker missing: {marker}",
+            failures,
+        )
     require(
         'createButton.addEventListener("click", () => runLibraryCommand("create_library"))'
         in source,

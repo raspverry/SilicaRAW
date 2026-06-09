@@ -567,9 +567,22 @@
         importProgressLabel.textContent = label;
       }
 
-      function readImportNumber(message, label) {
-        const match = message.match(new RegExp(`${label}:\\s*(\\d+)`));
-        return match ? match[1] : "0";
+      function responseMessage(response, fallback = "Command completed.") {
+        return response?.message || response?.data?.message || fallback;
+      }
+
+      function responseErrorMessage(error, fallback = "Command failed.") {
+        if (!error) {
+          return fallback;
+        }
+        if (typeof error === "string") {
+          return error;
+        }
+        return error.error?.message || error.message || fallback;
+      }
+
+      function commandFailed(response) {
+        return !response || response.ok === false;
       }
 
       function photoFromCard(card) {
@@ -814,11 +827,6 @@
         }));
       }
 
-      function parsePreviewField(message, label) {
-        const match = message.match(new RegExp(`^${label}:\\s*(.+)$`, "m"));
-        return match ? match[1] : "";
-      }
-
       function syncExportDialog() {
         const photo = selectedPhoto();
         const hasPhoto = Boolean(photo);
@@ -888,23 +896,28 @@
         exportStatus.value = "Exporting JPEG sRGB...";
         setStatus(exportStatus.value);
         try {
-          const message = await invoke("export_photo_jpeg_srgb", {
+          const response = await invoke("export_photo_jpeg_srgb", {
             libraryPath: activeLibraryPath,
             photoId: photo.photoId,
             outputPath,
           });
-          if (!message) {
+          if (commandFailed(response)) {
+            exportStatus.value = responseErrorMessage(response, "JPEG sRGB export failed.");
+            setStatus(exportStatus.value);
+            return;
+          }
+          if (!response.data) {
             exportStatus.value = "Catalog photo was not found.";
             setStatus(exportStatus.value);
             return;
           }
-          const exportedPath = parsePreviewField(message, "Export");
+          const exportedPath = response.data.outputPath;
           exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
-          exportStatus.value = parsePreviewField(message, "Message") || "JPEG sRGB export completed.";
-          setStatus(message);
+          exportStatus.value = response.data.message || responseMessage(response, "JPEG sRGB export completed.");
+          setStatus(responseMessage(response));
         } catch (error) {
-          exportStatus.value = String(error);
-          setStatus(String(error));
+          exportStatus.value = responseErrorMessage(error, "JPEG sRGB export failed.");
+          setStatus(exportStatus.value);
         } finally {
           setBusy(false);
         }
@@ -996,7 +1009,7 @@
 
         const sequence = ++developPreviewSequence;
         try {
-          const message = await invoke("preview_exposure_contrast_edit", {
+          const response = await invoke("preview_exposure_contrast_edit", {
             libraryPath: activeLibraryPath,
             photoId: photo.photoId,
             exposure: state.draftExposure,
@@ -1005,19 +1018,26 @@
           if (sequence !== developPreviewSequence) {
             return;
           }
-          if (!message) {
+          if (commandFailed(response)) {
+            const message = responseErrorMessage(response, "Develop preview failed.");
+            renderDevelopPreviewState({ status: "No Preview", message });
+            setStatus(message);
+            return;
+          }
+          if (!response.data) {
             renderDevelopPreviewState({ status: "No Preview", message: "Catalog photo was not found." });
             setStatus("Develop preview unavailable.");
             return;
           }
           renderDevelopPreviewState({
-            status: parsePreviewField(message, "Preview"),
-            message: parsePreviewField(message, "Message"),
+            status: response.data.status,
+            message: response.data.message,
           });
-          setStatus(message);
+          setStatus(responseMessage(response));
         } catch (error) {
-          renderDevelopPreviewState({ status: "No Preview", message: String(error) });
-          setStatus(String(error));
+          const message = responseErrorMessage(error, "Develop preview failed.");
+          renderDevelopPreviewState({ status: "No Preview", message });
+          setStatus(message);
         }
       }
 
@@ -1039,22 +1059,26 @@
 
         setBusy(true);
         try {
-          const message = await invoke("commit_exposure_contrast_edit", {
+          const response = await invoke("commit_exposure_contrast_edit", {
             libraryPath: activeLibraryPath,
             photoId: photo.photoId,
             exposure: state.draftExposure,
             contrast: state.draftContrast,
           });
-          if (!message) {
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Develop edit commit failed."));
+            return;
+          }
+          if (!response.data) {
             setStatus("Develop edit was not committed because the catalog photo was not found.");
             return;
           }
           state.committedExposure = state.draftExposure;
           state.committedContrast = state.draftContrast;
           updateDevelopDirtyState(state);
-          setStatus(message);
+          setStatus(responseMessage(response));
         } catch (error) {
-          setStatus(String(error));
+          setStatus(responseErrorMessage(error, "Develop edit commit failed."));
         } finally {
           setBusy(false);
         }
@@ -1171,25 +1195,32 @@
         setBusy(true);
         setStatus("Opening preview...");
         try {
-          const message = await invoke("open_photo_preview", {
+          const response = await invoke("open_photo_preview", {
             libraryPath: activeLibraryPath,
             photoId: selected.photoId,
           });
-          if (!message) {
+          if (commandFailed(response)) {
+            const message = responseErrorMessage(response, "Preview failed.");
+            renderPreviewState({ status: "No Preview", message });
+            setStatus(message);
+            return;
+          }
+          if (!response.data) {
             renderPreviewState({ status: "No Preview", message: "Catalog photo was not found." });
             setStatus("Preview unavailable.");
             return;
           }
           renderPreviewState({
-            fileName: parsePreviewField(message, "File"),
-            status: parsePreviewField(message, "Preview"),
-            sourcePath: parsePreviewField(message, "Source"),
-            message: parsePreviewField(message, "Message"),
+            fileName: response.data.fileName,
+            status: response.data.status,
+            sourcePath: response.data.sourcePath,
+            message: response.data.message,
           });
-          setStatus(message);
+          setStatus(responseMessage(response));
         } catch (error) {
-          renderPreviewState({ status: "No Preview", message: String(error) });
-          setStatus(String(error));
+          const message = responseErrorMessage(error, "Preview failed.");
+          renderPreviewState({ status: "No Preview", message });
+          setStatus(message);
         } finally {
           setBusy(false);
         }
@@ -1223,12 +1254,16 @@
         gridEmptyState.hidden = true;
         setStatus("Loading catalog photos...");
         try {
-          const message = await invoke("list_library_photos", { libraryPath: activeLibraryPath });
-          renderLibraryGrid(JSON.parse(message));
-          setStatus("Library grid loaded.");
+          const response = await invoke("list_library_photos", { libraryPath: activeLibraryPath });
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Library grid failed to load."));
+            return;
+          }
+          renderLibraryGrid(response.data?.photos ?? []);
+          setStatus(responseMessage(response, "Library grid loaded."));
         } catch (error) {
           gridLoadingState.hidden = true;
-          setStatus(String(error));
+          setStatus(responseErrorMessage(error, "Library grid failed to load."));
         }
       }
 
@@ -1250,7 +1285,7 @@
         if (activeLibraryPath && invoke) {
           setBusy(true);
           try {
-            const message = await invoke("set_photo_flags", {
+            const response = await invoke("set_photo_flags", {
               libraryPath: activeLibraryPath,
               photoId: next.photoId,
               rating: next.rating,
@@ -1258,9 +1293,20 @@
               rejected: next.rejected,
               colorLabel: next.colorLabel,
             });
-            setStatus(message);
+            if (commandFailed(response)) {
+              setStatus(responseErrorMessage(response, "Photo flags failed to update."));
+              setBusy(false);
+              return;
+            }
+            if (response.data) {
+              next.rating = response.data.rating;
+              next.picked = response.data.picked;
+              next.rejected = response.data.rejected;
+              next.colorLabel = response.data.colorLabel;
+            }
+            setStatus(responseMessage(response, "Photo flags updated."));
           } catch (error) {
-            setStatus(String(error));
+            setStatus(responseErrorMessage(error, "Photo flags failed to update."));
             setBusy(false);
             return;
           } finally {
@@ -1341,13 +1387,17 @@
         setBusy(true);
         setStatus("Working...");
         try {
-          const message = await invoke(command, { path });
-          activeLibraryPath = path;
+          const response = await invoke(command, { path });
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Library command failed."));
+            return;
+          }
+          activeLibraryPath = response.data?.rootPath || path;
           setLibraryState("open");
-          setStatus(message);
+          setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
-          setStatus(String(error));
+          setStatus(responseErrorMessage(error, "Library command failed."));
         } finally {
           setBusy(false);
         }
@@ -1377,20 +1427,26 @@
         setStatus("Importing by reference...");
         setImportProgress(45, "Scanning");
         try {
-          const message = await invoke("import_folder", {
+          const response = await invoke("import_folder", {
             libraryPath: activeLibraryPath,
             folderPath,
           });
-          importedCount.textContent = readImportNumber(message, "Supported");
-          unsupportedCount.textContent = readImportNumber(message, "Unsupported");
+          if (commandFailed(response)) {
+            importErrorCount.textContent = "1";
+            setImportProgress(100, "Needs Review");
+            setStatus(responseErrorMessage(response, "Import failed."));
+            return;
+          }
+          importedCount.textContent = String(response.data?.supportedFiles ?? 0);
+          unsupportedCount.textContent = String(response.data?.unsupportedFiles ?? 0);
           importErrorCount.textContent = "0";
           setImportProgress(100, "Completed");
-          setStatus(message);
+          setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
           importErrorCount.textContent = "1";
           setImportProgress(100, "Needs Review");
-          setStatus(String(error));
+          setStatus(responseErrorMessage(error, "Import failed."));
         } finally {
           setBusy(false);
         }

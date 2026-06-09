@@ -12,6 +12,9 @@ use std::time::UNIX_EPOCH;
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-core";
 
+pub use silica_storage::LibraryPhotoGridItem;
+pub use silica_storage::PhotoFlags;
+
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 
 /// Local library session returned by core commands.
@@ -219,7 +222,7 @@ pub fn import_folder(
 
 /// List imported catalog photos as JSON for the desktop Library grid.
 pub fn list_library_photos_json(library_root_path: impl AsRef<Path>) -> Result<String, CoreError> {
-    let photos = silica_storage::list_library_photos(library_root_path)?;
+    let photos = list_library_photos(library_root_path)?;
     let rows = photos
         .into_iter()
         .map(|photo| {
@@ -239,6 +242,13 @@ pub fn list_library_photos_json(library_root_path: impl AsRef<Path>) -> Result<S
         .collect::<Vec<_>>();
 
     Ok(serde_json::Value::Array(rows).to_string())
+}
+
+/// List imported catalog photos through the typed core command boundary.
+pub fn list_library_photos(
+    library_root_path: impl AsRef<Path>,
+) -> Result<Vec<silica_storage::LibraryPhotoGridItem>, CoreError> {
+    silica_storage::list_library_photos(library_root_path).map_err(CoreError::from)
 }
 
 /// Persist photo culling and label flags through the core command boundary.

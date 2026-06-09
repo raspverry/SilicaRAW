@@ -29,6 +29,7 @@ tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
 silica-core = { path = "../../../crates/silica-core" }
+serde = { version = "1.0.228", features = ["derive"] }
 tauri = { version = "2.11.2", features = [] }
 
 [dev-dependencies]
