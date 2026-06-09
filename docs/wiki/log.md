@@ -14,6 +14,19 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-09] phase-5.5 | UI MVP baseline started
+
+- Added Task 5.5 as a UI MVP vertical slice before local install QA.
+- Added the UI MVP baseline topic with source hierarchy, mockup mapping, and `ui-ux-pro-max` accepted/rejected guidance.
+- Started static frontend tokenization with `apps/desktop/static/styles/tokens.css` and `base.css`.
+
+## [2026-06-09] phase-5 | JPEG sRGB export added
+
+- Added command/API-level JPEG sRGB export for already-rendered raster sources.
+- Added catalog export record persistence and exported flag updates.
+- Added a minimal Tauri export command.
+- Kept RAW decoding, Metal rendering, UI export screens, broad color fixture validation, MLX, MCP, plugin behavior, and distribution changes out of scope.
+
 ## [2026-06-09] phase-5 | Exposure and contrast edit flow added
 
 - Added default edit graph construction and validated exposure/contrast updates to `silica-edit`.

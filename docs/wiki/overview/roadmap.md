@@ -32,6 +32,8 @@ The current implementation order starts with:
 14. Implement minimal preview path contract.
 15. Implement edit graph types and validation.
 16. Implement exposure and contrast edit flow.
+17. Implement JPEG sRGB export.
+18. Establish UI MVP baseline and then implement the connected UI vertical slice.
 
 ## Gate Logic
 
@@ -56,6 +58,8 @@ The current implementation order starts with:
 - Phase 5.1 adds a minimal preview readiness path: raster candidates can return ready-by-reference, unsupported entries return a clear state, and RAW entries remain blocked until fixture-backed Core Image probe work.
 - Phase 5.2 adds typed edit graph structures and schema-aware validation in `silica-edit`; edit application, render integration, sidecar persistence, and UI controls remain later tasks.
 - Phase 5.3 adds command/API-level exposure and contrast edit flow: draft preview requests do not write SQLite, while commit persists the active edit graph.
+- Phase 5.4 adds command/API-level JPEG sRGB export with original overwrite protection and catalog export records.
+- Phase 5.5 starts the UI MVP vertical slice. Task 5.5.1 records the baseline and tokenizes the static shell; product screens begin in Task 5.5.2.
 
 ## Links
 
@@ -69,6 +73,7 @@ The current implementation order starts with:
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [ADR 0005: Defer MLX from Local Alpha](../decisions/adr-0005-mlx-deferral-for-local-alpha.md)
 - [Catalog](../topics/catalog.md)
+- [UI MVP Baseline](../topics/ui-mvp-baseline.md)
 
 ## Notes for LLM Agents
 

@@ -1,0 +1,95 @@
+:root {
+  color-scheme: dark light;
+
+  --sr-bg-primary: #101010;
+  --sr-bg-secondary: #181818;
+  --sr-bg-tertiary: #202020;
+
+  --sr-surface-panel: #1c1c1e;
+  --sr-surface-card: #242426;
+  --sr-surface-raised: #2a2a2c;
+  --sr-surface-hover: #2c2c2e;
+  --sr-surface-active: #333336;
+
+  --sr-border-subtle: #2f2f31;
+  --sr-border-default: #3a3a3c;
+  --sr-border-strong: #4a4a4d;
+
+  --sr-text-primary: #f5f5f7;
+  --sr-text-secondary: #b8b8bd;
+  --sr-text-tertiary: #7a7a80;
+  --sr-text-disabled: #5c5c61;
+
+  --sr-accent-system: #0a84ff;
+  --sr-accent-silica: #d6a84f;
+  --sr-accent-silica-hover: #e2b75e;
+  --sr-accent-silica-muted: #6e5527;
+  --sr-accent-on-silica: #1d1d1f;
+
+  --sr-success: #30d158;
+  --sr-warning: #ff9f0a;
+  --sr-danger: #ff453a;
+  --sr-info: #64d2ff;
+
+  --sr-font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Helvetica Neue", sans-serif;
+
+  --sr-type-display: 28px;
+  --sr-type-title: 22px;
+  --sr-type-heading: 17px;
+  --sr-type-body: 15px;
+  --sr-type-control: 13px;
+  --sr-type-caption: 11px;
+
+  --sr-line-display: 34px;
+  --sr-line-title: 28px;
+  --sr-line-heading: 24px;
+  --sr-line-body: 22px;
+  --sr-line-control: 18px;
+  --sr-line-caption: 14px;
+
+  --sr-space-2xs: 2px;
+  --sr-space-xs: 4px;
+  --sr-space-sm: 8px;
+  --sr-space-md: 12px;
+  --sr-space-lg: 16px;
+  --sr-space-xl: 24px;
+  --sr-space-2xl: 32px;
+  --sr-space-3xl: 48px;
+  --sr-space-4xl: 64px;
+
+  --sr-radius-xs: 4px;
+  --sr-radius-sm: 6px;
+  --sr-radius-md: 10px;
+  --sr-radius-lg: 14px;
+  --sr-radius-xl: 20px;
+  --sr-radius-full: 999px;
+
+  --sr-motion-fast: 120ms;
+  --sr-motion-normal: 180ms;
+  --sr-motion-slow: 260ms;
+  --sr-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sr-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --sr-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="light"] {
+  --sr-bg-primary: #f5f5f7;
+  --sr-bg-secondary: #ffffff;
+  --sr-bg-tertiary: #ececef;
+
+  --sr-surface-panel: #ffffff;
+  --sr-surface-card: #f7f7f8;
+  --sr-surface-raised: #ffffff;
+  --sr-surface-hover: #efeff1;
+  --sr-surface-active: #e5e5ea;
+
+  --sr-border-subtle: #d8d8dd;
+  --sr-border-default: #c7c7cc;
+  --sr-border-strong: #aeaeb2;
+
+  --sr-text-primary: #1d1d1f;
+  --sr-text-secondary: #515154;
+  --sr-text-tertiary: #86868b;
+  --sr-text-disabled: #aeaeb2;
+}

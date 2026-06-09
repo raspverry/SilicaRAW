@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-09
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -45,6 +45,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Catalog](topics/catalog.md)
 - [Data Safety](topics/data-safety.md)
 - [UI Mockups](topics/ui-mockups.md)
+- [UI MVP Baseline](topics/ui-mvp-baseline.md)
 - [Edit Graph](topics/edit-graph.md)
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)

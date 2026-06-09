@@ -409,6 +409,128 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 
 **Status:** Completed on 2026-06-09 as a command/API-level local alpha export path. `silica-export` decodes an already-rendered raster source, applies persisted exposure/contrast values on the CPU, writes a separate JPEG output at fixed local-alpha quality, and refuses to overwrite the original source path. `silica-render` records the JPEG sRGB export request contract, `silica-storage` stores the export row and marks `photo_flags.exported`, `silica-core` orchestrates edit state, export, and catalog recording, and the minimal Tauri shell exposes an export command. This task does not implement RAW decoding, Metal rendering, UI export screens, broad color fixture validation, Display P3 export, MLX/MCP/plugin behavior, or auto-update/distribution changes.
 
+## Phase 5.5: UI MVP Vertical Slice
+
+**Goal:** Make the local alpha workflow usable through real app screens before local install QA.
+
+**Demo/Validation:**
+
+- A tester can use the app window to create/open a library, import a folder by reference, browse a grid, cull photos, adjust exposure/contrast, and export JPEG sRGB.
+- UI follows `MockupUI/` information structure and the design-system/component specifications.
+- UI QA runs on the connected workflow first, then responsive variants.
+
+### Task 5.5.1: Establish UI Design System Baseline
+
+- **Location:** `docs/wiki/topics/ui-mvp-baseline.md`, `apps/desktop/static/styles/`, `apps/desktop/static/index.html`
+- **Description:** Record the UI MVP plan, define the source hierarchy, run `ui-ux-pro-max` against the product direction, and start tokenized static frontend styles.
+- **Dependencies:** Tasks 5.4, `MockupUI/MANIFEST.md`, `docs/05_Design_System_Specification.md`, `docs/05_5_Component_Library_Specification.md`, `docs/06_Screen_Inventory_and_Wireframe_Specification.md`
+- **Acceptance Criteria:**
+  - Task 5.5 is atomized in the wiki before implementation proceeds.
+  - Baseline states that `MockupUI/` is the product UI target.
+  - `ui-ux-pro-max` output is recorded with accepted and rejected guidance.
+  - Static frontend loads shared design tokens instead of inline hard-coded colors.
+- **Validation:** Markdown link check, dependency guard, and harness pass.
+
+**Status:** Completed on 2026-06-09. The UI MVP baseline is recorded in [UI MVP Baseline](../topics/ui-mvp-baseline.md), Task 5.5 is atomized below, `ui-ux-pro-max` guidance is explicitly filtered against SilicaRAW's Apple Pro App design direction, and the current static shell now loads token/base CSS from `apps/desktop/static/styles/`.
+
+### Task 5.5.2: Build App Frame and Mode Navigation
+
+- **Location:** `apps/desktop/static/`, `docs/wiki/topics/ui-mvp-baseline.md`
+- **Description:** Replace the minimal static shell with the global app frame: toolbar, sidebar region, main content region, inspector region, status/progress area, and Library/Develop/Export mode navigation.
+- **Dependencies:** Task 5.5.1
+- **Acceptance Criteria:**
+  - Frame follows `docs/06` global app frame rules.
+  - No screen content is hidden under native viewer proof layers.
+  - Navigation state is visible and keyboard reachable.
+- **Validation:** Static app smoke test and screenshot check at 1280px and 1440px.
+
+### Task 5.5.3: Implement Welcome and Library Open/Create UI
+
+- **Location:** `apps/desktop/static/`, `MockupUI/M001_Welcome.png`
+- **Description:** Implement the first-launch/welcome screen and connect create/open library commands.
+- **Dependencies:** Task 5.5.2
+- **Acceptance Criteria:**
+  - User can create or open a local library from the app.
+  - Success/error states are visible in the app frame.
+  - Screen matches M001 information structure.
+- **Validation:** Tauri command smoke test through the UI.
+
+### Task 5.5.4: Implement Import Flow UI
+
+- **Location:** `apps/desktop/static/`, `MockupUI/M009_Import_Progress.png`
+- **Description:** Add import-by-reference controls and import progress/status feedback.
+- **Dependencies:** Task 5.5.3
+- **Acceptance Criteria:**
+  - User can enter/select an import folder path and import by reference.
+  - UI states that original files stay in place.
+  - Unsupported file count and errors are visible.
+- **Validation:** Import a mixed folder and verify catalog rows without copying originals.
+
+### Task 5.5.5: Implement Library Grid MVP
+
+- **Location:** `apps/desktop/static/`, `MockupUI/M003_Library_Grid_populated.png`
+- **Description:** Show imported catalog photos in a grid with selection and culling controls.
+- **Dependencies:** Task 5.5.4
+- **Acceptance Criteria:**
+  - Grid can show imported photos using catalog data.
+  - Rating, pick, and reject actions call the command/API path.
+  - Empty, loading, missing, and unsupported states are represented.
+- **Validation:** Grid smoke test and culling persistence check.
+
+### Task 5.5.6: Implement Preview/Loupe MVP
+
+- **Location:** `apps/desktop/static/`, `MockupUI/M004_Library_Loupe.png`
+- **Description:** Add one-photo preview/loupe state backed by the existing preview readiness command.
+- **Dependencies:** Task 5.5.5
+- **Acceptance Criteria:**
+  - JPEG raster candidates show a preview surface.
+  - RAW candidates show the blocked decode state without implying RAW decode is implemented.
+  - Unsupported files show a clear unsupported state.
+- **Validation:** Preview status smoke test with JPEG, RAW placeholder, and unsupported file.
+
+### Task 5.5.7: Implement Develop Panel MVP
+
+- **Location:** `apps/desktop/static/`, `MockupUI/M005_Develop_default.png`
+- **Description:** Add Develop mode controls for exposure and contrast using the current preview/commit commands.
+- **Dependencies:** Task 5.5.6
+- **Acceptance Criteria:**
+  - Exposure and contrast controls use `SrAdjustmentSlider` rules.
+  - Draft updates do not write per tick.
+  - Commit persists final values.
+- **Validation:** Edit preview/commit smoke test and no-draft-write check.
+
+### Task 5.5.8: Implement Export Dialog MVP
+
+- **Location:** `apps/desktop/static/`, `MockupUI/M007_Export_Dialog.png`
+- **Description:** Add export dialog UI connected to the JPEG sRGB export command.
+- **Dependencies:** Task 5.5.7
+- **Acceptance Criteria:**
+  - User can enter/select an output path and export JPEG sRGB.
+  - UI states that originals are not modified.
+  - Export success/error state is visible.
+- **Validation:** Export smoke test, exported JPEG inspection, and catalog export record check.
+
+### Task 5.5.9: Add UI Workflow Smoke Harness
+
+- **Location:** `scripts/harness/`, `apps/desktop/static/`, test docs
+- **Description:** Add a lightweight repeatable UI smoke path for the connected local alpha workflow.
+- **Dependencies:** Tasks 5.5.3 through 5.5.8
+- **Acceptance Criteria:**
+  - Harness documents or automates the core UI workflow.
+  - It does not require MLX, MCP, plugin runtime, cloud, or telemetry.
+- **Validation:** Harness passes locally and in CI where feasible.
+
+### Task 5.5.10: Run Visual and Responsive QA Pass
+
+- **Location:** `MockupUI/`, `apps/desktop/static/`, QA notes
+- **Description:** Compare implemented M003/M005/M007 surfaces against compact and large mockup variants.
+- **Dependencies:** Task 5.5.9
+- **Acceptance Criteria:**
+  - No text overlaps or clipped controls at 1280px, 1440px, and 1728px.
+  - Layout preserves the photo-first hierarchy.
+  - Export and Develop dialogs/panels remain usable at compact width.
+- **Validation:** Screenshot review and recorded QA notes.
+
 ## Phase 6: Local Install QA
 
 **Goal:** Verify the app behaves correctly when installed from DMG, not only when run from the build tree.
