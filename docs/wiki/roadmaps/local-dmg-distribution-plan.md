@@ -534,6 +534,8 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - It does not require MLX, MCP, plugin runtime, cloud, or telemetry.
 - **Validation:** Harness passes locally and in CI where feasible.
 
+**Status:** Completed on 2026-06-09. The main harness now runs `scripts/harness/check-ui-workflow-smoke.py`, a Python stdlib static workflow contract check for the connected local alpha path: open/create library, import by reference, browse/cull the grid, open loupe preview, apply Develop exposure/contrast, and export JPEG sRGB. The harness verifies required UI element IDs, command wiring, non-destructive original-file copy/reference messaging, Develop edit bounds, locked JPEG sRGB export settings, and the export guard that blocks writing over the referenced original path. It does not require a browser automation dependency, MLX, MCP, plugin runtime, cloud services, telemetry, RAW decoding, or Metal rendering.
+
 ### Task 5.5.10: Run Visual and Responsive QA Pass
 
 - **Location:** `MockupUI/`, `apps/desktop/static/`, QA notes

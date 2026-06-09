@@ -15,6 +15,9 @@ scripts/harness/check-scope-guardrails.sh
 echo "==> Checking static UI contract"
 python3 scripts/harness/check-static-ui.py
 
+echo "==> Checking UI workflow smoke path"
+python3 scripts/harness/check-ui-workflow-smoke.py
+
 echo "==> Checking Rust formatting"
 cargo fmt --all --check
 
