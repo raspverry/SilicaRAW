@@ -822,14 +822,28 @@ progress::-webkit-progress-value {
 }
 
 .sr-photo-card.is-rejected .sr-thumb-art,
+.sr-photo-card.is-rejected .sr-thumb-image,
 .sr-photo-card.is-missing .sr-thumb-art,
-.sr-photo-card.is-unsupported .sr-thumb-art {
+.sr-photo-card.is-missing .sr-thumb-image,
+.sr-photo-card.is-unsupported .sr-thumb-art,
+.sr-photo-card.is-unsupported .sr-thumb-image {
   opacity: 0.58;
 }
 
-.sr-thumb-art {
+.sr-thumb-art,
+.sr-thumb-image {
   position: absolute;
   inset: 0;
+}
+
+.sr-thumb-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.sr-thumb-art {
   background:
     linear-gradient(135deg, var(--sr-overlay-white-subtle), transparent 48%),
     linear-gradient(0deg, var(--sr-bg-primary), transparent 34%),

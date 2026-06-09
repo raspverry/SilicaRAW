@@ -91,6 +91,9 @@ pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
     "backups",
 ];
 
+/// Cache record type used for disposable Library grid thumbnails.
+pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
+
 /// Opened or newly created local library paths and schema state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLibrary {
@@ -125,12 +128,25 @@ pub struct LibraryPhotoGridItem {
     pub file_name: String,
     pub path: String,
     pub file_type: String,
+    pub thumbnail_path: Option<String>,
+    pub thumbnail_cache_key: Option<String>,
     pub missing: bool,
     pub unsupported: bool,
     pub rating: u8,
     pub picked: bool,
     pub rejected: bool,
     pub color_label: Option<String>,
+}
+
+/// Disposable cache row recorded in the local catalog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CacheRecord {
+    pub id: String,
+    pub photo_id: Option<String>,
+    pub cache_type: String,
+    pub cache_key: String,
+    pub path: String,
+    pub byte_size: i64,
 }
 
 /// Catalog export row written after an export completes.
@@ -324,16 +340,79 @@ pub fn list_library_photos(
           photo_flags.rating,
           photo_flags.picked,
           photo_flags.rejected,
-          photo_flags.color_label
+          photo_flags.color_label,
+          thumbnail_cache.path,
+          thumbnail_cache.cache_key
         FROM photos
         LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+        LEFT JOIN cache_records AS thumbnail_cache
+          ON thumbnail_cache.photo_id = photos.id
+          AND thumbnail_cache.cache_type = ?1
         ORDER BY photos.file_name ASC, photos.path ASC
         "#,
     )?;
-    let rows = statement.query_map([], library_photo_grid_item_from_row)?;
+    let rows = statement.query_map([THUMBNAIL_CACHE_TYPE], library_photo_grid_item_from_row)?;
 
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(LibraryStorageError::from)
+}
+
+/// Record a disposable JPEG thumbnail cache file for a catalog photo.
+pub fn record_thumbnail_cache(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    cache_key: impl AsRef<str>,
+    path: impl AsRef<Path>,
+    byte_size: i64,
+) -> Result<CacheRecord, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let cache_id = stable_catalog_id("cache-thumbnail", photo_id);
+    let cache_key = cache_key.as_ref().to_string();
+    let path = path_to_string(path.as_ref())?;
+
+    connection.execute(
+        r#"
+        INSERT INTO cache_records(
+          id,
+          photo_id,
+          cache_type,
+          cache_key,
+          path,
+          byte_size,
+          created_at,
+          last_accessed_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          cache_key = excluded.cache_key,
+          path = excluded.path,
+          byte_size = excluded.byte_size,
+          created_at = CURRENT_TIMESTAMP,
+          last_accessed_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            cache_id,
+            photo_id,
+            THUMBNAIL_CACHE_TYPE,
+            cache_key,
+            path,
+            byte_size,
+        ],
+    )?;
+
+    Ok(CacheRecord {
+        id: cache_id,
+        photo_id: Some(photo_id.to_string()),
+        cache_type: THUMBNAIL_CACHE_TYPE.to_string(),
+        cache_key,
+        path,
+        byte_size,
+    })
 }
 
 /// Persist culling and label flags for a photo in the catalog.
@@ -878,6 +957,8 @@ fn library_photo_grid_item_from_row(
         file_name,
         path,
         file_type,
+        thumbnail_path: row.get(9)?,
+        thumbnail_cache_key: row.get(10)?,
         missing: sql_to_bool(row.get::<_, i64>(3)?),
         unsupported: sql_to_bool(row.get::<_, i64>(4)?),
         rating,
@@ -1497,6 +1578,63 @@ mod tests {
         assert_eq!(unsupported.file_type, "TXT");
         assert!(unsupported.unsupported);
         assert_eq!(unsupported.rating, 0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn records_thumbnail_cache_and_exposes_grid_path() {
+        let workspace = unique_library_root("thumbnail-cache");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let thumbnail_path = library
+            .root_path
+            .join("thumbnails")
+            .join("sample-thumb.jpg");
+        std::fs::write(&thumbnail_path, b"thumbnail bytes").expect("write thumbnail");
+
+        let record = record_thumbnail_cache(
+            &library.root_path,
+            &photo_id,
+            "thumbnail-key",
+            &thumbnail_path,
+            15,
+        )
+        .expect("record thumbnail cache");
+        assert_eq!(record.photo_id.as_deref(), Some(photo_id.as_str()));
+        assert_eq!(record.cache_type, THUMBNAIL_CACHE_TYPE);
+        assert_eq!(record.path, thumbnail_path.display().to_string());
+        assert_eq!(record.byte_size, 15);
+
+        let items = list_library_photos(&library.root_path).expect("list grid items");
+        let item = items
+            .iter()
+            .find(|item| item.file_name == "sample.jpg")
+            .expect("jpeg grid item");
+        assert_eq!(
+            item.thumbnail_path.as_deref(),
+            Some(thumbnail_path.display().to_string().as_str())
+        );
+        assert_eq!(item.thumbnail_cache_key.as_deref(), Some("thumbnail-key"));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let cache_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM cache_records WHERE cache_type = 'thumbnail'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count thumbnail cache rows");
+        assert_eq!(cache_count, 1);
 
         remove_library_root(&workspace);
     }

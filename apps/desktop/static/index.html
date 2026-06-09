@@ -565,6 +565,7 @@
       let activeLibraryPath = "";
       let developPreviewSequence = 0;
       const developAdjustmentsByPhoto = new Map();
+      const thumbnailObjectUrls = new Map();
 
       function setStatus(message) {
         statusOutput.value = message;
@@ -698,6 +699,8 @@
           picked: card.dataset.picked === "true",
           rejected: card.dataset.rejected === "true",
           colorLabel: card.dataset.colorLabel || null,
+          thumbnailPath: card.dataset.thumbnailPath || null,
+          thumbnailBytes: null,
           artClass: Array.from(card.querySelector(".sr-thumb-art")?.classList ?? []).find((className) => className.startsWith("sr-thumb-art-")) ?? "sr-thumb-art-a",
         };
       }
@@ -799,6 +802,38 @@
         return null;
       }
 
+      function thumbnailBlobUrl(photo) {
+        if (!Array.isArray(photo?.thumbnailBytes) || photo.thumbnailBytes.length === 0) {
+          return "";
+        }
+        const cacheKey = `${photo.photoId}:${photo.thumbnailPath ?? ""}:${photo.thumbnailBytes.length}`;
+        if (thumbnailObjectUrls.has(cacheKey)) {
+          return thumbnailObjectUrls.get(cacheKey);
+        }
+        const blob = new Blob([new Uint8Array(photo.thumbnailBytes)], { type: "image/jpeg" });
+        const url = URL.createObjectURL(blob);
+        thumbnailObjectUrls.set(cacheKey, url);
+        return url;
+      }
+
+      function renderThumbnailArt(photo, index) {
+        const thumbnailUrl = thumbnailBlobUrl(photo);
+        if (thumbnailUrl) {
+          const image = document.createElement("img");
+          image.className = "sr-thumb-image";
+          image.src = thumbnailUrl;
+          image.alt = "";
+          image.decoding = "async";
+          image.loading = "lazy";
+          return image;
+        }
+
+        const art = document.createElement("span");
+        art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
+        art.setAttribute("aria-hidden", "true");
+        return art;
+      }
+
       function renderLibraryGrid(photos) {
         libraryPhotos = photos;
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
@@ -835,10 +870,7 @@
         card.classList.toggle("is-unsupported", photo.unsupported);
         card.addEventListener("click", () => selectPhoto(photo.photoId));
 
-        const art = document.createElement("span");
-        art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
-        art.setAttribute("aria-hidden", "true");
-        card.append(art);
+        card.append(renderThumbnailArt(photo, index));
 
         const badge = document.createElement("span");
         badge.className = "sr-file-badge";
@@ -898,9 +930,7 @@
           card.dataset.photoId = photo.photoId;
           card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
           card.classList.toggle("is-rejected", photo.rejected);
-          const art = document.createElement("span");
-          art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
-          art.setAttribute("aria-hidden", "true");
+          const art = renderThumbnailArt(photo, index);
           const name = document.createElement("span");
           name.textContent = photo.fileName;
           card.append(art, name);
@@ -917,9 +947,7 @@
           card.dataset.photoId = photo.photoId;
           card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
           card.classList.toggle("is-rejected", photo.rejected);
-          const art = document.createElement("span");
-          art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
-          art.setAttribute("aria-hidden", "true");
+          const art = renderThumbnailArt(photo, index);
           const name = document.createElement("span");
           name.textContent = photo.fileName;
           card.append(art, name);

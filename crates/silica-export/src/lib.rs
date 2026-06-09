@@ -44,12 +44,30 @@ pub struct JpegSrgbExportResult {
     pub bytes_written: u64,
 }
 
+/// Request to create a disposable JPEG thumbnail for a raster source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegThumbnailRequest {
+    pub source_path: PathBuf,
+    pub output_path: PathBuf,
+    pub max_edge: u32,
+    pub quality: u8,
+}
+
+/// Result returned after a JPEG thumbnail is written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegThumbnailResult {
+    pub output_path: PathBuf,
+    pub format: ExportImageFormat,
+    pub bytes_written: u64,
+}
+
 /// Errors returned by the export crate.
 #[derive(Debug)]
 pub enum ExportError {
     Io(std::io::Error),
     Image(image::ImageError),
     InvalidQuality(u8),
+    InvalidThumbnailEdge(u32),
     NonFiniteAdjustment,
     SameSourceAndOutput(PathBuf),
 }
@@ -63,6 +81,12 @@ impl fmt::Display for ExportError {
                 write!(
                     formatter,
                     "jpeg quality must be between 1 and 100, got {quality}"
+                )
+            }
+            Self::InvalidThumbnailEdge(edge) => {
+                write!(
+                    formatter,
+                    "thumbnail max edge must be greater than 0, got {edge}"
                 )
             }
             Self::NonFiniteAdjustment => {
@@ -87,9 +111,10 @@ impl Error for ExportError {
         match self {
             Self::Io(error) => Some(error),
             Self::Image(error) => Some(error),
-            Self::InvalidQuality(_) | Self::NonFiniteAdjustment | Self::SameSourceAndOutput(_) => {
-                None
-            }
+            Self::InvalidQuality(_)
+            | Self::InvalidThumbnailEdge(_)
+            | Self::NonFiniteAdjustment
+            | Self::SameSourceAndOutput(_) => None,
         }
     }
 }
@@ -110,7 +135,7 @@ impl From<image::ImageError> for ExportError {
 pub fn export_jpeg_srgb(
     request: JpegSrgbExportRequest,
 ) -> Result<JpegSrgbExportResult, ExportError> {
-    if request.source_path == request.output_path || existing_paths_match(&request)? {
+    if paths_match(&request.source_path, &request.output_path)? {
         return Err(ExportError::SameSourceAndOutput(request.output_path));
     }
     if !(1..=100).contains(&request.quality) {
@@ -145,12 +170,54 @@ pub fn export_jpeg_srgb(
     })
 }
 
-fn existing_paths_match(request: &JpegSrgbExportRequest) -> Result<bool, ExportError> {
-    if !request.output_path.exists() {
+/// Write a disposable JPEG thumbnail for a raster source.
+pub fn write_jpeg_thumbnail(
+    request: JpegThumbnailRequest,
+) -> Result<JpegThumbnailResult, ExportError> {
+    if paths_match(&request.source_path, &request.output_path)? {
+        return Err(ExportError::SameSourceAndOutput(request.output_path));
+    }
+    if !(1..=100).contains(&request.quality) {
+        return Err(ExportError::InvalidQuality(request.quality));
+    }
+    if request.max_edge == 0 {
+        return Err(ExportError::InvalidThumbnailEdge(request.max_edge));
+    }
+
+    let decoded = image::ImageReader::open(&request.source_path)?
+        .with_guessed_format()?
+        .decode()?;
+    let rgb = decoded
+        .thumbnail(request.max_edge, request.max_edge)
+        .to_rgb8();
+
+    let mut output = File::create(&request.output_path)?;
+    let mut encoder =
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut output, request.quality);
+    encoder.encode(
+        rgb.as_raw(),
+        rgb.width(),
+        rgb.height(),
+        image::ExtendedColorType::Rgb8,
+    )?;
+    drop(output);
+
+    Ok(JpegThumbnailResult {
+        bytes_written: fs::metadata(&request.output_path)?.len(),
+        output_path: request.output_path,
+        format: ExportImageFormat::Jpeg,
+    })
+}
+
+fn paths_match(source_path: &PathBuf, output_path: &PathBuf) -> Result<bool, ExportError> {
+    if source_path == output_path {
+        return Ok(true);
+    }
+    if !output_path.exists() {
         return Ok(false);
     }
 
-    Ok(fs::canonicalize(&request.source_path)? == fs::canonicalize(&request.output_path)?)
+    Ok(fs::canonicalize(source_path)? == fs::canonicalize(output_path)?)
 }
 
 fn apply_exposure_contrast(image: &mut image::RgbImage, exposure: f64, contrast: f64) {
@@ -234,6 +301,43 @@ mod tests {
         .expect_err("same source/output path should fail");
 
         assert!(error.to_string().contains("output path must differ"));
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_jpeg_thumbnail_without_mutating_original() {
+        let root = unique_export_root("thumbnail");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("thumbs").join("source-thumb.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::write_jpeg_thumbnail(super::JpegThumbnailRequest {
+            source_path: source_path.clone(),
+            output_path: output_path.clone(),
+            max_edge: 2,
+            quality: 80,
+        })
+        .expect("write thumbnail");
+
+        assert_eq!(result.output_path, output_path);
+        assert_eq!(result.format, super::ExportImageFormat::Jpeg);
+        assert!(result.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        let decoded = image::ImageReader::open(&result.output_path)
+            .expect("open thumbnail")
+            .with_guessed_format()
+            .expect("guess thumbnail format")
+            .decode()
+            .expect("decode thumbnail");
+        assert!(decoded.width() <= 2);
+        assert!(decoded.height() <= 2);
+
         remove_export_root(&root);
     }
 

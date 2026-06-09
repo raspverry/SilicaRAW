@@ -158,6 +158,8 @@ struct DesktopPhotoGridItem {
     file_name: String,
     path: String,
     file_type: String,
+    thumbnail_path: Option<String>,
+    thumbnail_bytes: Option<Vec<u8>>,
     missing: bool,
     unsupported: bool,
     rating: u8,
@@ -173,6 +175,11 @@ impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
             file_name: photo.file_name,
             path: photo.path,
             file_type: photo.file_type,
+            thumbnail_bytes: photo
+                .thumbnail_path
+                .as_ref()
+                .and_then(|path| std::fs::read(path).ok()),
+            thumbnail_path: photo.thumbnail_path,
             missing: photo.missing,
             unsupported: photo.unsupported,
             rating: photo.rating,
@@ -684,10 +691,12 @@ mod tests {
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
         let supported_file = import_root.join("sample.DNG");
+        let jpeg_file = import_root.join("sample.jpg");
         let unsupported_file = import_root.join("notes.txt");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
         std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        write_source_jpeg(&jpeg_file);
         std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
 
         silica_core::create_library(&library_root).expect("create library");
@@ -708,11 +717,19 @@ mod tests {
         assert!(grid.ok);
         match response_data(&grid) {
             super::DesktopCommandData::PhotoGrid { photos } => {
-                assert_eq!(photos.len(), 2);
+                assert_eq!(photos.len(), 3);
                 assert!(photos.iter().any(|photo| photo.file_name == "sample.DNG"
                     && photo.rating == 4
                     && photo.picked
                     && photo.color_label.as_deref() == Some("green")));
+                assert!(photos.iter().any(|photo| {
+                    photo.file_name == "sample.jpg"
+                        && photo.thumbnail_path.is_some()
+                        && photo
+                            .thumbnail_bytes
+                            .as_ref()
+                            .is_some_and(|bytes| !bytes.is_empty())
+                }));
                 assert!(photos
                     .iter()
                     .any(|photo| photo.file_name == "notes.txt" && photo.unsupported));
