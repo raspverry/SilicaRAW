@@ -1017,6 +1017,24 @@ progress::-webkit-progress-value {
     linear-gradient(145deg, var(--sr-surface-card), var(--sr-bg-primary) 68%);
 }
 
+.sr-loupe-image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: calc(100% - var(--sr-space-2xl));
+  max-height: calc(100% - var(--sr-space-2xl));
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-bg-primary);
+  transform: translate(-50%, -50%);
+}
+
+.sr-loupe-viewer[data-preview-status="ready"] .sr-loupe-art {
+  opacity: 0;
+}
+
 .sr-loupe-viewer[data-preview-status="blocked"] .sr-loupe-art,
 .sr-loupe-viewer[data-preview-status="unsupported"] .sr-loupe-art {
   opacity: 0.34;

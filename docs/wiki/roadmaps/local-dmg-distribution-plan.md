@@ -640,6 +640,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Preview cache data is disposable.
 - **Validation:** Preview UI smoke, cache/original safety test, and harness pass.
 
+**Status:** Completed on 2026-06-09. JPEG/JPG Loupe opening now creates a disposable resized JPEG preview under each library `previews/` directory, records it in `cache_records` with cache type `preview`, reuses fresh preview cache entries when the source fingerprint is unchanged, and returns `previewBytes` through the desktop command response. The static frontend renders those bytes as a Blob-backed `.sr-loupe-image` inside the existing neutral Loupe viewer without broadening Tauri asset protocol scope. RAW candidates remain decode-blocked, unsupported or missing entries keep blocked states, corrupt JPEG bytes leave the preview surface without real pixels rather than implying RAW decoding, and tests verify cache row behavior plus original-file safety.
+
 ### Task 5.6.6: Real JPEG Develop Preview MVP
 
 - **Location:** `crates/silica-core`, `crates/silica-render`, `apps/desktop/static/`

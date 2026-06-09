@@ -93,6 +93,8 @@ pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
 
 /// Cache record type used for disposable Library grid thumbnails.
 pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
+/// Cache record type used for disposable Loupe preview images.
+pub const PREVIEW_CACHE_TYPE: &str = "preview";
 
 /// Opened or newly created local library paths and schema state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -365,15 +367,92 @@ pub fn record_thumbnail_cache(
     path: impl AsRef<Path>,
     byte_size: i64,
 ) -> Result<CacheRecord, LibraryStorageError> {
+    record_photo_cache(
+        library_root_path,
+        "cache-thumbnail",
+        photo_id,
+        THUMBNAIL_CACHE_TYPE,
+        cache_key,
+        path,
+        byte_size,
+    )
+}
+
+/// Record a disposable JPEG Loupe preview cache file for a catalog photo.
+pub fn record_preview_cache(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    cache_key: impl AsRef<str>,
+    path: impl AsRef<Path>,
+    byte_size: i64,
+) -> Result<CacheRecord, LibraryStorageError> {
+    record_photo_cache(
+        library_root_path,
+        "cache-preview",
+        photo_id,
+        PREVIEW_CACHE_TYPE,
+        cache_key,
+        path,
+        byte_size,
+    )
+}
+
+/// Read a disposable cache record for one catalog photo and cache type.
+pub fn get_photo_cache_record(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    cache_type: &str,
+) -> Result<Option<CacheRecord>, LibraryStorageError> {
     if photo_id.is_empty() {
         return Err(CatalogFlagError::EmptyPhotoId.into());
     }
 
     let library = open_existing_library_for_read(library_root_path)?;
     let connection = open_catalog(&library.catalog_path)?;
-    let cache_id = stable_catalog_id("cache-thumbnail", photo_id);
+    connection
+        .query_row(
+            r#"
+            SELECT id, photo_id, cache_type, cache_key, path, byte_size
+            FROM cache_records
+            WHERE photo_id = ?1 AND cache_type = ?2
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+            params![photo_id, cache_type],
+            |row| {
+                Ok(CacheRecord {
+                    id: row.get(0)?,
+                    photo_id: row.get(1)?,
+                    cache_type: row.get(2)?,
+                    cache_key: row.get(3)?,
+                    path: row.get(4)?,
+                    byte_size: row.get(5)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
+}
+
+fn record_photo_cache(
+    library_root_path: impl AsRef<Path>,
+    cache_id_namespace: &str,
+    photo_id: &str,
+    cache_type: &str,
+    cache_key: impl AsRef<str>,
+    path: impl AsRef<Path>,
+    byte_size: i64,
+) -> Result<CacheRecord, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let cache_id = stable_catalog_id(cache_id_namespace, photo_id);
     let cache_key = cache_key.as_ref().to_string();
     let path = path_to_string(path.as_ref())?;
+    let cache_type = cache_type.to_string();
 
     connection.execute(
         r#"
@@ -395,20 +474,13 @@ pub fn record_thumbnail_cache(
           created_at = CURRENT_TIMESTAMP,
           last_accessed_at = CURRENT_TIMESTAMP
         "#,
-        params![
-            cache_id,
-            photo_id,
-            THUMBNAIL_CACHE_TYPE,
-            cache_key,
-            path,
-            byte_size,
-        ],
+        params![cache_id, photo_id, cache_type, cache_key, path, byte_size,],
     )?;
 
     Ok(CacheRecord {
         id: cache_id,
         photo_id: Some(photo_id.to_string()),
-        cache_type: THUMBNAIL_CACHE_TYPE.to_string(),
+        cache_type,
         cache_key,
         path,
         byte_size,
@@ -1634,6 +1706,56 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("count thumbnail cache rows");
+        assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn records_preview_cache_and_reads_it_by_photo_type() {
+        let workspace = unique_library_root("preview-cache");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview_path = library
+            .root_path
+            .join("previews")
+            .join("sample-preview.jpg");
+        std::fs::write(&preview_path, b"preview bytes").expect("write preview");
+
+        let record = record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &preview_path,
+            13,
+        )
+        .expect("record preview cache");
+        assert_eq!(record.cache_type, PREVIEW_CACHE_TYPE);
+
+        let cached = get_photo_cache_record(&library.root_path, &photo_id, PREVIEW_CACHE_TYPE)
+            .expect("read preview cache")
+            .expect("preview cache row");
+        assert_eq!(cached.path, preview_path.display().to_string());
+        assert_eq!(cached.cache_key, "preview-key");
+        assert_eq!(cached.byte_size, 13);
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let cache_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM cache_records WHERE cache_type = 'preview'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
 
         remove_library_root(&workspace);
