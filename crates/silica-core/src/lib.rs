@@ -217,6 +217,30 @@ pub fn import_folder(
     silica_storage::import_folder(library_root_path, folder_path).map_err(CoreError::from)
 }
 
+/// List imported catalog photos as JSON for the desktop Library grid.
+pub fn list_library_photos_json(library_root_path: impl AsRef<Path>) -> Result<String, CoreError> {
+    let photos = silica_storage::list_library_photos(library_root_path)?;
+    let rows = photos
+        .into_iter()
+        .map(|photo| {
+            serde_json::json!({
+                "photoId": photo.photo_id,
+                "fileName": photo.file_name,
+                "path": photo.path,
+                "fileType": photo.file_type,
+                "missing": photo.missing,
+                "unsupported": photo.unsupported,
+                "rating": photo.rating,
+                "picked": photo.picked,
+                "rejected": photo.rejected,
+                "colorLabel": photo.color_label,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(serde_json::Value::Array(rows).to_string())
+}
+
 /// Persist photo culling and label flags through the core command boundary.
 pub fn set_photo_flags(
     library_root_path: impl AsRef<Path>,
@@ -514,6 +538,58 @@ mod tests {
             .expect("flags row");
 
         assert_eq!(persisted, updated);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn serializes_library_photo_grid_rows_for_desktop() {
+        let workspace = unique_library_root("core-grid");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.DNG'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        set_photo_flags(
+            &created.root_path,
+            photo_id,
+            4,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set grid flags through core");
+
+        let rows = list_library_photos_json(&created.root_path).expect("list grid rows as json");
+        let rows: serde_json::Value = serde_json::from_str(&rows).expect("parse grid rows json");
+        let rows = rows.as_array().expect("grid rows array");
+
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().any(|row| {
+            row["fileName"] == "sample.DNG"
+                && row["fileType"] == "DNG"
+                && row["rating"] == 4
+                && row["picked"] == true
+                && row["colorLabel"] == "green"
+        }));
+        assert!(rows.iter().any(|row| {
+            row["fileName"] == "notes.txt" && row["fileType"] == "TXT" && row["unsupported"] == true
+        }));
 
         remove_library_root(&workspace);
     }

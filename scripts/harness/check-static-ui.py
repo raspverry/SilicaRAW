@@ -86,6 +86,17 @@ def main():
         "importSummary",
         "unsupportedCount",
         "viewImportErrors",
+        "libraryGrid",
+        "gridEmptyState",
+        "gridLoadingState",
+        "gridStateNote",
+        "libraryPhotoCount",
+        "selectedPhotoName",
+        "selectedPhotoRating",
+        "rateSelectedPhoto",
+        "pickSelectedPhoto",
+        "rejectSelectedPhoto",
+        "thumbnailSize",
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)
