@@ -64,16 +64,16 @@ Verification source: local workspace Cargo metadata and Phase 4.2 core/storage t
 ```txt
 Name: silica-core
 Version: workspace
-Purpose: Desktop command boundary for local library create/open.
+Purpose: Desktop command boundary for local library, edit, and export workflows.
 License: project internal
 Repository/Homepage: this repository
 Used by: apps/desktop/src-tauri
-Why needed: Phase 4.2 exposes minimal Tauri commands through Core instead of letting the desktop shell call storage directly.
+Why needed: Phase 4.2 exposes minimal Tauri commands through Core instead of letting the desktop shell call storage directly; Phase 5.4 reuses the same boundary for command-level JPEG sRGB export.
 Alternatives considered: desktop shell calling `silica-storage` directly.
 Risk notes: Keep app shell thin. Do not add RAW, Metal viewer, import scanner, plugin, MCP, or MLX behavior through this dependency.
 Binary size impact: Internal workspace code only.
 Security notes: Desktop commands accept local paths and must not mutate original photo folders.
-Verification source: local workspace Cargo metadata and Phase 4.2 desktop command test.
+Verification source: local workspace Cargo metadata, Phase 4.2 desktop command test, and Phase 5.4 export command test.
 ```
 
 ```txt
@@ -89,6 +89,21 @@ Risk notes: Keep edit graph ownership inside `silica-edit`; storage should persi
 Binary size impact: Internal workspace code only.
 Security notes: Imported or stored edit graph JSON remains untrusted and must validate before use.
 Verification source: local workspace Cargo metadata and Phase 5.3 edit flow tests.
+```
+
+```txt
+Name: silica-export
+Version: workspace
+Purpose: Local alpha JPEG sRGB export boundary.
+License: project internal
+Repository/Homepage: this repository
+Used by: crates/silica-core
+Why needed: Phase 5.4 keeps JPEG file writing and export-specific validation out of Core, Render, and Storage while still allowing Core to orchestrate the local alpha workflow.
+Alternatives considered: direct JPEG encoding in `silica-core`, postponing export until UI screens, placeholder output files.
+Risk notes: This crate handles already-rendered raster inputs only. It does not implement RAW decoding, a Metal renderer, ICC fixture validation, or broad fallback export paths.
+Binary size impact: Internal workspace code only; external image codec impact is tracked under `image`.
+Security notes: Reject exporting over the original source path and treat image inputs as untrusted files.
+Verification source: local workspace Cargo metadata and Phase 5.4 `silica-export` tests.
 ```
 
 ### Tauri Runtime
@@ -319,13 +334,30 @@ Version: 1.0.150
 Purpose: JSON value, number, map, parsing, and serialization support.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/serde-rs/json
-Used by: crates/silica-edit in Phase 5.2 and crates/silica-storage in Phase 5.3; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
-Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, and active edit graph JSON persistence in SQLite.
+Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, and crates/silica-core in Phase 5.4; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
+Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, active edit graph JSON persistence in SQLite, export settings JSON validation, and export settings JSON construction at the Core orchestration boundary.
 Alternatives considered: simd-json, manual JSON parsing, schemars-only workflows
 Risk notes: JSON Schema validation rules still need explicit validation or a schema validator; serde_json only parses and serializes JSON.
 Binary size impact: Low/typical Rust ecosystem dependency.
-Security notes: Treat imported edit graph JSON as untrusted and validate it before accepting it.
-Verification source: `Cargo.lock` after Phase 5.2 and serde_json repository license section.
+Security notes: Treat imported edit graph JSON and stored export settings JSON as untrusted and validate before accepting or reusing them.
+Verification source: `Cargo.lock` after Phase 5.4 and serde_json repository license section.
+```
+
+### Raster Image I/O
+
+```txt
+Name: image
+Version: 0.25.6
+Purpose: JPEG decode/encode for the local alpha JPEG sRGB export path and JPEG fixture inspection in integration tests.
+License: MIT OR Apache-2.0
+Repository/Homepage: https://github.com/image-rs/image
+Used by: crates/silica-export at runtime; crates/silica-core and apps/desktop/src-tauri as dev-dependencies for JPEG test fixture generation and inspection.
+Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer.
+Alternatives considered: placeholder export bytes, direct `zune-jpeg` use, Core Image export bridge, postponing export until UI implementation.
+Risk notes: Pinned exactly to 0.25.6 because it declares Rust 1.70 compatibility while the workspace targets Rust 1.80. Default features are disabled and only the `jpeg` feature is enabled. This does not prove final ICC/color correctness.
+Binary size impact: Adds the JPEG-only subset of `image` and its transitive codec support; measure final `.app` and `.dmg` during packaging QA.
+Security notes: Treat decoded image files as untrusted. Export path protection is enforced before writing so original source files are not overwritten.
+Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, and Task 5.4 export tests.
 ```
 
 ### RAW Decode — Core Image
