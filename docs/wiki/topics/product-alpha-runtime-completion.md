@@ -50,7 +50,7 @@ This audit records why Phase 6 clean-Mac testing must wait for Phase 5.6.
 | Command responses | Tauri commands return structured response envelopes. | None for covered local alpha commands. | Completed in Task 5.6.2. |
 | Grid | JPEG/JPG rows render real cached thumbnail pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.4. |
 | Loupe | JPEG/JPG rows render real cached Loupe preview pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.5. |
-| Develop | Exposure/contrast controls call command paths, but the preview surface is placeholder state. | Edits are not visibly reflected in the app. | Real JPEG/JPG Develop preview updates. |
+| Develop | JPEG/JPG exposure/contrast drafts render real adjusted preview pixels. | Persisted UI readback is still memory-backed until Task 5.6.7. | Pixel preview completed in Task 5.6.6; readback remains Task 5.6.7. |
 | Edit state restore | Core persists edit graphs, but frontend keeps slider state in an in-memory map. | Reopen/restart can lose visible slider state even when catalog persisted. | UI reads active edit state and restores controls. |
 | Export support | Export path writes JPEG sRGB, but UI implies broader raster exportability. | UI capability copy does not match codec coverage. | Installed-alpha contract narrows guaranteed source path to JPEG/JPG until more codecs are tested. |
 | Cache clear | Storage has cache directories and `cache_records`, but no product command/UI. | QA simulates cache deletion outside the app. | Product cache-clear command plus minimal maintenance UI. |

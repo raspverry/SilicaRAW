@@ -567,6 +567,7 @@
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
+      const developObjectUrls = new Map();
 
       function setStatus(message) {
         statusOutput.value = message;
@@ -865,6 +866,37 @@
         loupeViewer.prepend(image);
       }
 
+      function developPreviewBlobUrl(preview) {
+        if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
+          return "";
+        }
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.developPreviewBytes.length}`;
+        if (developObjectUrls.has(cacheKey)) {
+          return developObjectUrls.get(cacheKey);
+        }
+        const blob = new Blob([new Uint8Array(preview.developPreviewBytes)], { type: "image/jpeg" });
+        const url = URL.createObjectURL(blob);
+        developObjectUrls.set(cacheKey, url);
+        return url;
+      }
+
+      function renderDevelopPreviewImage(preview) {
+        developPreviewSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
+        const previewUrl = developPreviewBlobUrl(preview);
+        developPreviewSurface.dataset.hasPreviewImage = String(Boolean(previewUrl));
+        if (!previewUrl) {
+          return;
+        }
+
+        const image = document.createElement("img");
+        image.className = "sr-develop-image";
+        image.src = previewUrl;
+        image.alt = "";
+        image.decoding = "async";
+        image.draggable = false;
+        developPreviewSurface.prepend(image);
+      }
+
       function renderLibraryGrid(photos) {
         libraryPhotos = photos;
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
@@ -1095,7 +1127,7 @@
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
         const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}.`;
-        if (["JPG", "JPEG", "PNG", "HEIC", "TIF", "TIFF"].includes((photo.fileType || "").toUpperCase())) {
+        if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
         }
         return {
@@ -1117,6 +1149,7 @@
             ? "Preview Ready"
             : preview.status || "No Preview";
         developPreviewMessage.textContent = preview.message || "No preview session.";
+        renderDevelopPreviewImage(preview);
       }
 
       function syncDevelopSelection() {
@@ -1191,7 +1224,12 @@
             return;
           }
           renderDevelopPreviewState({
+            photoId: response.data.photoId,
+            sourcePath: response.data.sourcePath,
             status: response.data.status,
+            exposure: response.data.exposure,
+            contrast: response.data.contrast,
+            developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
           setStatus(responseMessage(response));

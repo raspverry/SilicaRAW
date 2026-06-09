@@ -99,6 +99,7 @@ enum DesktopCommandData {
         status: &'static str,
         exposure: f64,
         contrast: f64,
+        develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
     EditCommit {
@@ -406,6 +407,7 @@ fn preview_exposure_contrast_edit(
                 status: preview_status_text(preview.status),
                 exposure: preview.exposure,
                 contrast: preview.contrast,
+                develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
         ),
@@ -786,7 +788,7 @@ mod tests {
         let supported_file = import_root.join("sample.jpg");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        write_source_jpeg(&supported_file);
 
         silica_core::create_library(&library_root).expect("create library");
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
@@ -804,11 +806,15 @@ mod tests {
                 status,
                 exposure,
                 contrast,
+                develop_preview_bytes,
                 ..
             } => {
                 assert_eq!(*status, "Ready");
                 assert_eq!(*exposure, 0.5);
                 assert_eq!(*contrast, -8.0);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
             }
             other => panic!("unexpected response data: {other:?}"),
         }
