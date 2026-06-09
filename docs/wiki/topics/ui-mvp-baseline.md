@@ -168,6 +168,20 @@ Task 5.5.7 adds the M005 Develop Panel MVP:
 - RAW candidates may accept a valid edit graph draft while still showing blocked decode preview state.
 - Real image pixels, Metal output, RAW decoding, masks, full tone/color/detail controls, and sidecar writing remain future work.
 
+## Task 5.5.8 Export Dialog
+
+Task 5.5.8 adds the M007 Export Dialog MVP:
+
+- Export mode and the toolbar Export action open the same modal dialog.
+- The dialog uses the selected Library photo as the export target.
+- The local-alpha settings are locked to JPEG, sRGB, and quality 90.
+- The user can enter a local output path.
+- The UI states that original files are not modified and blocks output paths that equal the referenced original path.
+- Runtime export calls `export_photo_jpeg_srgb`.
+- Static smoke mode does not claim to write a file; it shows that desktop runtime is required for the JPEG and catalog export record.
+- RAW, missing, and unsupported candidates show blocked states instead of implying exportable pixels.
+- Native folder picking, multi-photo export, export presets, alternate formats, resizing, metadata policy editing, real image pixels, RAW decoding, Metal output, and sidecar writing remain future work.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.
