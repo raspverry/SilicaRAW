@@ -89,6 +89,7 @@ enum DesktopCommandData {
         photo_id: String,
         file_name: String,
         source_path: String,
+        preview_bytes: Option<Vec<u8>>,
         status: &'static str,
         message: String,
     },
@@ -364,6 +365,7 @@ fn open_photo_preview(library_path: String, photo_id: String) -> DesktopCommandR
                 photo_id: preview.photo_id,
                 file_name: preview.file_name,
                 source_path: preview.source_path,
+                preview_bytes: preview.preview_bytes,
                 status: preview_status_text(preview.status),
                 message: preview.message,
             },
@@ -748,7 +750,7 @@ mod tests {
         let supported_file = import_root.join("sample.jpg");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        write_source_jpeg(&supported_file);
 
         silica_core::create_library(&library_root).expect("create library");
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
@@ -762,11 +764,13 @@ mod tests {
                 file_name,
                 status,
                 message,
+                preview_bytes,
                 ..
             } => {
                 assert_eq!(file_name, "sample.jpg");
                 assert_eq!(*status, "Ready");
                 assert!(message.contains("display-profile-aware"));
+                assert!(preview_bytes.as_ref().is_some_and(|bytes| bytes.len() > 2));
             }
             other => panic!("unexpected response data: {other:?}"),
         }

@@ -365,16 +365,16 @@ Verification source: `Cargo.lock` after Phase 5.4 and serde_json repository lice
 ```txt
 Name: image
 Version: 0.25.6
-Purpose: JPEG decode/encode for the local alpha JPEG sRGB export path, JPEG thumbnail cache generation, and JPEG fixture inspection in integration tests.
+Purpose: JPEG decode/encode for the local alpha JPEG sRGB export path, JPEG thumbnail and Loupe preview cache generation, and JPEG fixture inspection in integration tests.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/image-rs/image
 Used by: crates/silica-export at runtime; crates/silica-core and apps/desktop/src-tauri as dev-dependencies for JPEG test fixture generation and inspection.
-Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer. Task 5.6.4 reuses the same JPEG-only runtime image path to create disposable grid thumbnails for JPEG/JPG originals.
+Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer. Tasks 5.6.4 and 5.6.5 reuse the same JPEG-only runtime image path to create disposable grid thumbnails and Loupe previews for JPEG/JPG originals.
 Alternatives considered: placeholder export bytes, direct `zune-jpeg` use, Core Image export bridge, postponing export until UI implementation.
 Risk notes: Pinned exactly to 0.25.6 because it declares Rust 1.70 compatibility while the workspace targets Rust 1.80. Default features are disabled and only the `jpeg` feature is enabled. This does not prove final ICC/color correctness.
 Binary size impact: Adds the JPEG-only subset of `image` and its transitive codec support; measure final `.app` and `.dmg` during packaging QA.
 Security notes: Treat decoded image files as untrusted. Export path protection is enforced before writing so original source files are not overwritten.
-Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, Task 5.4 export tests, and Task 5.6.4 thumbnail cache tests.
+Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, Task 5.4 export tests, Task 5.6.4 thumbnail cache tests, and Task 5.6.5 Loupe preview cache tests.
 ```
 
 ### RAW Decode — Core Image

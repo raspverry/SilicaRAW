@@ -44,12 +44,12 @@ This audit records why Phase 6 clean-Mac testing must wait for Phase 5.6.
 
 | Area | Current State | Product Gap | Required Before Phase 6 |
 |---|---|---|---|
-| Library path UX | User types a path into the web UI. | This is not a normal macOS app workflow. | Native/selectable library create/open path UX. |
-| Import path UX | User types an import folder path. | Manual absolute paths are fragile for installed-app QA. | Native folder picker or a clearly accepted typed-path alpha limitation. |
-| Export path UX | User types an output path. | Export should use a save-location affordance and handle cancel cleanly. | Native save path UX or documented typed-path limitation. |
-| Command responses | Tauri commands return strings; frontend parses status text. | String parsing makes UI state brittle and hides error kinds. | Structured command response envelopes. |
-| Grid | Catalog rows render, but thumbnails are CSS placeholder art. | Culling without real photo pixels is not a photo workflow. | Real JPEG/JPG thumbnail cache and rendering. |
-| Loupe | Preview command returns readiness status only. | The selected photo is not visibly opened. | Real JPEG/JPG preview pixels in the loupe. |
+| Library path UX | Native/selectable create/open path UX is implemented. | None for the current local alpha path. | Completed in Task 5.6.3. |
+| Import path UX | Native/selectable import folder UX is implemented. | None for the current local alpha path. | Completed in Task 5.6.3. |
+| Export path UX | Native save-location UX is implemented and cancel is distinct from error. | None for the current local alpha path. | Completed in Task 5.6.3. |
+| Command responses | Tauri commands return structured response envelopes. | None for covered local alpha commands. | Completed in Task 5.6.2. |
+| Grid | JPEG/JPG rows render real cached thumbnail pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.4. |
+| Loupe | JPEG/JPG rows render real cached Loupe preview pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.5. |
 | Develop | Exposure/contrast controls call command paths, but the preview surface is placeholder state. | Edits are not visibly reflected in the app. | Real JPEG/JPG Develop preview updates. |
 | Edit state restore | Core persists edit graphs, but frontend keeps slider state in an in-memory map. | Reopen/restart can lose visible slider state even when catalog persisted. | UI reads active edit state and restores controls. |
 | Export support | Export path writes JPEG sRGB, but UI implies broader raster exportability. | UI capability copy does not match codec coverage. | Installed-alpha contract narrows guaranteed source path to JPEG/JPG until more codecs are tested. |

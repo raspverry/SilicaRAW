@@ -18,6 +18,8 @@ pub use silica_storage::PhotoFlags;
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
 const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
+const LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY: u8 = 88;
+const LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE: u32 = 2048;
 
 /// Local library session returned by core commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +65,7 @@ pub struct PhotoPreviewSession {
     pub photo_id: String,
     pub file_name: String,
     pub source_path: String,
+    pub preview_bytes: Option<Vec<u8>>,
     pub status: PhotoPreviewStatus,
     pub message: String,
 }
@@ -289,17 +292,25 @@ pub fn open_photo_preview(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
 ) -> Result<Option<PhotoPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
     let (photo_id, file_name, render_plan) = match preview_render_plan(library_root_path, photo_id)?
     {
         Some(plan) => plan,
         None => return Ok(None),
+    };
+    let status = preview_status_from_render(render_plan.status);
+    let preview_bytes = if status == PhotoPreviewStatus::Ready {
+        ensure_jpeg_loupe_preview_cache(library_root_path, &photo_id, &render_plan.source_path)?
+    } else {
+        None
     };
 
     Ok(Some(PhotoPreviewSession {
         photo_id,
         file_name,
         source_path: render_plan.source_path,
-        status: preview_status_from_render(render_plan.status),
+        preview_bytes,
+        status,
         message: render_plan.message,
     }))
 }
@@ -458,6 +469,65 @@ fn preview_render_plan(
     Ok(Some((candidate.photo_id, candidate.file_name, render_plan)))
 }
 
+fn ensure_jpeg_loupe_preview_cache(
+    library_root_path: &Path,
+    photo_id: &str,
+    source_path: &str,
+) -> Result<Option<Vec<u8>>, CoreError> {
+    let source_path = PathBuf::from(source_path);
+    if !is_jpeg_path(&source_path) || !source_path.is_file() {
+        return Ok(None);
+    }
+
+    let preview_root = library_root_path.join("previews");
+    std::fs::create_dir_all(&preview_root)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)?;
+    let cache_key = preview_cache_key(photo_id, &source_path);
+
+    if let Some(cached) = silica_storage::get_photo_cache_record(
+        library_root_path,
+        photo_id,
+        silica_storage::PREVIEW_CACHE_TYPE,
+    )? {
+        let cached_path = PathBuf::from(&cached.path);
+        if cached.cache_key == cache_key
+            && cached_path.starts_with(&preview_root)
+            && cached_path.is_file()
+        {
+            return std::fs::read(cached_path)
+                .map(Some)
+                .map_err(silica_storage::LibraryStorageError::from)
+                .map_err(CoreError::from);
+        }
+    }
+
+    let output_path = preview_root.join(format!("{photo_id}.jpg"));
+    let result = match silica_export::write_jpeg_thumbnail(silica_export::JpegThumbnailRequest {
+        source_path: source_path.clone(),
+        output_path: output_path.clone(),
+        max_edge: LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE,
+        quality: LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY,
+    }) {
+        Ok(result) => result,
+        Err(silica_export::ExportError::Image(_)) => return Ok(None),
+        Err(error) => return Err(CoreError::from(error)),
+    };
+
+    let byte_size = i64::try_from(result.bytes_written).unwrap_or(i64::MAX);
+    silica_storage::record_preview_cache(
+        library_root_path,
+        photo_id,
+        cache_key,
+        &result.output_path,
+        byte_size,
+    )?;
+    std::fs::read(result.output_path)
+        .map(Some)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)
+}
+
 fn ensure_jpeg_thumbnail_cache(library_root_path: &Path) -> Result<(), CoreError> {
     let photos = silica_storage::list_library_photos(library_root_path)?;
     let thumbnail_root = library_root_path.join("thumbnails");
@@ -524,6 +594,14 @@ fn is_jpeg_thumbnail_candidate(photo: &silica_storage::LibraryPhotoGridItem) -> 
     !photo.missing && !photo.unsupported && matches!(photo.file_type.as_str(), "JPG" | "JPEG")
 }
 
+fn is_jpeg_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
+        })
+}
+
 fn thumbnail_cache_key(photo: &silica_storage::LibraryPhotoGridItem, source_path: &Path) -> String {
     let metadata = std::fs::metadata(source_path).ok();
     let file_size = metadata.as_ref().map(std::fs::Metadata::len).unwrap_or(0);
@@ -535,6 +613,25 @@ fn thumbnail_cache_key(photo: &silica_storage::LibraryPhotoGridItem, source_path
     format!(
         "thumbnail:v1:{}:{}:{}:{}",
         photo.photo_id, photo.path, file_size, modified
+    )
+}
+
+fn preview_cache_key(photo_id: &str, source_path: &Path) -> String {
+    let metadata = std::fs::metadata(source_path).ok();
+    let file_size = metadata.as_ref().map(std::fs::Metadata::len).unwrap_or(0);
+    let modified = metadata
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "preview:v1:{}:{}:{}:{}:{}:{}",
+        photo_id,
+        source_path.display(),
+        file_size,
+        modified,
+        LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE,
+        LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY
     )
 }
 
@@ -778,10 +875,11 @@ mod tests {
         let unsupported_file = import_root.join("notes.txt");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&jpeg_file, b"jpeg placeholder bytes").expect("write jpeg");
+        write_source_jpeg(&jpeg_file);
         std::fs::write(&raw_file, b"raw placeholder bytes").expect("write raw");
         std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
 
+        let original_hash = file_hash(&jpeg_file);
         let created = create_library(&library_root).expect("create library through core");
         import_folder(&created.root_path, &import_root).expect("import through core");
 
@@ -814,12 +912,23 @@ mod tests {
         assert_eq!(jpeg_preview.file_name, "sample.jpg");
         assert_eq!(jpeg_preview.status, PhotoPreviewStatus::Ready);
         assert_eq!(jpeg_preview.source_path, jpeg_file.display().to_string());
+        assert!(jpeg_preview
+            .preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert_original_hash(&jpeg_file, &original_hash, "loupe preview cache generation");
+
+        let jpeg_preview_again = open_photo_preview(&created.root_path, &jpeg_id)
+            .expect("reopen jpeg preview")
+            .expect("cached jpeg preview session");
+        assert_eq!(jpeg_preview_again.preview_bytes, jpeg_preview.preview_bytes);
 
         let raw_preview = open_photo_preview(&created.root_path, &raw_id)
             .expect("open raw preview")
             .expect("raw preview session");
         assert_eq!(raw_preview.status, PhotoPreviewStatus::BlockedByDecode);
         assert!(raw_preview.message.contains("Core Image RAW preview"));
+        assert!(raw_preview.preview_bytes.is_none());
 
         let unsupported_preview = open_photo_preview(&created.root_path, &unsupported_id)
             .expect("open unsupported preview")
@@ -829,6 +938,15 @@ mod tests {
         assert!(open_photo_preview(&created.root_path, "missing-photo")
             .expect("missing preview lookup")
             .is_none());
+
+        let cache_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM cache_records WHERE cache_type = 'preview'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count preview cache rows");
+        assert_eq!(cache_count, 1);
 
         remove_library_root(&workspace);
     }

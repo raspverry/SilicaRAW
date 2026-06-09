@@ -566,6 +566,7 @@
       let developPreviewSequence = 0;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
+      const loupeObjectUrls = new Map();
 
       function setStatus(message) {
         statusOutput.value = message;
@@ -832,6 +833,36 @@
         art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
         art.setAttribute("aria-hidden", "true");
         return art;
+      }
+
+      function loupePreviewBlobUrl(preview) {
+        if (!Array.isArray(preview?.previewBytes) || preview.previewBytes.length === 0) {
+          return "";
+        }
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.previewBytes.length}`;
+        if (loupeObjectUrls.has(cacheKey)) {
+          return loupeObjectUrls.get(cacheKey);
+        }
+        const blob = new Blob([new Uint8Array(preview.previewBytes)], { type: "image/jpeg" });
+        const url = URL.createObjectURL(blob);
+        loupeObjectUrls.set(cacheKey, url);
+        return url;
+      }
+
+      function renderLoupePreviewImage(preview) {
+        loupeViewer.querySelectorAll(".sr-loupe-image").forEach((image) => image.remove());
+        const previewUrl = loupePreviewBlobUrl(preview);
+        if (!previewUrl) {
+          return;
+        }
+
+        const image = document.createElement("img");
+        image.className = "sr-loupe-image";
+        image.src = previewUrl;
+        image.alt = preview.fileName ? `${preview.fileName} preview` : "";
+        image.decoding = "async";
+        image.draggable = false;
+        loupeViewer.prepend(image);
       }
 
       function renderLibraryGrid(photos) {
@@ -1305,6 +1336,7 @@
         if (preview.fileName) {
           loupePhotoName.textContent = preview.fileName;
         }
+        renderLoupePreviewImage(preview);
       }
 
       async function previewSelectedPhoto() {
@@ -1341,9 +1373,11 @@
             return;
           }
           renderPreviewState({
+            photoId: response.data.photoId,
             fileName: response.data.fileName,
             status: response.data.status,
             sourcePath: response.data.sourcePath,
+            previewBytes: response.data.previewBytes,
             message: response.data.message,
           });
           setStatus(responseMessage(response));

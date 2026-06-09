@@ -244,6 +244,13 @@ def main():
         "sr-thumb-image",
     ]:
         require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
+    for marker in [
+        "previewBytes",
+        "loupeObjectUrls",
+        "renderLoupePreviewImage",
+        "sr-loupe-image",
+    ]:
+        require(marker in source, f"real loupe preview marker missing: {marker}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",
