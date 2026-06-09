@@ -130,7 +130,7 @@
                 <button type="button" class="sr-icon-button" aria-label="Grid">
                   <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
                 </button>
-                <button type="button" class="sr-icon-button" aria-label="Loupe">1:1</button>
+                <button type="button" class="sr-icon-button" id="openLoupe" aria-label="Loupe">1:1</button>
               </div>
             </div>
             <section class="sr-import-panel" id="importPanel" aria-labelledby="importTitle" hidden>
@@ -213,10 +213,10 @@
                   <span class="sr-card-state sr-card-state-pick">Pick</span>
                   <span class="sr-card-footer"><span>DSC_1042.CR3</span><span>*****</span></span>
                 </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-002" data-rating="4" data-picked="false" data-rejected="false" data-color-label="blue" data-file-name="DSC_1043.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1043.CR3">
+                <button class="sr-photo-card" type="button" data-photo-id="demo-002" data-rating="4" data-picked="false" data-rejected="false" data-color-label="blue" data-file-name="DSC_1043.JPG" data-file-type="JPG" data-path="/Volumes/Photography/Tokyo/DSC_1043.jpg">
                   <span class="sr-thumb-art sr-thumb-art-b" aria-hidden="true"></span>
-                  <span class="sr-file-badge">CR3</span>
-                  <span class="sr-card-footer"><span>DSC_1043.CR3</span><span>****-</span></span>
+                  <span class="sr-file-badge">JPG</span>
+                  <span class="sr-card-footer"><span>DSC_1043.JPG</span><span>****-</span></span>
                 </button>
                 <button class="sr-photo-card is-rejected" type="button" data-photo-id="demo-003" data-rating="2" data-picked="false" data-rejected="true" data-color-label="red" data-file-name="DSC_1044.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1044.CR3">
                   <span class="sr-thumb-art sr-thumb-art-c" aria-hidden="true"></span>
@@ -275,6 +275,31 @@
                 </button>
               </div>
             </div>
+            <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
+              <div class="sr-loupe-header">
+                <button id="closeLoupe" type="button">Grid</button>
+                <div>
+                  <h2 id="loupePhotoName">No photo selected</h2>
+                  <p id="loupePhotoRating">-----</p>
+                </div>
+                <div class="sr-loupe-actions">
+                  <select id="loupeFitMode" aria-label="Loupe fit mode">
+                    <option>Fit</option>
+                    <option>100%</option>
+                  </select>
+                  <button type="button">Previous</button>
+                  <button type="button">Next</button>
+                </div>
+              </div>
+              <div class="sr-loupe-viewer" id="loupeViewer" data-preview-status="blocked">
+                <div class="sr-loupe-art" aria-hidden="true"></div>
+                <div class="sr-loupe-status">
+                  <strong id="loupePreviewStatus">No Preview</strong>
+                  <span id="loupePreviewMessage">No preview session.</span>
+                </div>
+              </div>
+              <div class="sr-loupe-filmstrip" id="loupeFilmstrip" aria-label="Loupe filmstrip"></div>
+            </section>
           </section>
         </section>
 
@@ -380,6 +405,14 @@
       const gridLoadingState = document.querySelector("#gridLoadingState");
       const gridStateNote = document.querySelector("#gridStateNote");
       const gridPhotoSubtitle = document.querySelector("#gridPhotoSubtitle");
+      const libraryGridShell = document.querySelector(".sr-library-grid-shell");
+      const loupeSurface = document.querySelector("#loupeSurface");
+      const loupeViewer = document.querySelector("#loupeViewer");
+      const loupePreviewStatus = document.querySelector("#loupePreviewStatus");
+      const loupePhotoName = document.querySelector("#loupePhotoName");
+      const loupePhotoRating = document.querySelector("#loupePhotoRating");
+      const loupePreviewMessage = document.querySelector("#loupePreviewMessage");
+      const loupeFilmstrip = document.querySelector("#loupeFilmstrip");
       const libraryPhotoCount = document.querySelector("#libraryPhotoCount");
       const allPhotosCount = document.querySelector("#allPhotosCount");
       const selectedPhotoName = document.querySelector("#selectedPhotoName");
@@ -395,6 +428,9 @@
       const rateSelectedButton = document.querySelector("#rateSelectedPhoto");
       const pickSelectedButton = document.querySelector("#pickSelectedPhoto");
       const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
+      const openLoupeButton = document.querySelector("#openLoupe");
+      const loupeButtons = Array.from(document.querySelectorAll('[aria-label="Loupe"]'));
+      const closeLoupeButton = document.querySelector("#closeLoupe");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
 
       const invoke = window.__TAURI__?.core?.invoke;
@@ -476,6 +512,7 @@
         libraryGrid.hidden = libraryPhotos.length === 0;
 
         libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
+        renderLoupeFilmstrip();
         selectPhoto(selectedPhotoId);
       }
 
@@ -526,8 +563,141 @@
         Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
           card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
         });
+        Array.from(loupeFilmstrip.querySelectorAll(".sr-filmstrip-card")).forEach((card) => {
+          card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
+        });
         selectedPhotoName.textContent = selected?.fileName ?? "None";
         selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+        loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
+        loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+        if (!loupeSurface.hidden) {
+          previewSelectedPhoto();
+        }
+      }
+
+      function renderLoupeFilmstrip() {
+        loupeFilmstrip.replaceChildren(...libraryPhotos.map((photo, index) => {
+          const card = document.createElement("button");
+          card.className = "sr-filmstrip-card";
+          card.type = "button";
+          card.dataset.photoId = photo.photoId;
+          card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
+          card.classList.toggle("is-rejected", photo.rejected);
+          const art = document.createElement("span");
+          art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
+          art.setAttribute("aria-hidden", "true");
+          const name = document.createElement("span");
+          name.textContent = photo.fileName;
+          card.append(art, name);
+          card.addEventListener("click", () => selectPhoto(photo.photoId));
+          return card;
+        }));
+      }
+
+      function parsePreviewField(message, label) {
+        const match = message.match(new RegExp(`^${label}:\\s*(.+)$`, "m"));
+        return match ? match[1] : "";
+      }
+
+      function localPreviewPlan(photo) {
+        if (!photo) {
+          return { status: "missing", message: "No preview session." };
+        }
+        if (photo.unsupported) {
+          return {
+            fileName: photo.fileName,
+            status: "Unsupported",
+            message: "Unsupported file type for SilicaRAW preview.",
+          };
+        }
+        if (["JPG", "JPEG", "PNG", "HEIC", "TIF", "TIFF"].includes((photo.fileType || "").toUpperCase())) {
+          return {
+            fileName: photo.fileName,
+            status: "Ready",
+            message: "Preview source is ready for a display-profile-aware surface.",
+          };
+        }
+        return {
+          fileName: photo.fileName,
+          status: "BlockedByDecode",
+          message: "Core Image RAW preview is selected but not implemented until fixture-backed probe coverage exists.",
+        };
+      }
+
+      function renderPreviewState(preview) {
+        const normalized = preview.status === "Ready"
+          ? "ready"
+          : preview.status === "Unsupported"
+            ? "unsupported"
+            : "blocked";
+        loupeViewer.dataset.previewStatus = normalized;
+        loupePreviewStatus.textContent = preview.status === "BlockedByDecode"
+          ? "Blocked by Decode"
+          : preview.status || "No Preview";
+        loupePreviewMessage.textContent = preview.message || "No preview session.";
+        if (preview.fileName) {
+          loupePhotoName.textContent = preview.fileName;
+        }
+      }
+
+      async function previewSelectedPhoto() {
+        const selected = libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+        if (!selected) {
+          renderPreviewState({ status: "No Preview", message: "No preview session." });
+          return;
+        }
+
+        loupePhotoName.textContent = selected.fileName;
+        loupePhotoRating.textContent = stars(selected.rating);
+
+        if (!activeLibraryPath || !invoke) {
+          renderPreviewState(localPreviewPlan(selected));
+          return;
+        }
+
+        setBusy(true);
+        setStatus("Opening preview...");
+        try {
+          const message = await invoke("open_photo_preview", {
+            libraryPath: activeLibraryPath,
+            photoId: selected.photoId,
+          });
+          if (!message) {
+            renderPreviewState({ status: "No Preview", message: "Catalog photo was not found." });
+            setStatus("Preview unavailable.");
+            return;
+          }
+          renderPreviewState({
+            fileName: parsePreviewField(message, "File"),
+            status: parsePreviewField(message, "Preview"),
+            sourcePath: parsePreviewField(message, "Source"),
+            message: parsePreviewField(message, "Message"),
+          });
+          setStatus(message);
+        } catch (error) {
+          renderPreviewState({ status: "No Preview", message: String(error) });
+          setStatus(String(error));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function openLoupeView() {
+        if (!selectedPhotoId) {
+          setStatus("No photo selected.");
+          return;
+        }
+        document.querySelector("#importPanel").hidden = true;
+        libraryGridShell.hidden = true;
+        loupeSurface.hidden = false;
+        renderLoupeFilmstrip();
+        await previewSelectedPhoto();
+      }
+
+      function closeLoupeView() {
+        loupeSurface.hidden = true;
+        libraryGridShell.hidden = false;
+        setStatus("Library grid loaded.");
       }
 
       async function loadLibraryGrid() {
@@ -619,6 +789,7 @@
         rateSelectedButton.disabled = isBusy;
         pickSelectedButton.disabled = isBusy;
         rejectSelectedButton.disabled = isBusy;
+        openLoupeButton.disabled = isBusy;
       }
 
       async function runLibraryCommand(command) {
@@ -700,6 +871,10 @@
       rateSelectedButton.addEventListener("click", () => applySelectedFlags({ rating: 5 }));
       pickSelectedButton.addEventListener("click", () => applySelectedFlags({ picked: true }));
       rejectSelectedButton.addEventListener("click", () => applySelectedFlags({ rejected: true }));
+      loupeButtons.forEach((button) => {
+        button.addEventListener("click", openLoupeView);
+      });
+      closeLoupeButton.addEventListener("click", closeLoupeView);
       thumbnailSizeInput.addEventListener("input", () => {
         libraryGrid.style.setProperty("--sr-thumb-min", `${thumbnailSizeInput.value}px`);
         libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${thumbnailSizeInput.value}px, 1fr))`;

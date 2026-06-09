@@ -97,6 +97,16 @@ def main():
         "pickSelectedPhoto",
         "rejectSelectedPhoto",
         "thumbnailSize",
+        "openLoupe",
+        "closeLoupe",
+        "loupeSurface",
+        "loupeViewer",
+        "loupePreviewStatus",
+        "loupePhotoName",
+        "loupePhotoRating",
+        "loupePreviewMessage",
+        "loupeFitMode",
+        "loupeFilmstrip",
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)

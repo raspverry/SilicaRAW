@@ -909,6 +909,174 @@ progress::-webkit-progress-value {
   white-space: nowrap;
 }
 
+.sr-loupe-surface {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--sr-space-md);
+  overflow: hidden;
+}
+
+.sr-loupe-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sr-space-md);
+}
+
+.sr-loupe-header h2 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-heading);
+  line-height: var(--sr-line-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-loupe-header p {
+  margin: var(--sr-space-2xs) 0 0;
+  color: var(--sr-accent-silica);
+  font-size: var(--sr-type-body);
+  line-height: var(--sr-line-body);
+}
+
+.sr-loupe-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sr-space-sm);
+}
+
+.sr-loupe-viewer {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-bg-primary);
+}
+
+.sr-loupe-art {
+  position: absolute;
+  inset: var(--sr-space-lg);
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background:
+    radial-gradient(circle at 38% 28%, var(--sr-overlay-silica-soft), transparent 22%),
+    radial-gradient(circle at 70% 22%, var(--sr-overlay-white-subtle), transparent 18%),
+    linear-gradient(145deg, var(--sr-surface-card), var(--sr-bg-primary) 68%);
+}
+
+.sr-loupe-viewer[data-preview-status="blocked"] .sr-loupe-art,
+.sr-loupe-viewer[data-preview-status="unsupported"] .sr-loupe-art {
+  opacity: 0.34;
+}
+
+.sr-loupe-viewer[data-preview-status="ready"] .sr-loupe-art {
+  border-color: var(--sr-accent-system);
+}
+
+.sr-loupe-status {
+  position: relative;
+  z-index: 1;
+  width: min(520px, calc(100% - 48px));
+  display: grid;
+  gap: var(--sr-space-sm);
+  justify-items: center;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-panel);
+  padding: var(--sr-space-xl);
+  text-align: center;
+}
+
+.sr-loupe-status strong {
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-heading);
+}
+
+.sr-loupe-status span {
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+}
+
+.sr-loupe-viewer[data-preview-status="ready"] .sr-loupe-status {
+  align-self: end;
+  margin-bottom: var(--sr-space-lg);
+}
+
+.sr-loupe-viewer[data-preview-status="unsupported"] .sr-loupe-status strong {
+  color: var(--sr-danger);
+}
+
+.sr-loupe-viewer[data-preview-status="blocked"] .sr-loupe-status strong {
+  color: var(--sr-warning);
+}
+
+.sr-loupe-filmstrip {
+  min-height: 104px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 112px;
+  gap: var(--sr-space-sm);
+  overflow: auto hidden;
+  padding: var(--sr-space-sm) 0;
+  scrollbar-color: var(--sr-border-strong) transparent;
+}
+
+.sr-loupe-filmstrip::-webkit-scrollbar {
+  height: 6px;
+}
+
+.sr-loupe-filmstrip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sr-loupe-filmstrip::-webkit-scrollbar-thumb {
+  border-radius: var(--sr-radius-full);
+  background: var(--sr-border-strong);
+}
+
+.sr-filmstrip-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-card);
+  padding: 0;
+}
+
+.sr-filmstrip-card .sr-thumb-art {
+  inset: 0;
+}
+
+.sr-filmstrip-card span:last-child {
+  position: absolute;
+  right: var(--sr-space-xs);
+  bottom: var(--sr-space-xs);
+  left: var(--sr-space-xs);
+  z-index: 1;
+  overflow: hidden;
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-filmstrip-card.is-selected {
+  border-color: var(--sr-accent-silica);
+  box-shadow: 0 0 0 2px var(--sr-overlay-silica-soft);
+}
+
+.sr-filmstrip-card.is-rejected {
+  opacity: 0.58;
+}
+
 .sr-viewer-mode {
   background:
     radial-gradient(circle at center, var(--sr-overlay-white-faint), transparent 42%),
