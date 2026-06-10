@@ -156,18 +156,18 @@
                 <div class="sr-import-steps" aria-label="Import steps">
                   <div class="sr-import-step">
                     <span>Scanning files</span>
-                    <progress max="100" value="0"></progress>
-                    <output>Pending</output>
+                    <progress max="100" value="0" data-import-step-progress></progress>
+                    <output data-import-step-output>Pending</output>
                   </div>
                   <div class="sr-import-step">
                     <span>Reading metadata</span>
-                    <progress max="100" value="0"></progress>
-                    <output>Pending</output>
+                    <progress max="100" value="0" data-import-step-progress></progress>
+                    <output data-import-step-output>Pending</output>
                   </div>
                   <div class="sr-import-step">
                     <span>Detecting unsupported files</span>
-                    <progress max="100" value="0"></progress>
-                    <output>Pending</output>
+                    <progress max="100" value="0" data-import-step-progress></progress>
+                    <output data-import-step-output>Pending</output>
                   </div>
                 </div>
 
@@ -435,6 +435,8 @@
       const importStatus = document.querySelector("#importStatus");
       const importProgress = document.querySelector("#importProgress");
       const importProgressLabel = document.querySelector("#importProgressLabel");
+      const importStepProgress = Array.from(document.querySelectorAll("[data-import-step-progress]"));
+      const importStepOutputs = Array.from(document.querySelectorAll("[data-import-step-output]"));
       const importedCount = document.querySelector("#importedCount");
       const unsupportedCount = document.querySelector("#unsupportedCount");
       const importErrorCount = document.querySelector("#importErrorCount");
@@ -503,6 +505,7 @@
       const exportStatus = document.querySelector("#exportStatus");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
+      const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
 
       const invoke = window.__TAURI__?.core?.invoke;
@@ -528,6 +531,16 @@
         importProgress.value = value;
         importProgress.textContent = `${value}%`;
         importProgressLabel.textContent = label;
+      }
+
+      function setImportStepState(value, label) {
+        importStepProgress.forEach((progress) => {
+          progress.value = value;
+          progress.textContent = `${value}%`;
+        });
+        importStepOutputs.forEach((output) => {
+          output.textContent = label;
+        });
       }
 
       function responseMessage(response, fallback = "Command completed.") {
@@ -932,6 +945,23 @@
         developPreviewSurface.prepend(image);
       }
 
+      function renderExportPreviewImage(photo) {
+        exportPreviewCard.querySelectorAll(".sr-export-preview-image").forEach((image) => image.remove());
+        const previewUrl = thumbnailBlobUrl(photo);
+        exportPreviewArt.hidden = Boolean(previewUrl);
+        if (!previewUrl) {
+          return;
+        }
+
+        const image = document.createElement("img");
+        image.className = "sr-export-preview-image";
+        image.src = previewUrl;
+        image.alt = photo?.fileName ? `${photo.fileName} export preview` : "";
+        image.decoding = "async";
+        image.draggable = false;
+        exportPreviewCard.prepend(image);
+      }
+
       function renderLibraryGrid(photos) {
         libraryPhotos = photos;
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
@@ -1062,6 +1092,7 @@
         exportSelectedInline.textContent = photo?.fileName ?? "None";
         exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg` : "None";
         exportPreviewArt.className = `sr-thumb-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
+        renderExportPreviewImage(photo);
         if (photo && (!exportOutputPath.value || exportOutputPath.dataset.autofilled === "true")) {
           exportOutputPath.value = defaultExportPath(photo);
           exportOutputPath.dataset.autofilled = "true";
@@ -1730,7 +1761,7 @@
           }
           activeLibraryPath = response.data?.rootPath || path;
           setLibraryState("open");
-          cacheClearStatus.value = "Ready to clear thumbnails, previews, render-cache, and ai-cache only.";
+          cacheClearStatus.value = "Ready to clear disposable caches.";
           setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
@@ -1745,24 +1776,28 @@
         if (!folderPath) {
           setStatus("Enter an import folder path.");
           setImportProgress(0, "Ready");
+          setImportStepState(0, "Pending");
           return;
         }
 
         if (!activeLibraryPath) {
           setStatus("Open or create a library before importing.");
           setImportProgress(0, "Waiting");
+          setImportStepState(0, "Pending");
           return;
         }
 
         if (!invoke) {
           setStatus("Desktop runtime unavailable.");
           setImportProgress(0, "Blocked");
+          setImportStepState(0, "Blocked");
           return;
         }
 
         setBusy(true);
         setStatus("Importing by reference...");
         setImportProgress(45, "Scanning");
+        setImportStepState(45, "Scanning");
         try {
           const response = await invoke("import_folder", {
             libraryPath: activeLibraryPath,
@@ -1771,6 +1806,7 @@
           if (commandFailed(response)) {
             importErrorCount.textContent = "1";
             setImportProgress(100, "Needs Review");
+            setImportStepState(100, "Needs Review");
             setStatus(responseErrorMessage(response, "Import failed."));
             return;
           }
@@ -1778,11 +1814,13 @@
           unsupportedCount.textContent = String(response.data?.unsupportedFiles ?? 0);
           importErrorCount.textContent = "0";
           setImportProgress(100, "Completed");
+          setImportStepState(100, "Completed");
           setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
           importErrorCount.textContent = "1";
           setImportProgress(100, "Needs Review");
+          setImportStepState(100, "Needs Review");
           setStatus(responseErrorMessage(error, "Import failed."));
         } finally {
           setBusy(false);

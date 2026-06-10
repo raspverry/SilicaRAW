@@ -42,9 +42,9 @@ WORKFLOW_STEPS = [
             "importFolderPath",
             "chooseImportFolderPath",
             "startImport",
-            "importStatus",
-            "importSafetyNote",
-        ],
+        "importStatus",
+        "importSafetyNote",
+    ],
         "commands": ["import_folder"],
         "text": [
             "Import by Reference",
@@ -263,6 +263,12 @@ def main():
     ]:
         require(marker in source, f"native path picker marker missing: {marker}", failures)
     for marker in [
+        "data-import-step-progress",
+        "data-import-step-output",
+        "setImportStepState",
+    ]:
+        require(marker in source, f"import progress step marker missing: {marker}", failures)
+    for marker in [
         "thumbnailPath",
         "thumbnailBytes",
         "renderThumbnailArt",
@@ -284,6 +290,11 @@ def main():
         "sr-develop-image",
     ]:
         require(marker in source, f"real develop preview marker missing: {marker}", failures)
+    for marker in [
+        "renderExportPreviewImage",
+        "sr-export-preview-image",
+    ]:
+        require(marker in source, f"real export preview marker missing: {marker}", failures)
     for marker in [
         "readPersistedDevelopState",
         "get_photo_edit_state",
