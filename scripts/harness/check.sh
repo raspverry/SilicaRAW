@@ -21,6 +21,9 @@ python3 scripts/harness/check-static-ui.py
 echo "==> Checking UI workflow smoke path"
 python3 scripts/harness/check-ui-workflow-smoke.py
 
+echo "==> Checking connected desktop runtime smoke"
+python3 scripts/harness/check-connected-runtime-smoke.py
+
 echo "==> Checking Rust formatting"
 cargo fmt --all --check
 

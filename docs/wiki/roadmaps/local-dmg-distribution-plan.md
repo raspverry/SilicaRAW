@@ -723,6 +723,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - It does not require MLX, MCP, plugin runtime, cloud, telemetry, RAW decoding, or Metal rendering.
 - **Validation:** Runtime smoke and harness pass.
 
+**Status:** Completed on 2026-06-10. Added `scripts/harness/check-connected-runtime-smoke.py`, which generates legal fixtures, passes their path into an exact `silica-desktop` runtime smoke test, and keeps generated output under ignored `.tmp/` paths. The desktop smoke covers create/open library, import by reference, grid thumbnail loading, rating/pick/reject updates, JPEG loupe preview, RAW-placeholder blocked preview, Develop exposure/contrast preview and commit, JPEG sRGB export, disposable cache clear, library reopen, persisted flag/edit-state readback, and original fixture byte comparisons after each major stage. The developer runtime scope and clean-Mac DMG separation are documented in [Connected Developer Runtime Smoke](../../../checklists/CONNECTED_RUNTIME_SMOKE.md).
+
 ### Task 5.6.12: Final Visual and Responsive QA Refresh
 
 - **Location:** `MockupUI/`, `apps/desktop/static/`, `docs/wiki/topics/ui-visual-responsive-qa.md`

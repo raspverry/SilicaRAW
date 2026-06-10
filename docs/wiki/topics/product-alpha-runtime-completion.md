@@ -56,7 +56,7 @@ This audit records why Phase 6 clean-Mac testing must wait for Phase 5.6.
 | Cache clear | Product command and Library maintenance UI clear only `thumbnails`, `previews`, `render-cache`, `ai-cache`, then recreate those directories. | None for the current local alpha cache clear scope. | Completed in Task 5.6.8. |
 | Recents/session | Clean launch shows an empty recent state and no fictional library rows. | Real persisted recents/session restore remains deferred beyond the current local alpha hardening pass. | Fake demo state removed in Task 5.6.9. |
 | Culling controls | Library inspector supports rating 0 through 5, pick/reject toggles, and clear culling flags with coherent mutual exclusion. | None for the current local alpha culling scope. | Completed in Task 5.6.9. |
-| Runtime QA | Harness now generates legal synthetic QA fixtures and records a developer installed-app preflight report. | Static checks can still pass while installed app workflow automation fails. | Task 5.6.10 adds the fixture/preflight gate; Task 5.6.11 adds the connected runtime smoke path. |
+| Runtime QA | Harness now generates legal synthetic QA fixtures, records a developer installed-app preflight report, and runs a connected desktop command runtime smoke. | Installed DMG execution on a clean Mac remains a later Phase 6 gate. | Task 5.6.10 adds the fixture/preflight gate; Task 5.6.11 adds the developer runtime smoke path. |
 
 ## Required Phase 5.6 Task Order
 
@@ -88,6 +88,7 @@ Phase 6 can resume only after Phase 5.6 proves:
 
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [Installed-App Developer Preflight](../../../checklists/INSTALLED_APP_PREFLIGHT.md)
+- [Connected Developer Runtime Smoke](../../../checklists/CONNECTED_RUNTIME_SMOKE.md)
 - [UI MVP Baseline](ui-mvp-baseline.md)
 - [UI Mockups](ui-mockups.md)
 - [Data Safety](data-safety.md)
