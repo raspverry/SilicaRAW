@@ -126,6 +126,12 @@ enum DesktopCommandData {
         export_record_id: String,
         message: String,
     },
+    CacheClear {
+        cleared_directories: Vec<String>,
+        recreated_directories: Vec<String>,
+        removed_cache_records: usize,
+        message: String,
+    },
 }
 
 impl DesktopCommandData {
@@ -141,6 +147,7 @@ impl DesktopCommandData {
             Self::EditCommit { .. } => "editCommit",
             Self::EditState { .. } => "editState",
             Self::Export { .. } => "export",
+            Self::CacheClear { .. } => "cacheClear",
         }
     }
 
@@ -538,6 +545,31 @@ fn export_photo_jpeg_srgb(
     }
 }
 
+#[tauri::command]
+fn clear_library_cache(library_path: String) -> DesktopCommandResponse {
+    let command = "clear_library_cache";
+    match silica_core::clear_library_cache(PathBuf::from(&library_path)) {
+        Ok(summary) => DesktopCommandResponse::ok(
+            command,
+            summary.message.clone(),
+            DesktopCommandData::CacheClear {
+                cleared_directories: summary.cleared_directories,
+                recreated_directories: summary.recreated_directories,
+                removed_cache_records: summary.removed_cache_records,
+                message: summary.message,
+            },
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
 fn library_session_data(session: silica_core::LibrarySession) -> DesktopCommandData {
     DesktopCommandData::LibrarySession {
         root_path: session.root_path.display().to_string(),
@@ -591,7 +623,8 @@ fn main() {
             preview_exposure_contrast_edit,
             commit_exposure_contrast_edit,
             get_photo_edit_state,
-            export_photo_jpeg_srgb
+            export_photo_jpeg_srgb,
+            clear_library_cache
         ])
         .run(tauri::generate_context!())
         .expect("failed to run SilicaRAW desktop shell");
@@ -939,6 +972,72 @@ mod tests {
             other => panic!("unexpected response data: {other:?}"),
         }
         assert!(output_path.is_file());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_clears_only_disposable_cache() {
+        let workspace = unique_library_root("desktop-cache-clear");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+        let original_bytes = std::fs::read(&supported_file).expect("read original before");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        silica_core::open_photo_preview(&library_root, &photo_id)
+            .expect("open preview")
+            .expect("preview session");
+        for directory in ["render-cache", "ai-cache"] {
+            let path = library_root.join(directory);
+            std::fs::create_dir_all(&path).expect("create cache directory");
+            std::fs::write(path.join("sentinel.cache"), b"cache bytes")
+                .expect("write cache sentinel");
+        }
+        for directory in ["sidecars", "exports", "logs", "backups"] {
+            let path = library_root.join(directory);
+            std::fs::create_dir_all(&path).expect("create protected directory");
+            std::fs::write(path.join("keep.txt"), b"preserve this").expect("write protected file");
+        }
+
+        let clear = super::clear_library_cache(library_root.display().to_string());
+
+        assert!(clear.ok);
+        match response_data(&clear) {
+            super::DesktopCommandData::CacheClear {
+                cleared_directories,
+                removed_cache_records,
+                ..
+            } => {
+                assert_eq!(
+                    cleared_directories,
+                    &vec![
+                        "thumbnails".to_string(),
+                        "previews".to_string(),
+                        "render-cache".to_string(),
+                        "ai-cache".to_string()
+                    ]
+                );
+                assert_eq!(*removed_cache_records, 1);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        for directory in ["thumbnails", "previews", "render-cache", "ai-cache"] {
+            assert!(library_root.join(directory).is_dir());
+            assert!(!library_root.join(directory).join("sentinel.cache").exists());
+        }
+        for directory in ["sidecars", "exports", "logs", "backups"] {
+            assert!(library_root.join(directory).join("keep.txt").is_file());
+        }
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after"),
+            original_bytes
+        );
 
         remove_library_root(&workspace);
     }

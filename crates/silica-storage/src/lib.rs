@@ -79,6 +79,10 @@ pub const CATALOG_DATABASE_FILE: &str = "catalog.db";
 /// Stable local alpha library row id for single-library catalog databases.
 pub const LOCAL_LIBRARY_ID: &str = "local";
 
+/// Disposable cache directories that product cache clearing may delete.
+pub const DISPOSABLE_CACHE_DIRECTORIES: &[&str] =
+    &["thumbnails", "previews", "render-cache", "ai-cache"];
+
 /// Required support directories inside a SilicaRAW library folder.
 pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
     "sidecars",
@@ -149,6 +153,15 @@ pub struct CacheRecord {
     pub cache_key: String,
     pub path: String,
     pub byte_size: i64,
+}
+
+/// Result of clearing disposable local alpha cache data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CacheClearSummary {
+    pub cleared_directories: Vec<String>,
+    pub recreated_directories: Vec<String>,
+    pub removed_cache_records: usize,
+    pub message: String,
 }
 
 /// Catalog export row written after an export completes.
@@ -432,6 +445,35 @@ pub fn get_photo_cache_record(
         )
         .optional()
         .map_err(LibraryStorageError::from)
+}
+
+/// Clear only disposable cache directories and cache record metadata.
+pub fn clear_disposable_cache(
+    library_root_path: impl AsRef<Path>,
+) -> Result<CacheClearSummary, LibraryStorageError> {
+    let library = open_local_library(library_root_path)?;
+    let mut cleared_directories = Vec::with_capacity(DISPOSABLE_CACHE_DIRECTORIES.len());
+    let mut recreated_directories = Vec::with_capacity(DISPOSABLE_CACHE_DIRECTORIES.len());
+
+    for directory in DISPOSABLE_CACHE_DIRECTORIES {
+        let path = library.root_path.join(directory);
+        if path.exists() {
+            fs::remove_dir_all(&path)?;
+        }
+        fs::create_dir_all(&path)?;
+        cleared_directories.push((*directory).to_string());
+        recreated_directories.push((*directory).to_string());
+    }
+
+    let connection = open_catalog(&library.catalog_path)?;
+    let removed_cache_records = connection.execute("DELETE FROM cache_records", [])?;
+
+    Ok(CacheClearSummary {
+        cleared_directories,
+        recreated_directories,
+        removed_cache_records,
+        message: "Cache clear removed only disposable library caches.".to_string(),
+    })
 }
 
 fn record_photo_cache(
@@ -1772,6 +1814,102 @@ mod tests {
             )
             .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn clears_only_disposable_cache_directories() {
+        let workspace = unique_library_root("clear-cache");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        let original_bytes = std::fs::read(&supported_file).expect("read original before");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        for directory in DISPOSABLE_CACHE_DIRECTORIES {
+            let path = library.root_path.join(directory);
+            std::fs::create_dir_all(&path).expect("create cache directory");
+            std::fs::write(path.join("sentinel.cache"), b"disposable cache bytes")
+                .expect("write cache sentinel");
+        }
+        for directory in ["sidecars", "exports", "logs", "backups"] {
+            let path = library.root_path.join(directory);
+            std::fs::create_dir_all(&path).expect("create protected directory");
+            std::fs::write(path.join("keep.txt"), b"preserve this").expect("write protected file");
+        }
+
+        let thumbnail_path = library
+            .root_path
+            .join("thumbnails")
+            .join("sample-thumb.jpg");
+        let preview_path = library
+            .root_path
+            .join("previews")
+            .join("sample-preview.jpg");
+        std::fs::write(&thumbnail_path, b"thumbnail bytes").expect("write thumbnail cache");
+        std::fs::write(&preview_path, b"preview bytes").expect("write preview cache");
+        record_thumbnail_cache(
+            &library.root_path,
+            &photo_id,
+            "thumbnail-key",
+            &thumbnail_path,
+            15,
+        )
+        .expect("record thumbnail cache");
+        record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &preview_path,
+            13,
+        )
+        .expect("record preview cache");
+
+        let summary = clear_disposable_cache(&library.root_path).expect("clear cache");
+
+        assert_eq!(
+            summary.cleared_directories,
+            DISPOSABLE_CACHE_DIRECTORIES
+                .iter()
+                .map(|directory| directory.to_string())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(summary.removed_cache_records, 2);
+        for directory in DISPOSABLE_CACHE_DIRECTORIES {
+            let path = library.root_path.join(directory);
+            assert!(path.is_dir(), "{directory} should be recreated");
+            assert!(
+                !path.join("sentinel.cache").exists(),
+                "{directory} sentinel should be removed"
+            );
+        }
+        for directory in ["sidecars", "exports", "logs", "backups"] {
+            assert!(
+                library.root_path.join(directory).join("keep.txt").is_file(),
+                "{directory} should be preserved"
+            );
+        }
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photos", [], |row| row.get(0))
+            .expect("count photos");
+        let cache_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM cache_records", [], |row| row.get(0))
+            .expect("count cache records");
+        assert_eq!(photo_count, 1);
+        assert_eq!(cache_count, 0);
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after"),
+            original_bytes
+        );
 
         remove_library_root(&workspace);
     }

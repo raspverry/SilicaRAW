@@ -176,6 +176,28 @@ impl PhotoExportSession {
     }
 }
 
+/// Summary returned when disposable library caches are cleared.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryCacheClearSession {
+    pub cleared_directories: Vec<String>,
+    pub recreated_directories: Vec<String>,
+    pub removed_cache_records: usize,
+    pub message: String,
+}
+
+impl LibraryCacheClearSession {
+    /// Compact status string for the minimal desktop shell entry point.
+    pub fn status_text(&self) -> String {
+        format!(
+            "Cleared: {}\nRecreated: {}\nCache records removed: {}\nMessage: {}",
+            self.cleared_directories.join(", "),
+            self.recreated_directories.join(", "),
+            self.removed_cache_records,
+            self.message
+        )
+    }
+}
+
 /// Errors returned by core command APIs.
 #[derive(Debug)]
 pub enum CoreError {
@@ -528,6 +550,19 @@ pub fn export_photo_jpeg_srgb(
         export_record_id: export_record.id,
         message: "JPEG sRGB export completed.".to_string(),
     }))
+}
+
+/// Clear disposable library cache data without removing catalog or original files.
+pub fn clear_library_cache(
+    library_root_path: impl AsRef<Path>,
+) -> Result<LibraryCacheClearSession, CoreError> {
+    let summary = silica_storage::clear_disposable_cache(library_root_path)?;
+    Ok(LibraryCacheClearSession {
+        cleared_directories: summary.cleared_directories,
+        recreated_directories: summary.recreated_directories,
+        removed_cache_records: summary.removed_cache_records,
+        message: summary.message,
+    })
 }
 
 fn preview_render_plan(
@@ -1292,7 +1327,15 @@ mod tests {
         assert_ne!(exported.output_path, jpeg_file);
         assert_original_hash(&jpeg_file, &original_hash, "JPEG sRGB export");
 
-        simulate_cache_clear(&created.root_path);
+        let cache_clear = clear_library_cache(&created.root_path).expect("clear library cache");
+        assert_eq!(cache_clear.removed_cache_records, 1);
+        assert_eq!(
+            cache_clear.cleared_directories,
+            vec!["thumbnails", "previews", "render-cache", "ai-cache"]
+        );
+        for directory in &cache_clear.recreated_directories {
+            assert!(created.root_path.join(directory).is_dir());
+        }
         assert_original_hash(&jpeg_file, &original_hash, "cache directory clear");
 
         let reopened = open_library(&library_root).expect("reopen library through core");
@@ -1354,16 +1397,6 @@ mod tests {
             expected_hash,
             "original file hash changed after {stage}"
         );
-    }
-
-    fn simulate_cache_clear(library_root: &Path) {
-        for directory in ["thumbnails", "previews", "render-cache", "ai-cache"] {
-            let path = library_root.join(directory);
-            std::fs::create_dir_all(&path).expect("create cache directory");
-            std::fs::write(path.join("sentinel.cache"), b"disposable cache bytes")
-                .expect("write cache sentinel");
-            std::fs::remove_dir_all(&path).expect("remove cache directory");
-        }
     }
 
     fn write_source_jpeg(path: &Path) {

@@ -190,6 +190,17 @@
                 </div>
               </div>
             </section>
+            <section class="sr-cache-maintenance" id="cacheMaintenance" aria-labelledby="cacheMaintenanceTitle">
+              <div>
+                <span>Maintenance</span>
+                <h2 id="cacheMaintenanceTitle">Clear Disposable Caches</h2>
+                <p id="cacheClearScope">Deletes thumbnails, previews, render-cache, and ai-cache only. Catalog, edits, exports, originals, sidecars, backups, and logs stay intact.</p>
+              </div>
+              <div class="sr-cache-maintenance-actions">
+                <button id="clearLibraryCache" type="button" disabled>Clear Caches</button>
+                <output id="cacheClearStatus" aria-live="polite">Cache clear waits for an open library.</output>
+              </div>
+            </section>
             <div class="sr-library-grid-shell" aria-label="Library grid surface">
               <div class="sr-grid-toolbar" aria-label="Library grid filters">
                 <div>
@@ -528,6 +539,8 @@
       const viewImportErrorsButton = document.querySelector("#viewImportErrors");
       const showImportPanelButton = document.querySelector("#showImportPanel");
       const minimizeImportButton = document.querySelector("#minimizeImport");
+      const clearLibraryCacheButton = document.querySelector("#clearLibraryCache");
+      const cacheClearStatus = document.querySelector("#cacheClearStatus");
       const rateSelectedButton = document.querySelector("#rateSelectedPhoto");
       const pickSelectedButton = document.querySelector("#pickSelectedPhoto");
       const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
@@ -1601,6 +1614,44 @@
         }));
       }
 
+      async function runCacheClearCommand() {
+        if (!activeLibraryPath) {
+          cacheClearStatus.value = "Open or create a library before clearing disposable caches.";
+          setStatus(cacheClearStatus.value);
+          return;
+        }
+        if (!invoke) {
+          cacheClearStatus.value = "Desktop runtime unavailable; cache clear was not run.";
+          setStatus(cacheClearStatus.value);
+          return;
+        }
+
+        setBusy(true);
+        cacheClearStatus.value = "Clearing thumbnails, previews, render-cache, and ai-cache only...";
+        setStatus(cacheClearStatus.value);
+        try {
+          const response = await invoke("clear_library_cache", {
+            libraryPath: activeLibraryPath,
+          });
+          if (commandFailed(response)) {
+            cacheClearStatus.value = responseErrorMessage(response, "Cache clear failed.");
+            setStatus(cacheClearStatus.value);
+            return;
+          }
+          const cleared = response.data.clearedDirectories.join(", ");
+          const removed = response.data.removedCacheRecords;
+          const message = `${responseMessage(response, "Cache clear removed only disposable library caches.")} Cleared: ${cleared}. Cache records removed: ${removed}.`;
+          cacheClearStatus.value = message;
+          await loadLibraryGrid();
+          setStatus(message);
+        } catch (error) {
+          cacheClearStatus.value = responseErrorMessage(error, "Cache clear failed.");
+          setStatus(cacheClearStatus.value);
+        } finally {
+          setBusy(false);
+        }
+      }
+
       function setMode(mode) {
         appFrame.dataset.activeMode = mode;
         modeButtons.forEach((button) => {
@@ -1638,6 +1689,7 @@
         pickSelectedButton.disabled = isBusy;
         rejectSelectedButton.disabled = isBusy;
         openLoupeButton.disabled = isBusy;
+        clearLibraryCacheButton.disabled = isBusy || !activeLibraryPath;
         const developDisabled = isBusy || !isDevelopable(selectedPhoto());
         [
           developExposureSlider,
@@ -1677,6 +1729,7 @@
           }
           activeLibraryPath = response.data?.rootPath || path;
           setLibraryState("open");
+          cacheClearStatus.value = "Ready to clear thumbnails, previews, render-cache, and ai-cache only.";
           setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
@@ -1743,6 +1796,7 @@
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
       chooseImportFolderPathButton.addEventListener("click", () => chooseDirectoryPath("import"));
       startImportButton.addEventListener("click", runImportCommand);
+      clearLibraryCacheButton.addEventListener("click", runCacheClearCommand);
       rateSelectedButton.addEventListener("click", () => applySelectedFlags({ rating: 5 }));
       pickSelectedButton.addEventListener("click", () => applySelectedFlags({ picked: true }));
       rejectSelectedButton.addEventListener("click", () => applySelectedFlags({ rejected: true }));

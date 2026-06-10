@@ -681,6 +681,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - UI labels make the destructive scope precise.
 - **Validation:** Automated cache-clear/original hash test, UI smoke, and harness pass.
 
+**Status:** Completed on 2026-06-10. `silica-storage` now clears only the fixed disposable cache allowlist (`thumbnails`, `previews`, `render-cache`, `ai-cache`), deletes `cache_records`, recreates those cache directories, and leaves catalog tables, edit/export records, sidecars, backups, logs, exports, and original referenced files intact. `silica-core` exposes the cache-clear summary, the desktop shell exposes `clear_library_cache`, and the Library workbench includes a compact maintenance control whose copy states the destructive scope precisely.
+
 ### Task 5.6.9: Remove Fake Demo State and Harden Culling UX
 
 - **Location:** `apps/desktop/static/`, `crates/silica-core`
