@@ -47,8 +47,9 @@ def require(condition, message, failures):
 
 
 def main():
+    source = INDEX.read_text(encoding="utf-8")
     parser = StaticUiParser()
-    parser.feed(INDEX.read_text(encoding="utf-8"))
+    parser.feed(source)
     failures = []
 
     require(parser.styles == 0, "index.html must not use inline <style> blocks", failures)
@@ -77,7 +78,7 @@ def main():
         "openLibrary",
         "createLibrary",
         "openRecent",
-        "openSampleProject",
+        "recentEmptyState",
         "importPanel",
         "importFolderPath",
         "startImport",
@@ -93,9 +94,11 @@ def main():
         "libraryPhotoCount",
         "selectedPhotoName",
         "selectedPhotoRating",
-        "rateSelectedPhoto",
+        "ratingControlGroup",
+        "clearCullingFlags",
         "pickSelectedPhoto",
         "rejectSelectedPhoto",
+        "cullingStatus",
         "thumbnailSize",
         "openLoupe",
         "closeLoupe",
@@ -139,6 +142,24 @@ def main():
     ]
     for element_id in required_ids:
         require(element_id in parser.ids, f"missing #{element_id}", failures)
+    for rating in range(6):
+        require(f"ratePhoto{rating}" in parser.ids, f"missing #ratePhoto{rating}", failures)
+
+    require(
+        "disabled" in parser.ids.get("openRecent", {}),
+        "#openRecent must be disabled until real recents exist",
+        failures,
+    )
+    for forbidden in [
+        "demo-",
+        "/Volumes/Photography",
+        "Tokyo Street Walk",
+        "Cafe Reviews",
+        "Portrait Session",
+        "Open Sample Project",
+        "Rate 5",
+    ]:
+        require(forbidden not in source, f"static UI must not contain fake demo marker: {forbidden}", failures)
 
     app_frame = parser.ids.get("appFrame", {})
     require(

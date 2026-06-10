@@ -60,12 +60,20 @@ WORKFLOW_STEPS = [
             "gridLoadingState",
             "selectedPhotoName",
             "selectedPhotoRating",
-            "rateSelectedPhoto",
+            "ratingControlGroup",
+            "ratePhoto0",
+            "ratePhoto1",
+            "ratePhoto2",
+            "ratePhoto3",
+            "ratePhoto4",
+            "ratePhoto5",
+            "clearCullingFlags",
             "pickSelectedPhoto",
             "rejectSelectedPhoto",
+            "cullingStatus",
         ],
         "commands": ["list_library_photos", "set_photo_flags"],
-        "text": ["All Photos", "Pick", "Reject"],
+        "text": ["All Photos", "Rating", "Pick", "Reject", "Clear"],
     },
     {
         "name": "preview-loupe",
@@ -291,6 +299,26 @@ def main():
         "Cache clear removed only disposable library caches.",
     ]:
         require(marker in source, f"cache clear marker missing: {marker}", failures)
+    for marker in [
+        "recentEmptyState",
+        "No recent libraries yet",
+        "setSelectedRating",
+        "toggleSelectedPick",
+        "toggleSelectedReject",
+        "updateCullingControls",
+        "RAW decode is not enabled in this alpha",
+    ]:
+        require(marker in source, f"demo removal/culling marker missing: {marker}", failures)
+    for forbidden in [
+        "demo-",
+        "/Volumes/Photography",
+        "Tokyo Street Walk",
+        "Cafe Reviews",
+        "Portrait Session",
+        "Open Sample Project",
+        "Rate 5",
+    ]:
+        require(forbidden not in source, f"fake demo state marker must be removed: {forbidden}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",

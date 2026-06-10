@@ -425,6 +425,11 @@ body {
   font-size: var(--sr-type-body);
 }
 
+.sr-alpha-scope-note {
+  max-width: 560px;
+  text-align: center;
+}
+
 .sr-welcome-form {
   width: min(320px, 100%);
   display: grid;
@@ -532,25 +537,40 @@ body {
   text-align: left;
 }
 
-.sr-recent-row span:nth-child(2) {
+.sr-recent-empty {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sr-space-md);
+  border-top: 1px solid var(--sr-border-subtle);
+  padding: var(--sr-space-md) var(--sr-space-lg);
+}
+
+.sr-recent-row span:nth-child(2),
+.sr-recent-empty span:nth-child(2) {
   display: grid;
   gap: var(--sr-space-2xs);
   min-width: 0;
 }
 
 .sr-recent-row strong,
-.sr-recent-row small {
+.sr-recent-row small,
+.sr-recent-empty strong,
+.sr-recent-empty small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sr-recent-row strong {
+.sr-recent-row strong,
+.sr-recent-empty strong {
   color: var(--sr-text-primary);
 }
 
 .sr-recent-row small,
-.sr-recent-row time {
+.sr-recent-row time,
+.sr-recent-empty small {
   color: var(--sr-text-tertiary);
   font-size: var(--sr-type-control);
 }
@@ -1606,6 +1626,34 @@ progress::-webkit-progress-value {
   color: var(--sr-text-primary);
   font-size: var(--sr-type-heading);
   letter-spacing: 1px;
+}
+
+.sr-rating-control-group {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--sr-space-xs);
+}
+
+.sr-rating-control-group button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0;
+}
+
+.sr-rating-control-group button[aria-pressed="true"],
+.sr-inspector-action[aria-pressed="true"] {
+  border-color: var(--sr-accent-system);
+  background: color-mix(in srgb, var(--sr-accent-system) 24%, transparent);
+  color: var(--sr-text-primary);
+}
+
+#cullingStatus {
+  min-height: auto;
+  margin: var(--sr-space-xs) 0 0;
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+  white-space: normal;
 }
 
 .sr-adjust-track {
