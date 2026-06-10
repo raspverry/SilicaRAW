@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-10
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-10] phase-5.6 | Legal fixtures and preflight added
+
+- Added a legal synthetic fixture generator for supported JPEG/JPG samples, unsupported files, and optional RAW-blocked placeholders.
+- Added an installed-app developer preflight report that records app artifact hash, host/macOS field, fixture path, fixture hash results, and known local-alpha limitations.
+- Wired the fixture/preflight check into the project harness and documented the manual preflight checklist.
 
 ## [2026-06-09] phase-5.6 | Product alpha runtime completion planned
 
