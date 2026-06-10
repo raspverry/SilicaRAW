@@ -54,8 +54,8 @@ This audit records why Phase 6 clean-Mac testing must wait for Phase 5.6.
 | Edit state restore | Frontend reads the active catalog edit state through `get_photo_edit_state` and restores sliders plus clean/dirty state. | None for the current JPEG/JPG local alpha path. | Completed in Task 5.6.7. |
 | Export support | Export path writes JPEG sRGB, but UI implies broader raster exportability. | UI capability copy does not match codec coverage. | Installed-alpha contract narrows guaranteed source path to JPEG/JPG until more codecs are tested. |
 | Cache clear | Product command and Library maintenance UI clear only `thumbnails`, `previews`, `render-cache`, `ai-cache`, then recreate those directories. | None for the current local alpha cache clear scope. | Completed in Task 5.6.8. |
-| Recents/session | Welcome recents are hardcoded demo rows; active library is JS memory only. | Clean install can look fake and restart behavior is weak. | Remove fake demo state; add real or empty recent/session behavior. |
-| Culling controls | Basic actions exist, but rating is effectively "set 5" and pick/reject need fuller toggles. | Culling is not ergonomic enough for actual photo review. | Minimal 0-5 rating and clear pick/reject behavior. |
+| Recents/session | Clean launch shows an empty recent state and no fictional library rows. | Real persisted recents/session restore remains deferred beyond the current local alpha hardening pass. | Fake demo state removed in Task 5.6.9. |
+| Culling controls | Library inspector supports rating 0 through 5, pick/reject toggles, and clear culling flags with coherent mutual exclusion. | None for the current local alpha culling scope. | Completed in Task 5.6.9. |
 | Runtime QA | Harness checks static contracts and Rust APIs. | Static checks can pass while installed app fails. | Connected installed/runtime smoke path before clean-Mac QA. |
 
 ## Required Phase 5.6 Task Order

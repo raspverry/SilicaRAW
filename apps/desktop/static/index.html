@@ -17,7 +17,7 @@
           <span class="sr-window-dot sr-window-dot-yellow"></span>
           <span class="sr-window-dot sr-window-dot-green"></span>
         </div>
-        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar">
+        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar" data-status-action="Sidebar layout controls">
           <span class="sr-glyph sr-glyph-sidebar" aria-hidden="true"></span>
         </button>
         <div class="sr-toolbar-title">SilicaRAW</div>
@@ -27,16 +27,16 @@
           <button id="modeExport" type="button" data-mode="export" aria-pressed="false">Export</button>
         </nav>
         <div class="sr-toolbar-actions" aria-label="Toolbar actions">
-          <input class="sr-search" type="search" aria-label="Search photos" placeholder="Search">
-          <button class="sr-icon-button" type="button" aria-label="Grid view">
+          <input class="sr-search" type="search" aria-label="Search photos" placeholder="Search" disabled title="Search is deferred until real recents and filters are implemented.">
+          <button class="sr-icon-button" type="button" aria-label="Grid view" data-status-action="Grid view options">
             <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
           </button>
-          <button class="sr-icon-button" type="button" aria-label="Inspector">
+          <button class="sr-icon-button" type="button" aria-label="Inspector" data-status-action="Inspector layout controls">
             <span class="sr-glyph sr-glyph-panel" aria-hidden="true"></span>
           </button>
-          <button class="sr-fit-action" type="button">Fit</button>
+          <button class="sr-fit-action" type="button" data-status-action="Fit zoom controls">Fit</button>
           <button class="primary sr-export-action" id="openExportDialog" type="button">Export</button>
-          <button class="sr-icon-button" type="button" aria-label="Settings">
+          <button class="sr-icon-button" type="button" aria-label="Settings" data-status-action="Preferences">
             <span class="sr-glyph sr-glyph-settings" aria-hidden="true"></span>
           </button>
         </div>
@@ -46,22 +46,22 @@
         <section class="sr-sidebar-section" data-mode-panel="library">
           <div class="sr-panel-heading">Library</div>
           <button class="sr-sidebar-item is-active" type="button"><span>All Photos</span><span id="allPhotosCount">0</span></button>
-          <button class="sr-sidebar-item" type="button"><span>Recent Imports</span><span id="recentImportCount">0</span></button>
-          <button class="sr-sidebar-item" type="button"><span>Favorites</span><span>0</span></button>
-          <button class="sr-sidebar-item" type="button"><span>Rejected</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="Recent import filters are deferred until real recents exist."><span>Recent Imports</span><span id="recentImportCount">0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="Favorites filter is deferred for the local alpha."><span>Favorites</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="Rejected filter is deferred until culling filters are implemented."><span>Rejected</span><span>0</span></button>
           <div class="sr-panel-heading sr-panel-heading-spaced">Folders</div>
-          <button class="sr-sidebar-item" type="button"><span>Local Library</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="Folder browsing is deferred for the local alpha."><span>Local Library</span><span>0</span></button>
         </section>
         <section class="sr-sidebar-section" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Presets</div>
-          <button class="sr-preset-row is-active" type="button"><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
-          <button class="sr-preset-row" type="button"><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
-          <button class="sr-preset-row" type="button"><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
+          <button class="sr-preset-row is-active" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
+          <button class="sr-preset-row" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
+          <button class="sr-preset-row" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
         </section>
         <section class="sr-sidebar-section" data-mode-panel="export" hidden>
           <div class="sr-panel-heading">Export</div>
           <button class="sr-sidebar-item is-active" type="button"><span>JPEG sRGB</span><span>Ready</span></button>
-          <button class="sr-sidebar-item" type="button"><span>Recent Exports</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="Recent exports are deferred until session persistence is implemented."><span>Recent Exports</span><span>0</span></button>
         </section>
       </aside>
 
@@ -84,41 +84,30 @@
                 </div>
                 <button class="sr-system-action" id="openLibrary" type="button">Open Folder</button>
                 <button id="createLibrary" type="button">Create Library</button>
-                <button id="openRecent" type="button">Open Recent</button>
-                <button id="openSampleProject" type="button" disabled>Open Sample Project</button>
+                <button id="openRecent" type="button" disabled title="Recent libraries are empty until a real library is opened in this alpha.">Open Recent</button>
               </form>
               <output class="sr-welcome-status" id="welcomeStatus" aria-live="polite">Enter a local library folder path to begin.</output>
               <div class="sr-welcome-tags" aria-label="Product traits">
                 <span>Built for macOS</span>
-                <span>Metal-first</span>
+                <span>JPEG/JPG alpha path</span>
+                <span>RAW decode blocked</span>
                 <span>Local-first</span>
               </div>
+              <p class="sr-alpha-scope-note">JPEG/JPG previews and JPEG sRGB export are enabled. RAW decode is not enabled in this alpha; Metal viewer output and AI tools are also disabled.</p>
               <section class="sr-recent-libraries" aria-label="Recent libraries">
                 <div class="sr-recent-header">
                   <h2>Recent Libraries</h2>
-                  <button type="button">View All</button>
                 </div>
-                <button class="sr-recent-row" type="button" data-recent-path="/Users/you/Pictures/Library/Tokyo Street Walk">
+                <div class="sr-recent-empty" id="recentEmptyState">
                   <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
-                  <span><strong>Tokyo Street Walk</strong><small>/Users/you/Pictures/Library/Tokyo Street Walk</small></span>
-                  <time>Today, 10:42 AM</time>
-                </button>
-                <button class="sr-recent-row" type="button" data-recent-path="/Users/you/Pictures/Library/Cafe Reviews">
-                  <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
-                  <span><strong>Cafe Reviews</strong><small>/Users/you/Pictures/Library/Cafe Reviews</small></span>
-                  <time>Yesterday, 6:31 PM</time>
-                </button>
-                <button class="sr-recent-row" type="button" data-recent-path="/Users/you/Pictures/Library/Portrait Session">
-                  <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
-                  <span><strong>Portrait Session</strong><small>/Users/you/Pictures/Library/Portrait Session</small></span>
-                  <time>May 11, 2024, 9:17 AM</time>
-                </button>
+                  <span><strong>No recent libraries yet</strong><small>Open or create a local library to begin.</small></span>
+                </div>
               </section>
             </div>
             <nav class="sr-welcome-footer" aria-label="Welcome links">
-              <button type="button">Documentation</button>
-              <button type="button">Keyboard Shortcuts</button>
-              <button type="button">Preferences</button>
+              <button type="button" data-welcome-action="Documentation">Documentation</button>
+              <button type="button" data-welcome-action="Keyboard Shortcuts">Keyboard Shortcuts</button>
+              <button type="button" data-welcome-action="Preferences">Preferences</button>
             </nav>
           </section>
 
@@ -149,7 +138,7 @@
                 <form class="sr-import-form">
                   <label for="importFolderPath">Folder path</label>
                   <div class="sr-import-path-row">
-                    <input id="importFolderPath" name="importFolderPath" autocomplete="off" spellcheck="false" placeholder="/Volumes/Photography/2025 Spring Trip">
+                    <input id="importFolderPath" name="importFolderPath" autocomplete="off" spellcheck="false" placeholder="/Users/you/Pictures/Import Folder">
                     <button class="sr-path-picker-button" id="chooseImportFolderPath" type="button">Choose Folder</button>
                     <button class="primary" id="startImport" type="button">Import by Reference</button>
                   </div>
@@ -208,9 +197,9 @@
                   <span id="gridPhotoSubtitle">Preview catalog rows</span>
                 </div>
                 <div class="sr-grid-tools">
-                  <button type="button">All Files</button>
-                  <button type="button" aria-label="Minimum rating">*****</button>
-                  <button type="button">Capture Time</button>
+                  <button type="button" disabled title="File filters are deferred for the local alpha.">All Files</button>
+                  <button type="button" aria-label="Minimum rating" disabled title="Rating filters are deferred for the local alpha.">*****</button>
+                  <button type="button" disabled title="Sort controls are deferred for the local alpha.">Capture Time</button>
                 </div>
               </div>
               <div class="sr-grid-state" id="gridLoadingState" hidden>
@@ -221,74 +210,7 @@
                 <strong>No imported photos</strong>
                 <span>Import a folder by reference to populate this grid.</span>
               </div>
-              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite">
-                <button class="sr-photo-card is-selected" type="button" data-photo-id="demo-001" data-rating="5" data-picked="true" data-rejected="false" data-color-label="green" data-file-name="DSC_1042.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1042.CR3">
-                  <span class="sr-thumb-art sr-thumb-art-a" aria-hidden="true"></span>
-                  <span class="sr-file-badge">CR3</span>
-                  <span class="sr-card-state sr-card-state-pick">Pick</span>
-                  <span class="sr-card-footer"><span>DSC_1042.CR3</span><span>*****</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-002" data-rating="4" data-picked="false" data-rejected="false" data-color-label="blue" data-file-name="DSC_1043.JPG" data-file-type="JPG" data-path="/Volumes/Photography/Tokyo/DSC_1043.jpg">
-                  <span class="sr-thumb-art sr-thumb-art-b" aria-hidden="true"></span>
-                  <span class="sr-file-badge">JPG</span>
-                  <span class="sr-card-footer"><span>DSC_1043.JPG</span><span>****-</span></span>
-                </button>
-                <button class="sr-photo-card is-rejected" type="button" data-photo-id="demo-003" data-rating="2" data-picked="false" data-rejected="true" data-color-label="red" data-file-name="DSC_1044.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1044.CR3">
-                  <span class="sr-thumb-art sr-thumb-art-c" aria-hidden="true"></span>
-                  <span class="sr-file-badge">CR3</span>
-                  <span class="sr-card-state sr-card-state-reject">Reject</span>
-                  <span class="sr-card-footer"><span>DSC_1044.CR3</span><span>**---</span></span>
-                </button>
-                <button class="sr-photo-card is-unsupported" type="button" data-photo-id="demo-004" data-rating="0" data-picked="false" data-rejected="false" data-color-label="" data-file-name="notes.txt" data-file-type="TXT" data-path="/Volumes/Photography/Tokyo/notes.txt">
-                  <span class="sr-thumb-art sr-thumb-art-d" aria-hidden="true"></span>
-                  <span class="sr-file-badge">TXT</span>
-                  <span class="sr-card-state">Unsupported</span>
-                  <span class="sr-card-footer"><span>notes.txt</span><span>-----</span></span>
-                </button>
-                <button class="sr-photo-card is-missing" type="button" data-photo-id="demo-005" data-rating="3" data-picked="false" data-rejected="false" data-color-label="yellow" data-file-name="DSC_1045.ARW" data-file-type="ARW" data-path="/Volumes/Photography/Tokyo/DSC_1045.ARW">
-                  <span class="sr-thumb-art sr-thumb-art-e" aria-hidden="true"></span>
-                  <span class="sr-file-badge">ARW</span>
-                  <span class="sr-card-state">Missing</span>
-                  <span class="sr-card-footer"><span>DSC_1045.ARW</span><span>***--</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-006" data-rating="5" data-picked="false" data-rejected="false" data-color-label="purple" data-file-name="DSC_1046.RAW" data-file-type="RAW" data-path="/Volumes/Photography/Tokyo/DSC_1046.RAW">
-                  <span class="sr-thumb-art sr-thumb-art-f" aria-hidden="true"></span>
-                  <span class="sr-file-badge">RAW</span>
-                  <span class="sr-card-footer"><span>DSC_1046.RAW</span><span>*****</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-007" data-rating="4" data-picked="false" data-rejected="false" data-color-label="orange" data-file-name="DSC_1047.NEF" data-file-type="NEF" data-path="/Volumes/Photography/Tokyo/DSC_1047.NEF">
-                  <span class="sr-thumb-art sr-thumb-art-g" aria-hidden="true"></span>
-                  <span class="sr-file-badge">NEF</span>
-                  <span class="sr-card-footer"><span>DSC_1047.NEF</span><span>****-</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-008" data-rating="3" data-picked="false" data-rejected="false" data-color-label="cyan" data-file-name="DSC_1048.DNG" data-file-type="DNG" data-path="/Volumes/Photography/Tokyo/DSC_1048.DNG">
-                  <span class="sr-thumb-art sr-thumb-art-h" aria-hidden="true"></span>
-                  <span class="sr-file-badge">DNG</span>
-                  <span class="sr-card-footer"><span>DSC_1048.DNG</span><span>***--</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-009" data-rating="5" data-picked="true" data-rejected="false" data-color-label="green" data-file-name="DSC_1049.CR3" data-file-type="CR3" data-path="/Volumes/Photography/Tokyo/DSC_1049.CR3">
-                  <span class="sr-thumb-art sr-thumb-art-a" aria-hidden="true"></span>
-                  <span class="sr-file-badge">CR3</span>
-                  <span class="sr-card-state sr-card-state-pick">Pick</span>
-                  <span class="sr-card-footer"><span>DSC_1049.CR3</span><span>*****</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-010" data-rating="4" data-picked="false" data-rejected="false" data-color-label="orange" data-file-name="DSC_1050.ARW" data-file-type="ARW" data-path="/Volumes/Photography/Tokyo/DSC_1050.ARW">
-                  <span class="sr-thumb-art sr-thumb-art-b" aria-hidden="true"></span>
-                  <span class="sr-file-badge">ARW</span>
-                  <span class="sr-card-footer"><span>DSC_1050.ARW</span><span>****-</span></span>
-                </button>
-                <button class="sr-photo-card is-rejected" type="button" data-photo-id="demo-011" data-rating="1" data-picked="false" data-rejected="true" data-color-label="red" data-file-name="DSC_1051.NEF" data-file-type="NEF" data-path="/Volumes/Photography/Tokyo/DSC_1051.NEF">
-                  <span class="sr-thumb-art sr-thumb-art-c" aria-hidden="true"></span>
-                  <span class="sr-file-badge">NEF</span>
-                  <span class="sr-card-state sr-card-state-reject">Reject</span>
-                  <span class="sr-card-footer"><span>DSC_1051.NEF</span><span>*----</span></span>
-                </button>
-                <button class="sr-photo-card" type="button" data-photo-id="demo-012" data-rating="3" data-picked="false" data-rejected="false" data-color-label="blue" data-file-name="DSC_1052.RAF" data-file-type="RAF" data-path="/Volumes/Photography/Tokyo/DSC_1052.RAF">
-                  <span class="sr-thumb-art sr-thumb-art-f" aria-hidden="true"></span>
-                  <span class="sr-file-badge">RAF</span>
-                  <span class="sr-card-footer"><span>DSC_1052.RAF</span><span>***--</span></span>
-                </button>
-              </div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite"></div>
             </div>
             <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
               <div class="sr-loupe-header">
@@ -298,12 +220,12 @@
                   <p id="loupePhotoRating">-----</p>
                 </div>
                 <div class="sr-loupe-actions">
-                  <select id="loupeFitMode" aria-label="Loupe fit mode">
+                  <select id="loupeFitMode" aria-label="Loupe fit mode" disabled title="Zoom controls are deferred for the local alpha.">
                     <option>Fit</option>
                     <option>100%</option>
                   </select>
-                  <button type="button">Previous</button>
-                  <button type="button">Next</button>
+                  <button type="button" disabled title="Previous navigation is deferred for the local alpha.">Previous</button>
+                  <button type="button" disabled title="Next navigation is deferred for the local alpha.">Next</button>
                 </div>
               </div>
               <div class="sr-loupe-viewer" id="loupeViewer" data-preview-status="blocked">
@@ -374,9 +296,18 @@
         <section class="sr-inspector-section" data-mode-panel="library">
           <div class="sr-panel-heading">Quick Review</div>
           <div class="sr-rating-row" id="selectedPhotoRating" aria-label="Selected photo rating">-----</div>
-          <button class="sr-inspector-action" id="rateSelectedPhoto" type="button">Rate 5</button>
-          <button class="sr-inspector-action" id="pickSelectedPhoto" type="button">Pick</button>
-          <button class="sr-inspector-action" id="rejectSelectedPhoto" type="button">Reject</button>
+          <div class="sr-rating-control-group" id="ratingControlGroup" aria-label="Rating">
+            <button id="ratePhoto0" type="button" data-rating-value="0" aria-label="Set rating 0" aria-pressed="true">0</button>
+            <button id="ratePhoto1" type="button" data-rating-value="1" aria-label="Set rating 1" aria-pressed="false">1</button>
+            <button id="ratePhoto2" type="button" data-rating-value="2" aria-label="Set rating 2" aria-pressed="false">2</button>
+            <button id="ratePhoto3" type="button" data-rating-value="3" aria-label="Set rating 3" aria-pressed="false">3</button>
+            <button id="ratePhoto4" type="button" data-rating-value="4" aria-label="Set rating 4" aria-pressed="false">4</button>
+            <button id="ratePhoto5" type="button" data-rating-value="5" aria-label="Set rating 5" aria-pressed="false">5</button>
+          </div>
+          <button class="sr-inspector-action" id="pickSelectedPhoto" type="button" aria-pressed="false">Pick</button>
+          <button class="sr-inspector-action" id="rejectSelectedPhoto" type="button" aria-pressed="false">Reject</button>
+          <button class="sr-inspector-action" id="clearCullingFlags" type="button">Clear</button>
+          <output id="cullingStatus" aria-live="polite">Select a photo to rate, pick, or reject.</output>
         </section>
         <section class="sr-inspector-section sr-develop-inspector" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Basic</div>
@@ -495,6 +426,8 @@
       const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
       const libraryStatePanels = Array.from(document.querySelectorAll("[data-library-state-panel]"));
       const recentButtons = Array.from(document.querySelectorAll("[data-recent-path]"));
+      const welcomeActionButtons = Array.from(document.querySelectorAll("[data-welcome-action]"));
+      const statusActionButtons = Array.from(document.querySelectorAll("[data-status-action]"));
       const pathInput = document.querySelector("#libraryPath");
       const importPathInput = document.querySelector("#importFolderPath");
       const statusOutput = document.querySelector("#appStatus");
@@ -541,9 +474,11 @@
       const minimizeImportButton = document.querySelector("#minimizeImport");
       const clearLibraryCacheButton = document.querySelector("#clearLibraryCache");
       const cacheClearStatus = document.querySelector("#cacheClearStatus");
-      const rateSelectedButton = document.querySelector("#rateSelectedPhoto");
+      const ratingButtons = Array.from(document.querySelectorAll("[data-rating-value]"));
       const pickSelectedButton = document.querySelector("#pickSelectedPhoto");
       const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
+      const clearCullingFlagsButton = document.querySelector("#clearCullingFlags");
+      const cullingStatus = document.querySelector("#cullingStatus");
       const openLoupeButton = document.querySelector("#openLoupe");
       const loupeButtons = Array.from(document.querySelectorAll('[aria-label="Loupe"]'));
       const closeLoupeButton = document.querySelector("#closeLoupe");
@@ -577,6 +512,7 @@
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let activeLibraryPath = "";
       let developPreviewSequence = 0;
+      let controlsBusy = false;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
@@ -723,6 +659,69 @@
       function stars(rating) {
         const value = Math.max(0, Math.min(5, Number(rating) || 0));
         return `${"*".repeat(value)}${"-".repeat(5 - value)}`;
+      }
+
+      function cullingStatusText(photo) {
+        if (!photo) {
+          return "Select a photo to rate, pick, or reject.";
+        }
+        const mark = photo.picked ? "Picked" : photo.rejected ? "Rejected" : "Unmarked";
+        return `Rating ${Number(photo.rating) || 0}. ${mark}.`;
+      }
+
+      function updateCullingControls(photo = selectedPhoto()) {
+        const disabled = controlsBusy || !photo;
+        const rating = Number(photo?.rating ?? 0);
+        ratingButtons.forEach((button) => {
+          const selected = Number(button.dataset.ratingValue) === rating;
+          button.disabled = disabled;
+          button.setAttribute("aria-pressed", String(Boolean(photo) && selected));
+        });
+        pickSelectedButton.disabled = disabled;
+        rejectSelectedButton.disabled = disabled;
+        clearCullingFlagsButton.disabled = disabled;
+        pickSelectedButton.setAttribute("aria-pressed", String(Boolean(photo?.picked)));
+        rejectSelectedButton.setAttribute("aria-pressed", String(Boolean(photo?.rejected)));
+        pickSelectedButton.textContent = photo?.picked ? "Unpick" : "Pick";
+        rejectSelectedButton.textContent = photo?.rejected ? "Unreject" : "Reject";
+        cullingStatus.value = cullingStatusText(photo);
+      }
+
+      function setSelectedRating(rating) {
+        applySelectedFlags({ rating });
+      }
+
+      function toggleSelectedPick() {
+        const selected = selectedPhoto();
+        if (!selected) {
+          setStatus("Select a photo before culling.");
+          return;
+        }
+        applySelectedFlags({
+          picked: !selected.picked,
+          rejected: false,
+        });
+      }
+
+      function toggleSelectedReject() {
+        const selected = selectedPhoto();
+        if (!selected) {
+          setStatus("Select a photo before culling.");
+          return;
+        }
+        applySelectedFlags({
+          picked: false,
+          rejected: !selected.rejected,
+        });
+      }
+
+      function clearSelectedCullingFlags() {
+        applySelectedFlags({
+          rating: 0,
+          picked: false,
+          rejected: false,
+          colorLabel: null,
+        });
       }
 
       function clamp(value, min, max) {
@@ -1011,6 +1010,7 @@
         selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+        updateCullingControls(selected);
         syncDevelopSelection();
         syncExportDialog();
         if (!loupeSurface.hidden) {
@@ -1568,10 +1568,10 @@
         }
 
         const next = { ...selected, ...patch };
-        if (patch.picked) {
+        if (patch.picked === true) {
           next.rejected = false;
         }
-        if (patch.rejected) {
+        if (patch.rejected === true) {
           next.picked = false;
         }
 
@@ -1598,6 +1598,7 @@
               next.colorLabel = response.data.colorLabel;
             }
             setStatus(responseMessage(response, "Photo flags updated."));
+            cullingStatus.value = cullingStatusText(next);
           } catch (error) {
             setStatus(responseErrorMessage(error, "Photo flags failed to update."));
             setBusy(false);
@@ -1607,6 +1608,7 @@
           }
         } else {
           setStatus("Desktop runtime unavailable; updated local grid preview.");
+          cullingStatus.value = cullingStatusText(next);
         }
 
         renderLibraryGrid(libraryPhotos.map((photo) => {
@@ -1680,16 +1682,15 @@
       }
 
       function setBusy(isBusy) {
+        controlsBusy = isBusy;
         createButton.disabled = isBusy;
         openButton.disabled = isBusy;
         chooseLibraryPathButton.disabled = isBusy;
         chooseImportFolderPathButton.disabled = isBusy;
         startImportButton.disabled = isBusy;
-        rateSelectedButton.disabled = isBusy;
-        pickSelectedButton.disabled = isBusy;
-        rejectSelectedButton.disabled = isBusy;
         openLoupeButton.disabled = isBusy;
         clearLibraryCacheButton.disabled = isBusy || !activeLibraryPath;
+        updateCullingControls(selectedPhoto());
         const developDisabled = isBusy || !isDevelopable(selectedPhoto());
         [
           developExposureSlider,
@@ -1797,9 +1798,12 @@
       chooseImportFolderPathButton.addEventListener("click", () => chooseDirectoryPath("import"));
       startImportButton.addEventListener("click", runImportCommand);
       clearLibraryCacheButton.addEventListener("click", runCacheClearCommand);
-      rateSelectedButton.addEventListener("click", () => applySelectedFlags({ rating: 5 }));
-      pickSelectedButton.addEventListener("click", () => applySelectedFlags({ picked: true }));
-      rejectSelectedButton.addEventListener("click", () => applySelectedFlags({ rejected: true }));
+      ratingButtons.forEach((button) => {
+        button.addEventListener("click", () => setSelectedRating(Number(button.dataset.ratingValue)));
+      });
+      pickSelectedButton.addEventListener("click", toggleSelectedPick);
+      rejectSelectedButton.addEventListener("click", toggleSelectedReject);
+      clearCullingFlagsButton.addEventListener("click", clearSelectedCullingFlags);
       loupeButtons.forEach((button) => {
         button.addEventListener("click", openLoupeView);
       });
@@ -1853,7 +1857,17 @@
         document.querySelector("#importPanel").hidden = true;
         setStatus("Import panel minimized.");
       });
-      openRecentButton.addEventListener("click", () => setStatus("Select a recent library below."));
+      openRecentButton.addEventListener("click", () => setStatus("No recent libraries yet."));
+      welcomeActionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          setStatus(`${button.dataset.welcomeAction} will be wired after the local alpha runtime loop is complete.`);
+        });
+      });
+      statusActionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          setStatus(`${button.dataset.statusAction} are deferred for this local alpha.`);
+        });
+      });
       recentButtons.forEach((button) => {
         button.addEventListener("click", () => {
           pathInput.value = button.dataset.recentPath;

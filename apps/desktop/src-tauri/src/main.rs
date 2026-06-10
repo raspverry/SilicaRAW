@@ -701,19 +701,69 @@ mod tests {
             super::DesktopCommandData::PhotoFlags {
                 rating,
                 picked,
+                rejected,
                 color_label,
                 ..
             } => {
                 assert_eq!(*rating, 2);
                 assert!(*picked);
+                assert!(!*rejected);
                 assert_eq!(color_label.as_deref(), Some("blue"));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let rejected = super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0,
+            false,
+            true,
+            None,
+        );
+        assert!(rejected.ok);
+        match response_data(&rejected) {
+            super::DesktopCommandData::PhotoFlags {
+                rating,
+                picked,
+                rejected,
+                color_label,
+                ..
+            } => {
+                assert_eq!(*rating, 0);
+                assert!(!*picked);
+                assert!(*rejected);
+                assert!(color_label.is_none());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let cleared = super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            5,
+            false,
+            false,
+            None,
+        );
+        assert!(cleared.ok);
+        match response_data(&cleared) {
+            super::DesktopCommandData::PhotoFlags {
+                rating,
+                picked,
+                rejected,
+                ..
+            } => {
+                assert_eq!(*rating, 5);
+                assert!(!*picked);
+                assert!(!*rejected);
             }
             other => panic!("unexpected response data: {other:?}"),
         }
 
         let reopened = super::get_photo_flags(library_root.display().to_string(), photo_id);
         assert!(reopened.ok);
-        assert_eq!(response_data(&reopened), response_data(&updated));
+        assert_eq!(response_data(&reopened), response_data(&cleared));
 
         remove_library_root(&workspace);
     }
