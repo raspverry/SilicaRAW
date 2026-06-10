@@ -19,6 +19,7 @@ ALLOWED_COMMANDS = {
     "commit_exposure_contrast_edit",
     "get_photo_edit_state",
     "export_photo_jpeg_srgb",
+    "clear_library_cache",
 }
 
 WORKFLOW_STEPS = [
@@ -117,6 +118,21 @@ WORKFLOW_STEPS = [
             "sRGB",
             "Original files will not be modified",
             "Output path must differ from the original source path.",
+        ],
+    },
+    {
+        "name": "maintenance-cache-clear",
+        "ids": [
+            "cacheMaintenance",
+            "clearLibraryCache",
+            "cacheClearScope",
+            "cacheClearStatus",
+        ],
+        "commands": ["clear_library_cache"],
+        "text": [
+            "Clear Disposable Caches",
+            "thumbnails, previews, render-cache, and ai-cache only",
+            "Catalog, edits, exports, originals, sidecars, backups, and logs stay intact",
         ],
     },
 ]
@@ -267,6 +283,14 @@ def main():
         "Restored committed edit state.",
     ]:
         require(marker in source, f"persisted develop readback marker missing: {marker}", failures)
+    for marker in [
+        "runCacheClearCommand",
+        "clear_library_cache",
+        "response.data.clearedDirectories",
+        "response.data.removedCacheRecords",
+        "Cache clear removed only disposable library caches.",
+    ]:
+        require(marker in source, f"cache clear marker missing: {marker}", failures)
 
     workflow_order = [
         "setLibraryState(\"open\")",
@@ -277,6 +301,7 @@ def main():
         "previewDevelopEdit",
         "commitDevelopEdit",
         "runJpegExport",
+        "runCacheClearCommand",
     ]
     for marker in workflow_order:
         require(marker in source, f"workflow marker missing: {marker}", failures)
