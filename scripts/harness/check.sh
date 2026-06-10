@@ -12,6 +12,9 @@ python3 scripts/harness/check-cargo-deps.py
 echo "==> Checking early-alpha scope guardrails"
 scripts/harness/check-scope-guardrails.sh
 
+echo "==> Checking legal QA fixtures and installed-app preflight"
+python3 scripts/harness/check-qa-fixtures.py
+
 echo "==> Checking static UI contract"
 python3 scripts/harness/check-static-ui.py
 

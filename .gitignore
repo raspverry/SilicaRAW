@@ -22,6 +22,10 @@
 /tmp/
 /.tmp/
 
+# Generated QA fixture/preflight output
+/qa-fixtures/
+/preflight-reports/
+
 # Local release/build scratch output
 /release/
 /dist/

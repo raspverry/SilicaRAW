@@ -710,6 +710,8 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Temporary artifacts are ignored by git.
 - **Validation:** Fixture generator check, docs link check, and harness pass.
 
+**Status:** Completed on 2026-06-10. Added `scripts/harness/generate-legal-fixtures.py` to create synthetic JPEG/JPG supported samples, unsupported files, and optional explicit RAW-blocked placeholders under ignored output paths, with `fixture-manifest.json` recording expected SHA-256 source hashes. Added `scripts/harness/installed-app-preflight.py` to record a developer app artifact digest, host/macOS version field, fixture path, fixture hash results, and known alpha limitations before clean-Mac QA. The fixture/preflight contract is covered by `scripts/harness/check-qa-fixtures.py`, wired into `scripts/harness/check.sh`, and documented in [Installed-App Developer Preflight](../../../checklists/INSTALLED_APP_PREFLIGHT.md).
+
 ### Task 5.6.11: Connected Runtime UI Smoke
 
 - **Location:** `scripts/harness/`, `apps/desktop/`, `checklists/`
