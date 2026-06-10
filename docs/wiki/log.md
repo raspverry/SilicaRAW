@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-10] phase-5.6 | Connected runtime smoke added
+
+- Added a developer runtime smoke that generates legal fixtures and exercises the desktop command workflow end to end.
+- Covered create/open, import, grid, culling, loupe, Develop edit, JPEG sRGB export, cache clear, reopen, and original byte comparisons.
+- Documented that this is not clean-Mac DMG install QA, which remains a Phase 6 gate.
+
 ## [2026-06-10] phase-5.6 | Legal fixtures and preflight added
 
 - Added a legal synthetic fixture generator for supported JPEG/JPG samples, unsupported files, and optional RAW-blocked placeholders.

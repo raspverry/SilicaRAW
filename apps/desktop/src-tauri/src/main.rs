@@ -1092,6 +1092,335 @@ mod tests {
         remove_library_root(&workspace);
     }
 
+    #[test]
+    fn desktop_connected_runtime_smoke() {
+        let Some(fixtures_root) =
+            std::env::var_os("SILICARAW_RUNTIME_SMOKE_FIXTURES").map(PathBuf::from)
+        else {
+            eprintln!("skipping desktop_connected_runtime_smoke; fixture env var is not set");
+            return;
+        };
+        let run_root = std::env::var_os("SILICARAW_RUNTIME_SMOKE_OUTPUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| unique_library_root("desktop-connected-runtime-smoke"));
+        let library_root = run_root.join("SilicaRAW Library");
+        let import_root = run_root.join("Import Originals");
+        let export_root = run_root.join("Exports");
+        std::fs::create_dir_all(&import_root).expect("create connected smoke import folder");
+        std::fs::create_dir_all(&export_root).expect("create connected smoke export folder");
+
+        assert!(
+            fixtures_root.join("fixture-manifest.json").is_file(),
+            "connected runtime smoke requires generated legal fixture metadata"
+        );
+        let primary_original = import_root.join("synthetic-gradient.jpg");
+        let secondary_original = import_root.join("synthetic-checker.jpeg");
+        let raw_placeholder = import_root.join("blocked-raw.DNG");
+        let unsupported_original = import_root.join("notes.txt");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            &primary_original,
+        )
+        .expect("copy primary JPEG fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-checker.jpeg"),
+            &secondary_original,
+        )
+        .expect("copy secondary JPEG fixture");
+        std::fs::copy(
+            fixtures_root.join("raw-blocked/blocked-raw.DNG"),
+            &raw_placeholder,
+        )
+        .expect("copy RAW-blocked placeholder");
+        std::fs::copy(
+            fixtures_root.join("unsupported/notes.txt"),
+            &unsupported_original,
+        )
+        .expect("copy unsupported fixture");
+        let originals = tracked_originals(&[
+            primary_original.clone(),
+            secondary_original.clone(),
+            raw_placeholder.clone(),
+            unsupported_original.clone(),
+        ]);
+
+        let created = super::create_library(library_root.display().to_string());
+        assert!(created.ok, "create library failed: {created:?}");
+        assert_eq!(response_data(&created).kind(), "librarySession");
+        let opened = super::open_library(library_root.display().to_string());
+        assert!(opened.ok, "open library failed: {opened:?}");
+        assert_originals_unchanged(&originals, "create/open library");
+
+        let imported = super::import_folder(
+            library_root.display().to_string(),
+            import_root.display().to_string(),
+        );
+        assert!(imported.ok, "import folder failed: {imported:?}");
+        match response_data(&imported) {
+            super::DesktopCommandData::ImportSummary {
+                scanned_files,
+                supported_files,
+                unsupported_files,
+                originals_unchanged,
+                ..
+            } => {
+                assert_eq!(*scanned_files, 4);
+                assert_eq!(*supported_files, 3);
+                assert_eq!(*unsupported_files, 1);
+                assert!(*originals_unchanged);
+            }
+            other => panic!("unexpected import response data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "import by reference");
+
+        let grid = super::list_library_photos(library_root.display().to_string());
+        assert!(grid.ok, "list library photos failed: {grid:?}");
+        let (photo_id, raw_photo_id) = match response_data(&grid) {
+            super::DesktopCommandData::PhotoGrid { photos } => {
+                assert_eq!(photos.len(), 4);
+                let primary = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "synthetic-gradient.jpg")
+                    .expect("primary JPEG grid row");
+                assert!(!primary.unsupported);
+                assert!(primary.thumbnail_path.is_some());
+                assert!(primary
+                    .thumbnail_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+                let raw = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "blocked-raw.DNG")
+                    .expect("RAW-blocked grid row");
+                assert!(!raw.unsupported);
+                let unsupported = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "notes.txt")
+                    .expect("unsupported grid row");
+                assert!(unsupported.unsupported);
+                (primary.photo_id.clone(), raw.photo_id.clone())
+            }
+            other => panic!("unexpected grid response data: {other:?}"),
+        };
+        assert_originals_unchanged(&originals, "grid thumbnail generation");
+
+        let picked = super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            None,
+        );
+        assert!(picked.ok, "pick update failed: {picked:?}");
+        let rejected = super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            3,
+            false,
+            true,
+            None,
+        );
+        assert!(rejected.ok, "reject update failed: {rejected:?}");
+        let final_flags = super::set_photo_flags(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("green".to_string()),
+        );
+        assert!(
+            final_flags.ok,
+            "final culling update failed: {final_flags:?}"
+        );
+        match response_data(&final_flags) {
+            super::DesktopCommandData::PhotoFlags {
+                rating,
+                picked,
+                rejected,
+                color_label,
+                ..
+            } => {
+                assert_eq!(*rating, 4);
+                assert!(*picked);
+                assert!(!*rejected);
+                assert_eq!(color_label.as_deref(), Some("green"));
+            }
+            other => panic!("unexpected final flags response data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "rating pick reject");
+
+        let loupe = super::open_photo_preview(library_root.display().to_string(), photo_id.clone());
+        assert!(loupe.ok, "loupe preview failed: {loupe:?}");
+        match response_data(&loupe) {
+            super::DesktopCommandData::PhotoPreview {
+                status,
+                source_path,
+                preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(source_path, &primary_original.display().to_string());
+                assert!(preview_bytes.as_ref().is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected loupe response data: {other:?}"),
+        }
+        let raw_preview =
+            super::open_photo_preview(library_root.display().to_string(), raw_photo_id.clone());
+        assert!(
+            raw_preview.ok,
+            "RAW-blocked preview command failed: {raw_preview:?}"
+        );
+        match response_data(&raw_preview) {
+            super::DesktopCommandData::PhotoPreview {
+                status,
+                preview_bytes,
+                message,
+                ..
+            } => {
+                assert_eq!(*status, "BlockedByDecode");
+                assert!(preview_bytes.is_none());
+                assert!(message.contains("Core Image RAW preview"));
+            }
+            other => panic!("unexpected RAW preview response data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "loupe preview");
+
+        let develop_preview = super::preview_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.4,
+            12.0,
+        );
+        assert!(
+            develop_preview.ok,
+            "develop preview failed: {develop_preview:?}"
+        );
+        match response_data(&develop_preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                exposure,
+                contrast,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*exposure, 0.4);
+                assert_eq!(*contrast, 12.0);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected develop preview response data: {other:?}"),
+        }
+        let committed = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.4,
+            12.0,
+        );
+        assert!(committed.ok, "commit edit failed: {committed:?}");
+        assert_originals_unchanged(&originals, "develop edit preview and commit");
+
+        let output_path = export_root.join("synthetic-gradient-export.jpg");
+        let exported = super::export_photo_jpeg_srgb(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            output_path.display().to_string(),
+        );
+        assert!(exported.ok, "JPEG sRGB export failed: {exported:?}");
+        match response_data(&exported) {
+            super::DesktopCommandData::Export {
+                source_path,
+                output_path: actual_output_path,
+                format,
+                color_profile,
+                bytes_written,
+                ..
+            } => {
+                assert_eq!(source_path, &primary_original.display().to_string());
+                assert_eq!(actual_output_path, &output_path.display().to_string());
+                assert_ne!(source_path, actual_output_path);
+                assert_eq!(format, "jpeg");
+                assert_eq!(color_profile, "srgb");
+                assert!(*bytes_written > 0);
+            }
+            other => panic!("unexpected export response data: {other:?}"),
+        }
+        assert!(output_path.is_file());
+        assert_originals_unchanged(&originals, "JPEG sRGB export");
+
+        let cleared = super::clear_library_cache(library_root.display().to_string());
+        assert!(cleared.ok, "cache clear failed: {cleared:?}");
+        match response_data(&cleared) {
+            super::DesktopCommandData::CacheClear {
+                cleared_directories,
+                recreated_directories,
+                removed_cache_records,
+                ..
+            } => {
+                assert_eq!(
+                    cleared_directories,
+                    &vec![
+                        "thumbnails".to_string(),
+                        "previews".to_string(),
+                        "render-cache".to_string(),
+                        "ai-cache".to_string()
+                    ]
+                );
+                assert_eq!(cleared_directories, recreated_directories);
+                assert!(*removed_cache_records > 0);
+            }
+            other => panic!("unexpected cache clear response data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "cache clear");
+
+        let reopened = super::open_library(library_root.display().to_string());
+        assert!(reopened.ok, "reopen library failed: {reopened:?}");
+        let restored_flags =
+            super::get_photo_flags(library_root.display().to_string(), photo_id.clone());
+        assert!(
+            restored_flags.ok,
+            "restore flags failed: {restored_flags:?}"
+        );
+        match response_data(&restored_flags) {
+            super::DesktopCommandData::PhotoFlags {
+                rating,
+                picked,
+                rejected,
+                color_label,
+                ..
+            } => {
+                assert_eq!(*rating, 4);
+                assert!(*picked);
+                assert!(!*rejected);
+                assert_eq!(color_label.as_deref(), Some("green"));
+            }
+            other => panic!("unexpected restored flags response data: {other:?}"),
+        }
+        let restored_edit =
+            super::get_photo_edit_state(library_root.display().to_string(), photo_id);
+        assert!(
+            restored_edit.ok,
+            "restore edit state failed: {restored_edit:?}"
+        );
+        match response_data(&restored_edit) {
+            super::DesktopCommandData::EditState {
+                exposure,
+                contrast,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*exposure, 0.4);
+                assert_eq!(*contrast, 12.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected restored edit response data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "library reopen");
+    }
+
     fn response_data(response: &super::DesktopCommandResponse) -> &super::DesktopCommandData {
         response.data.as_ref().expect("response data")
     }
@@ -1118,6 +1447,29 @@ mod tests {
 
     fn remove_library_root(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn tracked_originals(paths: &[PathBuf]) -> Vec<(PathBuf, Vec<u8>)> {
+        paths
+            .iter()
+            .map(|path| {
+                (
+                    path.clone(),
+                    std::fs::read(path).expect("read original fixture bytes"),
+                )
+            })
+            .collect()
+    }
+
+    fn assert_originals_unchanged(originals: &[(PathBuf, Vec<u8>)], stage: &str) {
+        for (path, expected) in originals {
+            assert_eq!(
+                std::fs::read(path).expect("read original fixture for comparison"),
+                *expected,
+                "original fixture changed after {stage}: {}",
+                path.display()
+            );
+        }
     }
 
     fn write_source_jpeg(path: &Path) {
