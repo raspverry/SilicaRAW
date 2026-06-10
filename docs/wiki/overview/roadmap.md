@@ -2,7 +2,7 @@
 title: Roadmap Overview
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-10
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -35,6 +35,8 @@ The current implementation order starts with:
 17. Implement JPEG sRGB export.
 18. Establish UI MVP baseline and then implement the connected UI vertical slice.
 19. Complete the product alpha runtime loop before clean-Mac install QA: real JPEG/JPG pixels, native/selectable paths, persisted UI readback, cache clear, fixture generation, and installed/runtime smoke.
+20. Complete local DMG install, signing, notarization, GitHub Release, and release hardening.
+21. Follow the post-alpha product roadmap for fixture-backed RAW, color, Metal, Library, Develop, masks, export, permissions, MLX, plugins, MCP, public beta, and v1.0.
 
 ## Gate Logic
 
@@ -62,6 +64,7 @@ The current implementation order starts with:
 - Phase 5.4 adds command/API-level JPEG sRGB export with original overwrite protection and catalog export records.
 - Phase 5.5 completed the UI MVP vertical slice as screen structure plus command wiring. It is not the final installed-app readiness gate because several surfaces still use placeholder pixels, typed paths, string command parsing, and static/demo state.
 - Phase 5.6 is now the required Product Alpha Runtime Completion pass before Phase 6 clean-Mac install QA. Its first task records the runtime gap audit and narrows the installed-alpha guaranteed visible photo path to JPEG/JPG until additional codecs are explicitly implemented and tested.
+- The local DMG distribution plan runs through Phase 9. After that, the post-alpha product roadmap continues with evidence and trust gates before broad RAW, Metal, Develop, MLX, plugin, or MCP work.
 
 ## Links
 
@@ -77,6 +80,7 @@ The current implementation order starts with:
 - [Catalog](../topics/catalog.md)
 - [UI MVP Baseline](../topics/ui-mvp-baseline.md)
 - [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md)
+- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md)
 
 ## Notes for LLM Agents
 
