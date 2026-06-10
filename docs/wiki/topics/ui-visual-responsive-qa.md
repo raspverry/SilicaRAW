@@ -2,7 +2,7 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-10
 source_of_truth: docs/wiki/topics/ui-mvp-baseline.md
 ---
 
@@ -21,6 +21,56 @@ Library grid -> Develop exposure/contrast -> Export JPEG sRGB dialog
 This is a visual and responsive QA pass only. It does not add real image pixels, thumbnail cache generation, RAW decoding, Metal rendering, native folder picking, or export formats beyond JPEG sRGB.
 
 This page remains the record for the static Phase 5.5 pass. It is not the final Phase 6 readiness gate. Phase 5.6.12 reruns visual/responsive QA after real JPEG/JPG thumbnails, loupe preview, Develop preview, path UX, cache UI, and demo-state cleanup are implemented.
+
+Task 5.6.12 is now the Phase 6 readiness visual gate. The Phase 5.5 notes below remain historical context only.
+
+## Final Phase 5.6.12 Refresh
+
+Final QA command:
+
+```bash
+python3 scripts/harness/run-final-visual-qa.py
+```
+
+The script starts a local static server from the repository root, generates legal synthetic JPEG/JPG fixtures, uses Agent Browser to drive UI states, captures screenshots under `.tmp/final-visual-responsive-qa/screenshots`, and writes DOM metrics to `.tmp/final-visual-responsive-qa/visual-qa-results.json`.
+
+Final checked surfaces:
+
+| Surface | Reference |
+|---|---|
+| Welcome | `M001_Welcome.png` |
+| Library empty | `M002_Library_Grid_empty.png` |
+| Library populated | `M003_Library_Grid_populated.png`, `M011`, `M012` |
+| Loupe | `M004_Library_Loupe.png` |
+| Develop | `M005_Develop_default.png`, `M013`, `M014` |
+| Export | `M007_Export_Dialog.png`, `M015`, `M016` |
+| Maintenance minimal | `M008_Preferences_Appearance.png` as the local-alpha maintenance subset |
+| Import progress | `M009_Import_Progress.png` |
+
+Final DOM results:
+
+| Viewport | Surfaces | Horizontal Overflow | Toolbar Overlap | Control Clipping | Result |
+|---|---:|---|---|---|---|
+| `1280x800` | 8 | false | false | 0 | Pass |
+| `1440x900` | 8 | false | false | 0 | Pass |
+| `1728x965` | 8 | false | false | 0 | Pass |
+
+Final screenshot review:
+
+- M001 welcome keeps the first-launch structure, honest alpha capability copy, empty recents, and no fake demo project rows.
+- M002 empty library shows a real empty grid state without fictional photos.
+- M003 populated library uses generated legal JPEG fixture pixels for thumbnails and keeps culling controls aligned at compact width.
+- M004 Loupe and M005 Develop scale real preview images to the viewer instead of rendering small natural-size fixture pixels.
+- M007 Export shows selected-photo thumbnail pixels in the dialog preview instead of placeholder art.
+- M008-minimal is represented by the local-alpha maintenance/cache-clear subset with precise destructive-scope copy.
+- M009 Import progress keeps overall and per-step progress states synchronized.
+
+Fixes from this final pass:
+
+- Scaled `.sr-loupe-image` and `.sr-develop-image` to fill their viewer boxes with `object-fit: contain`.
+- Added `.sr-export-preview-image` so Export preview uses selected thumbnail pixels when available.
+- Added import step state markers and UI updates so completed imports no longer show pending step rows.
+- Shortened cache-maintenance status copy and restored system font styling for that output.
 
 ## Method
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-10] phase-5.6 | Final visual QA refreshed
+
+- Added a final visual/responsive QA runner for M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces across compact, desktop, and large viewports.
+- Fixed final QA findings in Loupe/Develop image scaling, Export preview pixels, Import step progress state, and cache-maintenance status copy.
+- Recorded that the Phase 5.6.12 QA notes supersede the static-only Phase 5.5 visual pass for Phase 6 readiness.
+
 ## [2026-06-10] phase-5.6 | Connected runtime smoke added
 
 - Added a developer runtime smoke that generates legal fixtures and exercises the desktop command workflow end to end.
