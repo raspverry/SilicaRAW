@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-10] roadmap | Post-alpha product roadmap added
+
+- Added the Post-Alpha Product Roadmap after consulting separate RAW/Metal/color, Library/Develop/UI, and MLX/plugin/MCP planning agents.
+- Split post-alpha work into atomic phases for evidence and trust gates, session/library/metadata, Core Image RAW proof, color proof, product Metal viewer, RAW/color/Metal vertical slice, undo/history, Develop expansion, masks, export, preferences, hardening, permissions, MLX, plugins, MCP, public beta, and v1.0.
+- Linked the new roadmap from the wiki index, roadmap overview, and local DMG distribution plan so agents can continue after Phase 9 without expanding local-alpha scope.
+
 ## [2026-06-10] phase-5.6 | Final visual QA refreshed
 
 - Added a final visual/responsive QA runner for M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces across compact, desktop, and large viewports.

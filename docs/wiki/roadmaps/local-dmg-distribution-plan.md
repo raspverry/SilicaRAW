@@ -945,3 +945,4 @@ Do not store signing certificates or private keys directly in the repository.
 - Do not treat unsigned developer DMGs as user-ready releases.
 - Do not add dependencies without updating `docs/DEPENDENCIES.md`.
 - Do not add MLX, MCP, plugins, telemetry, cloud sync, or auto-update for local DMG alpha unless a maintainer explicitly changes the scope.
+- After Phase 9 is complete, continue with the [Post-Alpha Product Roadmap](post-alpha-product-roadmap.md) rather than expanding local-alpha scope retroactively.
