@@ -43,15 +43,21 @@ def main() -> None:
         ("version = 1", "backup version marker"),
         ("PRAGMA wal_checkpoint(TRUNCATE)", "checkpoint implementation marker"),
         ("temporary sidecar write files", "sidecar temp exclusion"),
+        ("Task 10.5.3 adds `silica-storage::restore_library_backup`", "restore API marker"),
+        ("Rejects backups from newer catalog schema versions", "newer schema rejection"),
+        ("sibling staging directory", "restore staging marker"),
+        ("rollback copy under `backups/restore-rollback-*`", "restore rollback marker"),
     ]:
         require(policy, needle, label)
 
     require(roadmap, "Task 10.5", "roadmap task")
     require(roadmap, "backup/WAL/checkpoint/restore policy", "roadmap policy status")
-    require(roadmap, "Task 10.5.2 completed backup boundary", "roadmap backup status")
+    require(roadmap, "Task 10.5.2 added checkpointed backup", "roadmap backup status")
+    require(roadmap, "Task 10.5.3 added staged restore", "roadmap restore status")
     require(data_safety, "Backup and Restore", "data safety topic link")
     require(data_safety, "checkpoint-before-copy", "data safety policy summary")
     require(data_safety, "checkpointed backup boundary creation", "data safety backup status")
+    require(data_safety, "staged restore from backup artifacts", "data safety restore status")
 
     print("recovery policy ok")
 

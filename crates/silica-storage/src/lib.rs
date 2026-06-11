@@ -199,6 +199,15 @@ pub struct LibraryBackupResult {
     pub bytes_copied: u64,
 }
 
+/// Result of restoring a local library backup artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryRestoreResult {
+    pub restored_library: LocalLibrary,
+    pub backup_path: PathBuf,
+    pub rollback_path: Option<PathBuf>,
+    pub restored_files: Vec<String>,
+}
+
 /// Catalog export row written after an export completes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportRecord {
@@ -303,6 +312,12 @@ struct SidecarPhotoSnapshot {
     modified_at: Option<String>,
     partial_hash: Option<String>,
     full_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BackupManifest {
+    catalog_schema_version: i64,
+    files: Vec<String>,
 }
 
 /// Errors returned by local library create/open operations.
@@ -662,6 +677,48 @@ pub fn create_library_backup(
         created_at,
         files,
         bytes_copied,
+    })
+}
+
+/// Restore a backup artifact into an empty or rollback-protected library root.
+pub fn restore_library_backup(
+    backup_path: impl AsRef<Path>,
+    target_root_path: impl AsRef<Path>,
+) -> Result<LibraryRestoreResult, LibraryStorageError> {
+    let backup_path = backup_path.as_ref();
+    let target_root_path = target_root_path.as_ref();
+    let manifest = read_backup_manifest(backup_path)?;
+    let staging_root = restore_staging_path(target_root_path);
+    if staging_root.exists() {
+        return Err(LibraryStorageError::BackupValidation(format!(
+            "restore staging path already exists: {}",
+            staging_root.display()
+        )));
+    }
+
+    copy_backup_payload_to_root(backup_path, &staging_root)?;
+    let staging_library = match open_local_library(&staging_root) {
+        Ok(library) => library,
+        Err(error) => {
+            let _ = fs::remove_dir_all(&staging_root);
+            return Err(error);
+        }
+    };
+    drop(staging_library);
+
+    let rollback_path = if target_has_library_state(target_root_path)? {
+        Some(create_restore_rollback(target_root_path)?)
+    } else {
+        None
+    };
+
+    let restored_library = apply_staged_restore(&staging_root, target_root_path)?;
+
+    Ok(LibraryRestoreResult {
+        restored_library,
+        backup_path: backup_path.to_path_buf(),
+        rollback_path,
+        restored_files: manifest.files,
     })
 }
 
@@ -1823,6 +1880,81 @@ fn checkpoint_catalog_for_backup(catalog_path: &Path) -> Result<(), LibraryStora
     Ok(())
 }
 
+fn read_backup_manifest(backup_path: &Path) -> Result<BackupManifest, LibraryStorageError> {
+    if !backup_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(backup_path.to_path_buf()));
+    }
+
+    let manifest_path = backup_path.join(BACKUP_MANIFEST_FILE);
+    let manifest: serde_json::Value = serde_json::from_slice(&fs::read(&manifest_path)?)?;
+
+    if manifest.get("schema").and_then(serde_json::Value::as_str) != Some(BACKUP_SCHEMA) {
+        return Err(LibraryStorageError::BackupValidation(
+            "backup schema marker must be silica.backup".to_string(),
+        ));
+    }
+    if manifest.get("version").and_then(serde_json::Value::as_i64) != Some(BACKUP_VERSION) {
+        return Err(LibraryStorageError::BackupValidation(
+            "backup version must be 1".to_string(),
+        ));
+    }
+    let catalog_schema_version = manifest
+        .get("catalog_schema_version")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| {
+            LibraryStorageError::BackupValidation(
+                "backup catalog_schema_version must be an integer".to_string(),
+            )
+        })?;
+    if catalog_schema_version > CURRENT_SCHEMA_VERSION {
+        return Err(LibraryStorageError::BackupValidation(format!(
+            "backup uses newer catalog schema {catalog_schema_version}; app supports {CURRENT_SCHEMA_VERSION}"
+        )));
+    }
+
+    let files = manifest
+        .get("files")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| {
+            LibraryStorageError::BackupValidation("backup files must be an array".to_string())
+        })?
+        .iter()
+        .map(|value| {
+            let file = value.as_str().ok_or_else(|| {
+                LibraryStorageError::BackupValidation(
+                    "backup files entries must be strings".to_string(),
+                )
+            })?;
+            validate_backup_relative_path(file)?;
+            Ok(file.to_string())
+        })
+        .collect::<Result<Vec<_>, LibraryStorageError>>()?;
+
+    if !files.iter().any(|file| file == CATALOG_DATABASE_FILE) {
+        return Err(LibraryStorageError::BackupValidation(
+            "backup files must include catalog.db".to_string(),
+        ));
+    }
+
+    Ok(BackupManifest {
+        catalog_schema_version,
+        files,
+    })
+}
+
+fn validate_backup_relative_path(path: &str) -> Result<(), LibraryStorageError> {
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.contains('\\')
+        || path.split('/').any(|part| part == "." || part == "..")
+    {
+        return Err(LibraryStorageError::BackupValidation(format!(
+            "backup contains unsafe relative path: {path:?}"
+        )));
+    }
+    Ok(())
+}
+
 fn copy_backup_file(
     source: &Path,
     destination: &Path,
@@ -1883,6 +2015,106 @@ fn copy_backup_directory(
     Ok(bytes)
 }
 
+fn copy_backup_payload_to_root(
+    backup_path: &Path,
+    target_root: &Path,
+) -> Result<(), LibraryStorageError> {
+    fs::create_dir_all(target_root)?;
+    copy_backup_file(
+        &backup_path.join(CATALOG_DATABASE_FILE),
+        &target_root.join(CATALOG_DATABASE_FILE),
+        CATALOG_DATABASE_FILE,
+        &mut Vec::new(),
+    )?;
+    copy_backup_directory(
+        &backup_path.join(SIDECAR_DIRECTORY),
+        &target_root.join(SIDECAR_DIRECTORY),
+        SIDECAR_DIRECTORY,
+        &mut Vec::new(),
+    )?;
+    Ok(())
+}
+
+fn target_has_library_state(target_root: &Path) -> Result<bool, LibraryStorageError> {
+    if !target_root.exists() {
+        return Ok(false);
+    }
+    if !target_root.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(target_root.to_path_buf()));
+    }
+    Ok(target_root.join(CATALOG_DATABASE_FILE).exists()
+        || target_root.join(SIDECAR_DIRECTORY).exists())
+}
+
+fn create_restore_rollback(target_root: &Path) -> Result<PathBuf, LibraryStorageError> {
+    let rollback_path = target_root
+        .join(BACKUPS_DIRECTORY)
+        .join(current_restore_rollback_id());
+    if rollback_path.exists() {
+        return Err(LibraryStorageError::BackupValidation(format!(
+            "restore rollback path already exists: {}",
+            rollback_path.display()
+        )));
+    }
+    fs::create_dir_all(&rollback_path)?;
+
+    if target_root.join(CATALOG_DATABASE_FILE).is_file() {
+        copy_backup_file(
+            &target_root.join(CATALOG_DATABASE_FILE),
+            &rollback_path.join(CATALOG_DATABASE_FILE),
+            CATALOG_DATABASE_FILE,
+            &mut Vec::new(),
+        )?;
+    }
+    if target_root.join(SIDECAR_DIRECTORY).is_dir() {
+        copy_backup_directory(
+            &target_root.join(SIDECAR_DIRECTORY),
+            &rollback_path.join(SIDECAR_DIRECTORY),
+            SIDECAR_DIRECTORY,
+            &mut Vec::new(),
+        )?;
+    }
+
+    Ok(rollback_path)
+}
+
+fn apply_staged_restore(
+    staging_root: &Path,
+    target_root: &Path,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    if !target_root.exists() {
+        fs::rename(staging_root, target_root)?;
+    } else if is_empty_directory(target_root)? {
+        fs::remove_dir(target_root)?;
+        fs::rename(staging_root, target_root)?;
+    } else {
+        fs::copy(
+            staging_root.join(CATALOG_DATABASE_FILE),
+            target_root.join(CATALOG_DATABASE_FILE),
+        )?;
+        let target_sidecars = target_root.join(SIDECAR_DIRECTORY);
+        if target_sidecars.exists() {
+            fs::remove_dir_all(&target_sidecars)?;
+        }
+        copy_backup_directory(
+            &staging_root.join(SIDECAR_DIRECTORY),
+            &target_sidecars,
+            SIDECAR_DIRECTORY,
+            &mut Vec::new(),
+        )?;
+        fs::remove_dir_all(staging_root)?;
+    }
+
+    open_local_library(target_root)
+}
+
+fn is_empty_directory(path: &Path) -> Result<bool, LibraryStorageError> {
+    if !path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(path.to_path_buf()));
+    }
+    Ok(fs::read_dir(path)?.next().is_none())
+}
+
 fn current_backup_id() -> String {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1892,6 +2124,19 @@ fn current_backup_id() -> String {
         duration.as_secs(),
         duration.subsec_nanos()
     )
+}
+
+fn current_restore_rollback_id() -> String {
+    format!("restore-rollback-{}", current_backup_id())
+}
+
+fn restore_staging_path(target_root: &Path) -> PathBuf {
+    let parent = target_root.parent().unwrap_or_else(|| Path::new("."));
+    let name = target_root
+        .file_name()
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "library".to_string());
+    parent.join(format!(".{name}.restore-staging-{}", current_backup_id()))
 }
 
 fn update_sidecar_status(
@@ -3578,6 +3823,254 @@ mod tests {
         assert_eq!(picked, 1);
 
         drop(connection);
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn restores_backup_to_empty_directory_preserving_catalog_state_and_originals() {
+        let workspace = unique_library_root("restore-empty");
+        let library_root = workspace.join("SilicaRAW Library");
+        let restore_root = workspace.join("Restored Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("External Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let export_file = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+        std::fs::write(&export_file, b"exported jpeg bytes").expect("write export output");
+        let original_bytes = std::fs::read(&supported_file).expect("read original before");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("purple".to_string()),
+        )
+        .expect("set flags");
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.75, -12.0, "unix:7").expect("edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+        let sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write sidecar");
+        record_export(
+            &library.root_path,
+            &photo_id,
+            &export_file,
+            r#"{"format":"jpeg","color_profile":"srgb"}"#,
+        )
+        .expect("record export");
+        let backup =
+            create_library_backup(&library.root_path, "0.1.0-alpha.1").expect("create backup");
+
+        let restored =
+            restore_library_backup(&backup.backup_path, &restore_root).expect("restore backup");
+
+        assert_eq!(restored.restored_library.root_path, restore_root);
+        assert!(restored.rollback_path.is_none());
+        assert!(restore_root.join(CATALOG_DATABASE_FILE).is_file());
+        assert!(restore_root.join(&sidecar.sidecar_relative_path).is_file());
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after"),
+            original_bytes
+        );
+
+        let restored_library = open_local_library(&restore_root).expect("open restored library");
+        let restored_flags = get_photo_flags(&restored_library.root_path, &photo_id)
+            .expect("read restored flags")
+            .expect("restored flags");
+        assert_eq!(restored_flags.rating, 5);
+        assert!(restored_flags.picked);
+        assert_eq!(restored_flags.color_label.as_deref(), Some("purple"));
+
+        let restored_graph =
+            load_active_edit_graph_or_default(&restored_library.root_path, &photo_id)
+                .expect("read restored edit")
+                .expect("restored edit");
+        assert_eq!(restored_graph.basic.exposure.as_f64(), Some(0.75));
+        assert_eq!(restored_graph.basic.contrast.as_f64(), Some(-12.0));
+
+        let connection = open_catalog(&restored_library.catalog_path).expect("open restored db");
+        assert_eq!(count_edit_states(&connection), 1);
+        let export_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM exports", [], |row| row.get(0))
+            .expect("count exports");
+        let sidecar_status_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM sidecar_status", [], |row| row.get(0))
+            .expect("count sidecar status");
+        let schema_version: i64 = connection
+            .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
+                row.get(0)
+            })
+            .expect("schema version");
+        let (edited_flag, exported_flag): (i64, i64) = connection
+            .query_row(
+                "SELECT edited, exported FROM photo_flags WHERE photo_id = ?1",
+                params![photo_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("edited/exported flags");
+        assert_eq!(export_count, 1);
+        assert_eq!(sidecar_status_count, 1);
+        assert_eq!(schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(edited_flag, 1);
+        assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn restore_into_existing_library_creates_rollback_before_replacing_state() {
+        let workspace = unique_library_root("restore-existing");
+        let source_root = workspace.join("Source Library");
+        let target_root = workspace.join("Target Library");
+        let source_import = workspace.join("Source Originals");
+        let target_import = workspace.join("Target Originals");
+        let source_file = source_import.join("source.jpg");
+        let target_file = target_import.join("target.jpg");
+
+        std::fs::create_dir_all(&source_import).expect("create source import");
+        std::fs::create_dir_all(&target_import).expect("create target import");
+        std::fs::write(&source_file, b"source jpeg bytes").expect("write source");
+        std::fs::write(&target_file, b"target jpeg bytes").expect("write target");
+
+        let source_library = create_local_library(&source_root).expect("create source library");
+        import_folder(&source_library.root_path, &source_import).expect("import source");
+        let source_photo_id = stable_catalog_id("photo", &source_file.display().to_string());
+        set_photo_flags(
+            &source_library.root_path,
+            source_photo_id.clone(),
+            4,
+            true,
+            false,
+            None,
+        )
+        .expect("set source flags");
+        write_photo_sidecar(&source_library.root_path, &source_photo_id, "0.1.0-alpha.1")
+            .expect("write source sidecar");
+        let backup =
+            create_library_backup(&source_library.root_path, "0.1.0-alpha.1").expect("backup");
+
+        let target_library = create_local_library(&target_root).expect("create target library");
+        import_folder(&target_library.root_path, &target_import).expect("import target");
+        let target_photo_id = stable_catalog_id("photo", &target_file.display().to_string());
+        set_photo_flags(
+            &target_library.root_path,
+            target_photo_id.clone(),
+            1,
+            false,
+            true,
+            None,
+        )
+        .expect("set target flags");
+        write_photo_sidecar(&target_library.root_path, &target_photo_id, "0.1.0-alpha.1")
+            .expect("write target sidecar");
+
+        let restored = restore_library_backup(&backup.backup_path, &target_root)
+            .expect("restore over existing target");
+        let rollback_path = restored.rollback_path.expect("rollback path");
+        assert!(rollback_path.starts_with(target_root.join(BACKUPS_DIRECTORY)));
+        assert!(rollback_path.join(CATALOG_DATABASE_FILE).is_file());
+        assert!(
+            rollback_path
+                .join(SIDECAR_DIRECTORY)
+                .join(format!("{target_photo_id}{SIDECAR_FILE_SUFFIX}"))
+                .is_file(),
+            "rollback must preserve previous target sidecar"
+        );
+
+        let restored_items = list_library_photos(&target_root).expect("list restored target");
+        assert!(restored_items
+            .iter()
+            .any(|item| item.photo_id == source_photo_id));
+        assert!(!restored_items
+            .iter()
+            .any(|item| item.photo_id == target_photo_id));
+
+        let rollback_connection =
+            open_catalog(rollback_path.join(CATALOG_DATABASE_FILE)).expect("open rollback db");
+        let rollback_photo_count: i64 = rollback_connection
+            .query_row("SELECT COUNT(*) FROM photos", [], |row| row.get(0))
+            .expect("count rollback photos");
+        let rollback_target_count: i64 = rollback_connection
+            .query_row(
+                "SELECT COUNT(*) FROM photos WHERE id = ?1",
+                params![target_photo_id],
+                |row| row.get(0),
+            )
+            .expect("count rollback target photo");
+        assert_eq!(rollback_photo_count, 1);
+        assert_eq!(rollback_target_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn restore_rejects_newer_schema_backup_without_mutating_existing_library() {
+        let workspace = unique_library_root("restore-newer-schema");
+        let source_root = workspace.join("Source Library");
+        let target_root = workspace.join("Target Library");
+        let source_import = workspace.join("Source Originals");
+        let target_import = workspace.join("Target Originals");
+        let source_file = source_import.join("source.jpg");
+        let target_file = target_import.join("target.jpg");
+
+        std::fs::create_dir_all(&source_import).expect("create source import");
+        std::fs::create_dir_all(&target_import).expect("create target import");
+        std::fs::write(&source_file, b"source jpeg bytes").expect("write source");
+        std::fs::write(&target_file, b"target jpeg bytes").expect("write target");
+
+        let source_library = create_local_library(&source_root).expect("create source library");
+        import_folder(&source_library.root_path, &source_import).expect("import source");
+        let backup =
+            create_library_backup(&source_library.root_path, "0.1.0-alpha.1").expect("backup");
+        let manifest_path = backup.backup_path.join(BACKUP_MANIFEST_FILE);
+        let mut manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&manifest_path).expect("read manifest"))
+                .expect("parse manifest");
+        manifest["catalog_schema_version"] = serde_json::json!(CURRENT_SCHEMA_VERSION + 1);
+        std::fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize newer manifest"),
+        )
+        .expect("write newer manifest");
+
+        let target_library = create_local_library(&target_root).expect("create target library");
+        import_folder(&target_library.root_path, &target_import).expect("import target");
+        let target_photo_id = stable_catalog_id("photo", &target_file.display().to_string());
+        set_photo_flags(
+            &target_library.root_path,
+            target_photo_id.clone(),
+            2,
+            false,
+            true,
+            None,
+        )
+        .expect("set target flags");
+
+        let error = restore_library_backup(&backup.backup_path, &target_root)
+            .expect_err("newer schema restore must fail");
+        assert!(error.to_string().contains("newer catalog schema"));
+
+        let target_flags = get_photo_flags(&target_root, &target_photo_id)
+            .expect("read target flags")
+            .expect("target flags still present");
+        assert_eq!(target_flags.rating, 2);
+        assert!(target_flags.rejected);
+        assert!(!target_root
+            .join(BACKUPS_DIRECTORY)
+            .join("restore-rollback")
+            .exists());
+
         remove_library_root(&workspace);
     }
 

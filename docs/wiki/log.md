@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Restore boundary implementation added
+
+- Added Task 10.5.3 staged restore behavior in `silica-storage`.
+- Restore validates backup manifests, rejects newer catalog schema backups before target mutation, restores through staging, and creates rollback copies before replacing existing target catalog and sidecars.
+- Verified restored edit states, flags, sidecar status, export records, migration metadata, and original-file preservation; user-facing restore UI and conflict UI remain later work.
+
 ## [2026-06-11] phase-10 | Backup boundary implementation added
 
 - Added Task 10.5.2 checkpointed backup artifact creation in `silica-storage`.

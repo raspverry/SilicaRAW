@@ -134,10 +134,11 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Catalog backup does not include disposable caches.
   - Restore preserves edit states, flags, sidecar status, and export history.
   - Migration failures have a documented recovery path.
-- **Status:** In progress. Task 10.5.1 completed on 2026-06-11 with the [Backup and Restore](../topics/backup-restore.md) backup/WAL/checkpoint/restore policy and static recovery-policy harness. Task 10.5.2 completed backup boundary implementation with checkpointed `catalog.db`, `sidecars/`, and `backup-manifest.json` artifacts under `backups/`. Restore behavior, rollback tests, and runtime APIs remain pending.
+- **Status:** Completed on 2026-06-11. Task 10.5.1 added the [Backup and Restore](../topics/backup-restore.md) backup/WAL/checkpoint/restore policy and static recovery-policy harness. Task 10.5.2 added checkpointed backup artifacts with `catalog.db`, `sidecars/`, and `backup-manifest.json` under `backups/`. Task 10.5.3 added staged restore, existing-target rollback copies, restored catalog/sidecar preservation, newer-schema rejection before target mutation, and original-file safety tests. User-facing restore UI and conflict UI remain later product work.
 - **Validation:**
   - `python3 scripts/harness/check-recovery-policy.py`
   - `cargo test -p silica-storage backup`
+  - `cargo test -p silica-storage restore`
   - `cargo test -p silica-storage`
   - Manual QA checklist entry.
 
