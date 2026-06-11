@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "apps/desktop/static/index.html"
 
 ALLOWED_COMMANDS = {
+    "read_app_session",
     "create_library",
     "open_library",
     "import_folder",
@@ -312,6 +313,11 @@ def main():
         require(marker in source, f"cache clear marker missing: {marker}", failures)
     for marker in [
         "recentEmptyState",
+        "recentLibraryList",
+        "renderRecentLibraries",
+        "openRecentLibrary",
+        "read_app_session",
+        "Unavailable",
         "No recent libraries yet",
         "setSelectedRating",
         "toggleSelectedPick",

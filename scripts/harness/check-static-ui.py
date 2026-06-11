@@ -79,6 +79,7 @@ def main():
         "createLibrary",
         "openRecent",
         "recentEmptyState",
+        "recentLibraryList",
         "importPanel",
         "importFolderPath",
         "startImport",

@@ -254,6 +254,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-static-ui.py`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. Welcome now reads real app-session recents, renders an honest first-launch empty state, disables unavailable library paths, and opens available recent libraries through the existing desktop command path. The desktop DTO marks recent availability from the real catalog file; relaunch restore remains Task 11.3.
 
 ### Task 11.3.1: Relaunch Restore State Machine
 

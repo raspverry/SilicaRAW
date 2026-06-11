@@ -526,6 +526,14 @@ body {
   padding: 0;
 }
 
+.sr-recent-list {
+  display: grid;
+}
+
+.sr-recent-list[hidden] {
+  display: none;
+}
+
 .sr-recent-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 60px;
@@ -535,6 +543,16 @@ body {
   background: transparent;
   padding: var(--sr-space-sm) var(--sr-space-lg);
   text-align: left;
+}
+
+.sr-recent-row:not(:disabled):hover {
+  background: var(--sr-surface-muted);
+}
+
+.sr-recent-row.is-unavailable {
+  color: var(--sr-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .sr-recent-empty {
@@ -573,6 +591,12 @@ body {
 .sr-recent-empty small {
   color: var(--sr-text-tertiary);
   font-size: var(--sr-type-control);
+}
+
+.sr-recent-state {
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-control);
+  white-space: nowrap;
 }
 
 .sr-welcome-footer {

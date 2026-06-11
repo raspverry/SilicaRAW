@@ -98,6 +98,7 @@
                 <div class="sr-recent-header">
                   <h2>Recent Libraries</h2>
                 </div>
+                <div class="sr-recent-list" id="recentLibraryList" aria-label="Recent library list" hidden></div>
                 <div class="sr-recent-empty" id="recentEmptyState">
                   <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
                   <span><strong>No recent libraries yet</strong><small>Open or create a local library to begin.</small></span>
@@ -425,7 +426,6 @@
       const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
       const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
       const libraryStatePanels = Array.from(document.querySelectorAll("[data-library-state-panel]"));
-      const recentButtons = Array.from(document.querySelectorAll("[data-recent-path]"));
       const welcomeActionButtons = Array.from(document.querySelectorAll("[data-welcome-action]"));
       const statusActionButtons = Array.from(document.querySelectorAll("[data-status-action]"));
       const pathInput = document.querySelector("#libraryPath");
@@ -468,6 +468,8 @@
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
       const openRecentButton = document.querySelector("#openRecent");
+      const recentLibraryList = document.querySelector("#recentLibraryList");
+      const recentEmptyState = document.querySelector("#recentEmptyState");
       const chooseLibraryPathButton = document.querySelector("#chooseLibraryPath");
       const chooseImportFolderPathButton = document.querySelector("#chooseImportFolderPath");
       const startImportButton = document.querySelector("#startImport");
@@ -514,6 +516,7 @@
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let activeLibraryPath = "";
+      let recentLibraries = [];
       let developPreviewSequence = 0;
       let controlsBusy = false;
       const developAdjustmentsByPhoto = new Map();
@@ -559,6 +562,96 @@
 
       function commandFailed(response) {
         return !response || response.ok === false;
+      }
+
+      function recentDisplayName(recent) {
+        return recent?.displayName || recent?.rootPath?.split(/[\\/]/).filter(Boolean).pop() || "Local Library";
+      }
+
+      function recentStatusText(recent) {
+        if (recent?.available === false) {
+          return "Unavailable";
+        }
+        return recent?.lastOpenedAt || "Ready";
+      }
+
+      function firstAvailableRecent() {
+        return recentLibraries.find((recent) => recent?.rootPath && recent.available !== false);
+      }
+
+      function renderRecentLibraries(recents = []) {
+        recentLibraries = Array.isArray(recents) ? recents.filter((recent) => recent?.rootPath) : [];
+        recentLibraryList.replaceChildren();
+        const hasRecents = recentLibraries.length > 0;
+        recentLibraryList.hidden = !hasRecents;
+        recentEmptyState.hidden = hasRecents;
+
+        const availableRecent = firstAvailableRecent();
+        openRecentButton.disabled = !availableRecent;
+        openRecentButton.title = availableRecent
+          ? "Open the most recent available library."
+          : "Recent libraries are empty or unavailable.";
+
+        recentLibraries.forEach((recent) => {
+          const isAvailable = recent.available !== false;
+          const row = document.createElement("button");
+          row.className = "sr-recent-row";
+          row.type = "button";
+          row.disabled = !isAvailable;
+          row.dataset.recentPath = recent.rootPath;
+          row.setAttribute("aria-label", `${recentDisplayName(recent)} ${recentStatusText(recent)}`);
+          if (!isAvailable) {
+            row.classList.add("is-unavailable");
+            row.title = "This recent library path is unavailable.";
+          }
+
+          const icon = document.createElement("span");
+          icon.className = "sr-glyph sr-glyph-folder";
+          icon.setAttribute("aria-hidden", "true");
+
+          const text = document.createElement("span");
+          const name = document.createElement("strong");
+          name.textContent = recentDisplayName(recent);
+          const path = document.createElement("small");
+          path.textContent = recent.rootPath;
+          text.append(name, path);
+
+          const state = document.createElement("span");
+          state.className = "sr-recent-state";
+          state.textContent = recentStatusText(recent);
+
+          row.append(icon, text, state);
+          if (isAvailable) {
+            row.addEventListener("click", () => openRecentLibrary(recent));
+          }
+          recentLibraryList.append(row);
+        });
+      }
+
+      async function loadAppSession() {
+        if (!invoke) {
+          renderRecentLibraries([]);
+          return;
+        }
+        try {
+          const response = await invoke("read_app_session");
+          if (commandFailed(response)) {
+            renderRecentLibraries([]);
+            return;
+          }
+          renderRecentLibraries(response.data?.session?.recents ?? []);
+        } catch (_error) {
+          renderRecentLibraries([]);
+        }
+      }
+
+      async function openRecentLibrary(recent = firstAvailableRecent()) {
+        if (!recent?.rootPath || recent.available === false) {
+          setStatus("Recent library is unavailable.");
+          return;
+        }
+        pathInput.value = recent.rootPath;
+        await runLibraryCommand("open_library");
       }
 
       function dialogPathValue(selection) {
@@ -1764,6 +1857,7 @@
           cacheClearStatus.value = "Ready to clear disposable caches.";
           setStatus(responseMessage(response));
           await loadLibraryGrid();
+          await loadAppSession();
         } catch (error) {
           setStatus(responseErrorMessage(error, "Library command failed."));
         } finally {
@@ -1895,7 +1989,7 @@
         document.querySelector("#importPanel").hidden = true;
         setStatus("Import panel minimized.");
       });
-      openRecentButton.addEventListener("click", () => setStatus("No recent libraries yet."));
+      openRecentButton.addEventListener("click", () => openRecentLibrary());
       welcomeActionButtons.forEach((button) => {
         button.addEventListener("click", () => {
           setStatus(`${button.dataset.welcomeAction} will be wired after the local alpha runtime loop is complete.`);
@@ -1906,12 +2000,7 @@
           setStatus(`${button.dataset.statusAction} are deferred for this local alpha.`);
         });
       });
-      recentButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          pathInput.value = button.dataset.recentPath;
-          setStatus("Recent library path selected.");
-        });
-      });
+      loadAppSession();
       renderLibraryGrid(initialGridPhotos);
     </script>
   </body>

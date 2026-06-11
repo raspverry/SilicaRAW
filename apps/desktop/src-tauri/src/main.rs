@@ -268,14 +268,18 @@ struct DesktopRecentLibrary {
     root_path: String,
     display_name: String,
     last_opened_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    available: Option<bool>,
 }
 
 impl DesktopRecentLibrary {
     fn from_core(recent: silica_core::AppRecentLibrary) -> Self {
+        let available = recent.root_path.join("catalog.db").is_file();
         Self {
             root_path: recent.root_path.display().to_string(),
             display_name: recent.display_name,
             last_opened_at: recent.last_opened_at,
+            available: Some(available),
         }
     }
 
@@ -1194,6 +1198,7 @@ mod tests {
             root_path: library_root.display().to_string(),
             display_name: "SilicaRAW Library".to_string(),
             last_opened_at: "unix:42".to_string(),
+            available: None,
         });
         expected_session.per_library.insert(
             library_root.display().to_string(),
@@ -1240,12 +1245,17 @@ mod tests {
             super::DesktopCommandData::AppSession {
                 session, warnings, ..
             } => {
-                assert_eq!(session, &expected_session);
                 assert_eq!(session.last_mode, "develop");
                 assert_eq!(
                     session.last_library_root_path.as_deref(),
                     Some(library_root.display().to_string().as_str())
                 );
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    expected_session.recents[0].root_path
+                );
+                assert_eq!(session.recents[0].available, Some(false));
                 assert!(warnings.is_empty());
             }
             other => panic!("unexpected response data: {other:?}"),
@@ -1311,6 +1321,7 @@ mod tests {
                     session.recents[0].root_path,
                     library_root.display().to_string()
                 );
+                assert_eq!(session.recents[0].available, Some(true));
             }
             other => panic!("unexpected response data: {other:?}"),
         }
@@ -1328,6 +1339,7 @@ mod tests {
                     session.recents[0].root_path,
                     library_root.display().to_string()
                 );
+                assert_eq!(session.recents[0].available, Some(true));
             }
             other => panic!("unexpected response data: {other:?}"),
         }

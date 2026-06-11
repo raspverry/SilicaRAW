@@ -188,6 +188,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - `cargo test -p silica-core`
   - UI workflow smoke.
+- **Status:** Completed on 2026-06-11. Task 11.2 records recent libraries only after successful create/open, dedupes and caps them in app-session state, and renders real Welcome recents with honest empty and unavailable states. Relaunch restore, selected-photo restore, and layout persistence remain Task 11.3 and Task 11.4.
 
 ### Task 11.3: Restore Last Library, Mode, and Selection
 

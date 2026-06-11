@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Welcome recent libraries connected
+
+- Added Task 11.2.2 Welcome recents rendering from real app-session data.
+- First launch stays empty, unavailable recent paths are disabled and labeled, and valid recent libraries open through the existing desktop command path.
+- Relaunch restore, selected-photo restore, and layout preference persistence remain separate Phase 11 tasks.
+
 ## [2026-06-11] phase-11 | Real recent recording added
 
 - Added Task 11.2.1 app-session recent recording after successful library create/open.
