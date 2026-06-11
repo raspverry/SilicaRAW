@@ -36,13 +36,22 @@ def main() -> None:
         ("A backup from a newer catalog schema must be rejected", "newer schema rejection"),
         ("If migration fails", "migration failure behavior"),
         ("Task 10.5 implementation tests must prove", "future test policy"),
+        ("Task 10.5.2 adds `silica-storage::create_library_backup`", "backup API marker"),
+        ("<library_root>/backups/<backup_id>/", "backup artifact path"),
+        ("backup-manifest.json", "backup manifest file"),
+        ("schema = silica.backup", "backup schema marker"),
+        ("version = 1", "backup version marker"),
+        ("PRAGMA wal_checkpoint(TRUNCATE)", "checkpoint implementation marker"),
+        ("temporary sidecar write files", "sidecar temp exclusion"),
     ]:
         require(policy, needle, label)
 
     require(roadmap, "Task 10.5", "roadmap task")
     require(roadmap, "backup/WAL/checkpoint/restore policy", "roadmap policy status")
+    require(roadmap, "Task 10.5.2 completed backup boundary", "roadmap backup status")
     require(data_safety, "Backup and Restore", "data safety topic link")
     require(data_safety, "checkpoint-before-copy", "data safety policy summary")
+    require(data_safety, "checkpointed backup boundary creation", "data safety backup status")
 
     print("recovery policy ok")
 
