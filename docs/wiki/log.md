@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-8 | Developer-preview artifact runbook added
+
+- Added a maintainer runbook for triggering, watching, downloading, and checksum-verifying unsigned developer-preview DMG artifacts.
+- Documented manual workflow dispatch and `developer-preview-*` tag workflows without treating the artifact as user-ready local distribution.
+- Extended release workflow guardrails so the runbook and unsigned/notarized boundary stay present.
+
 ## [2026-06-11] phase-8 | Unsigned developer-preview workflow added
 
 - Added ADR 0006 to permit unsigned developer-preview DMG artifacts while Developer ID funding is blocked.
