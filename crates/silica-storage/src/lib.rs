@@ -182,6 +182,17 @@ pub struct ExportRecord {
     pub export_settings_json: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SidecarPhotoRow {
+    photo_id: String,
+    original_path: String,
+    file_name: String,
+    file_size: i64,
+    modified_at: Option<String>,
+    partial_hash: Option<String>,
+    full_hash: Option<String>,
+}
+
 /// Errors returned by local library create/open operations.
 #[derive(Debug)]
 pub enum LibraryStorageError {
@@ -738,6 +749,221 @@ pub fn load_active_edit_graph_or_default(
         .optional()?;
 
     Ok(source.map(|source| silica_edit::default_edit_graph(source, current_timestamp_string())))
+}
+
+fn load_sidecar_photo_row(
+    connection: &Connection,
+    photo_id: &str,
+) -> Result<Option<SidecarPhotoRow>, LibraryStorageError> {
+    connection
+        .query_row(
+            r#"
+            SELECT id, path, file_name, file_size, modified_at, partial_hash, full_hash
+            FROM photos
+            WHERE id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok(SidecarPhotoRow {
+                    photo_id: row.get(0)?,
+                    original_path: row.get(1)?,
+                    file_name: row.get(2)?,
+                    file_size: row.get(3)?,
+                    modified_at: row.get(4)?,
+                    partial_hash: row.get(5)?,
+                    full_hash: row.get(6)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
+}
+
+fn active_edit_state_id(
+    connection: &Connection,
+    photo_id: &str,
+) -> Result<Option<String>, LibraryStorageError> {
+    connection
+        .query_row(
+            r#"
+            SELECT id
+            FROM edit_states
+            WHERE photo_id = ?1 AND active = 1
+            ORDER BY updated_at DESC
+            LIMIT 1
+            "#,
+            params![photo_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
+}
+
+fn edit_color_label_from_catalog(
+    label: Option<&str>,
+) -> Result<Option<silica_edit::ColorLabel>, LibraryStorageError> {
+    match label {
+        None => Ok(None),
+        Some("red") => Ok(Some(silica_edit::ColorLabel::Red)),
+        Some("orange") => Ok(Some(silica_edit::ColorLabel::Orange)),
+        Some("yellow") => Ok(Some(silica_edit::ColorLabel::Yellow)),
+        Some("green") => Ok(Some(silica_edit::ColorLabel::Green)),
+        Some("blue") => Ok(Some(silica_edit::ColorLabel::Blue)),
+        Some("purple") => Ok(Some(silica_edit::ColorLabel::Purple)),
+        Some(other) => Err(LibraryStorageError::SidecarValidation(format!(
+            "unsupported sidecar color label: {other}"
+        ))),
+    }
+}
+
+fn color_label_value(label: Option<&str>) -> serde_json::Value {
+    match label {
+        Some(label) => serde_json::Value::String(label.to_string()),
+        None => serde_json::Value::Null,
+    }
+}
+
+fn build_photo_sidecar_value(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    app_version: &str,
+) -> Result<serde_json::Value, LibraryStorageError> {
+    validate_sidecar_photo_id(photo_id)?;
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let photo = load_sidecar_photo_row(&connection, photo_id)?
+        .ok_or_else(|| LibraryStorageError::MissingPhoto(photo_id.to_string()))?;
+    let flags = get_photo_flags(&library.root_path, photo_id)?
+        .ok_or_else(|| LibraryStorageError::MissingPhoto(photo_id.to_string()))?;
+    let mut graph = load_active_edit_graph_or_default(&library.root_path, photo_id)?
+        .ok_or_else(|| LibraryStorageError::MissingPhoto(photo_id.to_string()))?;
+
+    graph.app_version = Some(app_version.to_string());
+    graph.metadata.rating = i64::from(flags.rating);
+    graph.metadata.picked = flags.picked;
+    graph.metadata.rejected = flags.rejected;
+    graph.metadata.color_label = edit_color_label_from_catalog(flags.color_label.as_deref())?;
+    silica_edit::validate_edit_graph(&graph)?;
+    let edit_graph_json = serde_json::to_value(&graph)?;
+    let written_at = current_timestamp_string();
+    let catalog_edit_state_id = active_edit_state_id(&connection, photo_id)?;
+
+    let value = serde_json::json!({
+        "schema": SIDECAR_SCHEMA,
+        "version": SIDECAR_VERSION,
+        "app_version": app_version,
+        "photo": {
+            "photo_id": photo.photo_id,
+            "original_path": photo.original_path,
+            "file_name": photo.file_name,
+            "fingerprint": {
+                "file_size": photo.file_size,
+                "modified_at": photo.modified_at.unwrap_or_else(|| "unknown".to_string()),
+                "partial_hash": photo.partial_hash.unwrap_or_default(),
+                "full_hash": photo.full_hash
+            }
+        },
+        "edit_graph": edit_graph_json,
+        "flags": {
+            "rating": flags.rating,
+            "picked": flags.picked,
+            "rejected": flags.rejected,
+            "color_label": color_label_value(flags.color_label.as_deref())
+        },
+        "sync": {
+            "status": "in_sync",
+            "catalog_edit_state_id": catalog_edit_state_id,
+            "sidecar_hash": serde_json::Value::Null
+        },
+        "written_at": written_at
+    });
+
+    validate_sidecar_json(&value)?;
+    Ok(value)
+}
+
+fn validate_sidecar_json(value: &serde_json::Value) -> Result<(), LibraryStorageError> {
+    let object = value.as_object().ok_or_else(|| {
+        LibraryStorageError::SidecarValidation("sidecar root must be an object".to_string())
+    })?;
+    if object.get("schema").and_then(serde_json::Value::as_str) != Some(SIDECAR_SCHEMA) {
+        return Err(LibraryStorageError::SidecarValidation(
+            "sidecar schema marker must be silica.sidecar".to_string(),
+        ));
+    }
+    if object.get("version").and_then(serde_json::Value::as_i64) != Some(SIDECAR_VERSION) {
+        return Err(LibraryStorageError::SidecarValidation(
+            "sidecar version must be 1".to_string(),
+        ));
+    }
+    for required in [
+        "app_version",
+        "photo",
+        "edit_graph",
+        "flags",
+        "sync",
+        "written_at",
+    ] {
+        if !object.contains_key(required) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar missing required field: {required}"
+            )));
+        }
+    }
+
+    let flags = object
+        .get("flags")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation("sidecar.flags must be an object".to_string())
+        })?;
+    let allowed_flags = ["rating", "picked", "rejected", "color_label"];
+    for key in flags.keys() {
+        if !allowed_flags.contains(&key.as_str()) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar.flags contains unsupported field: {key}"
+            )));
+        }
+    }
+    if flags
+        .get("rating")
+        .and_then(serde_json::Value::as_i64)
+        .map_or(true, |rating| !(0..=5).contains(&rating))
+    {
+        return Err(LibraryStorageError::SidecarValidation(
+            "sidecar.flags.rating must be 0..=5".to_string(),
+        ));
+    }
+    for key in ["picked", "rejected"] {
+        if !flags.get(key).is_some_and(serde_json::Value::is_boolean) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar.flags.{key} must be boolean"
+            )));
+        }
+    }
+    match flags.get("color_label") {
+        Some(value) if value.is_null() => {}
+        Some(value) => {
+            let label = value.as_str().ok_or_else(|| {
+                LibraryStorageError::SidecarValidation(
+                    "sidecar.flags.color_label must be string or null".to_string(),
+                )
+            })?;
+            edit_color_label_from_catalog(Some(label))?;
+        }
+        None => {
+            return Err(LibraryStorageError::SidecarValidation(
+                "sidecar.flags.color_label is required".to_string(),
+            ));
+        }
+    }
+
+    let edit_graph = object.get("edit_graph").ok_or_else(|| {
+        LibraryStorageError::SidecarValidation("sidecar.edit_graph is required".to_string())
+    })?;
+    silica_edit::validate_edit_graph_json(edit_graph)?;
+
+    Ok(())
 }
 
 /// Persist the active edit graph for a photo. Draft preview updates should not call this.
@@ -1649,6 +1875,90 @@ mod tests {
                 "invalid photo id should be rejected: {invalid:?}"
             );
         }
+    }
+
+    #[test]
+    fn builds_valid_sidecar_payload_with_flags_and_metadata_mirror() {
+        let workspace = unique_library_root("sidecar-payload");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("purple".to_string()),
+        )
+        .expect("set flags");
+
+        let sidecar = build_photo_sidecar_value(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("build sidecar");
+
+        validate_sidecar_json(&sidecar).expect("validate sidecar");
+        assert_eq!(sidecar["schema"], SIDECAR_SCHEMA);
+        assert_eq!(sidecar["version"], SIDECAR_VERSION);
+        assert_eq!(sidecar["photo"]["photo_id"], photo_id);
+        assert_eq!(sidecar["flags"]["rating"], 5);
+        assert_eq!(sidecar["flags"]["picked"], true);
+        assert_eq!(sidecar["flags"]["rejected"], false);
+        assert_eq!(sidecar["flags"]["color_label"], "purple");
+        assert_eq!(sidecar["edit_graph"]["metadata"]["rating"], 5);
+        assert_eq!(sidecar["edit_graph"]["metadata"]["picked"], true);
+        assert_eq!(sidecar["edit_graph"]["metadata"]["rejected"], false);
+        assert_eq!(sidecar["edit_graph"]["metadata"]["color_label"], "purple");
+        assert!(sidecar["sync"]["sidecar_hash"].is_null());
+        assert!(sidecar["flags"].get("edited").is_none());
+        assert!(sidecar["flags"].get("exported").is_none());
+
+        let connection = open_catalog(library.catalog_path).expect("open catalog");
+        assert_eq!(
+            count_edit_states(&connection),
+            0,
+            "building a sidecar for an unedited photo must not write edit_states"
+        );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rejects_sidecar_payload_for_invalid_color_label() {
+        let workspace = unique_library_root("sidecar-invalid-label");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        connection
+            .execute(
+                "UPDATE photo_flags SET color_label = 'cyan' WHERE photo_id = ?1",
+                params![photo_id],
+            )
+            .expect("force invalid catalog label");
+        drop(connection);
+
+        let error = build_photo_sidecar_value(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect_err("invalid sidecar label should fail");
+        assert!(error
+            .to_string()
+            .contains("unsupported sidecar color label"));
+
+        remove_library_root(&workspace);
     }
 
     #[test]
