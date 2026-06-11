@@ -224,6 +224,7 @@ Demo/Validation:
   - Desktop tests can use a temp app-session path.
 - **Validation:**
   - `cargo test -p silica-desktop app_session`
+- **Status:** Completed on 2026-06-11. Added desktop app-session DTOs, app-config path resolution through Tauri `BaseDirectory::AppConfig`, and read/write/reset/inspect command handlers with temp-path test helpers. This does not record real recents, restore last state on launch, or persist frontend layout interactions.
 
 ### Task 11.2.1: Record Real Recent Libraries
 

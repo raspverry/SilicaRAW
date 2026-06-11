@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Desktop app session commands added
+
+- Added Task 11.1.3 desktop app-session command boundary.
+- Desktop resolves `app-session.json` under the Tauri app config directory and exposes read, write, reset, and inspect handlers backed by `silica-core`.
+- Real recent recording, Welcome recents, and relaunch restore remain separate Phase 11 tasks.
+
 ## [2026-06-11] phase-11 | App session core types added
 
 - Added Task 11.1.2 core app-session v1 types and JSON read/write helpers.

@@ -1,8 +1,10 @@
 #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
 mod metal_host_spike;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use tauri::{path::BaseDirectory, Manager};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +69,20 @@ enum DesktopCommandData {
         root_path: String,
         catalog_path: String,
         schema_version: i64,
+    },
+    AppSession {
+        session_path: String,
+        session: DesktopAppSession,
+        warnings: Vec<String>,
+    },
+    AppSessionWrite {
+        session_path: String,
+        bytes_written: u64,
+    },
+    AppSessionInspection {
+        session_path: String,
+        exists: bool,
+        warnings: Vec<String>,
     },
     ImportSummary {
         folder_path: String,
@@ -139,6 +155,9 @@ impl DesktopCommandData {
     fn kind(&self) -> &'static str {
         match self {
             Self::LibrarySession { .. } => "librarySession",
+            Self::AppSession { .. } => "appSession",
+            Self::AppSessionWrite { .. } => "appSessionWrite",
+            Self::AppSessionInspection { .. } => "appSessionInspection",
             Self::ImportSummary { .. } => "importSummary",
             Self::PhotoGrid { .. } => "photoGrid",
             Self::PhotoFlags { .. } => "photoFlags",
@@ -165,6 +184,223 @@ impl DesktopCommandData {
             Self::LibrarySession { catalog_path, .. } => Some(catalog_path.clone()),
             _ => None,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopAppSession {
+    schema: String,
+    version: i64,
+    last_library_root_path: Option<String>,
+    last_mode: String,
+    recents: Vec<DesktopRecentLibrary>,
+    layout: DesktopLayoutPreferences,
+    per_library: BTreeMap<String, DesktopPerLibrarySession>,
+}
+
+impl Default for DesktopAppSession {
+    fn default() -> Self {
+        Self::from_core(silica_core::AppSession::default())
+    }
+}
+
+impl DesktopAppSession {
+    fn from_core(session: silica_core::AppSession) -> Self {
+        Self {
+            schema: session.schema,
+            version: session.version,
+            last_library_root_path: session
+                .last_library_root_path
+                .map(|path| path.display().to_string()),
+            last_mode: app_session_mode_string(session.last_mode).to_string(),
+            recents: session
+                .recents
+                .into_iter()
+                .map(DesktopRecentLibrary::from_core)
+                .collect(),
+            layout: DesktopLayoutPreferences::from_core(session.layout),
+            per_library: session
+                .per_library
+                .into_iter()
+                .map(|(key, value)| (key, DesktopPerLibrarySession::from_core(value)))
+                .collect(),
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppSession, silica_core::CoreError> {
+        if self.schema != silica_core::APP_SESSION_SCHEMA {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session schema: {}",
+                self.schema
+            )));
+        }
+        if self.version != silica_core::APP_SESSION_VERSION {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session version: {}",
+                self.version
+            )));
+        }
+
+        Ok(silica_core::AppSession {
+            schema: self.schema,
+            version: self.version,
+            last_library_root_path: self.last_library_root_path.map(PathBuf::from),
+            last_mode: parse_desktop_app_session_mode(&self.last_mode)?,
+            recents: self
+                .recents
+                .into_iter()
+                .map(DesktopRecentLibrary::into_core)
+                .collect(),
+            layout: self.layout.into_core()?,
+            per_library: self
+                .per_library
+                .into_iter()
+                .map(|(key, value)| value.into_core().map(|value| (key, value)))
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopRecentLibrary {
+    root_path: String,
+    display_name: String,
+    last_opened_at: String,
+}
+
+impl DesktopRecentLibrary {
+    fn from_core(recent: silica_core::AppRecentLibrary) -> Self {
+        Self {
+            root_path: recent.root_path.display().to_string(),
+            display_name: recent.display_name,
+            last_opened_at: recent.last_opened_at,
+        }
+    }
+
+    fn into_core(self) -> silica_core::AppRecentLibrary {
+        silica_core::AppRecentLibrary {
+            root_path: PathBuf::from(self.root_path),
+            display_name: self.display_name,
+            last_opened_at: self.last_opened_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopPerLibrarySession {
+    selected_photo_id: Option<String>,
+    last_mode: String,
+    last_opened_at: String,
+}
+
+impl DesktopPerLibrarySession {
+    fn from_core(session: silica_core::AppPerLibrarySession) -> Self {
+        Self {
+            selected_photo_id: session.selected_photo_id,
+            last_mode: app_session_mode_string(session.last_mode).to_string(),
+            last_opened_at: session.last_opened_at,
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppPerLibrarySession, silica_core::CoreError> {
+        Ok(silica_core::AppPerLibrarySession {
+            selected_photo_id: self.selected_photo_id,
+            last_mode: parse_desktop_app_session_mode(&self.last_mode)?,
+            last_opened_at: self.last_opened_at,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopLayoutPreferences {
+    sidebar_collapsed: bool,
+    inspector_collapsed: bool,
+    filmstrip_visible: bool,
+    thumbnail_size: u16,
+    sort: String,
+    filters: DesktopSessionFilters,
+}
+
+impl DesktopLayoutPreferences {
+    fn from_core(layout: silica_core::AppLayoutPreferences) -> Self {
+        Self {
+            sidebar_collapsed: layout.sidebar_collapsed,
+            inspector_collapsed: layout.inspector_collapsed,
+            filmstrip_visible: layout.filmstrip_visible,
+            thumbnail_size: layout.thumbnail_size,
+            sort: app_library_sort_string(layout.sort).to_string(),
+            filters: DesktopSessionFilters::from_core(layout.filters),
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppLayoutPreferences, silica_core::CoreError> {
+        if self.thumbnail_size < silica_core::MIN_APP_SESSION_THUMBNAIL_SIZE
+            || self.thumbnail_size > silica_core::MAX_APP_SESSION_THUMBNAIL_SIZE
+        {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session thumbnail size: {}",
+                self.thumbnail_size
+            )));
+        }
+
+        Ok(silica_core::AppLayoutPreferences {
+            sidebar_collapsed: self.sidebar_collapsed,
+            inspector_collapsed: self.inspector_collapsed,
+            filmstrip_visible: self.filmstrip_visible,
+            thumbnail_size: self.thumbnail_size,
+            sort: parse_desktop_app_library_sort(&self.sort)?,
+            filters: self.filters.into_core()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopSessionFilters {
+    min_rating: Option<u8>,
+    picked: Option<bool>,
+    rejected: Option<bool>,
+    file_type: Option<String>,
+    search: String,
+}
+
+impl DesktopSessionFilters {
+    fn from_core(filters: silica_core::AppSessionFilters) -> Self {
+        Self {
+            min_rating: filters.min_rating,
+            picked: filters.picked,
+            rejected: filters.rejected,
+            file_type: filters
+                .file_type
+                .map(app_file_type_filter_string)
+                .map(str::to_string),
+            search: filters.search,
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppSessionFilters, silica_core::CoreError> {
+        if self.min_rating.is_some_and(|rating| rating > 5) {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session min rating: {}",
+                self.min_rating.unwrap_or_default()
+            )));
+        }
+
+        Ok(silica_core::AppSessionFilters {
+            min_rating: self.min_rating,
+            picked: self.picked,
+            rejected: self.rejected,
+            file_type: self
+                .file_type
+                .as_deref()
+                .map(parse_desktop_app_file_type_filter)
+                .transpose()?,
+            search: self.search,
+        })
     }
 }
 
@@ -222,6 +458,54 @@ struct DesktopCommandError {
     kind: String,
     message: String,
     context: DesktopCommandContext,
+}
+
+#[tauri::command]
+fn read_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => read_app_session_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "read_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn write_app_session(app: tauri::AppHandle, session: DesktopAppSession) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => write_app_session_at_path(session_path, session),
+        Err(error) => DesktopCommandResponse::error(
+            "write_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn reset_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => reset_app_session_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "reset_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn inspect_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => inspect_app_session_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "inspect_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
 }
 
 #[tauri::command]
@@ -578,6 +862,104 @@ fn library_session_data(session: silica_core::LibrarySession) -> DesktopCommandD
     }
 }
 
+fn resolve_app_session_path(app: &tauri::AppHandle) -> Result<PathBuf, silica_core::CoreError> {
+    app.path()
+        .resolve("app-session.json", BaseDirectory::AppConfig)
+        .map_err(|error| {
+            silica_core::CoreError::AppSession(format!("resolve app session path: {error}"))
+        })
+}
+
+fn read_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "read_app_session";
+    match silica_core::load_app_session(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session loaded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn write_app_session_at_path(
+    session_path: PathBuf,
+    session: DesktopAppSession,
+) -> DesktopCommandResponse {
+    let command = "write_app_session";
+    let session = match session.into_core() {
+        Ok(session) => session,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+
+    match silica_core::write_app_session(&session_path, &session) {
+        Ok(written) => DesktopCommandResponse::ok(
+            command,
+            "App session written.",
+            DesktopCommandData::AppSessionWrite {
+                session_path: written.session_path.display().to_string(),
+                bytes_written: written.bytes_written,
+            },
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn reset_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "reset_app_session";
+    let session = silica_core::AppSession::default();
+    match silica_core::write_app_session(&session_path, &session) {
+        Ok(_) => DesktopCommandResponse::ok(
+            command,
+            "App session reset.",
+            DesktopCommandData::AppSession {
+                session_path: session_path.display().to_string(),
+                session: DesktopAppSession::from_core(session),
+                warnings: Vec::new(),
+            },
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn inspect_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "inspect_app_session";
+    let exists = session_path.is_file();
+    match silica_core::load_app_session(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session inspected.",
+            DesktopCommandData::AppSessionInspection {
+                session_path: session_path.display().to_string(),
+                exists,
+                warnings: app_session_warning_strings(&loaded.warnings),
+            },
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn app_session_data(
+    session_path: PathBuf,
+    loaded: silica_core::AppSessionLoadResult,
+) -> DesktopCommandData {
+    DesktopCommandData::AppSession {
+        session_path: session_path.display().to_string(),
+        session: DesktopAppSession::from_core(loaded.session),
+        warnings: app_session_warning_strings(&loaded.warnings),
+    }
+}
+
 fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
     DesktopCommandData::PhotoFlags {
         photo_id: flags.photo_id,
@@ -585,6 +967,82 @@ fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
         picked: flags.picked,
         rejected: flags.rejected,
         color_label: flags.color_label,
+    }
+}
+
+fn app_session_warning_strings(warnings: &[silica_core::AppSessionWarning]) -> Vec<String> {
+    warnings
+        .iter()
+        .map(|warning| match warning {
+            silica_core::AppSessionWarning::Missing => "missing",
+            silica_core::AppSessionWarning::Corrupt => "corrupt",
+            silica_core::AppSessionWarning::UnsupportedVersion => "unsupportedVersion",
+            silica_core::AppSessionWarning::InvalidValues => "invalidValues",
+        })
+        .map(str::to_string)
+        .collect()
+}
+
+fn parse_desktop_app_session_mode(
+    mode: &str,
+) -> Result<silica_core::AppSessionMode, silica_core::CoreError> {
+    match mode {
+        "library" => Ok(silica_core::AppSessionMode::Library),
+        "develop" => Ok(silica_core::AppSessionMode::Develop),
+        "export" => Ok(silica_core::AppSessionMode::Export),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app session mode: {other}"
+        ))),
+    }
+}
+
+fn app_session_mode_string(mode: silica_core::AppSessionMode) -> &'static str {
+    match mode {
+        silica_core::AppSessionMode::Library => "library",
+        silica_core::AppSessionMode::Develop => "develop",
+        silica_core::AppSessionMode::Export => "export",
+    }
+}
+
+fn parse_desktop_app_library_sort(
+    sort: &str,
+) -> Result<silica_core::AppLibrarySort, silica_core::CoreError> {
+    match sort {
+        "imported_at_desc" => Ok(silica_core::AppLibrarySort::ImportedAtDesc),
+        "file_name_asc" => Ok(silica_core::AppLibrarySort::FileNameAsc),
+        "rating_desc" => Ok(silica_core::AppLibrarySort::RatingDesc),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app library sort: {other}"
+        ))),
+    }
+}
+
+fn app_library_sort_string(sort: silica_core::AppLibrarySort) -> &'static str {
+    match sort {
+        silica_core::AppLibrarySort::ImportedAtDesc => "imported_at_desc",
+        silica_core::AppLibrarySort::FileNameAsc => "file_name_asc",
+        silica_core::AppLibrarySort::RatingDesc => "rating_desc",
+    }
+}
+
+fn parse_desktop_app_file_type_filter(
+    file_type: &str,
+) -> Result<silica_core::AppFileTypeFilter, silica_core::CoreError> {
+    match file_type {
+        "jpeg" => Ok(silica_core::AppFileTypeFilter::Jpeg),
+        "raw" => Ok(silica_core::AppFileTypeFilter::Raw),
+        "unsupported" => Ok(silica_core::AppFileTypeFilter::Unsupported),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app file type filter: {other}"
+        ))),
+    }
+}
+
+fn app_file_type_filter_string(filter: silica_core::AppFileTypeFilter) -> &'static str {
+    match filter {
+        silica_core::AppFileTypeFilter::Jpeg => "jpeg",
+        silica_core::AppFileTypeFilter::Raw => "raw",
+        silica_core::AppFileTypeFilter::Unsupported => "unsupported",
     }
 }
 
@@ -614,6 +1072,10 @@ fn main() {
 
     builder
         .invoke_handler(tauri::generate_handler![
+            read_app_session,
+            write_app_session,
+            reset_app_session,
+            inspect_app_session,
             create_library,
             open_library,
             import_folder,
@@ -635,6 +1097,129 @@ fn main() {
 mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn desktop_app_session_commands_round_trip_temp_path() {
+        let workspace = unique_library_root("desktop-app-session");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        let missing = super::read_app_session_at_path(session_path.clone());
+        assert!(missing.ok);
+        match response_data(&missing) {
+            super::DesktopCommandData::AppSession {
+                session_path: returned_path,
+                session,
+                warnings,
+            } => {
+                assert_eq!(returned_path, &session_path.display().to_string());
+                assert_eq!(session.last_mode, "library");
+                assert_eq!(session.layout.thumbnail_size, 168);
+                assert_eq!(warnings, &vec!["missing".to_string()]);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(!session_path.exists());
+
+        let mut expected_session = super::DesktopAppSession::default();
+        expected_session.last_library_root_path = Some(library_root.display().to_string());
+        expected_session.last_mode = "develop".to_string();
+        expected_session.recents.push(super::DesktopRecentLibrary {
+            root_path: library_root.display().to_string(),
+            display_name: "SilicaRAW Library".to_string(),
+            last_opened_at: "unix:42".to_string(),
+        });
+        expected_session.per_library.insert(
+            library_root.display().to_string(),
+            super::DesktopPerLibrarySession {
+                selected_photo_id: Some("photo-1".to_string()),
+                last_mode: "develop".to_string(),
+                last_opened_at: "unix:42".to_string(),
+            },
+        );
+
+        let written =
+            super::write_app_session_at_path(session_path.clone(), expected_session.clone());
+        assert!(written.ok);
+        match response_data(&written) {
+            super::DesktopCommandData::AppSessionWrite {
+                session_path: returned_path,
+                bytes_written,
+            } => {
+                assert_eq!(returned_path, &session_path.display().to_string());
+                assert!(*bytes_written > 0);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(session_path.is_file());
+
+        let inspected = super::inspect_app_session_at_path(session_path.clone());
+        assert!(inspected.ok);
+        match response_data(&inspected) {
+            super::DesktopCommandData::AppSessionInspection {
+                session_path: returned_path,
+                exists,
+                warnings,
+            } => {
+                assert_eq!(returned_path, &session_path.display().to_string());
+                assert!(*exists);
+                assert!(warnings.is_empty());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let loaded = super::read_app_session_at_path(session_path.clone());
+        assert!(loaded.ok);
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession {
+                session, warnings, ..
+            } => {
+                assert_eq!(session, &expected_session);
+                assert_eq!(session.last_mode, "develop");
+                assert_eq!(
+                    session.last_library_root_path.as_deref(),
+                    Some(library_root.display().to_string().as_str())
+                );
+                assert!(warnings.is_empty());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let reset = super::reset_app_session_at_path(session_path.clone());
+        assert!(reset.ok);
+        match response_data(&reset) {
+            super::DesktopCommandData::AppSession {
+                session, warnings, ..
+            } => {
+                assert_eq!(session.last_mode, "library");
+                assert!(session.last_library_root_path.is_none());
+                assert!(session.recents.is_empty());
+                assert!(warnings.is_empty());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_app_session_write_rejects_invalid_payload() {
+        let workspace = unique_library_root("desktop-app-session-invalid");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let mut session = super::DesktopAppSession::default();
+        session.last_mode = "not-real".to_string();
+
+        let response = super::write_app_session_at_path(session_path.clone(), session);
+
+        assert!(!response.ok);
+        assert_eq!(response.command, "write_app_session");
+        let error = response.error.as_ref().expect("structured error");
+        assert_eq!(error.kind, "appSession");
+        assert!(error.message.contains("invalid app session mode"));
+        assert!(!session_path.exists());
+
+        remove_library_root(&workspace);
+    }
 
     #[test]
     fn desktop_commands_create_and_open_library() {

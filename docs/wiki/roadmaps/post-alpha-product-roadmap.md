@@ -174,6 +174,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Missing recent paths degrade to disabled/error states.
   - No fictional recent rows are introduced.
 - **Validation:** `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. Task 11.1 established the app-session boundary, added core app-session v1 types and JSON read/write helpers, and exposed desktop read/write/reset/inspect command handlers using the Tauri app config path. Real recent recording and Welcome recents UI remain Task 11.2.
 
 ### Task 11.2: Persist Real Recent Libraries
 
