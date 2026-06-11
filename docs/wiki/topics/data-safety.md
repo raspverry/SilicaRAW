@@ -27,6 +27,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 10.4 adds a rebuild dry-run report that reads library-local sidecars as untrusted input and reports rebuild actions/issues without mutating the live catalog or original files.
 - Task 10.5.1 records the [Backup and Restore](backup-restore.md) policy: checkpoint-before-copy, no original referenced photo files in backups, disposable cache exclusion, rollback-aware restore targets, and explicit migration failure behavior.
 - Task 10.5.2 adds checkpointed backup boundary creation for `catalog.db`, `sidecars/`, and `backup-manifest.json` under `backups/` while excluding originals, caches, export outputs, logs, and nested backups.
+- Task 10.5.3 adds staged restore from backup artifacts with existing-target rollback copies, restored catalog/sidecar preservation, newer-schema rejection before target mutation, and original-file safety tests.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -43,6 +44,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Sidecar rebuild dry-run safety. Task 10.4 covers deterministic output, catalog non-mutation, precedence from `sidecar.flags` to `edit_graph.metadata` to defaults, and conflict/malformed-sidecar reporting.
 - Recovery policy safety. Task 10.5.1 covers backup boundaries, WAL checkpoint policy, restore target rules, disposable cache exclusion, and migration failure behavior.
 - Backup boundary safety. Task 10.5.2 covers checkpointed backup artifacts, manifest creation, cache/original/export-output exclusion, and latest WAL state preservation in the copied `catalog.db`.
+- Restore boundary safety. Task 10.5.3 covers restore into empty targets, rollback-protected restore into existing targets, restored edit/flag/sidecar/export/migration state, newer-schema rejection before target mutation, and original-file preservation.
 - Cache clear safety. Phase 6.2 simulates the currently scoped cache safety surface by deleting disposable library cache directories because no product cache-clear command exists yet.
 
 ## Links

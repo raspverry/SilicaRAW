@@ -85,6 +85,23 @@ Restore must not:
 
 After copying backup data into the destination, the app must reopen the restored catalog through normal migration code. If migration fails, restore must abort and keep the destination recoverable through the rollback copy or untouched empty destination.
 
+## Current Restore Implementation
+
+Task 10.5.3 adds `silica-storage::restore_library_backup`.
+
+Restore behavior:
+
+- Validates `backup-manifest.json` before mutating the target.
+- Rejects backups from newer catalog schema versions before mutating the target.
+- Copies backup `catalog.db` and `sidecars/` into a sibling staging directory first.
+- Opens the staging library through normal `silica-storage` migration/open code.
+- Restores into an empty or missing target by moving the validated staging library into place.
+- Restores into an existing library only after creating a rollback copy under `backups/restore-rollback-*`.
+- Replaces only `catalog.db` and `sidecars/` in an existing target.
+- Reopens the restored target through normal library open code so the local library row is updated for the destination root.
+
+Restore still does not add a user-facing conflict UI, merge sidecar conflicts, copy original referenced photo files, copy export output files, or rebuild disposable caches.
+
 ## Durable Data
 
 These are durable recovery inputs:
@@ -128,9 +145,9 @@ Task 10.5 implementation tests must prove:
 - Backup excludes disposable caches. Covered by Task 10.5.2.
 - Backup includes catalog and sidecars. Covered by Task 10.5.2.
 - Backup does not include original referenced files. Covered by Task 10.5.2.
-- Restore preserves edit states, flags, sidecar status, export records, and migration metadata.
-- Restore does not write into original photo folders.
-- Migration failure leaves a recoverable target state.
+- Restore preserves edit states, flags, sidecar status, export records, and migration metadata. Covered by Task 10.5.3.
+- Restore does not write into original photo folders. Covered by Task 10.5.3.
+- Migration failure leaves a recoverable target state. Covered by Task 10.5.3 through newer-schema rejection before target mutation.
 
 ## Links
 

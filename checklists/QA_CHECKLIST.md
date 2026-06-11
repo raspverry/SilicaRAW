@@ -85,13 +85,14 @@ Automated coverage:
 
 ## Task 10.5 Backup and Restore QA Record
 
-Status: Task 10.5.1 recovery policy added on 2026-06-11. Task 10.5.2 backup boundary implementation added on 2026-06-11. Restore execution remains pending.
+Status: Task 10.5 completed on 2026-06-11. Task 10.5.1 added recovery policy, Task 10.5.2 added backup boundary implementation, and Task 10.5.3 added staged restore with rollback behavior.
 
 Automated policy validation command:
 
 ```bash
 python3 scripts/harness/check-recovery-policy.py
 cargo test -p silica-storage backup
+cargo test -p silica-storage restore
 ```
 
 Policy coverage:
@@ -115,11 +116,13 @@ Backup implementation coverage:
 - [x] Backup does not copy temporary sidecar write files.
 - [x] Backup copies latest WAL state through checkpoint before copying `catalog.db`.
 
-Restore implementation QA still needed:
+Restore implementation coverage:
 
-- [ ] Restore preserves edit states, flags, sidecar status, export records, and migration metadata.
-- [ ] Restore does not write into original photo folders.
-- [ ] Migration failure leaves the target recoverable.
+- [x] Restore preserves edit states, flags, sidecar status, export records, and migration metadata.
+- [x] Restore does not write into original photo folders.
+- [x] Restore into an existing target creates a rollback copy before replacing catalog and sidecars.
+- [x] Newer schema backup rejection happens before target mutation.
+- [x] Migration/schema rejection leaves the target recoverable.
 
 ## General QA Backlog
 
