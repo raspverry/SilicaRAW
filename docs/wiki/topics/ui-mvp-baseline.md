@@ -2,7 +2,7 @@
 title: UI MVP Baseline
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-11
 source_of_truth: docs/05_Design_System_Specification.md
 ---
 
@@ -204,6 +204,29 @@ Task 5.5.10 checks the implemented M003/M005/M007 surfaces against their compact
 - Real image pixels and thumbnail cache generation remain outside this static UI QA task.
 
 See [UI Visual and Responsive QA](ui-visual-responsive-qa.md) for the recorded notes.
+
+## Phase 11 Workspace Layout Preferences
+
+Task 11.4 makes workspace layout an app-session preference, not frontend-only state.
+
+Defaults are owned by `silica-core`:
+
+| Preference | Default | Invalid Value Behavior |
+|---|---:|---|
+| `sidebar_collapsed` | `false` | Reset to `false` |
+| `inspector_collapsed` | `false` | Reset to `false` |
+| `filmstrip_visible` | `true` | Reset to `true` |
+| `thumbnail_size` | `168` | Clamp to `132..=220` |
+| `sort` | `imported_at_desc` | Reset to `imported_at_desc` |
+| `filters.min_rating` | `null` | Clamp numeric values to `0..=5`; non-numeric resets to `null` |
+| `filters.picked` | `null` | Non-boolean resets to `null` |
+| `filters.rejected` | `null` | Non-boolean resets to `null` |
+| `filters.file_type` | `null` | Unknown values reset to `null` |
+| `filters.search` | `""` | Non-string resets to `""` |
+
+Reset layout means only `AppSession.layout` returns to these defaults. It must not clear recents, last library, selected photo, culling flags, edit state, catalog rows, sidecars, caches, or original-file references.
+
+The default sort remains `imported_at_desc` so Task 11.5 can introduce paged, sorted, and filtered query APIs without changing the first page ordering contract.
 
 ## QA Strategy
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Layout preference model documented
+
+- Added Task 11.4.1 core helpers for layout defaults and layout reset.
+- Documented sidebar, inspector, filmstrip, thumbnail size, sort, and filter defaults plus invalid-value behavior in the UI MVP baseline.
+- Desktop layout persistence wiring and responsive QA remain Task 11.4.2 and Task 11.4.3.
+
 ## [2026-06-11] phase-11 | Selected photo restore added
 
 - Added Task 11.3.2 selected-photo restore from app-session state.

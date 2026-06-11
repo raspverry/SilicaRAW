@@ -307,6 +307,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core layout_preferences`
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. Added core default/reset helpers for `AppSession.layout`, verified reset preserves non-layout app-session state, and documented the layout defaults plus invalid-value behavior in the UI MVP wiki. Desktop command and UI wiring remain Task 11.4.2.
 
 ### Task 11.4.2: Persist Layout Interactions
 

@@ -546,6 +546,11 @@ pub fn write_app_session(
     })
 }
 
+/// Return the documented default workspace layout preferences.
+pub fn default_app_layout_preferences() -> AppLayoutPreferences {
+    AppLayoutPreferences::default()
+}
+
 /// Record a successful library create/open in app-level desktop session state.
 pub fn record_app_session_recent_library(
     session_path: impl AsRef<Path>,
@@ -575,6 +580,24 @@ pub fn record_app_session_recent_library(
     );
     session.recents.truncate(APP_SESSION_RECENTS_LIMIT);
 
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
+/// Reset only workspace layout preferences in app-level desktop session state.
+pub fn reset_app_session_layout(
+    session_path: impl AsRef<Path>,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    session.layout = default_app_layout_preferences();
     write_app_session(session_path, &session)?;
 
     Ok(AppSessionLoadResult { session, warnings })
@@ -1876,6 +1899,45 @@ mod tests {
         assert_eq!(per_library.last_mode, AppSessionMode::Library);
         assert_eq!(per_library.selected_photo_id.as_deref(), Some("photo-2"));
         assert_eq!(loaded.warnings, vec![AppSessionWarning::InvalidValues]);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn layout_preferences_defaults_and_reset_are_stable() {
+        let workspace = unique_library_root("layout-preferences-reset");
+        let session_path = workspace.join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+        let defaults = default_app_layout_preferences();
+
+        assert!(!defaults.sidebar_collapsed);
+        assert!(!defaults.inspector_collapsed);
+        assert!(defaults.filmstrip_visible);
+        assert_eq!(defaults.thumbnail_size, DEFAULT_APP_SESSION_THUMBNAIL_SIZE);
+        assert_eq!(defaults.sort, AppLibrarySort::ImportedAtDesc);
+        assert_eq!(defaults.filters, AppSessionFilters::default());
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_root.clone());
+        session.layout.sidebar_collapsed = true;
+        session.layout.inspector_collapsed = true;
+        session.layout.filmstrip_visible = false;
+        session.layout.thumbnail_size = MAX_APP_SESSION_THUMBNAIL_SIZE;
+        session.layout.sort = AppLibrarySort::RatingDesc;
+        session.layout.filters.min_rating = Some(4);
+        session.layout.filters.search = "portrait".to_string();
+        write_app_session(&session_path, &session).expect("write app session");
+
+        let reset = reset_app_session_layout(&session_path).expect("reset layout");
+
+        assert!(reset.warnings.is_empty());
+        assert_eq!(reset.session.layout, defaults);
+        assert_eq!(
+            reset.session.last_library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
+        let loaded = load_app_session(&session_path).expect("reload reset layout");
+        assert_eq!(loaded.session.layout, defaults);
 
         remove_library_root(&workspace);
     }
