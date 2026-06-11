@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-10
+updated: 2026-06-11
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -87,7 +87,9 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Policy separates byte equality, perceptual tolerance, ICC/profile inspection, and manual visual review.
   - Color correctness claims remain blocked until fixture-backed proof exists.
   - RAW support claims are tied to fixture classes, not marketing language.
+- **Status:** Completed on 2026-06-11. Added the golden image and tolerance policy baseline and linked it from RAW/color topics. This records evidence categories and forbidden claims only; it does not add golden images, RAW decoding, Core Image probing, ICC parsing, pixel comparison, or color correctness proof.
 - **Validation:**
+  - `python3 scripts/harness/check-golden-tolerance-policy.py`
   - `python3 scripts/harness/check-md-links.py`
 
 ### Task 10.3: Sidecar v1 Read/Write Foundation

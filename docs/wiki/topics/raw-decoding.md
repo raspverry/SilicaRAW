@@ -62,6 +62,14 @@ Core Image probe result -> absent until Phase 12
 RAW support claim -> forbidden until fixture-backed evidence exists
 ```
 
+## Task 10.2 Golden Image and Tolerance Policy
+
+The [Golden Image and Tolerance Policy](../../../checklists/GOLDEN_IMAGE_TOLERANCE_POLICY.md) keeps RAW support claims tied to fixture-backed evidence, not file extensions or marketing language.
+
+RAW support claims require a legal fixture manifest entry, fixture source hash verification, Core Image probe result, decode result record, original file hash preservation proof, and explicit blocked records for unsupported classes.
+
+Task 10.2 does not add RAW decoding, Core Image probing, real RAW fixtures, or RAW support proof.
+
 ## Phase 5.1 Preview Contract
 
 `silica-decode` can now classify preview readiness:
