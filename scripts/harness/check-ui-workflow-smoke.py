@@ -18,6 +18,7 @@ ALLOWED_COMMANDS = {
     "open_library",
     "import_folder",
     "list_library_photos",
+    "query_library_photos",
     "set_photo_flags",
     "open_photo_preview",
     "preview_exposure_contrast_edit",
@@ -77,7 +78,7 @@ WORKFLOW_STEPS = [
             "rejectSelectedPhoto",
             "cullingStatus",
         ],
-        "commands": ["list_library_photos", "set_photo_flags"],
+        "commands": ["query_library_photos", "set_photo_flags"],
         "text": ["All Photos", "Rating", "Pick", "Reject", "Clear"],
     },
     {
@@ -279,6 +280,9 @@ def main():
         "renderThumbnailArt",
         "URL.createObjectURL",
         "sr-thumb-image",
+        "data-page-scoped-thumbnail-request",
+        "libraryGridPageRequest",
+        "query_library_photos",
     ]:
         require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
     for marker in [

@@ -831,7 +831,10 @@ fn query_library_photos(
         }
     };
 
-    match silica_core::query_library_photos(PathBuf::from(&library_path), query) {
+    match silica_core::query_library_photos_with_thumbnail_hydration(
+        PathBuf::from(&library_path),
+        query,
+    ) {
         Ok(page) => DesktopCommandResponse::ok(
             command,
             "Library grid page loaded.",

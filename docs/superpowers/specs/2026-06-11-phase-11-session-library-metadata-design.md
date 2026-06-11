@@ -403,7 +403,7 @@ Demo/Validation:
   - Error context remains structured.
 - **Validation:**
   - `cargo test -p silica-desktop paged_grid`
-- **Status:** Completed on 2026-06-11. Added the `query_library_photos` desktop command with a typed page/sort/filter request DTO, whitelist parsing for sort and file-type filters, a `photoGridPage` response carrying page metadata and deterministic order fields, and structured error context for invalid request values. Page-scoped thumbnail hydration remains Task 11.5.5.
+- **Status:** Completed on 2026-06-11. Added the `query_library_photos` desktop command with a typed page/sort/filter request DTO, whitelist parsing for sort and file-type filters, a `photoGridPage` response carrying page metadata and deterministic order fields, and structured error context for invalid request values. Page-scoped thumbnail hydration was later completed by Task 11.5.5.
 
 ### Task 11.5.5: Page-Scoped Thumbnail Hydration
 
@@ -418,6 +418,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core thumbnail`
   - UI smoke marker for page-scoped thumbnail requests
+- **Status:** Completed on 2026-06-11. Added a core page-scoped thumbnail hydration query that hydrates JPEG thumbnails only for rows in the requested page, leaves RAW/unsupported rows without thumbnails, preserves original files, and updates the desktop paged grid command/static product grid to use `query_library_photos` instead of the old full-list product grid path. Full page UI states remain Task 11.6.1.
 
 ### Task 11.6.1: Page-Driven Grid UI
 

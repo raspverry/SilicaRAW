@@ -232,7 +232,7 @@
                 <strong>No imported photos</strong>
                 <span>Import a folder by reference to populate this grid.</span>
               </div>
-              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite"></div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" data-page-scoped-thumbnail-request="query_library_photos"></div>
             </div>
             <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
               <div class="sr-loupe-header">
@@ -552,6 +552,7 @@
       let controlsBusy = false;
       let layoutHydrating = false;
       let layoutSaveTimer = 0;
+      const LIBRARY_GRID_PAGE_LIMIT = 100;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
@@ -641,6 +642,17 @@
             search: librarySearchInput.value,
           },
         });
+      }
+
+      function libraryGridPageRequest(options = {}) {
+        const layout = currentLayoutPreferences();
+        const offset = Math.max(0, Math.floor(Number(options.offset) || 0));
+        return {
+          offset,
+          limit: LIBRARY_GRID_PAGE_LIMIT,
+          sort: layout.sort,
+          filters: layout.filters,
+        };
       }
 
       function applyLayoutPreferences(layout = {}, options = {}) {
@@ -1915,13 +1927,16 @@
         gridEmptyState.hidden = true;
         setStatus("Loading catalog photos...");
         try {
-          const response = await invoke("list_library_photos", { libraryPath: activeLibraryPath });
+          const response = await invoke("query_library_photos", {
+            libraryPath: activeLibraryPath,
+            request: libraryGridPageRequest(options),
+          });
           if (commandFailed(response)) {
             setStatus(responseErrorMessage(response, "Library grid failed to load."));
             return;
           }
           renderLibraryGrid(response.data?.photos ?? [], options);
-          setStatus(responseMessage(response, "Library grid loaded."));
+          setStatus(responseMessage(response, "Library grid page loaded."));
         } catch (error) {
           gridLoadingState.hidden = true;
           setStatus(responseErrorMessage(error, "Library grid failed to load."));

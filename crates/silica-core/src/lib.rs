@@ -848,6 +848,17 @@ pub fn query_library_photos(
     silica_storage::query_library_photos(library_root_path, request).map_err(CoreError::from)
 }
 
+/// Query one catalog page and hydrate JPEG thumbnails only for rows in that page.
+pub fn query_library_photos_with_thumbnail_hydration(
+    library_root_path: impl AsRef<Path>,
+    request: silica_storage::LibraryQueryRequest,
+) -> Result<silica_storage::LibraryQueryPage<silica_storage::LibraryPhotoGridItem>, CoreError> {
+    let library_root_path = library_root_path.as_ref().to_path_buf();
+    let page = query_library_photos(&library_root_path, request.clone())?;
+    ensure_jpeg_thumbnail_cache_for_photos(&library_root_path, &page.items)?;
+    query_library_photos(&library_root_path, request)
+}
+
 /// Persist photo culling and label flags through the core command boundary.
 pub fn set_photo_flags(
     library_root_path: impl AsRef<Path>,
@@ -1251,15 +1262,27 @@ fn write_jpeg_develop_preview_bytes(
 
 fn ensure_jpeg_thumbnail_cache(library_root_path: &Path) -> Result<(), CoreError> {
     let photos = silica_storage::list_library_photos(library_root_path)?;
+    ensure_jpeg_thumbnail_cache_for_photos(library_root_path, &photos)
+}
+
+fn ensure_jpeg_thumbnail_cache_for_photos(
+    library_root_path: &Path,
+    photos: &[silica_storage::LibraryPhotoGridItem],
+) -> Result<(), CoreError> {
+    let photos = photos
+        .iter()
+        .filter(|photo| is_jpeg_thumbnail_candidate(photo))
+        .collect::<Vec<_>>();
+    if photos.is_empty() {
+        return Ok(());
+    }
+
     let thumbnail_root = library_root_path.join("thumbnails");
     std::fs::create_dir_all(&thumbnail_root)
         .map_err(silica_storage::LibraryStorageError::from)
         .map_err(CoreError::from)?;
 
-    for photo in photos
-        .iter()
-        .filter(|photo| is_jpeg_thumbnail_candidate(photo))
-    {
+    for photo in photos {
         let source_path = PathBuf::from(&photo.path);
         if !source_path.is_file() {
             continue;
@@ -2420,6 +2443,71 @@ mod tests {
             )
             .expect("count thumbnail cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn hydrates_thumbnails_only_for_queried_page() {
+        let workspace = unique_library_root("core-thumbnail-page");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let first_jpeg = import_root.join("a-first.jpg");
+        let second_jpeg = import_root.join("b-second.jpg");
+        let raw_file = import_root.join("c-raw.DNG");
+        let unsupported_file = import_root.join("d-notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&first_jpeg);
+        write_source_jpeg(&second_jpeg);
+        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+        std::fs::write(&unsupported_file, b"unsupported").expect("write unsupported");
+        let first_hash = file_hash(&first_jpeg);
+        let second_hash = file_hash(&second_jpeg);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+
+        let page = query_library_photos_with_thumbnail_hydration(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                0,
+                1,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query hydrated page");
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].file_name, "a-first.jpg");
+        assert!(page.items[0].thumbnail_path.is_some());
+        assert!(page.items[0].thumbnail_cache_key.is_some());
+        assert_original_hash(&first_jpeg, &first_hash, "page thumbnail hydration");
+        assert_original_hash(&second_jpeg, &second_hash, "page thumbnail hydration");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let thumbnail_records: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM cache_records WHERE cache_type = 'thumbnail'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count thumbnail records");
+        assert_eq!(thumbnail_records, 1);
+
+        let second_page = query_library_photos(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                1,
+                1,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query second page without hydration");
+        assert_eq!(second_page.items[0].file_name, "b-second.jpg");
+        assert!(second_page.items[0].thumbnail_path.is_none());
 
         remove_library_root(&workspace);
     }
