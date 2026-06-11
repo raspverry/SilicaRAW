@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Metadata migration and extraction added
+
+- Added Task 11.7.3 metadata migration and import-time extraction.
+- Catalog schema version 4 adds nullable width, height, and orientation fields under `photo_metadata`.
+- JPEG/JPG imports persist width and height when readable; RAW missing metadata stays unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
+
 ## [2026-06-11] phase-11 | Metadata backfill policy added
 
 - Added Task 11.7.2 metadata backfill and JPEG-only extraction policy.
@@ -24,7 +30,7 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 - Added Task 11.7.1 metadata field and dependency gate.
 - No EXIF parser dependency is added yet; camera/lens/orientation/capture metadata remains explicitly unavailable.
-- Backfill policy was later completed by Task 11.7.2; migration remains Task 11.7.3.
+- Backfill policy was later completed by Task 11.7.2; migration and import-time JPEG dimension extraction were later completed by Task 11.7.3.
 
 ## [2026-06-11] phase-11 | Multi-select grid semantics added
 

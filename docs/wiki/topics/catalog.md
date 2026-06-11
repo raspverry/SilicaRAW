@@ -32,11 +32,12 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 
 ## Implemented Foundation
 
-- Current alpha schema version: `3`.
+- Current alpha schema version: `4`.
 - Migration table: `schema_migrations`.
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
 - Migration 3 adds `photos.file_type`, backfills `jpeg`, `raw`, and `unsupported`, and creates the accepted paged-query indexes.
+- Migration 4 adds nullable `photo_metadata.width`, `photo_metadata.height`, and `photo_metadata.orientation` columns for import-time metadata extraction.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
@@ -64,6 +65,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.6.4 keeps product grid multi-selection page-local and UI-only: primary selection stays explicit, range/toggle selection updates visual state and counts, and batch catalog edits remain out of scope.
 - Task 11.7.1 records the metadata schema/dependency gate: no EXIF parser is added yet, and unavailable camera/lens/orientation/capture metadata must stay explicit.
 - Task 11.7.2 records the backfill/extraction policy: no open/restore backfill, existing unknown metadata stays unknown until explicit import/backfill work, and JPEG/JPG dimensions may use the existing raster path without implying RAW decode support.
+- Task 11.7.3 adds migration 4 plus import-time metadata persistence: JPEG/JPG width and height are stored when available, RAW rows stay explicitly unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
 
 ## Paged Library Query Contract
 
@@ -93,14 +95,15 @@ Task 11.7 starts with a storage-shape and dependency gate before extraction:
 
 - No EXIF or camera metadata parser dependency is added in Task 11.7.1.
 - No automatic metadata backfill runs on app launch, library open, or session restore.
-- `photo_metadata` normalized fields are planned as nullable values: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
+- `photo_metadata` normalized fields are nullable values: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
 - `photos.file_size` and `photos.modified_at` remain file-system metadata captured at import time; they are not duplicated into `photo_metadata`.
 - Existing imports without `photo_metadata` rows remain unknown until an import-time extractor or explicit scoped backfill populates them.
 - JPEG/JPG dimensions may be read through the existing raster path already used for thumbnails/previews.
+- Import-time JPEG/JPG extraction stores width and height when `image::image_dimensions` can read them; failed reads leave metadata unavailable instead of inventing values.
 - RAW metadata policy does not imply RAW decode support; RAW dimensions and camera/lens metadata stay unavailable until later gates add supported extraction.
 - Until a parser is added, camera make, camera model, lens model, orientation, and EXIF capture time are stored and displayed as unavailable rather than inferred.
 - `photo_metadata.raw_json` remains parser-owned untrusted data and defaults to `{}`.
-- A later migration task owns adding missing physical columns and backfill behavior; Task 11.7.1 is the contract gate only.
+- Migration 4 adds the first physical metadata extraction columns. Existing imports are not backfilled on open or session restore.
 
 ## Not Implemented Yet
 

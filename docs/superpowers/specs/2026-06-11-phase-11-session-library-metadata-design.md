@@ -530,6 +530,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core metadata`
   - original hash safety checks
+- **Status:** Completed on 2026-06-11. Migration 4 now adds nullable `photo_metadata.width`, `photo_metadata.height`, and `photo_metadata.orientation`; storage can upsert normalized metadata by original path for imported, supported photos only. Core import persists JPEG/JPG width and height via the existing JPEG-only image path, keeps missing RAW/camera/lens/orientation/capture metadata unavailable, skips unsupported files, and verifies original hashes remain unchanged.
 
 ### Task 11.7.4: Metadata Query API
 

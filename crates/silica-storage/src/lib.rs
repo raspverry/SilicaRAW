@@ -147,6 +147,34 @@ pub struct MetadataExtractionPolicy {
     pub camera_lens_available: bool,
 }
 
+/// Normalized metadata values to persist for one imported photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMetadataUpdate {
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub orientation: Option<String>,
+    pub capture_time: Option<String>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens_model: Option<String>,
+    pub raw_json: String,
+}
+
+impl PhotoMetadataUpdate {
+    pub fn unavailable() -> Self {
+        Self {
+            width: None,
+            height: None,
+            orientation: None,
+            capture_time: None,
+            camera_make: None,
+            camera_model: None,
+            lens_model: None,
+            raw_json: "{}".to_string(),
+        }
+    }
+}
+
 /// Return the metadata extraction policy for one original path.
 pub fn metadata_extraction_policy_for_path(path: &Path) -> MetadataExtractionPolicy {
     let is_jpeg = path
@@ -486,6 +514,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 3,
         name: "paged_library_query_indexes",
         sql: PAGED_LIBRARY_QUERY_INDEXES_SQL,
+    },
+    Migration {
+        version: 4,
+        name: "photo_metadata_normalized_fields",
+        sql: PHOTO_METADATA_NORMALIZED_FIELDS_SQL,
     },
 ];
 
@@ -861,6 +894,69 @@ pub fn import_folder(
         unsupported_files,
         candidates,
     })
+}
+
+/// Insert or update normalized metadata for an imported photo by original path.
+pub fn upsert_photo_metadata_by_path(
+    library_root_path: impl AsRef<Path>,
+    original_path: impl AsRef<Path>,
+    metadata: PhotoMetadataUpdate,
+) -> Result<(), LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let original_path = path_to_string(original_path.as_ref())?;
+    let connection = open_catalog(&library.catalog_path)?;
+    connection.execute(
+        r#"
+        INSERT INTO photo_metadata(
+          photo_id,
+          camera_make,
+          camera_model,
+          lens_model,
+          capture_time,
+          raw_json,
+          width,
+          height,
+          orientation
+        )
+        SELECT
+          photos.id,
+          ?2,
+          ?3,
+          ?4,
+          ?5,
+          ?6,
+          ?7,
+          ?8,
+          ?9
+        FROM photos
+        WHERE photos.library_id = ?1
+          AND photos.path = ?10
+          AND photos.unsupported = 0
+        ON CONFLICT(photo_id) DO UPDATE SET
+          camera_make = excluded.camera_make,
+          camera_model = excluded.camera_model,
+          lens_model = excluded.lens_model,
+          capture_time = excluded.capture_time,
+          raw_json = excluded.raw_json,
+          width = excluded.width,
+          height = excluded.height,
+          orientation = excluded.orientation
+        "#,
+        params![
+            LOCAL_LIBRARY_ID,
+            metadata.camera_make,
+            metadata.camera_model,
+            metadata.lens_model,
+            metadata.capture_time,
+            metadata.raw_json,
+            metadata.width,
+            metadata.height,
+            metadata.orientation,
+            original_path,
+        ],
+    )?;
+
+    Ok(())
 }
 
 /// List imported catalog photos for the Library grid without touching originals.
@@ -3174,6 +3270,17 @@ CREATE INDEX IF NOT EXISTS idx_photo_flags_rating_photo_id
   ON photo_flags(rating DESC, photo_id ASC);
 "#;
 
+const PHOTO_METADATA_NORMALIZED_FIELDS_SQL: &str = r#"
+ALTER TABLE photo_metadata
+  ADD COLUMN width INTEGER;
+
+ALTER TABLE photo_metadata
+  ADD COLUMN height INTEGER;
+
+ALTER TABLE photo_metadata
+  ADD COLUMN orientation TEXT;
+"#;
+
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
 SELECT COUNT(*)
 FROM photos
@@ -3370,6 +3477,71 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM photo_metadata", [], |row| row.get(0))
             .expect("count metadata after reopen");
         assert_eq!(after_count, 0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_migration_adds_normalized_columns_and_upsert() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations(&mut connection).expect("run migrations");
+
+        let columns: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT name FROM pragma_table_info('photo_metadata')")
+                .expect("prepare metadata column query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query metadata columns")
+                .map(|row| row.expect("metadata column"))
+                .collect()
+        };
+        for column in ["width", "height", "orientation"] {
+            assert!(
+                columns.contains(&column.to_string()),
+                "missing metadata column {column}"
+            );
+        }
+
+        let workspace = unique_library_root("metadata-upsert");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&jpeg_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        upsert_photo_metadata_by_path(
+            &library.root_path,
+            &jpeg_file,
+            PhotoMetadataUpdate {
+                width: Some(2),
+                height: Some(3),
+                ..PhotoMetadataUpdate::unavailable()
+            },
+        )
+        .expect("upsert metadata");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let (width, height, camera_make): (Option<i64>, Option<i64>, Option<String>) = connection
+            .query_row(
+                r#"
+                SELECT photo_metadata.width, photo_metadata.height, photo_metadata.camera_make
+                FROM photo_metadata
+                JOIN photos ON photos.id = photo_metadata.photo_id
+                WHERE photos.file_name = 'sample.jpg'
+                "#,
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("read metadata row");
+        assert_eq!(width, Some(2));
+        assert_eq!(height, Some(3));
+        assert_eq!(camera_make, None);
 
         remove_library_root(&workspace);
     }

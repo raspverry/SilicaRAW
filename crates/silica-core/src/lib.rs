@@ -803,7 +803,10 @@ pub fn import_folder(
     library_root_path: impl AsRef<Path>,
     folder_path: impl AsRef<Path>,
 ) -> Result<silica_storage::FolderImportSummary, CoreError> {
-    silica_storage::import_folder(library_root_path, folder_path).map_err(CoreError::from)
+    let library_root_path = library_root_path.as_ref().to_path_buf();
+    let summary = silica_storage::import_folder(&library_root_path, folder_path)?;
+    persist_imported_photo_metadata(&library_root_path, &summary)?;
+    Ok(summary)
 }
 
 /// Return metadata extraction policy without running any backfill work.
@@ -811,6 +814,34 @@ pub fn metadata_extraction_policy_for_path(
     path: impl AsRef<Path>,
 ) -> silica_storage::MetadataExtractionPolicy {
     silica_storage::metadata_extraction_policy_for_path(path.as_ref())
+}
+
+fn persist_imported_photo_metadata(
+    library_root_path: &Path,
+    summary: &silica_storage::FolderImportSummary,
+) -> Result<(), CoreError> {
+    for candidate in summary
+        .candidates
+        .iter()
+        .filter(|candidate| !candidate.unsupported)
+    {
+        let path = PathBuf::from(&candidate.path);
+        let metadata = metadata_update_for_imported_path(&path);
+        silica_storage::upsert_photo_metadata_by_path(library_root_path, &path, metadata)?;
+    }
+    Ok(())
+}
+
+fn metadata_update_for_imported_path(path: &Path) -> silica_storage::PhotoMetadataUpdate {
+    let mut metadata = silica_storage::PhotoMetadataUpdate::unavailable();
+    let policy = metadata_extraction_policy_for_path(path);
+    if policy.dimension_source == silica_storage::MetadataDimensionSource::ExistingRasterPath {
+        if let Ok(dimensions) = silica_export::read_raster_dimensions(path.to_path_buf()) {
+            metadata.width = Some(i64::from(dimensions.width));
+            metadata.height = Some(i64::from(dimensions.height));
+        }
+    }
+    metadata
 }
 
 /// List imported catalog photos as JSON for the desktop Library grid.
@@ -2239,6 +2270,89 @@ mod tests {
         );
         assert!(!raw_policy.raw_decode_supported);
         assert!(!raw_policy.camera_lens_available);
+    }
+
+    #[test]
+    fn imports_jpeg_metadata_without_mutating_original() {
+        let workspace = unique_library_root("jpeg-metadata");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+        let raw_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&raw_file, b"raw placeholder bytes").expect("write raw");
+        std::fs::write(&unsupported_file, b"unsupported note").expect("write unsupported");
+        let jpeg_hash = file_hash(&jpeg_file);
+        let raw_hash = file_hash(&raw_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let (width, height, camera_make, lens_model): (
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        ) = connection
+            .query_row(
+                r#"
+                SELECT photo_metadata.width,
+                       photo_metadata.height,
+                       photo_metadata.camera_make,
+                       photo_metadata.lens_model
+                FROM photo_metadata
+                JOIN photos ON photos.id = photo_metadata.photo_id
+                WHERE photos.file_name = 'sample.jpg'
+                "#,
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("jpeg metadata row");
+        assert_eq!(width, Some(2));
+        assert_eq!(height, Some(2));
+        assert_eq!(camera_make, None);
+        assert_eq!(lens_model, None);
+
+        let raw_metadata_count: i64 = connection
+            .query_row(
+                r#"
+                SELECT COUNT(*)
+                FROM photo_metadata
+                JOIN photos ON photos.id = photo_metadata.photo_id
+                WHERE photos.file_name = 'sample.DNG'
+                  AND photo_metadata.width IS NULL
+                  AND photo_metadata.height IS NULL
+                  AND photo_metadata.camera_make IS NULL
+                  AND photo_metadata.lens_model IS NULL
+                "#,
+                [],
+                |row| row.get(0),
+            )
+            .expect("raw metadata count");
+        assert_eq!(raw_metadata_count, 1);
+
+        let unsupported_metadata_count: i64 = connection
+            .query_row(
+                r#"
+                SELECT COUNT(*)
+                FROM photo_metadata
+                JOIN photos ON photos.id = photo_metadata.photo_id
+                WHERE photos.file_name = 'notes.txt'
+                "#,
+                [],
+                |row| row.get(0),
+            )
+            .expect("unsupported metadata count");
+        assert_eq!(unsupported_metadata_count, 0);
+
+        assert_original_hash(&jpeg_file, &jpeg_hash, "JPEG metadata extraction");
+        assert_original_hash(&raw_file, &raw_hash, "RAW metadata policy");
+
+        remove_library_root(&workspace);
     }
 
     #[test]

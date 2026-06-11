@@ -10,7 +10,7 @@ use std::fmt;
 pub const CRATE_NAME: &str = "silica-catalog";
 
 /// Current local alpha catalog schema version.
-pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 3;
+pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 4;
 
 /// Migration bookkeeping table required in every catalog database.
 pub const SCHEMA_MIGRATIONS_TABLE: &str = "schema_migrations";
@@ -411,7 +411,7 @@ mod tests {
 
     #[test]
     fn records_phase_4_1_catalog_schema_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 3);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 4);
         assert_eq!(ALPHA_CATALOG_SCHEMA.migration_table, "schema_migrations");
         assert_eq!(
             ALPHA_CATALOG_SCHEMA.required_tables,
@@ -529,7 +529,7 @@ mod tests {
 
     #[test]
     fn records_paged_query_index_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 3);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 4);
         for index_name in [
             "idx_photos_library_imported_id",
             "idx_photos_library_file_name_path_id",

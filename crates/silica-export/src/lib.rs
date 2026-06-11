@@ -72,6 +72,13 @@ pub struct JpegThumbnailResult {
     pub bytes_written: u64,
 }
 
+/// Dimensions read from an existing raster file without writing output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RasterDimensions {
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Errors returned by the export crate.
 #[derive(Debug)]
 pub enum ExportError {
@@ -179,6 +186,12 @@ pub fn export_jpeg_srgb(
         format: ExportImageFormat::Jpeg,
         color_profile: ExportColorProfile::Srgb,
     })
+}
+
+/// Read raster dimensions through the existing image path.
+pub fn read_raster_dimensions(path: PathBuf) -> Result<RasterDimensions, ExportError> {
+    let (width, height) = image::image_dimensions(path)?;
+    Ok(RasterDimensions { width, height })
 }
 
 /// Write a disposable JPEG thumbnail for a raster source.

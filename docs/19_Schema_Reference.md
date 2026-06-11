@@ -148,12 +148,14 @@ This prevents Codex from inventing a separate meaning for `flags`.
 
 ## Catalog Photo Metadata
 
-Task 11.7.1 records the local alpha metadata contract without adding a parser dependency.
+Task 11.7 records the local alpha metadata contract without adding a parser dependency.
 
 - `photo_metadata` normalized fields: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
 - `photos.file_size` and `photos.modified_at` are file-system metadata captured during import and are not duplicated into `photo_metadata`.
+- Task 11.7.3 adds physical catalog columns for `width`, `height`, and `orientation`; JPEG/JPG import may store width and height from the existing raster path.
 - Camera make, camera model, lens model, orientation, and EXIF capture time remain unavailable until a parser dependency is selected and documented in `docs/DEPENDENCIES.md`.
 - `photo_metadata.raw_json` is parser-owned untrusted data and defaults to `{}`.
+- Unsupported files must not receive fake metadata rows. Existing imports are not backfilled on library open or session restore.
 
 ---
 
