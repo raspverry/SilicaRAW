@@ -1013,6 +1013,76 @@ fn validate_sidecar_json(value: &serde_json::Value) -> Result<(), LibraryStorage
             )));
         }
     }
+    let allowed_top_level = [
+        "schema",
+        "version",
+        "app_version",
+        "photo",
+        "edit_graph",
+        "flags",
+        "sync",
+        "written_at",
+    ];
+    for key in object.keys() {
+        if !allowed_top_level.contains(&key.as_str()) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "unsupported top-level field: {key}"
+            )));
+        }
+    }
+    if !object
+        .get("app_version")
+        .is_some_and(serde_json::Value::is_string)
+    {
+        return Err(LibraryStorageError::SidecarValidation(
+            "sidecar.app_version must be a string".to_string(),
+        ));
+    }
+    if !object
+        .get("written_at")
+        .is_some_and(serde_json::Value::is_string)
+    {
+        return Err(LibraryStorageError::SidecarValidation(
+            "sidecar.written_at must be a string".to_string(),
+        ));
+    }
+
+    let photo = object
+        .get("photo")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation("sidecar.photo must be an object".to_string())
+        })?;
+    let allowed_photo = ["photo_id", "original_path", "file_name", "fingerprint"];
+    for key in photo.keys() {
+        if !allowed_photo.contains(&key.as_str()) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar.photo contains unsupported field: {key}"
+            )));
+        }
+    }
+    for required in allowed_photo {
+        if !photo.contains_key(required) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar.photo missing required field: {required}"
+            )));
+        }
+    }
+    for key in ["photo_id", "original_path", "file_name"] {
+        if !photo.get(key).is_some_and(serde_json::Value::is_string) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar.photo.{key} must be a string"
+            )));
+        }
+    }
+    if !photo
+        .get("fingerprint")
+        .is_some_and(serde_json::Value::is_object)
+    {
+        return Err(LibraryStorageError::SidecarValidation(
+            "sidecar.photo.fingerprint must be an object".to_string(),
+        ));
+    }
 
     let flags = object
         .get("flags")
@@ -1065,6 +1135,43 @@ fn validate_sidecar_json(value: &serde_json::Value) -> Result<(), LibraryStorage
         LibraryStorageError::SidecarValidation("sidecar.edit_graph is required".to_string())
     })?;
     silica_edit::validate_edit_graph_json(edit_graph)?;
+
+    let sync = object
+        .get("sync")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation("sidecar.sync must be an object".to_string())
+        })?;
+    let allowed_sync = ["status", "catalog_edit_state_id", "sidecar_hash"];
+    for key in sync.keys() {
+        if !allowed_sync.contains(&key.as_str()) {
+            return Err(LibraryStorageError::SidecarValidation(format!(
+                "sidecar.sync contains unsupported field: {key}"
+            )));
+        }
+    }
+    let status = sync
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation(
+                "sidecar.sync.status must be a string".to_string(),
+            )
+        })?;
+    if ![
+        "in_sync",
+        "catalog_newer",
+        "sidecar_newer",
+        "conflict",
+        "missing",
+        "disabled",
+    ]
+    .contains(&status)
+    {
+        return Err(LibraryStorageError::SidecarValidation(format!(
+            "sidecar.sync.status is unsupported: {status}"
+        )));
+    }
 
     Ok(())
 }
@@ -2324,6 +2431,52 @@ mod tests {
         let error = read_photo_sidecar(&library.root_path, &photo_id)
             .expect_err("photo id mismatch must fail");
         assert!(error.to_string().contains("sidecar photo id mismatch"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn sidecar_read_rejects_schema_invalid_fields() {
+        let workspace = unique_library_root("sidecar-read-schema-invalid");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let result = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write valid sidecar");
+        let mut value: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&result.sidecar_path).expect("read sidecar"),
+        )
+        .expect("parse sidecar");
+
+        value["unexpected"] = serde_json::Value::String("not allowed".to_string());
+        std::fs::write(
+            &result.sidecar_path,
+            serde_json::to_vec_pretty(&value).expect("serialize top-level extra"),
+        )
+        .expect("write top-level extra");
+        let error = read_photo_sidecar(&library.root_path, &photo_id)
+            .expect_err("top-level extra field must fail");
+        assert!(error.to_string().contains("unsupported top-level field"));
+
+        value
+            .as_object_mut()
+            .expect("sidecar object")
+            .remove("unexpected");
+        value["sync"]["status"] = serde_json::Value::String("proof_claim".to_string());
+        std::fs::write(
+            &result.sidecar_path,
+            serde_json::to_vec_pretty(&value).expect("serialize bad sync"),
+        )
+        .expect("write bad sync");
+        let error = read_photo_sidecar(&library.root_path, &photo_id)
+            .expect_err("bad sync status must fail");
+        assert!(error.to_string().contains("sidecar.sync.status"));
 
         remove_library_root(&workspace);
     }
