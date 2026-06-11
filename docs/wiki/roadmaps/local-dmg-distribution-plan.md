@@ -783,6 +783,8 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
   - Local alpha workflow completes.
 - **Validation:** Manual test record with macOS version and machine model.
 
+**Build-Mac Smoke Status:** Completed on 2026-06-11 for a developer unsigned DMG built from commit `ca49652`. The DMG verified, mounted, exposed `SilicaRAW.app`, matched the installed `/Applications/SilicaRAW.app` tree hash, passed installed-app preflight with generated legal fixtures, and launched from `/Applications` with process path `/Applications/SilicaRAW.app/Contents/MacOS/silica-desktop`. This is useful evidence, but it does not close Task 6.3 because the task explicitly requires a Mac that did not build the app.
+
 ## Phase 7: Signing and Notarization
 
 **Goal:** Make the DMG acceptable to Gatekeeper for normal downloaded-app behavior.

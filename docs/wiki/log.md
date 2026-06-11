@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-6 | Local build-Mac DMG smoke recorded
+
+- Built a developer unsigned DMG locally and verified its SHA256, mount behavior, mounted app presence, installed app hash match, installed-app preflight, and GUI launch from `/Applications`.
+- Added a repeatable local DMG artifact smoke harness for build-machine artifact checks.
+- Recorded that clean-Mac Task 6.3 remains pending because the local smoke ran on the Mac that built the app.
+
 ## [2026-06-10] roadmap | Post-alpha product roadmap added
 
 - Added the Post-Alpha Product Roadmap after consulting separate RAW/Metal/color, Library/Develop/UI, and MLX/plugin/MCP planning agents.

@@ -118,6 +118,28 @@ Blocker severity:
 Follow-up issue or PR:
 ```
 
+## Build-Mac Smoke Record
+
+This is not the clean-Mac result for Task 6.3. It records whether the DMG can be verified, mounted, installed, and launched on the Mac that built it.
+
+Latest local build-machine smoke:
+
+- Date: 2026-06-11
+- Git commit: `ca49652`
+- Artifact type: `developer unsigned DMG`
+- DMG path: `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg`
+- DMG SHA256: `c75bf14b422a46758c0ef24a830230fc4cf467a5ebf908a324786ade02959b1d`
+- App path launched: `/Applications/SilicaRAW.app`
+- macOS version: `26.4`
+- Machine: `arm64`, `Apple M5 Max`
+- DMG verification: pass
+- DMG mount and app presence: pass
+- Installed app tree hash matches built app: pass
+- Installed-app preflight: pass, `.tmp/local-dmg-smoke/installed-app-preflight-canonical.json`
+- GUI launch command: pass, process observed at `/Applications/SilicaRAW.app/Contents/MacOS/silica-desktop`
+- Screenshot capture: not recorded; macOS screen capture permission blocked `screencapture`
+- Clean-Mac Task 6.3 result: still pending
+
 ## Related References
 
 - [Local DMG Distribution Plan](../docs/wiki/roadmaps/local-dmg-distribution-plan.md)
