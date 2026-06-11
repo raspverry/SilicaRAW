@@ -1,8 +1,9 @@
 //! Storage and persistence boundary for SilicaRAW.
 //!
 //! Spike 004 selects rusqlite with bundled SQLite and embedded SQL migrations.
-//! This crate owns catalog schema creation but does not scan folders, import
-//! photos, mutate originals, write sidecars, or manage caches yet.
+//! This crate owns catalog schema creation, library-local sidecars, cache
+//! records, and dry-run recovery reports. It does not decode photos, mutate
+//! originals, write next-to-original sidecars, or apply restore actions yet.
 
 use std::error::Error;
 use std::fmt;
@@ -78,6 +79,8 @@ pub const CATALOG_DATABASE_FILE: &str = "catalog.db";
 
 /// Library-local directory for portable sidecar JSON files.
 pub const SIDECAR_DIRECTORY: &str = "sidecars";
+
+const SIDECAR_FILE_SUFFIX: &str = ".silicaraw.sidecar.json";
 
 /// Stable sidecar schema marker required by `schemas/sidecar.schema.json`.
 pub const SIDECAR_SCHEMA: &str = "silica.sidecar";
@@ -203,12 +206,77 @@ pub struct ValidatedSidecar {
     pub json: serde_json::Value,
 }
 
+/// Deterministic report for a catalog rebuild preview from library-local sidecars.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogRebuildDryRunReport {
+    pub sidecars_scanned: usize,
+    pub entries: Vec<CatalogRebuildDryRunEntry>,
+    pub issues: Vec<CatalogRebuildDryRunIssue>,
+}
+
+/// Per-sidecar dry-run result for rebuildable photo flag state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogRebuildDryRunEntry {
+    pub photo_id: String,
+    pub sidecar_relative_path: String,
+    pub action: CatalogRebuildDryRunAction,
+    pub flag_source: CatalogRebuildFlagSource,
+    pub resolved_flags: PhotoFlags,
+    pub catalog_flags: Option<PhotoFlags>,
+}
+
+/// Rebuild action that would be taken if a later restore task applies the dry-run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogRebuildDryRunAction {
+    CreatePhotoFlags,
+    UpdatePhotoFlags,
+    KeepPhotoFlags,
+}
+
+/// Source used to resolve portable culling and label flags for rebuild preview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogRebuildFlagSource {
+    SidecarFlags,
+    EditGraphMetadata,
+    Defaults,
+}
+
+/// Structured dry-run issue kind for sidecar rebuild reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogRebuildDryRunIssueKind {
+    MalformedJson,
+    SchemaInvalid,
+    InvalidPathIdentity,
+    PhotoIdMismatch,
+    FlagsMetadataConflict,
+    CatalogReconcileConflict,
+}
+
+/// Non-fatal issue found while previewing catalog rebuild from sidecars.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogRebuildDryRunIssue {
+    pub kind: CatalogRebuildDryRunIssueKind,
+    pub photo_id: Option<String>,
+    pub sidecar_relative_path: String,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SidecarPhotoRow {
     photo_id: String,
     original_path: String,
     file_name: String,
     file_size: i64,
+    modified_at: Option<String>,
+    partial_hash: Option<String>,
+    full_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SidecarPhotoSnapshot {
+    original_path: String,
+    file_name: String,
+    file_size: Option<i64>,
     modified_at: Option<String>,
     partial_hash: Option<String>,
     full_hash: Option<String>,
@@ -371,7 +439,7 @@ pub fn sidecar_path_for_photo(
     Ok(library_root_path
         .as_ref()
         .join(SIDECAR_DIRECTORY)
-        .join(format!("{photo_id}.silicaraw.sidecar.json")))
+        .join(format!("{photo_id}{SIDECAR_FILE_SUFFIX}")))
 }
 
 /// Write a validated sidecar into the library-local sidecars directory.
@@ -383,7 +451,7 @@ pub fn write_photo_sidecar(
     validate_sidecar_photo_id(photo_id)?;
     let library = open_local_library(library_root_path)?;
     let sidecar_path = sidecar_path_for_photo(&library.root_path, photo_id)?;
-    let sidecar_relative_path = format!("{SIDECAR_DIRECTORY}/{photo_id}.silicaraw.sidecar.json");
+    let sidecar_relative_path = format!("{SIDECAR_DIRECTORY}/{photo_id}{SIDECAR_FILE_SUFFIX}");
     fs::create_dir_all(library.root_path.join(SIDECAR_DIRECTORY))?;
 
     let value = build_photo_sidecar_value(&library.root_path, photo_id, app_version)?;
@@ -454,6 +522,47 @@ pub fn read_photo_sidecar(
         edit_graph,
         json,
     }))
+}
+
+/// Preview how the live catalog would rebuild portable flag state from sidecars.
+pub fn dry_run_catalog_rebuild_from_sidecars(
+    library_root_path: impl AsRef<Path>,
+) -> Result<CatalogRebuildDryRunReport, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let sidecars_directory = library.root_path.join(SIDECAR_DIRECTORY);
+    let mut report = CatalogRebuildDryRunReport {
+        sidecars_scanned: 0,
+        entries: Vec::new(),
+        issues: Vec::new(),
+    };
+
+    if !sidecars_directory.is_dir() {
+        return Ok(report);
+    }
+
+    let mut sidecar_paths = Vec::new();
+    for entry in fs::read_dir(&sidecars_directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if file_name.ends_with(SIDECAR_FILE_SUFFIX) {
+            sidecar_paths.push(entry.path());
+        }
+    }
+    sidecar_paths.sort_by(|left, right| {
+        left.file_name()
+            .cmp(&right.file_name())
+            .then_with(|| left.cmp(right))
+    });
+
+    let connection = open_catalog(&library.catalog_path)?;
+    for sidecar_path in sidecar_paths {
+        process_rebuild_dry_run_sidecar(&connection, &sidecar_path, &mut report)?;
+    }
+
+    Ok(report)
 }
 
 /// Scan a selected folder and record file candidates by reference.
@@ -1235,6 +1344,369 @@ fn parse_sidecar_flags(value: &serde_json::Value) -> Result<PhotoFlags, LibraryS
         color_label,
     )
     .map_err(LibraryStorageError::from)
+}
+
+fn process_rebuild_dry_run_sidecar(
+    connection: &Connection,
+    sidecar_path: &Path,
+    report: &mut CatalogRebuildDryRunReport,
+) -> Result<(), LibraryStorageError> {
+    report.sidecars_scanned += 1;
+
+    let file_name = sidecar_path
+        .file_name()
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let sidecar_relative_path = format!("{SIDECAR_DIRECTORY}/{file_name}");
+    let expected_photo_id = file_name
+        .strip_suffix(SIDECAR_FILE_SUFFIX)
+        .unwrap_or_default()
+        .to_string();
+
+    if let Err(error) = validate_sidecar_photo_id(&expected_photo_id) {
+        push_rebuild_issue(
+            report,
+            CatalogRebuildDryRunIssueKind::InvalidPathIdentity,
+            Some(expected_photo_id),
+            sidecar_relative_path,
+            error.to_string(),
+        );
+        return Ok(());
+    }
+
+    let bytes = fs::read(sidecar_path)?;
+    let json: serde_json::Value = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            push_rebuild_issue(
+                report,
+                CatalogRebuildDryRunIssueKind::MalformedJson,
+                Some(expected_photo_id),
+                sidecar_relative_path,
+                error.to_string(),
+            );
+            return Ok(());
+        }
+    };
+
+    if json.get("schema").and_then(serde_json::Value::as_str) != Some(SIDECAR_SCHEMA)
+        || json.get("version").and_then(serde_json::Value::as_i64) != Some(SIDECAR_VERSION)
+    {
+        push_rebuild_issue(
+            report,
+            CatalogRebuildDryRunIssueKind::SchemaInvalid,
+            Some(expected_photo_id),
+            sidecar_relative_path,
+            "sidecar schema marker or version is unsupported".to_string(),
+        );
+        return Ok(());
+    }
+
+    if let Err(error) = validate_sidecar_json(&json) {
+        push_rebuild_issue(
+            report,
+            CatalogRebuildDryRunIssueKind::SchemaInvalid,
+            Some(expected_photo_id.clone()),
+            sidecar_relative_path.clone(),
+            error.to_string(),
+        );
+    }
+
+    let sidecar_photo_id = match json["photo"]["photo_id"].as_str() {
+        Some(photo_id) => photo_id,
+        None => {
+            push_rebuild_issue(
+                report,
+                CatalogRebuildDryRunIssueKind::PhotoIdMismatch,
+                Some(expected_photo_id),
+                sidecar_relative_path,
+                "sidecar.photo.photo_id is missing".to_string(),
+            );
+            return Ok(());
+        }
+    };
+
+    if sidecar_photo_id != expected_photo_id {
+        push_rebuild_issue(
+            report,
+            CatalogRebuildDryRunIssueKind::PhotoIdMismatch,
+            Some(sidecar_photo_id.to_string()),
+            sidecar_relative_path,
+            format!(
+                "sidecar path identity {expected_photo_id} does not match payload {sidecar_photo_id}"
+            ),
+        );
+        return Ok(());
+    }
+
+    let sidecar_flags = parse_valid_rebuild_sidecar_flags(&json).ok();
+    let metadata_flags = parse_valid_edit_graph_metadata_flags(&expected_photo_id, &json).ok();
+    if let (Some(sidecar_flags), Some(metadata_flags)) = (&sidecar_flags, &metadata_flags) {
+        if sidecar_flags != metadata_flags {
+            push_rebuild_issue(
+                report,
+                CatalogRebuildDryRunIssueKind::FlagsMetadataConflict,
+                Some(expected_photo_id.clone()),
+                sidecar_relative_path.clone(),
+                "sidecar.flags and edit_graph.metadata disagree; sidecar.flags would win"
+                    .to_string(),
+            );
+        }
+    }
+
+    if let Some(snapshot) = parse_sidecar_photo_snapshot(&json) {
+        report_catalog_reconcile_issues(
+            connection,
+            &expected_photo_id,
+            &sidecar_relative_path,
+            &snapshot,
+            report,
+        )?;
+    }
+
+    let (flag_source, resolved_flags) = match (sidecar_flags, metadata_flags) {
+        (Some(flags), _) => (CatalogRebuildFlagSource::SidecarFlags, flags),
+        (None, Some(flags)) => (CatalogRebuildFlagSource::EditGraphMetadata, flags),
+        (None, None) => (
+            CatalogRebuildFlagSource::Defaults,
+            default_rebuild_flags(&expected_photo_id),
+        ),
+    };
+    let catalog_flags = get_photo_flags_from_connection(connection, &expected_photo_id)?;
+    let action = match &catalog_flags {
+        None => CatalogRebuildDryRunAction::CreatePhotoFlags,
+        Some(flags) if flags != &resolved_flags => CatalogRebuildDryRunAction::UpdatePhotoFlags,
+        Some(_) => CatalogRebuildDryRunAction::KeepPhotoFlags,
+    };
+
+    report.entries.push(CatalogRebuildDryRunEntry {
+        photo_id: expected_photo_id,
+        sidecar_relative_path,
+        action,
+        flag_source,
+        resolved_flags,
+        catalog_flags,
+    });
+
+    Ok(())
+}
+
+fn push_rebuild_issue(
+    report: &mut CatalogRebuildDryRunReport,
+    kind: CatalogRebuildDryRunIssueKind,
+    photo_id: Option<String>,
+    sidecar_relative_path: String,
+    message: String,
+) {
+    report.issues.push(CatalogRebuildDryRunIssue {
+        kind,
+        photo_id,
+        sidecar_relative_path,
+        message,
+    });
+}
+
+fn parse_valid_rebuild_sidecar_flags(
+    value: &serde_json::Value,
+) -> Result<PhotoFlags, LibraryStorageError> {
+    let flags = parse_sidecar_flags(value)?;
+    if let Some(label) = flags.color_label.as_deref() {
+        edit_color_label_from_catalog(Some(label))?;
+    }
+    Ok(flags)
+}
+
+fn parse_valid_edit_graph_metadata_flags(
+    photo_id: &str,
+    value: &serde_json::Value,
+) -> Result<PhotoFlags, LibraryStorageError> {
+    let metadata = value
+        .get("edit_graph")
+        .and_then(|edit_graph| edit_graph.get("metadata"))
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation(
+                "sidecar.edit_graph.metadata must be an object".to_string(),
+            )
+        })?;
+
+    let rating = metadata
+        .get("rating")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation(
+                "edit_graph.metadata.rating must be an integer".to_string(),
+            )
+        })?;
+    let rating = u8::try_from(rating).map_err(|_| {
+        LibraryStorageError::SidecarValidation(
+            "edit_graph.metadata.rating must be 0..=5".to_string(),
+        )
+    })?;
+
+    let picked = metadata
+        .get("picked")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation(
+                "edit_graph.metadata.picked must be boolean".to_string(),
+            )
+        })?;
+    let rejected = metadata
+        .get("rejected")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            LibraryStorageError::SidecarValidation(
+                "edit_graph.metadata.rejected must be boolean".to_string(),
+            )
+        })?;
+    let color_label = match metadata.get("color_label") {
+        Some(value) if value.is_null() => None,
+        Some(value) => {
+            let label = value.as_str().ok_or_else(|| {
+                LibraryStorageError::SidecarValidation(
+                    "edit_graph.metadata.color_label must be string or null".to_string(),
+                )
+            })?;
+            edit_color_label_from_catalog(Some(label))?;
+            Some(label.to_string())
+        }
+        None => None,
+    };
+
+    PhotoFlags::new(photo_id.to_string(), rating, picked, rejected, color_label)
+        .map_err(LibraryStorageError::from)
+}
+
+fn parse_sidecar_photo_snapshot(value: &serde_json::Value) -> Option<SidecarPhotoSnapshot> {
+    let photo = value.get("photo")?.as_object()?;
+    let fingerprint = photo.get("fingerprint")?.as_object()?;
+
+    Some(SidecarPhotoSnapshot {
+        original_path: photo.get("original_path")?.as_str()?.to_string(),
+        file_name: photo.get("file_name")?.as_str()?.to_string(),
+        file_size: fingerprint
+            .get("file_size")
+            .and_then(serde_json::Value::as_i64),
+        modified_at: fingerprint
+            .get("modified_at")
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned),
+        partial_hash: fingerprint
+            .get("partial_hash")
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned),
+        full_hash: fingerprint.get("full_hash").and_then(|value| {
+            if value.is_null() {
+                None
+            } else {
+                value.as_str().map(ToOwned::to_owned)
+            }
+        }),
+    })
+}
+
+fn report_catalog_reconcile_issues(
+    connection: &Connection,
+    photo_id: &str,
+    sidecar_relative_path: &str,
+    snapshot: &SidecarPhotoSnapshot,
+    report: &mut CatalogRebuildDryRunReport,
+) -> Result<(), LibraryStorageError> {
+    let Some(catalog_photo) = load_sidecar_photo_row(connection, photo_id)? else {
+        push_rebuild_issue(
+            report,
+            CatalogRebuildDryRunIssueKind::CatalogReconcileConflict,
+            Some(photo_id.to_string()),
+            sidecar_relative_path.to_string(),
+            "catalog photo is missing; rebuild would depend on sidecar photo data".to_string(),
+        );
+        return Ok(());
+    };
+
+    let mut mismatches = Vec::new();
+    if catalog_photo.original_path != snapshot.original_path {
+        mismatches.push("original_path");
+    }
+    if catalog_photo.file_name != snapshot.file_name {
+        mismatches.push("file_name");
+    }
+    if snapshot
+        .file_size
+        .is_some_and(|file_size| file_size != catalog_photo.file_size)
+    {
+        mismatches.push("file_size");
+    }
+    if snapshot
+        .modified_at
+        .as_ref()
+        .is_some_and(|modified_at| Some(modified_at) != catalog_photo.modified_at.as_ref())
+    {
+        mismatches.push("modified_at");
+    }
+    if snapshot
+        .partial_hash
+        .as_ref()
+        .is_some_and(|partial_hash| Some(partial_hash) != catalog_photo.partial_hash.as_ref())
+    {
+        mismatches.push("partial_hash");
+    }
+    if snapshot
+        .full_hash
+        .as_ref()
+        .is_some_and(|full_hash| Some(full_hash) != catalog_photo.full_hash.as_ref())
+    {
+        mismatches.push("full_hash");
+    }
+
+    if !mismatches.is_empty() {
+        push_rebuild_issue(
+            report,
+            CatalogRebuildDryRunIssueKind::CatalogReconcileConflict,
+            Some(photo_id.to_string()),
+            sidecar_relative_path.to_string(),
+            format!(
+                "catalog photo differs from sidecar fields: {}",
+                mismatches.join(", ")
+            ),
+        );
+    }
+
+    Ok(())
+}
+
+fn get_photo_flags_from_connection(
+    connection: &Connection,
+    photo_id: &str,
+) -> Result<Option<PhotoFlags>, LibraryStorageError> {
+    connection
+        .query_row(
+            r#"
+            SELECT photo_id, rating, picked, rejected, color_label
+            FROM photo_flags
+            WHERE photo_id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )
+        .optional()?
+        .map(|(photo_id, rating, picked, rejected, color_label)| {
+            photo_flags_from_row(photo_id, rating, picked, rejected, color_label)
+        })
+        .transpose()
+}
+
+fn default_rebuild_flags(photo_id: &str) -> PhotoFlags {
+    PhotoFlags::new(photo_id.to_string(), 0, false, false, None)
+        .expect("default rebuild flags are valid")
 }
 
 fn update_sidecar_status(
@@ -2477,6 +2949,265 @@ mod tests {
         let error = read_photo_sidecar(&library.root_path, &photo_id)
             .expect_err("bad sync status must fail");
         assert!(error.to_string().contains("sidecar.sync.status"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rebuild_dry_run_reports_deterministic_updates_without_mutating_catalog() {
+        let workspace = unique_library_root("sidecar-rebuild-dry-run");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("purple".to_string()),
+        )
+        .expect("set sidecar flags");
+        write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1").expect("write sidecar");
+        set_photo_flags(&library.root_path, photo_id.clone(), 1, false, true, None)
+            .expect("change live catalog flags");
+
+        let report = dry_run_catalog_rebuild_from_sidecars(&library.root_path)
+            .expect("dry-run sidecar rebuild");
+        let second_report = dry_run_catalog_rebuild_from_sidecars(&library.root_path)
+            .expect("repeat dry-run sidecar rebuild");
+
+        assert_eq!(report, second_report, "dry-run output must be stable");
+        assert_eq!(report.sidecars_scanned, 1);
+        assert!(report.issues.is_empty());
+        assert_eq!(report.entries.len(), 1);
+        let entry = &report.entries[0];
+        assert_eq!(entry.photo_id, photo_id);
+        assert_eq!(entry.action, CatalogRebuildDryRunAction::UpdatePhotoFlags);
+        assert_eq!(entry.flag_source, CatalogRebuildFlagSource::SidecarFlags);
+        assert_eq!(entry.resolved_flags.rating, 5);
+        assert!(entry.resolved_flags.picked);
+        assert!(!entry.resolved_flags.rejected);
+        assert_eq!(entry.resolved_flags.color_label.as_deref(), Some("purple"));
+
+        let live_flags = get_photo_flags(&library.root_path, &photo_id)
+            .expect("read live flags")
+            .expect("live flags");
+        assert_eq!(live_flags.rating, 1);
+        assert!(!live_flags.picked);
+        assert!(live_flags.rejected);
+        assert_eq!(live_flags.color_label, None);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rebuild_dry_run_uses_metadata_fallback_and_defaults() {
+        let workspace = unique_library_root("sidecar-rebuild-precedence");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let metadata_file = import_root.join("metadata.jpg");
+        let defaults_file = import_root.join("defaults.jpg");
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&metadata_file, b"metadata jpeg bytes").expect("write metadata original");
+        std::fs::write(&defaults_file, b"defaults jpeg bytes").expect("write defaults original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let metadata_photo_id = stable_catalog_id("photo", &metadata_file.display().to_string());
+        let defaults_photo_id = stable_catalog_id("photo", &defaults_file.display().to_string());
+
+        let metadata_sidecar =
+            write_photo_sidecar(&library.root_path, &metadata_photo_id, "0.1.0-alpha.1")
+                .expect("write metadata sidecar");
+        let mut metadata_value: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&metadata_sidecar.sidecar_path).expect("read sidecar"),
+        )
+        .expect("parse metadata sidecar");
+        metadata_value
+            .as_object_mut()
+            .expect("sidecar object")
+            .remove("flags");
+        metadata_value["edit_graph"]["metadata"]["rating"] = serde_json::json!(2);
+        metadata_value["edit_graph"]["metadata"]["picked"] = serde_json::json!(true);
+        metadata_value["edit_graph"]["metadata"]["rejected"] = serde_json::json!(false);
+        metadata_value["edit_graph"]["metadata"]["color_label"] = serde_json::json!("blue");
+        std::fs::write(
+            &metadata_sidecar.sidecar_path,
+            serde_json::to_vec_pretty(&metadata_value).expect("serialize metadata fallback"),
+        )
+        .expect("write metadata fallback sidecar");
+
+        let defaults_sidecar =
+            write_photo_sidecar(&library.root_path, &defaults_photo_id, "0.1.0-alpha.1")
+                .expect("write defaults sidecar");
+        let mut defaults_value: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&defaults_sidecar.sidecar_path).expect("read sidecar"),
+        )
+        .expect("parse defaults sidecar");
+        defaults_value["flags"]["rating"] = serde_json::json!(99);
+        defaults_value["edit_graph"]["metadata"]["rating"] = serde_json::json!(9);
+        std::fs::write(
+            &defaults_sidecar.sidecar_path,
+            serde_json::to_vec_pretty(&defaults_value).expect("serialize defaults fallback"),
+        )
+        .expect("write defaults fallback sidecar");
+
+        let report = dry_run_catalog_rebuild_from_sidecars(&library.root_path)
+            .expect("dry-run sidecar rebuild");
+
+        assert_eq!(report.sidecars_scanned, 2);
+        assert_eq!(report.entries.len(), 2);
+        assert!(
+            report
+                .issues
+                .iter()
+                .filter(|issue| issue.kind == CatalogRebuildDryRunIssueKind::SchemaInvalid)
+                .count()
+                >= 2,
+            "schema-invalid sidecars must be reported"
+        );
+
+        let metadata_entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.photo_id == metadata_photo_id)
+            .expect("metadata entry");
+        assert_eq!(
+            metadata_entry.flag_source,
+            CatalogRebuildFlagSource::EditGraphMetadata
+        );
+        assert_eq!(metadata_entry.resolved_flags.rating, 2);
+        assert!(metadata_entry.resolved_flags.picked);
+        assert_eq!(
+            metadata_entry.resolved_flags.color_label.as_deref(),
+            Some("blue")
+        );
+
+        let defaults_entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.photo_id == defaults_photo_id)
+            .expect("defaults entry");
+        assert_eq!(
+            defaults_entry.flag_source,
+            CatalogRebuildFlagSource::Defaults
+        );
+        assert_eq!(defaults_entry.resolved_flags.rating, 0);
+        assert!(!defaults_entry.resolved_flags.picked);
+        assert!(!defaults_entry.resolved_flags.rejected);
+        assert_eq!(defaults_entry.resolved_flags.color_label, None);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rebuild_dry_run_reports_conflicts_and_identity_mismatch() {
+        let workspace = unique_library_root("sidecar-rebuild-conflicts");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set flags");
+        let sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write sidecar");
+        let mut value: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&sidecar.sidecar_path).expect("read sidecar"),
+        )
+        .expect("parse sidecar");
+        value["flags"]["rating"] = serde_json::json!(3);
+        value["photo"]["original_path"] = serde_json::json!("/tmp/elsewhere/sample.jpg");
+        std::fs::write(
+            &sidecar.sidecar_path,
+            serde_json::to_vec_pretty(&value).expect("serialize conflict sidecar"),
+        )
+        .expect("write conflict sidecar");
+
+        let mismatch_path =
+            sidecar_path_for_photo(&library.root_path, "mismatch-photo").expect("mismatch path");
+        std::fs::write(
+            &mismatch_path,
+            serde_json::to_vec_pretty(&value).expect("serialize mismatch sidecar"),
+        )
+        .expect("write mismatch sidecar");
+
+        let report = dry_run_catalog_rebuild_from_sidecars(&library.root_path)
+            .expect("dry-run sidecar rebuild");
+
+        assert_eq!(report.sidecars_scanned, 2);
+        let entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.photo_id == photo_id)
+            .expect("entry");
+        assert_eq!(entry.flag_source, CatalogRebuildFlagSource::SidecarFlags);
+        assert_eq!(entry.resolved_flags.rating, 3);
+        assert!(report.issues.iter().any(|issue| {
+            issue.kind == CatalogRebuildDryRunIssueKind::FlagsMetadataConflict
+                && issue.photo_id.as_deref() == Some(&photo_id)
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.kind == CatalogRebuildDryRunIssueKind::CatalogReconcileConflict
+                && issue.photo_id.as_deref() == Some(&photo_id)
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.kind == CatalogRebuildDryRunIssueKind::PhotoIdMismatch
+                && issue.sidecar_relative_path
+                    == format!("{SIDECAR_DIRECTORY}/mismatch-photo.silicaraw.sidecar.json")
+        }));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rebuild_dry_run_reports_malformed_sidecars_without_entries() {
+        let workspace = unique_library_root("sidecar-rebuild-malformed");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let sidecar_path =
+            sidecar_path_for_photo(&library.root_path, &photo_id).expect("sidecar path");
+        std::fs::write(&sidecar_path, b"{not json").expect("write malformed sidecar");
+
+        let report = dry_run_catalog_rebuild_from_sidecars(&library.root_path)
+            .expect("dry-run sidecar rebuild");
+
+        assert_eq!(report.sidecars_scanned, 1);
+        assert!(report.entries.is_empty());
+        assert_eq!(report.issues.len(), 1);
+        assert_eq!(
+            report.issues[0].kind,
+            CatalogRebuildDryRunIssueKind::MalformedJson
+        );
+        assert_eq!(
+            report.issues[0].photo_id.as_deref(),
+            Some(photo_id.as_str())
+        );
 
         remove_library_root(&workspace);
     }

@@ -12,6 +12,12 @@ use std::time::UNIX_EPOCH;
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-core";
 
+pub use silica_storage::CatalogRebuildDryRunAction;
+pub use silica_storage::CatalogRebuildDryRunEntry;
+pub use silica_storage::CatalogRebuildDryRunIssue;
+pub use silica_storage::CatalogRebuildDryRunIssueKind;
+pub use silica_storage::CatalogRebuildDryRunReport;
+pub use silica_storage::CatalogRebuildFlagSource;
 pub use silica_storage::LibraryPhotoGridItem;
 pub use silica_storage::PhotoFlags;
 pub use silica_storage::SidecarWriteResult;
@@ -352,6 +358,14 @@ pub fn read_photo_sidecar(
     photo_id: &str,
 ) -> Result<Option<ValidatedSidecar>, CoreError> {
     silica_storage::read_photo_sidecar(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Dry-run catalog rebuild from library-local sidecars through the core boundary.
+pub fn dry_run_catalog_rebuild_from_sidecars(
+    library_root_path: impl AsRef<Path>,
+) -> Result<CatalogRebuildDryRunReport, CoreError> {
+    silica_storage::dry_run_catalog_rebuild_from_sidecars(library_root_path)
+        .map_err(CoreError::from)
 }
 
 /// Build the preview session for one catalog photo.
@@ -1332,6 +1346,69 @@ mod tests {
         assert_eq!(read.flags.rating, 2);
         assert_eq!(read.flags.color_label.as_deref(), Some("blue"));
         assert_original_hash(&jpeg_file, &original_hash, "core sidecar read");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn dry_runs_sidecar_rebuild_through_core_without_mutating_flags() {
+        let workspace = unique_library_root("core-sidecar-rebuild");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        set_photo_flags(
+            &created.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set sidecar flags");
+        write_photo_sidecar(&created.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write sidecar")
+            .expect("sidecar write result");
+        set_photo_flags(&created.root_path, photo_id.clone(), 1, false, true, None)
+            .expect("change live catalog flags");
+
+        let report =
+            dry_run_catalog_rebuild_from_sidecars(&created.root_path).expect("dry-run rebuild");
+
+        assert_eq!(report.sidecars_scanned, 1);
+        assert!(report.issues.is_empty());
+        assert_eq!(report.entries.len(), 1);
+        assert_eq!(
+            report.entries[0].action,
+            CatalogRebuildDryRunAction::UpdatePhotoFlags
+        );
+        assert_eq!(
+            report.entries[0].flag_source,
+            CatalogRebuildFlagSource::SidecarFlags
+        );
+        assert_eq!(report.entries[0].resolved_flags.rating, 5);
+
+        let live_flags = get_photo_flags(&created.root_path, &photo_id)
+            .expect("read live flags")
+            .expect("live flags");
+        assert_eq!(live_flags.rating, 1);
+        assert!(!live_flags.picked);
+        assert!(live_flags.rejected);
 
         remove_library_root(&workspace);
     }

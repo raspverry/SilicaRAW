@@ -59,6 +59,30 @@ Manual checklist:
 - [ ] Recompute the original source file hash and confirm it matches the pre-workflow hash.
 - [ ] Confirm no exported file overwrote an original source path.
 
+## Task 10.4 Sidecar Rebuild Dry-Run QA Record
+
+Status: automated storage/core dry-run tests added on 2026-06-11. Applied restore behavior remains out of scope until Task 10.5.
+
+Automated validation commands:
+
+```bash
+cargo test -p silica-storage rebuild_dry_run
+cargo test -p silica-core sidecar_rebuild
+```
+
+Automated coverage:
+
+- [x] Dry-run output is deterministic for repeated scans.
+- [x] Dry-run does not mutate live `photo_flags`.
+- [x] `sidecar.flags` wins over `edit_graph.metadata`.
+- [x] `edit_graph.metadata` is used when sidecar flags are absent or invalid by the dry-run rule.
+- [x] Defaults are used when no valid portable flags exist.
+- [x] Malformed sidecars are reported without producing rebuild entries.
+- [x] Schema-invalid sidecars are reported.
+- [x] Photo-id path/payload mismatches are reported.
+- [x] Flag/metadata disagreements are reported instead of silently resolved.
+- [x] Catalog original-path or fingerprint reconciliation conflicts are reported.
+
 ## General QA Backlog
 
 - [ ] Import 1,000 mixed images

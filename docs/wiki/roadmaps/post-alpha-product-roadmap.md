@@ -119,8 +119,10 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Rebuild precedence follows `sidecar.flags`, then `edit_graph.metadata`, then defaults.
   - Conflicts are reported, not silently overwritten.
   - Dry-run output is stable enough for tests.
+- **Status:** Completed on 2026-06-11. Added deterministic sidecar rebuild dry-run reports through `silica-storage` and thin `silica-core` wrappers. The report scans library-local sidecars in stable order, resolves portable flags by `sidecar.flags` then `edit_graph.metadata` then defaults, reports malformed/schema-invalid sidecars, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts, and leaves the live catalog unchanged. This does not apply restore actions, overwrite catalog state, add conflict UI, rescan originals, or add backup archive behavior.
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core`
+  - `scripts/harness/check.sh`
 
 ### Task 10.5: Backup, WAL, Checkpoint, and Restore Policy
 

@@ -22,6 +22,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Phase 4.4 adds catalog-authoritative rating, picked, rejected, and color label persistence through `photo_flags`.
 - Phase 5.3 adds active edit graph persistence through `edit_states` on exposure/contrast commit.
 - Task 10.3 adds explicit library-local sidecar write/read behavior through `silica-storage`; `photo_flags` remains the live in-app authority until a later explicit sync task changes that policy.
+- Task 10.4 adds a catalog rebuild dry-run report from library-local sidecars. It reports what would happen and does not mutate `photos`, `photo_flags`, `edit_states`, or `sidecar_status`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -44,6 +45,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Exposure/contrast draft preview updates do not write SQLite.
 - Exposure/contrast commit/release writes the active edit graph to `edit_states`.
 - Sidecar write/read validates sidecar and nested edit graph JSON, mirrors rating/picked/rejected/color-label state only, writes under library `sidecars/`, and updates `sidecar_status` after successful writes.
+- Sidecar rebuild dry-run scans `sidecars/` in deterministic order, resolves portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults, and reports malformed sidecars, schema issues, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts without applying changes.
 
 ## Not Implemented Yet
 
@@ -52,7 +54,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
 - Automatic sidecar synchronization.
-- Catalog rebuild from sidecars.
+- Applied catalog rebuild or restore from sidecars.
 - Sidecar conflict handling and conflict UI.
 - Full edit history and undo/redo persistence.
 - Cache clear safety.
