@@ -2,21 +2,36 @@
 
 SilicaRAW is an early-stage, open-source RAW photo editor for Apple Silicon.
 
-This repository currently contains the monorepo foundation, a minimal Tauri desktop shell, and the first local library create/open path. Product editing features are intentionally still out of scope.
+The current delivery target is a local macOS alpha that can be installed from a DMG and complete a minimal JPEG/JPG editor workflow without modifying original photo files. Broad RAW decoding, the product Metal viewer, MLX, MCP, plugins, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are intentionally out of the current alpha scope.
 
 ## Current Scope
 
 - Rust workspace root
-- Minimal Tauri desktop shell
+- Tauri desktop shell for the local alpha app
 - Local library folder create/open path
 - Non-recursive folder import scanner for catalog candidates
 - Rating, pick, reject, and color label persistence in SQLite `photo_flags`
-- Minimal preview readiness path for raster candidates and clear RAW/unsupported states
-- Developer-only unsigned `.app` and `.dmg` packaging path
+- JPEG/JPG thumbnail, loupe preview, Develop preview, exposure/contrast, edit-state persistence, and JPEG sRGB export path
+- Product cache clear command for disposable cache directories
+- Connected static UI vertical slice for the local alpha workflow
+- Clear RAW/unsupported/missing-file blocked states without RAW decoding claims
+- Developer-only unsigned `.app` and `.dmg` preview artifact path
 - Core crate boundaries from the architecture documents
 - SQLite migration foundation for empty catalog schema, required indexes, and catalog schema contract
 - MLX boundary crate is explicitly deferred from local alpha
 - Per-crate responsibility notes
+
+## Distribution Status
+
+The user-ready local distribution target is a signed and notarized GitHub Release DMG containing `SilicaRAW.app`. That path is currently blocked until Apple Developer Program funding, a Developer ID Application certificate, and notarization credentials are available.
+
+While blocked, maintainers may build unsigned developer-preview DMG artifacts for internal testing. These artifacts are not signed, not notarized, and not user-ready; Gatekeeper warnings are expected.
+
+Release docs:
+
+- [Local DMG Distribution Plan](docs/wiki/roadmaps/local-dmg-distribution-plan.md)
+- [Local DMG Release Runbook](docs/wiki/roadmaps/local-dmg-release-runbook.md)
+- [Developer Preview Artifact Runbook](docs/wiki/roadmaps/developer-preview-artifact-runbook.md)
 
 ## Workspace Layout
 

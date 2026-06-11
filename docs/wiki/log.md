@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-9 | Local DMG release runbook added
+
+- Added a maintainer runbook for signed local alpha DMG releases and current unsigned developer-preview artifacts.
+- Included prerelease checks, tag naming, rollback steps, Gatekeeper assessment commands, and notarization troubleshooting links.
+- Updated README distribution notes so contributors can find the current release and preview paths from the repository entry point.
+
 ## [2026-06-11] phase-9 | Release notes template added
 
 - Added `.github/release-template.md` for local alpha DMG release notes.
