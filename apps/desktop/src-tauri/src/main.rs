@@ -2710,6 +2710,7 @@ mod tests {
         let library_root = run_root.join("SilicaRAW Library");
         let import_root = run_root.join("Import Originals");
         let export_root = run_root.join("Exports");
+        let session_path = run_root.join("AppConfig").join("app-session.json");
         std::fs::create_dir_all(&import_root).expect("create connected smoke import folder");
         std::fs::create_dir_all(&export_root).expect("create connected smoke export folder");
 
@@ -2721,6 +2722,13 @@ mod tests {
         let secondary_original = import_root.join("synthetic-checker.jpeg");
         let raw_placeholder = import_root.join("blocked-raw.DNG");
         let unsupported_original = import_root.join("notes.txt");
+        let recursive_root = import_root.join("Recursive");
+        let recursive_original = recursive_root.join("recursive-child.jpg");
+        let recursive_unsupported = recursive_root.join("recursive-notes.txt");
+        let recursive_hidden = recursive_root.join(".hidden.jpg");
+        let recursive_package = recursive_root.join("Archive.photoslibrary");
+        let recursive_package_child = recursive_package.join("package-child.jpg");
+        std::fs::create_dir_all(&recursive_package).expect("create recursive smoke package");
         std::fs::copy(
             fixtures_root.join("supported/synthetic-gradient.jpg"),
             &primary_original,
@@ -2741,18 +2749,61 @@ mod tests {
             &unsupported_original,
         )
         .expect("copy unsupported fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-checker.jpeg"),
+            &recursive_original,
+        )
+        .expect("copy recursive JPEG fixture");
+        std::fs::copy(
+            fixtures_root.join("unsupported/notes.txt"),
+            &recursive_unsupported,
+        )
+        .expect("copy recursive unsupported fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            &recursive_hidden,
+        )
+        .expect("copy recursive hidden fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            &recursive_package_child,
+        )
+        .expect("copy recursive package fixture");
         let originals = tracked_originals(&[
             primary_original.clone(),
             secondary_original.clone(),
             raw_placeholder.clone(),
             unsupported_original.clone(),
+            recursive_original.clone(),
+            recursive_unsupported.clone(),
+            recursive_hidden.clone(),
+            recursive_package_child.clone(),
         ]);
 
-        let created = super::create_library_at_path(library_root.display().to_string(), None);
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
         assert!(created.ok, "create library failed: {created:?}");
         assert_eq!(response_data(&created).kind(), "librarySession");
-        let opened = super::open_library_at_path(library_root.display().to_string(), None);
+        let opened = super::open_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
         assert!(opened.ok, "open library failed: {opened:?}");
+        let app_session = super::read_app_session_at_path(session_path.clone());
+        assert!(app_session.ok, "read app session failed: {app_session:?}");
+        match response_data(&app_session) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+                assert_eq!(session.recents[0].available, Some(true));
+            }
+            other => panic!("unexpected app session data: {other:?}"),
+        }
         assert_originals_unchanged(&originals, "create/open library");
 
         let imported = super::import_folder(
@@ -2808,6 +2859,49 @@ mod tests {
             other => panic!("unexpected grid response data: {other:?}"),
         };
         assert_originals_unchanged(&originals, "grid thumbnail generation");
+
+        let paged = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 2,
+                sort: "file_name_asc".to_string(),
+                filters: super::DesktopLibraryQueryFilters::default(),
+            },
+        );
+        assert!(paged.ok, "paged grid failed: {paged:?}");
+        match response_data(&paged) {
+            super::DesktopCommandData::PhotoGridPage {
+                photos,
+                total_count,
+                has_next_page,
+                ..
+            } => {
+                assert_eq!(*total_count, 4);
+                assert_eq!(photos.len(), 2);
+                assert!(*has_next_page);
+            }
+            other => panic!("unexpected paged grid data: {other:?}"),
+        }
+
+        let metadata =
+            super::get_photo_metadata(library_root.display().to_string(), photo_id.clone());
+        assert!(metadata.ok, "metadata query failed: {metadata:?}");
+        match response_data(&metadata) {
+            super::DesktopCommandData::PhotoMetadata {
+                width,
+                height,
+                camera_make,
+                ..
+            } => {
+                assert_eq!(width.state, "known");
+                assert!(width.value.is_some_and(|value| value > 0));
+                assert_eq!(height.state, "known");
+                assert!(height.value.is_some_and(|value| value > 0));
+                assert_eq!(camera_make.state, "unavailable");
+            }
+            other => panic!("unexpected metadata data: {other:?}"),
+        }
 
         let picked = super::set_photo_flags(
             library_root.display().to_string(),
@@ -2981,6 +3075,109 @@ mod tests {
         }
         assert_originals_unchanged(&originals, "cache clear");
 
+        let recorded_selection = super::record_app_session_selection_at_path(
+            session_path.clone(),
+            library_root.display().to_string(),
+            Some(photo_id.clone()),
+            "develop".to_string(),
+        );
+        assert!(
+            recorded_selection.ok,
+            "record session selection failed: {recorded_selection:?}"
+        );
+        let restored_launch = super::resolve_launch_restore_at_path(session_path.clone());
+        assert!(
+            restored_launch.ok,
+            "launch restore failed: {restored_launch:?}"
+        );
+        match response_data(&restored_launch) {
+            super::DesktopCommandData::LaunchRestore {
+                status,
+                state,
+                selected_photo_id,
+                selected_photo_status,
+                requested_mode,
+                resolved_mode,
+                ..
+            } => {
+                assert_eq!(status, "restored");
+                assert_eq!(state, "library");
+                assert_eq!(selected_photo_id.as_deref(), Some(photo_id.as_str()));
+                assert_eq!(selected_photo_status, "restored");
+                assert_eq!(requested_mode, "develop");
+                assert_eq!(resolved_mode, "develop");
+            }
+            other => panic!("unexpected launch restore data: {other:?}"),
+        }
+
+        let missing_session_path = run_root.join("AppConfig").join("missing-session.json");
+        let mut missing_session = super::DesktopAppSession::default();
+        missing_session.last_library_root_path =
+            Some(run_root.join("Missing Library").display().to_string());
+        let written_missing =
+            super::write_app_session_at_path(missing_session_path.clone(), missing_session);
+        assert!(
+            written_missing.ok,
+            "write missing fallback session failed: {written_missing:?}"
+        );
+        let missing_restore = super::resolve_launch_restore_at_path(missing_session_path);
+        assert!(
+            missing_restore.ok,
+            "missing restore failed: {missing_restore:?}"
+        );
+        match response_data(&missing_restore) {
+            super::DesktopCommandData::LaunchRestore {
+                status,
+                state,
+                selected_photo_status,
+                fallback_reason,
+                ..
+            } => {
+                assert_eq!(status, "missingLibrary");
+                assert_eq!(state, "welcome");
+                assert_eq!(selected_photo_status, "none");
+                assert_eq!(fallback_reason.as_deref(), Some("missingLibrary"));
+            }
+            other => panic!("unexpected missing restore data: {other:?}"),
+        }
+
+        let recursive_import = super::import_folder(
+            library_root.display().to_string(),
+            import_root.display().to_string(),
+            Some(true),
+        );
+        assert!(
+            recursive_import.ok,
+            "recursive import failed: {recursive_import:?}"
+        );
+        match response_data(&recursive_import) {
+            super::DesktopCommandData::ImportSummary {
+                scanned_files,
+                supported_files,
+                unsupported_files,
+                issues,
+                ..
+            } => {
+                assert_eq!(*scanned_files, 6);
+                assert_eq!(*supported_files, 4);
+                assert_eq!(*unsupported_files, 2);
+                assert!(issues.iter().any(|issue| {
+                    issue.kind == "unsupported_file"
+                        && issue.file_name == Some("recursive-notes.txt".to_string())
+                }));
+                assert!(issues.iter().any(|issue| {
+                    issue.kind == "hidden_entry_skipped"
+                        && issue.file_name == Some(".hidden.jpg".to_string())
+                }));
+                assert!(issues.iter().any(|issue| {
+                    issue.kind == "package_directory_skipped"
+                        && issue.file_name == Some("Archive.photoslibrary".to_string())
+                }));
+            }
+            other => panic!("unexpected recursive import data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "recursive import");
+
         let reopened = super::open_library_at_path(library_root.display().to_string(), None);
         assert!(reopened.ok, "reopen library failed: {reopened:?}");
         let restored_flags =
@@ -3024,6 +3221,7 @@ mod tests {
             other => panic!("unexpected restored edit response data: {other:?}"),
         }
         assert_originals_unchanged(&originals, "library reopen");
+        eprintln!("phase-11 connected runtime smoke complete");
     }
 
     fn response_data(response: &super::DesktopCommandResponse) -> &super::DesktopCommandData {

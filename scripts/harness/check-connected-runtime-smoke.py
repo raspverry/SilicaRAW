@@ -66,6 +66,11 @@ def main():
         print(smoke.stdout, file=sys.stderr)
         print(smoke.stderr, file=sys.stderr)
         return 1
+    if "phase-11 connected runtime smoke complete" not in output:
+        print("connected runtime smoke failed: missing Phase 11 completion marker", file=sys.stderr)
+        print(smoke.stdout, file=sys.stderr)
+        print(smoke.stderr, file=sys.stderr)
+        return 1
 
     print("connected developer runtime smoke ok; clean-Mac DMG QA remains separate")
     return 0

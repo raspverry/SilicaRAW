@@ -658,6 +658,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-connected-runtime-smoke.py`
   - `scripts/harness/check.sh`
+- **Status:** Completed on 2026-06-11. The connected runtime smoke now covers Phase 11 recents, relaunch restore, missing-library fallback, paged grid query, stored metadata display, recursive import issue reporting, and original-file hash preservation using generated legal fixtures. The smoke emits a Phase 11 completion marker that `scripts/harness/check-connected-runtime-smoke.py` requires.
 
 ## Validation Strategy
 

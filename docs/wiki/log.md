@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Connected runtime smoke extended
+
+- Completed Task 11.9.5 connected runtime smoke for Phase 11.
+- The smoke now covers recents, relaunch restore, missing-library fallback, paged grid, stored metadata, recursive import review issues, and original-file safety.
+- `check-connected-runtime-smoke.py` now requires a Phase 11 completion marker from the exact desktop smoke test.
+
 ## [2026-06-11] phase-11 | Opt-in recursive import added
 
 - Added Task 11.9.4 opt-in recursive import.
