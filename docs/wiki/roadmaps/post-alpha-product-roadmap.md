@@ -285,6 +285,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Prove Core Image RAW support on legal fixtures before showing product RAW pixels.
 
+**Agent Brief:** Use [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md) and [Task Cards](../tasks/index.md) for the small read path.
+
 ### Task 12.1: Feature-Gated Core Image RAW Probe
 
 - **Location:** `crates/silica-decode`, `docs/DEPENDENCIES.md`

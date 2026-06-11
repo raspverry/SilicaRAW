@@ -15,6 +15,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ## How to Use This Wiki
 
 - Start with [Project Overview](overview/project.md) if you are new to SilicaRAW.
+- Start with [LLM Routing Index](llm/index.md) if you are an agent trying to minimize read context.
 - Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
 - Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
@@ -23,6 +24,11 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - Use [Git and PR Workflow](contributing/git-and-pr-workflow.md) before starting a new branch or pull request.
 
 ## Sections
+
+### LLM Routing
+
+- [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
+- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work.
 
 ### Overview
 
@@ -33,6 +39,11 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local DMG Release Runbook](roadmaps/local-dmg-release-runbook.md): maintainer steps for signed local releases and current unsigned preview artifacts.
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
+
+### Phase Briefs
+
+- [Phase 11 Summary](phases/phase-11-summary.md): completed session, grid, metadata, and import foundation context.
+- [Phase 12 RAW Proof Brief](phases/phase-12-raw-proof.md): current RAW proof scope and task order.
 
 ### Decisions
 

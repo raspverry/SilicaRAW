@@ -2,7 +2,7 @@
 title: Wiki Conventions
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-11
 source_of_truth: docs/superpowers/specs/2026-06-08-public-llm-wiki-design.md
 ---
 
@@ -61,7 +61,14 @@ Decision records use the ADR shape defined in [Decision Records](decisions/index
 - Keep research notes under `docs/wiki/sources/` or topic pages, not in random files.
 - Mark stale or replaced pages as `superseded` instead of deleting them casually.
 
+## LLM Routing Pages
+
+- Keep routing pages short enough to read before a task.
+- Put phase-specific routes under `docs/wiki/phases/`.
+- Put current atomic task cards under `docs/wiki/tasks/`.
+- Use routing pages to point agents away from large roadmaps or completed specs unless they are truly needed.
+- Do not duplicate authoritative schema or dependency details; link to the source-of-truth file instead.
+
 ## Notes for LLM Agents
 
 When editing the wiki, preserve human readability. Do not turn public pages into private scratchpads, chain-of-thought logs, or task transcripts.
-

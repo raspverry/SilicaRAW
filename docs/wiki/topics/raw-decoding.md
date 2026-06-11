@@ -84,6 +84,8 @@ This preserves the Spike 002 decision without pretending RAW decoding exists.
 
 ## Links
 
+- [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)
+- [Phase 12 Task Cards](../tasks/index.md)
 - [Spike 002 Report](../../spikes/002-raw-decoder.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [RAW Editing Feature Specification](../../07_RAW_Editing_Feature_Specification.md)

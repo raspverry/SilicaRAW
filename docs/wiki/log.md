@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] wiki | LLM routing added
+
+- Added the LLM routing index, completed Phase 11 summary, Phase 12 brief, and Phase 12 task cards.
+- The default agent route now points to small phase/task pages before large roadmap or design-spec files.
+- Wiki conventions now describe routing pages and task cards as token-saving navigation aids.
+
 ## [2026-06-11] phase-11 | Connected runtime smoke extended
 
 - Completed Task 11.9.5 connected runtime smoke for Phase 11.
