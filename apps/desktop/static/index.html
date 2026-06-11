@@ -328,6 +328,12 @@
         </section>
         <section class="sr-inspector-section" data-mode-panel="library">
           <div class="sr-panel-heading">Quick Review</div>
+          <div class="sr-selection-summary" id="selectionSummary" data-multi-selection-state="single">
+            <span>Primary</span>
+            <strong id="primarySelectedPhotoName">None</strong>
+            <output id="multiSelectionCount">1 selected</output>
+            <button id="clearMultiSelection" type="button" disabled>Clear Multi-Select</button>
+          </div>
           <div class="sr-rating-row" id="selectedPhotoRating" aria-label="Selected photo rating">-----</div>
           <div class="sr-rating-control-group" id="ratingControlGroup" aria-label="Rating">
             <button id="ratePhoto0" type="button" data-rating-value="0" aria-label="Set rating 0" aria-pressed="true">0</button>
@@ -522,6 +528,10 @@
       const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
       const clearCullingFlagsButton = document.querySelector("#clearCullingFlags");
       const cullingStatus = document.querySelector("#cullingStatus");
+      const selectionSummary = document.querySelector("#selectionSummary");
+      const primarySelectedPhotoName = document.querySelector("#primarySelectedPhotoName");
+      const multiSelectionCount = document.querySelector("#multiSelectionCount");
+      const clearMultiSelectionButton = document.querySelector("#clearMultiSelection");
       const openLoupeButton = document.querySelector("#openLoupe");
       const loupeButtons = Array.from(document.querySelectorAll('[aria-label="Loupe"]'));
       const closeLoupeButton = document.querySelector("#closeLoupe");
@@ -565,6 +575,8 @@
       const GRID_OVERSCAN_ROWS = 2;
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
+      let selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
+      let selectionAnchorPhotoId = selectedPhotoId;
       let activeLibraryPath = "";
       let libraryGridPage = {
         offset: 0,
@@ -1107,6 +1119,9 @@
         pickSelectedButton.textContent = photo?.picked ? "Unpick" : "Pick";
         rejectSelectedButton.textContent = photo?.rejected ? "Unreject" : "Reject";
         cullingStatus.value = cullingStatusText(photo);
+        if (selectedPhotoIds.size > 1) {
+          cullingStatus.value = `${cullingStatus.value} Primary-only controls.`;
+        }
       }
 
       function setSelectedRating(rating) {
@@ -1161,6 +1176,39 @@
 
       function selectedPhoto() {
         return libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+      }
+
+      function currentPagePhotoIds() {
+        return new Set(libraryPhotos.map((photo) => photo.photoId));
+      }
+
+      function normalizeMultiSelection() {
+        const pageIds = currentPagePhotoIds();
+        selectedPhotoIds = new Set(Array.from(selectedPhotoIds).filter((photoId) => pageIds.has(photoId)));
+        if (selectedPhotoId && pageIds.has(selectedPhotoId)) {
+          selectedPhotoIds.add(selectedPhotoId);
+        }
+        if (!selectionAnchorPhotoId || !pageIds.has(selectionAnchorPhotoId)) {
+          selectionAnchorPhotoId = selectedPhotoId;
+        }
+      }
+
+      function syncSelectionSummary() {
+        normalizeMultiSelection();
+        const selected = selectedPhoto();
+        const count = selectedPhotoIds.size;
+        const state = count > 1 ? "multi" : selected ? "single" : "empty";
+        selectionSummary.dataset.multiSelectionState = state;
+        primarySelectedPhotoName.textContent = selected?.fileName ?? "None";
+        multiSelectionCount.value = count === 1 ? "1 selected" : `${count} selected`;
+        multiSelectionCount.textContent = multiSelectionCount.value;
+        clearMultiSelectionButton.disabled = count <= 1;
+      }
+
+      function clearMultiSelection() {
+        selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
+        selectionAnchorPhotoId = selectedPhotoId;
+        selectPhoto(selectedPhotoId, { persist: false, preserveSelectionSet: true });
       }
 
       function selectedPhotoBaseName(photo) {
@@ -1526,6 +1574,10 @@
         return libraryPhotos.findIndex((photo) => photo.photoId === selectedPhotoId);
       }
 
+      function photoIndexById(photoId) {
+        return libraryPhotos.findIndex((photo) => photo.photoId === photoId);
+      }
+
       function selectedGridCard() {
         return Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).find((card) => {
           return card.dataset.photoId === selectedPhotoId;
@@ -1571,8 +1623,48 @@
         }
       }
 
+      function selectPhotoRange(photoId) {
+        const targetIndex = photoIndexById(photoId);
+        if (targetIndex < 0) {
+          return;
+        }
+        const anchorIndex = photoIndexById(selectionAnchorPhotoId);
+        const start = Math.min(anchorIndex >= 0 ? anchorIndex : targetIndex, targetIndex);
+        const end = Math.max(anchorIndex >= 0 ? anchorIndex : targetIndex, targetIndex);
+        selectedPhotoIds = new Set(libraryPhotos.slice(start, end + 1).map((photo) => photo.photoId));
+        selectPhoto(photoId, { preserveSelectionSet: true });
+      }
+
+      function togglePhotoSelection(photoId) {
+        if (!photoId || !currentPagePhotoIds().has(photoId)) {
+          return;
+        }
+        if (selectedPhotoIds.has(photoId) && selectedPhotoIds.size > 1) {
+          selectedPhotoIds.delete(photoId);
+          const nextPrimary = photoId === selectedPhotoId
+            ? Array.from(selectedPhotoIds).at(-1) ?? ""
+            : selectedPhotoId;
+          selectPhoto(nextPrimary, { preserveSelectionSet: true });
+          return;
+        }
+
+        selectedPhotoIds.add(photoId);
+        selectionAnchorPhotoId = photoId;
+        selectPhoto(photoId, { preserveSelectionSet: true });
+      }
+
       function handleLibraryGridKeydown(event) {
         const navigationKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"];
+        if (event.key === " ") {
+          event.preventDefault();
+          togglePhotoSelection(selectedPhotoId);
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          clearMultiSelection();
+          return;
+        }
         if (event.key === "Enter") {
           event.preventDefault();
           void openLoupeView();
@@ -1596,7 +1688,17 @@
           PageUp: currentIndex - pageStep,
           PageDown: currentIndex + pageStep,
         };
-        moveGridSelectionToIndex(nextIndexByKey[event.key]);
+        const nextIndex = nextIndexByKey[event.key];
+        if (event.shiftKey) {
+          const nextPhoto = libraryPhotos[Math.min(Math.max(0, nextIndex), libraryPhotos.length - 1)];
+          if (nextPhoto) {
+            selectPhotoRange(nextPhoto.photoId);
+            scrollGridIndexIntoView(photoIndexById(nextPhoto.photoId));
+            focusSelectedGridCard();
+          }
+          return;
+        }
+        moveGridSelectionToIndex(nextIndex);
       }
 
       function createPhotoCard(photo, index) {
@@ -1608,11 +1710,20 @@
         card.tabIndex = photo.photoId === selectedPhotoId ? 0 : -1;
         card.setAttribute("aria-selected", String(photo.photoId === selectedPhotoId));
         card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
+        card.classList.toggle("is-multi-selected", selectedPhotoIds.has(photo.photoId) && photo.photoId !== selectedPhotoId);
         card.classList.toggle("is-rejected", photo.rejected);
         card.classList.toggle("is-missing", photo.missing);
         card.classList.toggle("is-unsupported", photo.unsupported);
-        card.addEventListener("click", () => {
-          selectPhoto(photo.photoId);
+        card.addEventListener("click", (event) => {
+          if (event.shiftKey) {
+            selectPhotoRange(photo.photoId);
+          } else if (event.metaKey || event.ctrlKey) {
+            togglePhotoSelection(photo.photoId);
+          } else {
+            selectedPhotoIds = new Set([photo.photoId]);
+            selectionAnchorPhotoId = photo.photoId;
+            selectPhoto(photo.photoId, { preserveSelectionSet: true });
+          }
           focusSelectedGridCard();
         });
 
@@ -1644,10 +1755,18 @@
 
       function selectPhoto(photoId, options = {}) {
         selectedPhotoId = photoId;
+        if (options.preserveSelectionSet !== true) {
+          selectedPhotoIds = new Set(photoId ? [photoId] : []);
+          selectionAnchorPhotoId = photoId;
+        } else {
+          normalizeMultiSelection();
+        }
         const selected = selectedPhoto();
         Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
           const isSelected = card.dataset.photoId === selectedPhotoId;
+          const isMultiSelected = selectedPhotoIds.has(card.dataset.photoId) && !isSelected;
           card.classList.toggle("is-selected", isSelected);
+          card.classList.toggle("is-multi-selected", isMultiSelected);
           card.tabIndex = isSelected ? 0 : -1;
           card.setAttribute("aria-selected", String(isSelected));
         });
@@ -1659,6 +1778,7 @@
         });
         selectedPhotoName.textContent = selected?.fileName ?? "None";
         selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+        syncSelectionSummary();
         loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         updateCullingControls(selected);
@@ -2506,6 +2626,7 @@
       pickSelectedButton.addEventListener("click", toggleSelectedPick);
       rejectSelectedButton.addEventListener("click", toggleSelectedReject);
       clearCullingFlagsButton.addEventListener("click", clearSelectedCullingFlags);
+      clearMultiSelectionButton.addEventListener("click", clearMultiSelection);
       loupeButtons.forEach((button) => {
         button.addEventListener("click", openLoupeView);
       });

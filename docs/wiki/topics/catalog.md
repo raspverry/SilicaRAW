@@ -61,6 +61,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.6.1 wires the product grid UI to page metadata, visible loading/empty/error states, and previous/next page controls without claiming hidden rows are rendered.
 - Task 11.6.2 renders only a visible page-local grid window plus overscan spacer rows and revokes grid-owned thumbnail object URLs as rows leave the rendered window.
 - Task 11.6.3 adds current-page roving-focus keyboard navigation for the product grid without changing the paged query contract.
+- Task 11.6.4 keeps product grid multi-selection page-local and UI-only: primary selection stays explicit, range/toggle selection updates visual state and counts, and batch catalog edits remain out of scope.
 
 ## Paged Library Query Contract
 

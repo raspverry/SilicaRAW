@@ -240,7 +240,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No horizontal overflow or control clipping at `1280x800`, `1440x900`, or `1728x965`.
   - Selection state is visually coherent and never fake.
 - **Validation:** Visual QA across current mockup viewports.
-- **Status:** In progress as of 2026-06-11. Task 11.6.1 completed page-driven grid loading, empty, page, and error states with previous/next controls backed by real page metadata. Task 11.6.2 added a page-local virtualized grid window with spacer rows and grid-owned thumbnail URL cleanup. Task 11.6.3 added roving-focus keyboard navigation for Arrow, Home, End, PageUp, PageDown, and Enter-to-loupe. Multi-select remains Task 11.6.4.
+- **Status:** Completed on 2026-06-11. Task 11.6.1 completed page-driven grid loading, empty, page, and error states with previous/next controls backed by real page metadata. Task 11.6.2 added a page-local virtualized grid window with spacer rows and grid-owned thumbnail URL cleanup. Task 11.6.3 added roving-focus keyboard navigation for Arrow, Home, End, PageUp, PageDown, and Enter-to-loupe. Task 11.6.4 added explicit primary selection, Shift range selection, Cmd/Ctrl or Space toggle selection, inspector selection counts, and clear multi-select without adding batch edit behavior.
 
 ### Task 11.7: Metadata Extraction and Storage
 

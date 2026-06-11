@@ -989,6 +989,11 @@ progress::-webkit-progress-value {
   box-shadow: 0 0 0 2px var(--sr-overlay-info-soft);
 }
 
+.sr-photo-card.is-multi-selected {
+  border-color: var(--sr-accent-silica);
+  box-shadow: inset 0 0 0 2px var(--sr-overlay-silica-soft);
+}
+
 .sr-photo-card.is-rejected .sr-thumb-art,
 .sr-photo-card.is-rejected .sr-thumb-image,
 .sr-photo-card.is-missing .sr-thumb-art,
@@ -1734,6 +1739,38 @@ progress::-webkit-progress-value {
   color: var(--sr-text-primary);
   font-size: var(--sr-type-heading);
   letter-spacing: 1px;
+}
+
+.sr-selection-summary {
+  display: grid;
+  gap: var(--sr-space-xs);
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-card);
+  padding: var(--sr-space-sm);
+}
+
+.sr-selection-summary span,
+.sr-selection-summary output {
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-caption);
+}
+
+.sr-selection-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-control);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-selection-summary[data-multi-selection-state="multi"] {
+  border-color: var(--sr-accent-silica);
+}
+
+.sr-selection-summary button {
+  min-height: 30px;
 }
 
 .sr-rating-control-group {

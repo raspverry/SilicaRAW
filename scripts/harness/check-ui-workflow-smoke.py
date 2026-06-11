@@ -296,6 +296,10 @@ def main():
         "data-grid-keyboard-navigation",
         "handleLibraryGridKeydown",
         "moveGridSelectionToIndex",
+        "multiSelectionCount",
+        "selectPhotoRange",
+        "togglePhotoSelection",
+        "clearMultiSelection",
     ]:
         require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
     for marker in [

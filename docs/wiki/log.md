@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Multi-select grid semantics added
+
+- Added Task 11.6.4 current-page multi-selection semantics.
+- The product grid now distinguishes primary selection from multi-selection, supports range/toggle selection, and shows inspector selection counts.
+- Batch edit behavior remains out of scope.
+
 ## [2026-06-11] phase-11 | Keyboard grid navigation added
 
 - Added Task 11.6.3 current-page roving-focus keyboard navigation.
 - Arrow keys, Home, End, PageUp, PageDown, and Enter-to-loupe are wired through the product grid.
-- Multi-select remains Task 11.6.4.
+- Multi-select was later completed by Task 11.6.4.
 
 ## [2026-06-11] phase-11 | Virtualized grid window added
 

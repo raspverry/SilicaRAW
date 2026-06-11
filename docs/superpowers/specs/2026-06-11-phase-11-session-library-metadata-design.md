@@ -475,6 +475,7 @@ Demo/Validation:
 - **Validation:**
   - focused UI harness
   - visual QA for selected and multi-selected states
+- **Status:** Completed on 2026-06-11. The grid now tracks an explicit primary photo plus current-page multi-selection state, supports Shift range selection with a stable anchor, Cmd/Ctrl or Space toggle selection, Escape/clear-button collapse back to the primary selection, and shows primary vs multi-selection count in the inspector while keeping batch edits out of scope.
 
 ## Sprint 4: Metadata
 
