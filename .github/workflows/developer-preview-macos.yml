@@ -1,0 +1,53 @@
+name: Developer Preview macOS DMG
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "developer-preview-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: developer-preview-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build unsigned developer preview DMG
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show Rust toolchain
+        run: rustup show
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version 2.11.2 --locked
+
+      - name: Build unsigned app and DMG
+        working-directory: apps/desktop/src-tauri
+        run: cargo tauri build --bundles app,dmg --ci --no-sign
+
+      - name: Generate checksums
+        run: |
+          mkdir -p .tmp/developer-preview-artifacts
+          cp target/release/bundle/dmg/SilicaRAW_*.dmg .tmp/developer-preview-artifacts/
+          shasum -a 256 .tmp/developer-preview-artifacts/*.dmg > .tmp/developer-preview-artifacts/SHA256SUMS.txt
+          cat > .tmp/developer-preview-artifacts/UNSIGNED-DEVELOPER-PREVIEW.txt <<'EOF'
+          SilicaRAW unsigned developer preview build.
+
+          This artifact is not signed or notarized.
+          Gatekeeper warnings are expected on downloaded builds.
+          Do not describe this artifact as user-ready local distribution.
+          EOF
+
+      - name: Upload unsigned developer preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: silicaraw-unsigned-developer-preview-macos
+          path: .tmp/developer-preview-artifacts/
+          if-no-files-found: error
+          retention-days: 14

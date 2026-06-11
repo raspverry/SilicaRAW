@@ -806,6 +806,8 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
 
 **Prerequisite Audit Status:** Blocked on 2026-06-11. The local keychain currently has an `Apple Development` identity, but no `Developer ID Application` identity. `gh secret list` reports no required repository signing/notarization secrets. Added [Signing and Notarization Prep](../../../checklists/SIGNING_NOTARIZATION_PREP.md) and `scripts/harness/check-signing-prereqs.py` to make the blocker repeatable without exposing secret values.
 
+**Developer ID Funding Status:** Blocked on 2026-06-11. Developer ID and notarization remain the user-ready target, but the project will use the unsigned developer-preview path from [ADR 0006](../decisions/adr-0006-unsigned-developer-preview-dmg.md) until Apple Developer Program funding is available.
+
 ### Task 7.2: Configure Hardened Runtime and Entitlements
 
 - **Location:** Tauri/macOS bundle config
@@ -833,9 +835,23 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
 
 **Goal:** Publish a downloadable DMG from GitHub.
 
+**Current Funding Constraint:** The signed/notarized GitHub Release pipeline remains blocked by Phase 7. While blocked, the project may publish unsigned developer-preview workflow artifacts only. These artifacts are not user-ready local distribution and must warn that Gatekeeper warnings are expected.
+
 **Demo/Validation:**
 
 - A GitHub Release contains the DMG, checksums, and notes.
+
+### Task 8.0: Add Unsigned Developer Preview Artifact Workflow
+
+- **Location:** `.github/workflows/developer-preview-macos.yml`, `docs/wiki/decisions/adr-0006-unsigned-developer-preview-dmg.md`
+- **Description:** Build unsigned developer-preview macOS DMG artifacts without requiring Apple Developer credentials.
+- **Dependencies:** ADR 0006
+- **Acceptance Criteria:**
+  - Workflow triggers manually and on `developer-preview-*` tags.
+  - Workflow runs `cargo tauri build --bundles app,dmg --ci --no-sign`.
+  - Workflow uploads the DMG, SHA256 checksum, and unsigned warning text as GitHub Actions artifacts.
+  - Workflow does not reference Apple signing or notarization secrets.
+- **Validation:** `python3 scripts/harness/check-release-workflows.py`
 
 ### Task 8.1: Add Release Build Workflow
 

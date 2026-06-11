@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-8 | Unsigned developer-preview workflow added
+
+- Added ADR 0006 to permit unsigned developer-preview DMG artifacts while Developer ID funding is blocked.
+- Added a manual/tag-triggered GitHub Actions workflow that builds unsigned macOS DMG artifacts, writes SHA256 checksums, and uploads an unsigned warning note.
+- Added release workflow guardrails to keep unsigned preview artifacts separate from the future signed/notarized user-ready release path.
+
 ## [2026-06-11] phase-7 | Signing prerequisite audit added
 
 - Checked local code signing identities and GitHub repository secret names for Phase 7.1.
