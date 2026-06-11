@@ -924,6 +924,8 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
   - Includes notarization troubleshooting links.
 - **Validation:** Maintainer dry-runs the runbook.
 
+**Documentation Status:** Completed on 2026-06-11. Added [Local DMG Release Runbook](local-dmg-release-runbook.md) with prerelease checks, signed local alpha tag naming, unsigned developer-preview tag naming, rollback steps, Gatekeeper assessment commands, notarization troubleshooting links, and a clear boundary between user-ready signed releases and current unsigned workflow artifacts. Signed-release dry-run remains blocked until Phase 7 signing/notarization and Phase 8 release pipeline work are available.
+
 ### Task 9.2: Add Release Notes Template
 
 - **Location:** `.github/release-template.md`
