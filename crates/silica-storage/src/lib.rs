@@ -76,6 +76,15 @@ pub const REQUIRED_INDEXES: &[&str] = ALPHA_CATALOG_REQUIRED_INDEXES;
 /// Catalog database filename inside a SilicaRAW library folder.
 pub const CATALOG_DATABASE_FILE: &str = "catalog.db";
 
+/// Library-local directory for portable sidecar JSON files.
+pub const SIDECAR_DIRECTORY: &str = "sidecars";
+
+/// Stable sidecar schema marker required by `schemas/sidecar.schema.json`.
+pub const SIDECAR_SCHEMA: &str = "silica.sidecar";
+
+/// Stable sidecar schema version for v0.1.
+pub const SIDECAR_VERSION: i64 = 1;
+
 /// Stable local alpha library row id for single-library catalog databases.
 pub const LOCAL_LIBRARY_ID: &str = "local";
 
@@ -182,8 +191,11 @@ pub enum LibraryStorageError {
     CatalogFlag(CatalogFlagError),
     EditGraph(silica_edit::EditGraphValidationError),
     MissingCatalog(PathBuf),
+    MissingPhoto(String),
     NotDirectory(PathBuf),
     InvalidPath(PathBuf),
+    InvalidSidecarPhotoId(String),
+    SidecarValidation(String),
 }
 
 impl fmt::Display for LibraryStorageError {
@@ -197,9 +209,16 @@ impl fmt::Display for LibraryStorageError {
             Self::MissingCatalog(path) => {
                 write!(formatter, "missing catalog database at {}", path.display())
             }
+            Self::MissingPhoto(photo_id) => write!(formatter, "missing catalog photo: {photo_id}"),
             Self::NotDirectory(path) => write!(formatter, "not a directory: {}", path.display()),
             Self::InvalidPath(path) => {
                 write!(formatter, "path is not valid UTF-8: {}", path.display())
+            }
+            Self::InvalidSidecarPhotoId(photo_id) => {
+                write!(formatter, "invalid sidecar photo id: {photo_id:?}")
+            }
+            Self::SidecarValidation(message) => {
+                write!(formatter, "sidecar validation error: {message}")
             }
         }
     }
@@ -213,7 +232,12 @@ impl Error for LibraryStorageError {
             Self::Json(error) => Some(error),
             Self::CatalogFlag(error) => Some(error),
             Self::EditGraph(error) => Some(error),
-            Self::MissingCatalog(_) | Self::NotDirectory(_) | Self::InvalidPath(_) => None,
+            Self::MissingCatalog(_)
+            | Self::MissingPhoto(_)
+            | Self::NotDirectory(_)
+            | Self::InvalidPath(_)
+            | Self::InvalidSidecarPhotoId(_)
+            | Self::SidecarValidation(_) => None,
         }
     }
 }
@@ -304,6 +328,18 @@ pub fn open_local_library(
 
     ensure_library_directories(root_path)?;
     open_library_catalog(root_path, &catalog_path)
+}
+
+/// Resolve the library-local sidecar path for a catalog photo id.
+pub fn sidecar_path_for_photo(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<PathBuf, LibraryStorageError> {
+    validate_sidecar_photo_id(photo_id)?;
+    Ok(library_root_path
+        .as_ref()
+        .join(SIDECAR_DIRECTORY)
+        .join(format!("{photo_id}.silicaraw.sidecar.json")))
 }
 
 /// Scan a selected folder and record file candidates by reference.
@@ -1112,6 +1148,28 @@ fn path_to_string(path: &Path) -> Result<String, LibraryStorageError> {
         .ok_or_else(|| LibraryStorageError::InvalidPath(path.to_path_buf()))
 }
 
+fn validate_sidecar_photo_id(photo_id: &str) -> Result<(), LibraryStorageError> {
+    if photo_id.is_empty()
+        || photo_id == "."
+        || photo_id == ".."
+        || photo_id.contains('/')
+        || photo_id.contains('\\')
+        || photo_id.contains("..")
+        || photo_id.chars().any(|character| {
+            !(character.is_ascii_alphanumeric()
+                || character == '-'
+                || character == '_'
+                || character == '.')
+        })
+    {
+        return Err(LibraryStorageError::InvalidSidecarPhotoId(
+            photo_id.to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 fn modified_at_string(metadata: &fs::Metadata) -> Option<String> {
     metadata
         .modified()
@@ -1559,6 +1617,38 @@ mod tests {
         }
 
         remove_library_root(&root);
+    }
+
+    #[test]
+    fn resolves_sidecar_paths_under_library_sidecars_only() {
+        let root = unique_library_root("sidecar-path");
+        let path =
+            sidecar_path_for_photo(&root, "photo_ABC-123.ok").expect("valid sidecar path");
+
+        assert_eq!(
+            path,
+            root.join("sidecars")
+                .join("photo_ABC-123.ok.silicaraw.sidecar.json")
+        );
+        assert!(path.starts_with(root.join("sidecars")));
+    }
+
+    #[test]
+    fn rejects_unsafe_sidecar_photo_ids() {
+        let root = unique_library_root("sidecar-invalid-id");
+        for invalid in [
+            "",
+            "../photo",
+            "folder/photo",
+            "folder\\photo",
+            "/tmp/photo",
+            "photo\nid",
+        ] {
+            assert!(
+                sidecar_path_for_photo(&root, invalid).is_err(),
+                "invalid photo id should be rejected: {invalid:?}"
+            );
+        }
     }
 
     #[test]
