@@ -134,7 +134,9 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Catalog backup does not include disposable caches.
   - Restore preserves edit states, flags, sidecar status, and export history.
   - Migration failures have a documented recovery path.
+- **Status:** In progress. Task 10.5.1 completed on 2026-06-11 with the [Backup and Restore](../topics/backup-restore.md) backup/WAL/checkpoint/restore policy and static recovery-policy harness. Backup archive creation, restore behavior, rollback tests, and runtime APIs remain pending.
 - **Validation:**
+  - `python3 scripts/harness/check-recovery-policy.py`
   - `cargo test -p silica-storage`
   - Manual QA checklist entry.
 

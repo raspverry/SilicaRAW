@@ -49,6 +49,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Color Management](topics/color-management.md)
 - [Catalog](topics/catalog.md)
 - [Data Safety](topics/data-safety.md)
+- [Backup and Restore](topics/backup-restore.md)
 - [UI Mockups](topics/ui-mockups.md)
 - [UI MVP Baseline](topics/ui-mvp-baseline.md)
 - [UI Visual and Responsive QA](topics/ui-visual-responsive-qa.md)

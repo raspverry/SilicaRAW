@@ -83,6 +83,35 @@ Automated coverage:
 - [x] Flag/metadata disagreements are reported instead of silently resolved.
 - [x] Catalog original-path or fingerprint reconciliation conflicts are reported.
 
+## Task 10.5 Backup and Restore QA Record
+
+Status: Task 10.5.1 recovery policy added on 2026-06-11. Backup archive creation and restore execution remain pending.
+
+Automated policy validation command:
+
+```bash
+python3 scripts/harness/check-recovery-policy.py
+```
+
+Policy coverage:
+
+- [x] Backup uses checkpoint-before-copy policy.
+- [x] Backup must exclude original referenced photo files.
+- [x] Backup must exclude disposable cache directories.
+- [x] Restore must target an empty directory or use a rollback copy first.
+- [x] Restore must not write into original referenced photo folders.
+- [x] Newer catalog schema backups are rejected by older app builds.
+- [x] Migration failure behavior is explicit.
+
+Implementation QA still needed:
+
+- [ ] Backup excludes `thumbnails/`, `previews/`, `render-cache/`, and `ai-cache`.
+- [ ] Backup includes `catalog.db` and `sidecars/`.
+- [ ] Backup does not include original referenced photo files.
+- [ ] Restore preserves edit states, flags, sidecar status, export records, and migration metadata.
+- [ ] Restore does not write into original photo folders.
+- [ ] Migration failure leaves the target recoverable.
+
 ## General QA Backlog
 
 - [ ] Import 1,000 mixed images
