@@ -1120,8 +1120,14 @@ fn parse_sidecar_flags(value: &serde_json::Value) -> Result<PhotoFlags, LibraryS
         None => None,
     };
 
-    PhotoFlags::new(photo_id.to_string(), rating as u8, picked, rejected, color_label)
-        .map_err(LibraryStorageError::from)
+    PhotoFlags::new(
+        photo_id.to_string(),
+        rating as u8,
+        picked,
+        rejected,
+        color_label,
+    )
+    .map_err(LibraryStorageError::from)
 }
 
 fn update_sidecar_status(
@@ -2027,8 +2033,7 @@ mod tests {
     #[test]
     fn resolves_sidecar_paths_under_library_sidecars_only() {
         let root = unique_library_root("sidecar-path");
-        let path =
-            sidecar_path_for_photo(&root, "photo_ABC-123.ok").expect("valid sidecar path");
+        let path = sidecar_path_for_photo(&root, "photo_ABC-123.ok").expect("valid sidecar path");
 
         assert_eq!(
             path,
@@ -2260,8 +2265,7 @@ mod tests {
             Some("green".to_string()),
         )
         .expect("set sidecar flags");
-        write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
-            .expect("write sidecar");
+        write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1").expect("write sidecar");
         set_photo_flags(&library.root_path, photo_id.clone(), 1, false, true, None)
             .expect("change catalog flags after write");
 
