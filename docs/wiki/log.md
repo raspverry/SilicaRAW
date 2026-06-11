@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Virtualized grid window added
+
+- Added Task 11.6.2 page-local virtualized grid rendering.
+- The product grid now renders visible rows plus overscan spacer rows and cleans up grid-owned thumbnail object URLs when rows leave the window.
+- Keyboard navigation and multi-select remain Task 11.6.3 and Task 11.6.4.
+
 ## [2026-06-11] phase-11 | Page-driven grid UI added
 
 - Added Task 11.6.1 page-driven grid UI states.
 - The product grid now shows page metadata, previous/next controls, loading, empty, and error states from `query_library_photos`.
-- Virtualized windowing, keyboard navigation, and multi-select remain Task 11.6.2 through Task 11.6.4.
+- Virtualized windowing was later completed by Task 11.6.2; keyboard navigation and multi-select remain Task 11.6.3 and Task 11.6.4.
 
 ## [2026-06-11] phase-11 | Page-scoped thumbnail hydration added
 

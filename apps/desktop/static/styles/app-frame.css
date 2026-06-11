@@ -956,6 +956,12 @@ progress::-webkit-progress-value {
   overflow: hidden auto;
 }
 
+.sr-grid-spacer {
+  grid-column: 1 / -1;
+  min-height: 0;
+  pointer-events: none;
+}
+
 .sr-photo-card {
   position: relative;
   min-width: 0;

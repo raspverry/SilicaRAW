@@ -290,6 +290,9 @@ def main():
         "renderGridError",
         "updateGridPageControls",
         "gridPageStatus",
+        "data-virtual-grid-window",
+        "renderVirtualGridWindow",
+        "releaseGridThumbnailObjectUrls",
     ]:
         require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
     for marker in [

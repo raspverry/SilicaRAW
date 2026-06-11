@@ -243,7 +243,7 @@
                 <strong>Grid page unavailable</strong>
                 <span id="gridErrorMessage">Library grid failed to load.</span>
               </div>
-              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" data-page-scoped-thumbnail-request="query_library_photos"></div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0"></div>
             </div>
             <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
               <div class="sr-loupe-header">
@@ -562,6 +562,7 @@
       const dialogApi = window.__TAURI__?.dialog;
       const initialGridPhotos = Array.from(document.querySelectorAll(".sr-photo-card")).map(photoFromCard);
       const LIBRARY_GRID_PAGE_LIMIT = 100;
+      const GRID_OVERSCAN_ROWS = 2;
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let activeLibraryPath = "";
@@ -576,8 +577,11 @@
       let controlsBusy = false;
       let layoutHydrating = false;
       let layoutSaveTimer = 0;
+      let gridVirtualRenderFrame = 0;
+      let gridVirtualWindow = { start: 0, end: 0 };
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
+      const pageThumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
       const developObjectUrls = new Map();
 
@@ -731,6 +735,7 @@
         thumbnailSizeInput.value = String(normalized.thumbnailSize);
         libraryGrid.style.setProperty("--sr-thumb-min", `${normalized.thumbnailSize}px`);
         libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${normalized.thumbnailSize}px, 1fr))`;
+        renderVirtualGridWindow({ force: true });
         librarySortInput.value = normalized.sort;
         fileTypeFilterInput.value = normalized.filters.fileType ?? "";
         minRatingFilterInput.value = normalized.filters.minRating ? String(normalized.filters.minRating) : "";
@@ -1256,22 +1261,43 @@
         return null;
       }
 
-      function thumbnailBlobUrl(photo) {
+      function thumbnailObjectUrlKey(photo) {
         if (!Array.isArray(photo?.thumbnailBytes) || photo.thumbnailBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${photo.photoId}:${photo.thumbnailPath ?? ""}:${photo.thumbnailBytes.length}`;
-        if (thumbnailObjectUrls.has(cacheKey)) {
-          return thumbnailObjectUrls.get(cacheKey);
+        return `${photo.photoId}:${photo.thumbnailPath ?? ""}:${photo.thumbnailBytes.length}`;
+      }
+
+      function thumbnailBlobUrl(photo, cache = thumbnailObjectUrls) {
+        const cacheKey = thumbnailObjectUrlKey(photo);
+        if (!cacheKey) {
+          return "";
+        }
+        if (cache.has(cacheKey)) {
+          return cache.get(cacheKey);
         }
         const blob = new Blob([new Uint8Array(photo.thumbnailBytes)], { type: "image/jpeg" });
         const url = URL.createObjectURL(blob);
-        thumbnailObjectUrls.set(cacheKey, url);
+        cache.set(cacheKey, url);
         return url;
       }
 
-      function renderThumbnailArt(photo, index) {
-        const thumbnailUrl = thumbnailBlobUrl(photo);
+      function releaseGridThumbnailObjectUrls(retainedKeys = new Set()) {
+        Array.from(thumbnailObjectUrls.entries()).forEach(([cacheKey, url]) => {
+          if (!retainedKeys.has(cacheKey)) {
+            URL.revokeObjectURL(url);
+            thumbnailObjectUrls.delete(cacheKey);
+          }
+        });
+      }
+
+      function releaseObjectUrlMap(cache) {
+        Array.from(cache.values()).forEach((url) => URL.revokeObjectURL(url));
+        cache.clear();
+      }
+
+      function renderThumbnailArt(photo, index, options = {}) {
+        const thumbnailUrl = thumbnailBlobUrl(photo, options.cache ?? thumbnailObjectUrls);
         if (thumbnailUrl) {
           const image = document.createElement("img");
           image.className = "sr-thumb-image";
@@ -1351,7 +1377,7 @@
 
       function renderExportPreviewImage(photo) {
         exportPreviewCard.querySelectorAll(".sr-export-preview-image").forEach((image) => image.remove());
-        const previewUrl = thumbnailBlobUrl(photo);
+        const previewUrl = thumbnailBlobUrl(photo, pageThumbnailObjectUrls);
         exportPreviewArt.hidden = Boolean(previewUrl);
         if (!previewUrl) {
           return;
@@ -1367,8 +1393,13 @@
       }
 
       function renderLibraryGrid(photos, options = {}) {
+        releaseGridThumbnailObjectUrls(new Set());
+        releaseObjectUrlMap(pageThumbnailObjectUrls);
         libraryPhotos = Array.isArray(photos) ? photos : [];
         libraryGridPage = normalizedGridPage(options.page, libraryPhotos.length);
+        if (options.preserveScroll !== true) {
+          libraryGrid.scrollTop = 0;
+        }
         const preferredPhotoId = options.preferredPhotoId || "";
         const preferredExists = libraryPhotos.some((photo) => photo.photoId === preferredPhotoId);
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
@@ -1395,10 +1426,97 @@
         libraryGrid.hidden = libraryPhotos.length === 0;
         updateGridPageControls(libraryPhotos.length ? "page" : "empty");
 
-        libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
+        renderVirtualGridWindow({ force: true });
         renderLoupeFilmstrip();
         renderDevelopFilmstrip();
         selectPhoto(selectedPhotoId, { persist: options.persistSelection === true });
+      }
+
+      function virtualGridMetrics() {
+        const styles = window.getComputedStyle(libraryGrid);
+        const columns = styles.gridTemplateColumns
+          .split(" ")
+          .filter((column) => column && column !== "none")
+          .length || 1;
+        const columnGap = Number.parseFloat(styles.columnGap) || 0;
+        const rowGap = Number.parseFloat(styles.rowGap) || 0;
+        const gridWidth = Math.max(1, libraryGrid.clientWidth);
+        const cardWidth = Math.max(1, (gridWidth - columnGap * (columns - 1)) / columns);
+        const cardHeight = cardWidth * 0.75;
+        const rowHeight = Math.max(1, cardHeight + rowGap);
+        const totalRows = Math.ceil(libraryPhotos.length / columns);
+        const viewportRows = Math.max(1, Math.ceil(Math.max(libraryGrid.clientHeight, rowHeight) / rowHeight));
+        const maxFirstRow = Math.max(0, totalRows - 1);
+        const firstVisibleRow = Math.min(maxFirstRow, Math.floor(libraryGrid.scrollTop / rowHeight));
+        const firstRenderedRow = Math.max(0, firstVisibleRow - GRID_OVERSCAN_ROWS);
+        const renderedRows = viewportRows + GRID_OVERSCAN_ROWS * 2;
+        const start = Math.min(libraryPhotos.length, firstRenderedRow * columns);
+        const end = Math.min(libraryPhotos.length, (firstRenderedRow + renderedRows) * columns);
+        const renderedEndRow = Math.ceil(end / columns);
+        return {
+          start,
+          end,
+          topSpacerHeight: firstRenderedRow * rowHeight,
+          bottomSpacerHeight: Math.max(0, (totalRows - renderedEndRow) * rowHeight),
+        };
+      }
+
+      function createGridSpacer(className, height) {
+        const spacer = document.createElement("div");
+        spacer.className = `sr-grid-spacer ${className}`;
+        spacer.dataset.gridSpacer = className;
+        spacer.style.height = `${Math.round(height)}px`;
+        return spacer;
+      }
+
+      function renderVirtualGridWindow(options = {}) {
+        if (libraryGrid.hidden || libraryPhotos.length === 0) {
+          libraryGrid.replaceChildren();
+          releaseGridThumbnailObjectUrls(new Set());
+          libraryGrid.dataset.virtualGridWindow = "0-0";
+          gridVirtualWindow = { start: 0, end: 0 };
+          return;
+        }
+
+        const metrics = virtualGridMetrics();
+        if (
+          options.force !== true
+          && gridVirtualWindow.start === metrics.start
+          && gridVirtualWindow.end === metrics.end
+        ) {
+          return;
+        }
+
+        const visiblePhotos = libraryPhotos.slice(metrics.start, metrics.end);
+        const retainedKeys = new Set(visiblePhotos.map(thumbnailObjectUrlKey).filter(Boolean));
+        const nodes = [];
+        if (metrics.topSpacerHeight > 0) {
+          nodes.push(createGridSpacer("sr-grid-spacer-before", metrics.topSpacerHeight));
+        }
+        nodes.push(...visiblePhotos.map((photo, index) => {
+          return createPhotoCard(photo, metrics.start + index);
+        }));
+        if (metrics.bottomSpacerHeight > 0) {
+          nodes.push(createGridSpacer("sr-grid-spacer-after", metrics.bottomSpacerHeight));
+        }
+
+        libraryGrid.replaceChildren(...nodes);
+        releaseGridThumbnailObjectUrls(retainedKeys);
+        gridVirtualWindow = { start: metrics.start, end: metrics.end };
+        libraryGrid.dataset.virtualGridWindow = `${metrics.start}-${metrics.end}`;
+      }
+
+      function scheduleVirtualGridWindowRender() {
+        if (gridVirtualRenderFrame) {
+          return;
+        }
+        const schedule = window.requestAnimationFrame
+          ? (callback) => window.requestAnimationFrame(callback)
+          : (callback) => window.setTimeout(callback, 16);
+        gridVirtualRenderFrame = schedule(() => {
+          gridVirtualRenderFrame = 0;
+          renderVirtualGridWindow();
+        });
       }
 
       function createPhotoCard(photo, index) {
@@ -1477,7 +1595,7 @@
           card.dataset.photoId = photo.photoId;
           card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
           card.classList.toggle("is-rejected", photo.rejected);
-          const art = renderThumbnailArt(photo, index);
+          const art = renderThumbnailArt(photo, index, { cache: pageThumbnailObjectUrls });
           const name = document.createElement("span");
           name.textContent = photo.fileName;
           card.append(art, name);
@@ -1494,7 +1612,7 @@
           card.dataset.photoId = photo.photoId;
           card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
           card.classList.toggle("is-rejected", photo.rejected);
-          const art = renderThumbnailArt(photo, index);
+          const art = renderThumbnailArt(photo, index, { cache: pageThumbnailObjectUrls });
           const name = document.createElement("span");
           name.textContent = photo.fileName;
           card.append(art, name);
@@ -2291,6 +2409,8 @@
       clearLibraryCacheButton.addEventListener("click", runCacheClearCommand);
       gridPreviousPageButton.addEventListener("click", () => void loadPreviousLibraryPage());
       gridNextPageButton.addEventListener("click", () => void loadNextLibraryPage());
+      libraryGrid.addEventListener("scroll", scheduleVirtualGridWindowRender);
+      window.addEventListener("resize", () => renderVirtualGridWindow({ force: true }));
       ratingButtons.forEach((button) => {
         button.addEventListener("click", () => setSelectedRating(Number(button.dataset.ratingValue)));
       });

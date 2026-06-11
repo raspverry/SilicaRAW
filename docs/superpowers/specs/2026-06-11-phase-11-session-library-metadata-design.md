@@ -446,6 +446,7 @@ Demo/Validation:
 - **Validation:**
   - targeted visual responsive QA
   - UI smoke markers for virtualization
+- **Status:** Completed on 2026-06-11. The product grid now renders a page-local virtual window with overscan spacer rows, preserves stable card aspect ratios through the existing grid layout, revokes grid-owned thumbnail object URLs when rows leave the rendered window, and keeps backend access bounded to the existing paged `query_library_photos` request.
 
 ### Task 11.6.3: Keyboard Grid Navigation
 
