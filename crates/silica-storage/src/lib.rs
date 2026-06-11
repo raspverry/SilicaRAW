@@ -23,8 +23,8 @@ use silica_catalog::{
     ALPHA_MAX_RATING,
 };
 pub use silica_catalog::{
-    LibraryQueryFileType, LibraryQueryFilters, LibraryQueryPage, LibraryQueryRequest,
-    LibraryQuerySort, PhotoFlags,
+    LibraryQueryFileType, LibraryQueryFilters, LibraryQueryOrderField, LibraryQueryPage,
+    LibraryQueryRequest, LibraryQuerySort, PhotoFlags,
 };
 
 /// Stable crate name used by scaffold verification.

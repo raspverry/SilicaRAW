@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Desktop paged grid command added
+
+- Added Task 11.5.4 `query_library_photos` desktop command for page-based grid queries.
+- The command accepts typed page/sort/filter fields and returns `photoGridPage` metadata.
+- Page-scoped thumbnail hydration remains Task 11.5.5.
+
 ## [2026-06-11] phase-11 | Storage/core paged query added
 
 - Added Task 11.5.3 read-only paged library query APIs in `silica-storage` and `silica-core`.
 - Query responses include bounded rows, total-count metadata, deterministic order fields, and deterministic empty pages.
-- Desktop command wiring remains Task 11.5.4.
+- At the time, desktop command wiring remained Task 11.5.4.
 
 ## [2026-06-11] phase-11 | Paged query indexes added
 

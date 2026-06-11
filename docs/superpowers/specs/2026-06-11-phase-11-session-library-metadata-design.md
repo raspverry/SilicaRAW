@@ -390,7 +390,7 @@ Demo/Validation:
   - Query does not mutate originals, catalog state, sidecars, caches, or thumbnails.
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core library_query`
-- **Status:** Completed on 2026-06-11. Added read-only `silica-storage` paged library queries with bounded rows, total-count metadata, deterministic empty pages, normalized `photos.file_type` filtering, fixed enum-backed sort clauses, and a `silica-core` wrapper that does not hydrate thumbnails or mutate cache/catalog state. Desktop command wiring remains Task 11.5.4.
+- **Status:** Completed on 2026-06-11. Added read-only `silica-storage` paged library queries with bounded rows, total-count metadata, deterministic empty pages, normalized `photos.file_type` filtering, fixed enum-backed sort clauses, and a `silica-core` wrapper that does not hydrate thumbnails or mutate cache/catalog state. Desktop command wiring was later completed by Task 11.5.4.
 
 ### Task 11.5.4: Desktop Paged Grid Command
 
@@ -403,6 +403,7 @@ Demo/Validation:
   - Error context remains structured.
 - **Validation:**
   - `cargo test -p silica-desktop paged_grid`
+- **Status:** Completed on 2026-06-11. Added the `query_library_photos` desktop command with a typed page/sort/filter request DTO, whitelist parsing for sort and file-type filters, a `photoGridPage` response carrying page metadata and deterministic order fields, and structured error context for invalid request values. Page-scoped thumbnail hydration remains Task 11.5.5.
 
 ### Task 11.5.5: Page-Scoped Thumbnail Hydration
 

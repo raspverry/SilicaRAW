@@ -22,6 +22,7 @@ pub use silica_storage::CatalogRebuildFlagSource;
 pub use silica_storage::LibraryPhotoGridItem;
 pub use silica_storage::LibraryQueryFileType;
 pub use silica_storage::LibraryQueryFilters;
+pub use silica_storage::LibraryQueryOrderField;
 pub use silica_storage::LibraryQueryPage;
 pub use silica_storage::LibraryQueryRequest;
 pub use silica_storage::LibraryQuerySort;

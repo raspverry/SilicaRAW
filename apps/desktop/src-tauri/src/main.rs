@@ -109,6 +109,14 @@ enum DesktopCommandData {
     PhotoGrid {
         photos: Vec<DesktopPhotoGridItem>,
     },
+    PhotoGridPage {
+        photos: Vec<DesktopPhotoGridItem>,
+        offset: u64,
+        limit: u16,
+        total_count: u64,
+        has_next_page: bool,
+        order_fields: Vec<&'static str>,
+    },
     PhotoFlags {
         photo_id: String,
         rating: u8,
@@ -176,6 +184,7 @@ impl DesktopCommandData {
             Self::LaunchRestore { .. } => "launchRestore",
             Self::ImportSummary { .. } => "importSummary",
             Self::PhotoGrid { .. } => "photoGrid",
+            Self::PhotoGridPage { .. } => "photoGridPage",
             Self::PhotoFlags { .. } => "photoFlags",
             Self::PhotoPreview { .. } => "photoPreview",
             Self::EditPreview { .. } => "editPreview",
@@ -418,6 +427,60 @@ impl DesktopSessionFilters {
                 .file_type
                 .as_deref()
                 .map(parse_desktop_app_file_type_filter)
+                .transpose()?,
+            search: self.search,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DesktopLibraryQueryRequest {
+    offset: u64,
+    limit: u16,
+    sort: String,
+    #[serde(default)]
+    filters: DesktopLibraryQueryFilters,
+}
+
+impl DesktopLibraryQueryRequest {
+    fn into_core(self) -> Result<silica_core::LibraryQueryRequest, silica_core::CoreError> {
+        Ok(silica_core::LibraryQueryRequest::new(
+            self.offset,
+            self.limit,
+            parse_desktop_library_query_sort(&self.sort)?,
+            self.filters.into_core()?,
+        ))
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+struct DesktopLibraryQueryFilters {
+    min_rating: Option<u8>,
+    picked: Option<bool>,
+    rejected: Option<bool>,
+    file_type: Option<String>,
+    search: String,
+}
+
+impl DesktopLibraryQueryFilters {
+    fn into_core(self) -> Result<silica_core::LibraryQueryFilters, silica_core::CoreError> {
+        if self.min_rating.is_some_and(|rating| rating > 5) {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid library query min rating: {}",
+                self.min_rating.unwrap_or_default()
+            )));
+        }
+
+        Ok(silica_core::LibraryQueryFilters {
+            min_rating: self.min_rating,
+            picked: self.picked,
+            rejected: self.rejected,
+            file_type: self
+                .file_type
+                .as_deref()
+                .map(parse_desktop_library_query_file_type)
                 .transpose()?,
             search: self.search,
         })
@@ -737,6 +800,43 @@ fn list_library_photos(library_path: String) -> DesktopCommandResponse {
                 DesktopCommandData::PhotoGrid { photos },
             )
         }
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn query_library_photos(
+    library_path: String,
+    request: DesktopLibraryQueryRequest,
+) -> DesktopCommandResponse {
+    let command = "query_library_photos";
+    let query = match request.into_core() {
+        Ok(query) => query,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            );
+        }
+    };
+
+    match silica_core::query_library_photos(PathBuf::from(&library_path), query) {
+        Ok(page) => DesktopCommandResponse::ok(
+            command,
+            "Library grid page loaded.",
+            photo_grid_page_data(page),
+        ),
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -1239,6 +1339,28 @@ fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
     }
 }
 
+fn photo_grid_page_data(
+    page: silica_core::LibraryQueryPage<silica_core::LibraryPhotoGridItem>,
+) -> DesktopCommandData {
+    DesktopCommandData::PhotoGridPage {
+        photos: page
+            .items
+            .into_iter()
+            .map(DesktopPhotoGridItem::from)
+            .collect(),
+        offset: page.offset,
+        limit: page.limit,
+        total_count: page.total_count,
+        has_next_page: page.has_next_page,
+        order_fields: page
+            .order_fields
+            .iter()
+            .copied()
+            .map(library_query_order_field_string)
+            .collect(),
+    }
+}
+
 fn app_session_warning_strings(warnings: &[silica_core::AppSessionWarning]) -> Vec<String> {
     warnings
         .iter()
@@ -1335,6 +1457,42 @@ fn app_file_type_filter_string(filter: silica_core::AppFileTypeFilter) -> &'stat
     }
 }
 
+fn parse_desktop_library_query_sort(
+    sort: &str,
+) -> Result<silica_core::LibraryQuerySort, silica_core::CoreError> {
+    match sort {
+        "imported_at_desc" => Ok(silica_core::LibraryQuerySort::ImportedAtDesc),
+        "file_name_asc" => Ok(silica_core::LibraryQuerySort::FileNameAsc),
+        "rating_desc" => Ok(silica_core::LibraryQuerySort::RatingDesc),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid library query sort: {other}"
+        ))),
+    }
+}
+
+fn parse_desktop_library_query_file_type(
+    file_type: &str,
+) -> Result<silica_core::LibraryQueryFileType, silica_core::CoreError> {
+    match file_type {
+        "jpeg" => Ok(silica_core::LibraryQueryFileType::Jpeg),
+        "raw" => Ok(silica_core::LibraryQueryFileType::Raw),
+        "unsupported" => Ok(silica_core::LibraryQueryFileType::Unsupported),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid library query file type: {other}"
+        ))),
+    }
+}
+
+fn library_query_order_field_string(field: silica_core::LibraryQueryOrderField) -> &'static str {
+    match field {
+        silica_core::LibraryQueryOrderField::ImportedAtDesc => "imported_at_desc",
+        silica_core::LibraryQueryOrderField::FileNameAsc => "file_name_asc",
+        silica_core::LibraryQueryOrderField::RatingDesc => "rating_desc",
+        silica_core::LibraryQueryOrderField::PhotoIdAsc => "photo_id_asc",
+        silica_core::LibraryQueryOrderField::PathAsc => "path_asc",
+    }
+}
+
 fn preview_status_text(status: silica_core::PhotoPreviewStatus) -> &'static str {
     match status {
         silica_core::PhotoPreviewStatus::Ready => "Ready",
@@ -1373,6 +1531,7 @@ fn main() {
             open_library,
             import_folder,
             list_library_photos,
+            query_library_photos,
             set_photo_flags,
             get_photo_flags,
             open_photo_preview,
@@ -1981,6 +2140,84 @@ mod tests {
             }
             other => panic!("unexpected response data: {other:?}"),
         }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn paged_grid_command_returns_typed_page_and_structured_errors() {
+        let workspace = unique_library_root("desktop-paged-grid");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("portrait.jpg");
+        let raw_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let raw_id = stable_catalog_id("photo", &raw_file.display().to_string());
+        silica_core::set_photo_flags(&library_root, raw_id.clone(), 5, true, false, None)
+            .expect("set raw flags");
+
+        let page = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 1,
+                sort: "rating_desc".to_string(),
+                filters: super::DesktopLibraryQueryFilters {
+                    min_rating: Some(4),
+                    picked: Some(true),
+                    rejected: None,
+                    file_type: Some("raw".to_string()),
+                    search: "sample".to_string(),
+                },
+            },
+        );
+
+        assert!(page.ok);
+        assert_eq!(page.command, "query_library_photos");
+        match response_data(&page) {
+            super::DesktopCommandData::PhotoGridPage {
+                photos,
+                offset,
+                limit,
+                total_count,
+                has_next_page,
+                order_fields,
+            } => {
+                assert_eq!(*offset, 0);
+                assert_eq!(*limit, 1);
+                assert_eq!(*total_count, 1);
+                assert!(!has_next_page);
+                assert_eq!(order_fields, &["rating_desc", "photo_id_asc"]);
+                assert_eq!(photos.len(), 1);
+                assert_eq!(photos[0].photo_id, raw_id);
+                assert_eq!(photos[0].thumbnail_bytes, None);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let invalid = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 1,
+                sort: "created_at_desc".to_string(),
+                filters: super::DesktopLibraryQueryFilters::default(),
+            },
+        );
+        assert!(!invalid.ok);
+        assert_eq!(invalid.command, "query_library_photos");
+        let error = invalid.error.as_ref().expect("structured error");
+        assert_eq!(error.kind, "appSession");
+        assert_eq!(
+            error.context.library_path.as_deref(),
+            Some(library_root.to_string_lossy().as_ref())
+        );
 
         remove_library_root(&workspace);
     }

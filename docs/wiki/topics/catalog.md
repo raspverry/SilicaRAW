@@ -56,6 +56,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.5.1 defines the typed paged query contract in `silica-catalog`: bounded offset pagination, whitelisted sort/filter enums, deterministic tie breakers, and no UI-provided SQL, column names, or raw predicates.
 - Task 11.5.2 represents the paged-query indexes in the catalog schema contract and applies them through embedded storage migration 3.
 - Task 11.5.3 implements read-only storage/core paged library query APIs without thumbnail hydration or catalog/cache mutation.
+- Task 11.5.4 exposes the paged library query through the desktop command boundary as `query_library_photos`.
 
 ## Paged Library Query Contract
 
@@ -77,6 +78,7 @@ Task 11.5 starts with a contract before storage implementation:
   - `idx_photo_flags_rating_photo_id`
 - Storage must translate the typed contract internally; UI code must not pass SQL strings, column names, or raw predicates.
 - `silica-storage::query_library_photos` opens the catalog read-only, returns page metadata, and leaves compatibility full-list behavior in `list_library_photos` until the desktop grid migration is complete.
+- The desktop `query_library_photos` command accepts a typed page/sort/filter DTO and returns `photoGridPage` metadata. UI consumption is still a later task.
 
 ## Not Implemented Yet
 
@@ -89,7 +91,7 @@ Task 11.5 starts with a contract before storage implementation:
 - Sidecar conflict handling and conflict UI.
 - Full edit history and undo/redo persistence.
 - Cache clear safety.
-- Paged query desktop wiring.
+- Paged query UI consumption.
 - Broad catalog UI screens beyond the local alpha workflow.
 - Plugin or MCP catalog access.
 
