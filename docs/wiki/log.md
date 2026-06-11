@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-12 | RAW proof plan added
+
+- Added the Phase 12 RAW proof design gate and implementation plan.
+- The plan keeps Core Image probing feature-gated, fixture-backed, and separate from product RAW pixels.
+- The Phase 12 brief now links to the design, plan, and task cards before implementation starts.
+
 ## [2026-06-11] wiki | LLM routing added
 
 - Added the LLM routing index, completed Phase 11 summary, Phase 12 brief, and Phase 12 task cards.

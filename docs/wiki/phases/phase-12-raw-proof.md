@@ -18,6 +18,8 @@ This phase is a proof phase, not a broad RAW editor implementation phase.
 
 For all Phase 12 tasks, read:
 
+- [Phase 12 RAW Proof Design](../../superpowers/specs/2026-06-11-phase-12-raw-proof-design.md)
+- [Phase 12 RAW Proof Implementation Plan](../../superpowers/plans/2026-06-11-phase-12-raw-proof.md)
 - [LLM Routing Index](../llm/index.md)
 - [RAW Decoding](../topics/raw-decoding.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
@@ -34,6 +36,7 @@ When the task adds or changes dependencies, also read:
 
 ## Task Order
 
+0. [Task 12.0.1: Phase 12 Design Gate](../../superpowers/specs/2026-06-11-phase-12-raw-proof-design.md)
 1. [Task 12.1: Feature-Gated Core Image RAW Probe](../tasks/12.1-core-image-raw-probe.md)
 2. [Task 12.2: RAW Fixture Probe Harness](../tasks/12.2-raw-fixture-probe-harness.md)
 3. [Task 12.3: Core Image Support Matrix and LibRaw Gate](../tasks/12.3-core-image-support-matrix.md)
