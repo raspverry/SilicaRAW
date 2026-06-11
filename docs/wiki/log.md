@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-9 | Homebrew and auto-update deferral recorded
+
+- Added ADR 0007 to defer Homebrew Cask and auto-update until local DMG alpha trust gates are met.
+- Corrected the Phase 9.3 planned ADR filename to avoid the existing ADR 0005 MLX deferral.
+- Linked the decision from release docs so future agents do not add updater or Homebrew behavior during local alpha.
+
 ## [2026-06-11] phase-8 | Developer-preview artifact runbook added
 
 - Added a maintainer runbook for triggering, watching, downloading, and checksum-verifying unsigned developer-preview DMG artifacts.

@@ -24,6 +24,7 @@ Use ADRs for decisions that future contributors or LLM agents might otherwise re
 | [ADR 0004](adr-0004-local-alpha-scope-and-license-gates.md) | accepted | Limit local alpha scope and keep license choice as a release gate. |
 | [ADR 0005](adr-0005-mlx-deferral-for-local-alpha.md) | accepted | Defer MLX from local alpha while keeping `silica-mlx` as a boundary crate. |
 | [ADR 0006](adr-0006-unsigned-developer-preview-dmg.md) | accepted | Use unsigned developer-preview DMGs while Developer ID funding is blocked. |
+| [ADR 0007](adr-0007-homebrew-and-auto-update-deferral.md) | accepted | Defer Homebrew Cask and auto-update until local DMG alpha trust gates are met. |
 
 ## ADR Format
 
