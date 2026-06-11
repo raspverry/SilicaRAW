@@ -156,6 +156,7 @@ Task 11.7 records the local alpha metadata contract without adding a parser depe
 - Camera make, camera model, lens model, orientation, and EXIF capture time remain unavailable until a parser dependency is selected and documented in `docs/DEPENDENCIES.md`.
 - `photo_metadata.raw_json` is parser-owned untrusted data and defaults to `{}`.
 - Unsupported files must not receive fake metadata rows. Existing imports are not backfilled on library open or session restore.
+- Metadata read APIs serialize each displayed field with an explicit `known`, `unknown`, or `unavailable` state and must not read original files during query.
 
 ---
 

@@ -175,6 +175,63 @@ impl PhotoMetadataUpdate {
     }
 }
 
+/// State of one metadata field in a read API response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoMetadataFieldState {
+    Known,
+    Unknown,
+    Unavailable,
+}
+
+/// One typed metadata field plus its truth state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMetadataField<T> {
+    pub state: PhotoMetadataFieldState,
+    pub value: Option<T>,
+}
+
+impl<T> PhotoMetadataField<T> {
+    pub fn known(value: T) -> Self {
+        Self {
+            state: PhotoMetadataFieldState::Known,
+            value: Some(value),
+        }
+    }
+
+    pub fn unknown() -> Self {
+        Self {
+            state: PhotoMetadataFieldState::Unknown,
+            value: None,
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self {
+            state: PhotoMetadataFieldState::Unavailable,
+            value: None,
+        }
+    }
+}
+
+/// Stored metadata and file facts for one catalog photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMetadata {
+    pub photo_id: String,
+    pub file_name: String,
+    pub source_path: String,
+    pub file_type: String,
+    pub unsupported: bool,
+    pub file_size: PhotoMetadataField<i64>,
+    pub modified_at: PhotoMetadataField<String>,
+    pub width: PhotoMetadataField<i64>,
+    pub height: PhotoMetadataField<i64>,
+    pub orientation: PhotoMetadataField<String>,
+    pub capture_time: PhotoMetadataField<String>,
+    pub camera_make: PhotoMetadataField<String>,
+    pub camera_model: PhotoMetadataField<String>,
+    pub lens_model: PhotoMetadataField<String>,
+}
+
 /// Return the metadata extraction policy for one original path.
 pub fn metadata_extraction_policy_for_path(path: &Path) -> MetadataExtractionPolicy {
     let is_jpeg = path
@@ -957,6 +1014,43 @@ pub fn upsert_photo_metadata_by_path(
     )?;
 
     Ok(())
+}
+
+/// Read stored metadata for one photo without touching original files.
+pub fn get_photo_metadata(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoMetadata>, LibraryStorageError> {
+    let (_library, connection) = open_existing_library_for_read_only_query(library_root_path)?;
+    connection
+        .query_row(
+            r#"
+            SELECT
+              photos.id,
+              photos.file_name,
+              photos.path,
+              photos.file_type,
+              photos.unsupported,
+              photos.file_size,
+              photos.modified_at,
+              photo_metadata.photo_id IS NOT NULL,
+              photo_metadata.width,
+              photo_metadata.height,
+              photo_metadata.orientation,
+              photo_metadata.capture_time,
+              photo_metadata.camera_make,
+              photo_metadata.camera_model,
+              photo_metadata.lens_model
+            FROM photos
+            LEFT JOIN photo_metadata ON photo_metadata.photo_id = photos.id
+            WHERE photos.library_id = ?1
+              AND photos.id = ?2
+            "#,
+            params![LOCAL_LIBRARY_ID, photo_id],
+            photo_metadata_from_row,
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
 }
 
 /// List imported catalog photos for the Library grid without touching originals.
@@ -2867,6 +2961,43 @@ fn library_photo_grid_item_from_row(
     })
 }
 
+fn photo_metadata_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoMetadata> {
+    let unsupported = sql_to_bool(row.get::<_, i64>(4)?);
+    let metadata_present = row.get::<_, i64>(7)? != 0;
+
+    Ok(PhotoMetadata {
+        photo_id: row.get(0)?,
+        file_name: row.get(1)?,
+        source_path: row.get(2)?,
+        file_type: row.get(3)?,
+        unsupported,
+        file_size: PhotoMetadataField::known(row.get(5)?),
+        modified_at: match row.get(6)? {
+            Some(value) => PhotoMetadataField::known(value),
+            None => PhotoMetadataField::unavailable(),
+        },
+        width: stored_metadata_field(row.get(8)?, metadata_present, unsupported),
+        height: stored_metadata_field(row.get(9)?, metadata_present, unsupported),
+        orientation: stored_metadata_field(row.get(10)?, metadata_present, unsupported),
+        capture_time: stored_metadata_field(row.get(11)?, metadata_present, unsupported),
+        camera_make: stored_metadata_field(row.get(12)?, metadata_present, unsupported),
+        camera_model: stored_metadata_field(row.get(13)?, metadata_present, unsupported),
+        lens_model: stored_metadata_field(row.get(14)?, metadata_present, unsupported),
+    })
+}
+
+fn stored_metadata_field<T>(
+    value: Option<T>,
+    metadata_present: bool,
+    unsupported: bool,
+) -> PhotoMetadataField<T> {
+    match value {
+        Some(value) => PhotoMetadataField::known(value),
+        None if metadata_present || unsupported => PhotoMetadataField::unavailable(),
+        None => PhotoMetadataField::unknown(),
+    }
+}
+
 fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRecord> {
     Ok(ExportRecord {
         id: row.get(0)?,
@@ -3542,6 +3673,79 @@ mod tests {
         assert_eq!(width, Some(2));
         assert_eq!(height, Some(3));
         assert_eq!(camera_make, None);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_query_returns_stored_states_without_original_reads() {
+        let workspace = unique_library_root("metadata-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let known_file = import_root.join("known.jpg");
+        let unknown_file = import_root.join("unknown.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&known_file, b"known jpeg bytes").expect("write known");
+        std::fs::write(&unknown_file, b"unknown jpeg bytes").expect("write unknown");
+        std::fs::write(&unsupported_file, b"unsupported").expect("write unsupported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        upsert_photo_metadata_by_path(
+            &library.root_path,
+            &known_file,
+            PhotoMetadataUpdate {
+                width: Some(24),
+                height: Some(36),
+                ..PhotoMetadataUpdate::unavailable()
+            },
+        )
+        .expect("upsert known metadata");
+
+        std::fs::remove_file(&known_file).expect("remove original after metadata persist");
+
+        let known_id = stable_catalog_id("photo", &known_file.display().to_string());
+        let known = get_photo_metadata(&library.root_path, &known_id)
+            .expect("query known metadata")
+            .expect("known photo metadata");
+        assert_eq!(known.width.state, PhotoMetadataFieldState::Known);
+        assert_eq!(known.width.value, Some(24));
+        assert_eq!(known.height.state, PhotoMetadataFieldState::Known);
+        assert_eq!(known.height.value, Some(36));
+        assert_eq!(
+            known.camera_make.state,
+            PhotoMetadataFieldState::Unavailable
+        );
+        assert_eq!(known.camera_make.value, None);
+        assert_eq!(known.file_size.state, PhotoMetadataFieldState::Known);
+
+        let unknown_id = stable_catalog_id("photo", &unknown_file.display().to_string());
+        let unknown = get_photo_metadata(&library.root_path, &unknown_id)
+            .expect("query unknown metadata")
+            .expect("unknown photo metadata");
+        assert_eq!(unknown.width.state, PhotoMetadataFieldState::Unknown);
+        assert_eq!(unknown.width.value, None);
+        assert_eq!(unknown.camera_model.state, PhotoMetadataFieldState::Unknown);
+
+        let unsupported_id = stable_catalog_id("photo", &unsupported_file.display().to_string());
+        let unsupported = get_photo_metadata(&library.root_path, &unsupported_id)
+            .expect("query unsupported metadata")
+            .expect("unsupported photo metadata");
+        assert!(unsupported.unsupported);
+        assert_eq!(
+            unsupported.width.state,
+            PhotoMetadataFieldState::Unavailable
+        );
+        assert_eq!(
+            unsupported.lens_model.state,
+            PhotoMetadataFieldState::Unavailable
+        );
+
+        assert!(get_photo_metadata(&library.root_path, "missing-photo")
+            .expect("query missing metadata")
+            .is_none());
 
         remove_library_root(&workspace);
     }

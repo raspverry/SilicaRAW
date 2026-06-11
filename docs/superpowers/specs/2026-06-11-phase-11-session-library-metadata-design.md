@@ -543,6 +543,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core metadata`
   - `cargo test -p silica-desktop metadata`
+- **Status:** Completed on 2026-06-11. Storage, core, and desktop now expose a typed `get_photo_metadata` path that reads catalog data only and returns explicit `known`, `unknown`, or `unavailable` field states. Tests remove originals before metadata query to verify inspector-style reads do not reopen source files.
 
 ### Task 11.8.1: Metadata Inspector UI
 

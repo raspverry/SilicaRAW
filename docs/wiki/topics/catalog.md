@@ -66,6 +66,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.7.1 records the metadata schema/dependency gate: no EXIF parser is added yet, and unavailable camera/lens/orientation/capture metadata must stay explicit.
 - Task 11.7.2 records the backfill/extraction policy: no open/restore backfill, existing unknown metadata stays unknown until explicit import/backfill work, and JPEG/JPG dimensions may use the existing raster path without implying RAW decode support.
 - Task 11.7.3 adds migration 4 plus import-time metadata persistence: JPEG/JPG width and height are stored when available, RAW rows stay explicitly unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
+- Task 11.7.4 adds typed metadata read APIs through storage, core, and desktop command boundaries. Query responses use explicit `known`, `unknown`, and `unavailable` field states and read only the catalog, not original files.
 
 ## Paged Library Query Contract
 
@@ -104,11 +105,14 @@ Task 11.7 starts with a storage-shape and dependency gate before extraction:
 - Until a parser is added, camera make, camera model, lens model, orientation, and EXIF capture time are stored and displayed as unavailable rather than inferred.
 - `photo_metadata.raw_json` remains parser-owned untrusted data and defaults to `{}`.
 - Migration 4 adds the first physical metadata extraction columns. Existing imports are not backfilled on open or session restore.
+- `silica-storage::get_photo_metadata`, the core wrapper, and desktop `get_photo_metadata` command expose stored metadata only. A missing metadata row reports nullable extraction fields as `unknown`; a present metadata row with `NULL` values reports them as `unavailable`; stored values report `known`.
+- Metadata query APIs use the read-only catalog query path and must not touch original files during inspector display.
 
 ## Not Implemented Yet
 
 - Recursive folder scanning.
 - Camera metadata extraction.
+- Metadata inspector UI.
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
 - Automatic sidecar synchronization.

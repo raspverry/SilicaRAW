@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Metadata query API added
+
+- Added Task 11.7.4 typed metadata query APIs across storage, core, and desktop.
+- Metadata fields now serialize explicit `known`, `unknown`, or `unavailable` states for inspector use.
+- Query APIs read only catalog state; tests remove originals before query to guard against display-time source-file reads.
+
 ## [2026-06-11] phase-11 | Metadata migration and extraction added
 
 - Added Task 11.7.3 metadata migration and import-time extraction.

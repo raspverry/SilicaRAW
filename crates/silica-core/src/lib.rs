@@ -27,6 +27,9 @@ pub use silica_storage::LibraryQueryPage;
 pub use silica_storage::LibraryQueryRequest;
 pub use silica_storage::LibraryQuerySort;
 pub use silica_storage::PhotoFlags;
+pub use silica_storage::PhotoMetadata;
+pub use silica_storage::PhotoMetadataField;
+pub use silica_storage::PhotoMetadataFieldState;
 pub use silica_storage::SidecarWriteResult;
 pub use silica_storage::ValidatedSidecar;
 
@@ -923,6 +926,14 @@ pub fn get_photo_flags(
     photo_id: &str,
 ) -> Result<Option<silica_storage::PhotoFlags>, CoreError> {
     silica_storage::get_photo_flags(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Read stored photo metadata through the core command boundary.
+pub fn get_photo_metadata(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<silica_storage::PhotoMetadata>, CoreError> {
+    silica_storage::get_photo_metadata(library_root_path, photo_id).map_err(CoreError::from)
 }
 
 /// Write a library-local sidecar through the core command boundary.
@@ -2351,6 +2362,41 @@ mod tests {
 
         assert_original_hash(&jpeg_file, &jpeg_hash, "JPEG metadata extraction");
         assert_original_hash(&raw_file, &raw_hash, "RAW metadata policy");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn queries_photo_metadata_without_reopening_original() {
+        let workspace = unique_library_root("core-metadata-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+        std::fs::remove_file(&jpeg_file).expect("remove original before metadata query");
+
+        let photo_id = list_library_photos(&created.root_path)
+            .expect("list imported photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.jpg")
+            .expect("sample photo")
+            .photo_id;
+        let metadata = get_photo_metadata(&created.root_path, &photo_id)
+            .expect("query metadata through core")
+            .expect("photo metadata");
+        assert_eq!(metadata.width.state, PhotoMetadataFieldState::Known);
+        assert_eq!(metadata.width.value, Some(2));
+        assert_eq!(metadata.height.state, PhotoMetadataFieldState::Known);
+        assert_eq!(metadata.height.value, Some(2));
+        assert_eq!(
+            metadata.capture_time.state,
+            PhotoMetadataFieldState::Unavailable
+        );
 
         remove_library_root(&workspace);
     }

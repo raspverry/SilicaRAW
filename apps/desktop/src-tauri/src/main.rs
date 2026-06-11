@@ -124,6 +124,22 @@ enum DesktopCommandData {
         rejected: bool,
         color_label: Option<String>,
     },
+    PhotoMetadata {
+        photo_id: String,
+        file_name: String,
+        source_path: String,
+        file_type: String,
+        unsupported: bool,
+        file_size: DesktopMetadataField<i64>,
+        modified_at: DesktopMetadataField<String>,
+        width: DesktopMetadataField<i64>,
+        height: DesktopMetadataField<i64>,
+        orientation: DesktopMetadataField<String>,
+        capture_time: DesktopMetadataField<String>,
+        camera_make: DesktopMetadataField<String>,
+        camera_model: DesktopMetadataField<String>,
+        lens_model: DesktopMetadataField<String>,
+    },
     PhotoPreview {
         photo_id: String,
         file_name: String,
@@ -186,6 +202,7 @@ impl DesktopCommandData {
             Self::PhotoGrid { .. } => "photoGrid",
             Self::PhotoGridPage { .. } => "photoGridPage",
             Self::PhotoFlags { .. } => "photoFlags",
+            Self::PhotoMetadata { .. } => "photoMetadata",
             Self::PhotoPreview { .. } => "photoPreview",
             Self::EditPreview { .. } => "editPreview",
             Self::EditCommit { .. } => "editCommit",
@@ -502,6 +519,13 @@ struct DesktopPhotoGridItem {
     picked: bool,
     rejected: bool,
     color_label: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopMetadataField<T> {
+    state: &'static str,
+    value: Option<T>,
 }
 
 impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
@@ -891,6 +915,28 @@ fn get_photo_flags(library_path: String, photo_id: String) -> DesktopCommandResp
         Ok(Some(flags)) => {
             DesktopCommandResponse::ok(command, "Photo flags loaded.", photo_flags_data(flags))
         }
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn get_photo_metadata(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_metadata";
+    match silica_core::get_photo_metadata(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(metadata)) => DesktopCommandResponse::ok(
+            command,
+            "Photo metadata loaded.",
+            photo_metadata_data(metadata),
+        ),
         Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
         Err(error) => DesktopCommandResponse::error(
             command,
@@ -1342,6 +1388,40 @@ fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
     }
 }
 
+fn photo_metadata_data(metadata: silica_core::PhotoMetadata) -> DesktopCommandData {
+    DesktopCommandData::PhotoMetadata {
+        photo_id: metadata.photo_id,
+        file_name: metadata.file_name,
+        source_path: metadata.source_path,
+        file_type: metadata.file_type,
+        unsupported: metadata.unsupported,
+        file_size: metadata_field(metadata.file_size),
+        modified_at: metadata_field(metadata.modified_at),
+        width: metadata_field(metadata.width),
+        height: metadata_field(metadata.height),
+        orientation: metadata_field(metadata.orientation),
+        capture_time: metadata_field(metadata.capture_time),
+        camera_make: metadata_field(metadata.camera_make),
+        camera_model: metadata_field(metadata.camera_model),
+        lens_model: metadata_field(metadata.lens_model),
+    }
+}
+
+fn metadata_field<T>(field: silica_core::PhotoMetadataField<T>) -> DesktopMetadataField<T> {
+    DesktopMetadataField {
+        state: metadata_field_state_string(field.state),
+        value: field.value,
+    }
+}
+
+fn metadata_field_state_string(state: silica_core::PhotoMetadataFieldState) -> &'static str {
+    match state {
+        silica_core::PhotoMetadataFieldState::Known => "known",
+        silica_core::PhotoMetadataFieldState::Unknown => "unknown",
+        silica_core::PhotoMetadataFieldState::Unavailable => "unavailable",
+    }
+}
+
 fn photo_grid_page_data(
     page: silica_core::LibraryQueryPage<silica_core::LibraryPhotoGridItem>,
 ) -> DesktopCommandData {
@@ -1537,6 +1617,7 @@ fn main() {
             query_library_photos,
             set_photo_flags,
             get_photo_flags,
+            get_photo_metadata,
             open_photo_preview,
             preview_exposure_contrast_edit,
             commit_exposure_contrast_edit,
@@ -2221,6 +2302,57 @@ mod tests {
             error.context.library_path.as_deref(),
             Some(library_root.to_string_lossy().as_ref())
         );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_command_returns_typed_field_states() {
+        let workspace = unique_library_root("desktop-metadata-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("portrait.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        std::fs::remove_file(&jpeg_file).expect("remove original before desktop metadata query");
+
+        let photo_id = stable_catalog_id("photo", &jpeg_file.display().to_string());
+        let response = super::get_photo_metadata(library_root.display().to_string(), photo_id);
+
+        assert!(response.ok);
+        assert_eq!(response.command, "get_photo_metadata");
+        match response_data(&response) {
+            super::DesktopCommandData::PhotoMetadata {
+                photo_id,
+                width,
+                height,
+                camera_make,
+                ..
+            } => {
+                assert_eq!(
+                    photo_id,
+                    &stable_catalog_id("photo", &jpeg_file.display().to_string())
+                );
+                assert_eq!(width.state, "known");
+                assert_eq!(width.value, Some(2));
+                assert_eq!(height.state, "known");
+                assert_eq!(height.value, Some(2));
+                assert_eq!(camera_make.state, "unavailable");
+                assert_eq!(camera_make.value, None);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let missing = super::get_photo_metadata(
+            library_root.display().to_string(),
+            "missing-photo".to_string(),
+        );
+        assert!(missing.ok);
+        assert_eq!(missing.data, None);
 
         remove_library_root(&workspace);
     }
