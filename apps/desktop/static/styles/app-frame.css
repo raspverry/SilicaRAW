@@ -979,6 +979,11 @@ progress::-webkit-progress-value {
   border-color: var(--sr-border-default);
 }
 
+.sr-photo-card:focus-visible {
+  outline: 2px solid var(--sr-accent-system);
+  outline-offset: 2px;
+}
+
 .sr-photo-card.is-selected {
   border-color: var(--sr-accent-system);
   box-shadow: 0 0 0 2px var(--sr-overlay-info-soft);

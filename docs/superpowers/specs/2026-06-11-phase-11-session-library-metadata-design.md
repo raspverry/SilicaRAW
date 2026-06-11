@@ -459,6 +459,7 @@ Demo/Validation:
   - Keyboard navigation does not lose selection when pages load.
 - **Validation:**
   - browser automation or focused UI harness
+- **Status:** Completed on 2026-06-11. The grid now exposes a roving-focus keyboard contract for the current page: Arrow keys move by item or row, Home/End jump to page bounds, PageUp/PageDown jump by viewport rows, and Enter opens the loupe for the selected photo. Rendered cards keep visible focus styling and page reloads retain a coherent selected photo.
 
 ### Task 11.6.4: Multi-Select Semantics
 

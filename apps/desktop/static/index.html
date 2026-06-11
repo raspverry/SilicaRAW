@@ -243,7 +243,7 @@
                 <strong>Grid page unavailable</strong>
                 <span id="gridErrorMessage">Library grid failed to load.</span>
               </div>
-              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0"></div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" tabindex="0" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0" data-grid-keyboard-navigation="roving-focus"></div>
             </div>
             <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
               <div class="sr-loupe-header">
@@ -1454,6 +1454,9 @@
         const end = Math.min(libraryPhotos.length, (firstRenderedRow + renderedRows) * columns);
         const renderedEndRow = Math.ceil(end / columns);
         return {
+          columns,
+          rowHeight,
+          viewportRows,
           start,
           end,
           topSpacerHeight: firstRenderedRow * rowHeight,
@@ -1519,17 +1522,99 @@
         });
       }
 
+      function selectedPhotoIndex() {
+        return libraryPhotos.findIndex((photo) => photo.photoId === selectedPhotoId);
+      }
+
+      function selectedGridCard() {
+        return Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).find((card) => {
+          return card.dataset.photoId === selectedPhotoId;
+        });
+      }
+
+      function focusSelectedGridCard() {
+        selectedGridCard()?.focus({ preventScroll: true });
+      }
+
+      function scrollGridIndexIntoView(index) {
+        if (index < 0 || libraryPhotos.length === 0) {
+          return;
+        }
+        const metrics = virtualGridMetrics();
+        const row = Math.floor(index / metrics.columns);
+        const top = row * metrics.rowHeight;
+        const bottom = top + metrics.rowHeight;
+        const viewportTop = libraryGrid.scrollTop;
+        const viewportBottom = viewportTop + libraryGrid.clientHeight;
+
+        if (top < viewportTop) {
+          libraryGrid.scrollTop = top;
+        } else if (bottom > viewportBottom) {
+          libraryGrid.scrollTop = Math.max(0, bottom - libraryGrid.clientHeight);
+        }
+        renderVirtualGridWindow({ force: true });
+      }
+
+      function moveGridSelectionToIndex(index, options = {}) {
+        if (libraryPhotos.length === 0) {
+          return;
+        }
+        const nextIndex = Math.min(Math.max(0, index), libraryPhotos.length - 1);
+        const nextPhoto = libraryPhotos[nextIndex];
+        if (!nextPhoto) {
+          return;
+        }
+        selectPhoto(nextPhoto.photoId);
+        scrollGridIndexIntoView(nextIndex);
+        if (options.focus !== false) {
+          focusSelectedGridCard();
+        }
+      }
+
+      function handleLibraryGridKeydown(event) {
+        const navigationKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"];
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void openLoupeView();
+          return;
+        }
+        if (!navigationKeys.includes(event.key)) {
+          return;
+        }
+
+        event.preventDefault();
+        const metrics = virtualGridMetrics();
+        const currentIndex = selectedPhotoIndex() >= 0 ? selectedPhotoIndex() : 0;
+        const pageStep = Math.max(1, metrics.columns * metrics.viewportRows);
+        const nextIndexByKey = {
+          ArrowLeft: currentIndex - 1,
+          ArrowRight: currentIndex + 1,
+          ArrowUp: currentIndex - metrics.columns,
+          ArrowDown: currentIndex + metrics.columns,
+          Home: 0,
+          End: libraryPhotos.length - 1,
+          PageUp: currentIndex - pageStep,
+          PageDown: currentIndex + pageStep,
+        };
+        moveGridSelectionToIndex(nextIndexByKey[event.key]);
+      }
+
       function createPhotoCard(photo, index) {
         const state = cardState(photo);
         const card = document.createElement("button");
         card.className = "sr-photo-card";
         card.type = "button";
         card.dataset.photoId = photo.photoId;
+        card.tabIndex = photo.photoId === selectedPhotoId ? 0 : -1;
+        card.setAttribute("aria-selected", String(photo.photoId === selectedPhotoId));
         card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
         card.classList.toggle("is-rejected", photo.rejected);
         card.classList.toggle("is-missing", photo.missing);
         card.classList.toggle("is-unsupported", photo.unsupported);
-        card.addEventListener("click", () => selectPhoto(photo.photoId));
+        card.addEventListener("click", () => {
+          selectPhoto(photo.photoId);
+          focusSelectedGridCard();
+        });
 
         card.append(renderThumbnailArt(photo, index));
 
@@ -1561,7 +1646,10 @@
         selectedPhotoId = photoId;
         const selected = selectedPhoto();
         Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
-          card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
+          const isSelected = card.dataset.photoId === selectedPhotoId;
+          card.classList.toggle("is-selected", isSelected);
+          card.tabIndex = isSelected ? 0 : -1;
+          card.setAttribute("aria-selected", String(isSelected));
         });
         Array.from(loupeFilmstrip.querySelectorAll(".sr-filmstrip-card")).forEach((card) => {
           card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
@@ -2410,6 +2498,7 @@
       gridPreviousPageButton.addEventListener("click", () => void loadPreviousLibraryPage());
       gridNextPageButton.addEventListener("click", () => void loadNextLibraryPage());
       libraryGrid.addEventListener("scroll", scheduleVirtualGridWindowRender);
+      libraryGrid.addEventListener("keydown", handleLibraryGridKeydown);
       window.addEventListener("resize", () => renderVirtualGridWindow({ force: true }));
       ratingButtons.forEach((button) => {
         button.addEventListener("click", () => setSelectedRating(Number(button.dataset.ratingValue)));

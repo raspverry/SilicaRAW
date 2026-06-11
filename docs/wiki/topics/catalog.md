@@ -60,6 +60,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.5.5 moves product grid thumbnail hydration to the requested page only.
 - Task 11.6.1 wires the product grid UI to page metadata, visible loading/empty/error states, and previous/next page controls without claiming hidden rows are rendered.
 - Task 11.6.2 renders only a visible page-local grid window plus overscan spacer rows and revokes grid-owned thumbnail object URLs as rows leave the rendered window.
+- Task 11.6.3 adds current-page roving-focus keyboard navigation for the product grid without changing the paged query contract.
 
 ## Paged Library Query Contract
 

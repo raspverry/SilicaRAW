@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Keyboard grid navigation added
+
+- Added Task 11.6.3 current-page roving-focus keyboard navigation.
+- Arrow keys, Home, End, PageUp, PageDown, and Enter-to-loupe are wired through the product grid.
+- Multi-select remains Task 11.6.4.
+
 ## [2026-06-11] phase-11 | Virtualized grid window added
 
 - Added Task 11.6.2 page-local virtualized grid rendering.
 - The product grid now renders visible rows plus overscan spacer rows and cleans up grid-owned thumbnail object URLs when rows leave the window.
-- Keyboard navigation and multi-select remain Task 11.6.3 and Task 11.6.4.
+- Keyboard navigation was later completed by Task 11.6.3; multi-select remains Task 11.6.4.
 
 ## [2026-06-11] phase-11 | Page-driven grid UI added
 
