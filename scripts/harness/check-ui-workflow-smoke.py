@@ -64,6 +64,10 @@ WORKFLOW_STEPS = [
             "libraryGrid",
             "gridEmptyState",
             "gridLoadingState",
+            "gridErrorState",
+            "gridPageStatus",
+            "gridPreviousPage",
+            "gridNextPage",
             "selectedPhotoName",
             "selectedPhotoRating",
             "ratingControlGroup",
@@ -283,6 +287,9 @@ def main():
         "data-page-scoped-thumbnail-request",
         "libraryGridPageRequest",
         "query_library_photos",
+        "renderGridError",
+        "updateGridPageControls",
+        "gridPageStatus",
     ]:
         require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
     for marker in [

@@ -418,7 +418,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core thumbnail`
   - UI smoke marker for page-scoped thumbnail requests
-- **Status:** Completed on 2026-06-11. Added a core page-scoped thumbnail hydration query that hydrates JPEG thumbnails only for rows in the requested page, leaves RAW/unsupported rows without thumbnails, preserves original files, and updates the desktop paged grid command/static product grid to use `query_library_photos` instead of the old full-list product grid path. Full page UI states remain Task 11.6.1.
+- **Status:** Completed on 2026-06-11. Added a core page-scoped thumbnail hydration query that hydrates JPEG thumbnails only for rows in the requested page, leaves RAW/unsupported rows without thumbnails, preserves original files, and updates the desktop paged grid command/static product grid to use `query_library_photos` instead of the old full-list product grid path. Full page UI states were completed by Task 11.6.1.
 
 ### Task 11.6.1: Page-Driven Grid UI
 
@@ -431,6 +431,7 @@ Demo/Validation:
   - Grid does not claim unavailable rows exist.
 - **Validation:**
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. The grid shell now renders explicit loading, empty, page, and error states, exposes previous/next page controls backed by `query_library_photos` metadata, keeps selection coherent when page contents change, and reports total vs visible page rows without implying unavailable rows are loaded.
 
 ### Task 11.6.2: Virtualized Grid Window
 

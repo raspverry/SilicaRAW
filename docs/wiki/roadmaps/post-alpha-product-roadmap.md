@@ -228,7 +228,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Query uses bounded offset pagination with deterministic tie breakers.
   - Query shape is documented.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
-- **Status:** Completed on 2026-06-11. Task 11.5.1 added the typed paged query contract in `silica-catalog`; Task 11.5.2 raised the catalog schema to version 3 with normalized `photos.file_type` values and accepted query indexes; Task 11.5.3 added read-only storage/core paged query APIs; Task 11.5.4 exposed the typed desktop paged grid command; Task 11.5.5 moved product grid thumbnail hydration to requested page rows only. Full page UI states and pagination controls continue in Task 11.6.1.
+- **Status:** Completed on 2026-06-11. Task 11.5.1 added the typed paged query contract in `silica-catalog`; Task 11.5.2 raised the catalog schema to version 3 with normalized `photos.file_type` values and accepted query indexes; Task 11.5.3 added read-only storage/core paged query APIs; Task 11.5.4 exposed the typed desktop paged grid command; Task 11.5.5 moved product grid thumbnail hydration to requested page rows only. Page UI states and pagination controls were completed by Task 11.6.1.
 
 ### Task 11.6: Virtualized Grid, Keyboard, and Multi-Select
 
@@ -240,6 +240,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No horizontal overflow or control clipping at `1280x800`, `1440x900`, or `1728x965`.
   - Selection state is visually coherent and never fake.
 - **Validation:** Visual QA across current mockup viewports.
+- **Status:** In progress as of 2026-06-11. Task 11.6.1 completed page-driven grid loading, empty, page, and error states with previous/next controls backed by real page metadata. Virtualized windowing, keyboard navigation, and multi-select remain Task 11.6.2 through Task 11.6.4.
 
 ### Task 11.7: Metadata Extraction and Storage
 

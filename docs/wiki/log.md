@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Page-driven grid UI added
+
+- Added Task 11.6.1 page-driven grid UI states.
+- The product grid now shows page metadata, previous/next controls, loading, empty, and error states from `query_library_photos`.
+- Virtualized windowing, keyboard navigation, and multi-select remain Task 11.6.2 through Task 11.6.4.
+
 ## [2026-06-11] phase-11 | Page-scoped thumbnail hydration added
 
 - Added Task 11.5.5 page-scoped thumbnail hydration for paged grid queries.
 - The product grid now calls `query_library_photos` and the UI smoke harness checks the page-scoped thumbnail request marker.
-- Full page UI states and pagination controls remain Task 11.6.1.
+- Full page UI states and pagination controls were later completed by Task 11.6.1.
 
 ## [2026-06-11] phase-11 | Desktop paged grid command added
 

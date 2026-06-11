@@ -58,6 +58,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.5.3 implements read-only storage/core paged library query APIs without thumbnail hydration or catalog/cache mutation.
 - Task 11.5.4 exposes the paged library query through the desktop command boundary as `query_library_photos`.
 - Task 11.5.5 moves product grid thumbnail hydration to the requested page only.
+- Task 11.6.1 wires the product grid UI to page metadata, visible loading/empty/error states, and previous/next page controls without claiming hidden rows are rendered.
 
 ## Paged Library Query Contract
 

@@ -224,6 +224,13 @@
                   </select>
                 </div>
               </div>
+              <div class="sr-grid-page-bar" id="gridPageState" data-grid-page-state="idle">
+                <output id="gridPageStatus">Page 1</output>
+                <div class="sr-grid-page-actions">
+                  <button id="gridPreviousPage" type="button" aria-label="Previous grid page" disabled>Previous</button>
+                  <button id="gridNextPage" type="button" aria-label="Next grid page" disabled>Next</button>
+                </div>
+              </div>
               <div class="sr-grid-state" id="gridLoadingState" hidden>
                 <strong>Loading catalog photos</strong>
                 <span>Reading imported references from the local catalog.</span>
@@ -231,6 +238,10 @@
               <div class="sr-grid-state" id="gridEmptyState" hidden>
                 <strong>No imported photos</strong>
                 <span>Import a folder by reference to populate this grid.</span>
+              </div>
+              <div class="sr-grid-state" id="gridErrorState" hidden>
+                <strong>Grid page unavailable</strong>
+                <span id="gridErrorMessage">Library grid failed to load.</span>
               </div>
               <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" data-page-scoped-thumbnail-request="query_library_photos"></div>
             </div>
@@ -465,6 +476,12 @@
       const libraryGrid = document.querySelector("#libraryGrid");
       const gridEmptyState = document.querySelector("#gridEmptyState");
       const gridLoadingState = document.querySelector("#gridLoadingState");
+      const gridErrorState = document.querySelector("#gridErrorState");
+      const gridErrorMessage = document.querySelector("#gridErrorMessage");
+      const gridPageState = document.querySelector("#gridPageState");
+      const gridPageStatus = document.querySelector("#gridPageStatus");
+      const gridPreviousPageButton = document.querySelector("#gridPreviousPage");
+      const gridNextPageButton = document.querySelector("#gridNextPage");
       const gridStateNote = document.querySelector("#gridStateNote");
       const gridPhotoSubtitle = document.querySelector("#gridPhotoSubtitle");
       const libraryGridShell = document.querySelector(".sr-library-grid-shell");
@@ -544,15 +561,21 @@
       const invoke = window.__TAURI__?.core?.invoke;
       const dialogApi = window.__TAURI__?.dialog;
       const initialGridPhotos = Array.from(document.querySelectorAll(".sr-photo-card")).map(photoFromCard);
+      const LIBRARY_GRID_PAGE_LIMIT = 100;
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let activeLibraryPath = "";
+      let libraryGridPage = {
+        offset: 0,
+        limit: LIBRARY_GRID_PAGE_LIMIT,
+        totalCount: initialGridPhotos.length,
+        hasNextPage: false,
+      };
       let recentLibraries = [];
       let developPreviewSequence = 0;
       let controlsBusy = false;
       let layoutHydrating = false;
       let layoutSaveTimer = 0;
-      const LIBRARY_GRID_PAGE_LIMIT = 100;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
@@ -653,6 +676,47 @@
           sort: layout.sort,
           filters: layout.filters,
         };
+      }
+
+      function normalizedGridPage(page = {}, visibleCount = libraryPhotos.length) {
+        const limit = Math.max(1, Number(page.limit || LIBRARY_GRID_PAGE_LIMIT));
+        const offset = Math.max(0, Number(page.offset || 0));
+        const totalCount = Math.max(0, Number(page.totalCount ?? visibleCount));
+        return {
+          offset,
+          limit,
+          totalCount,
+          hasNextPage: Boolean(page.hasNextPage),
+        };
+      }
+
+      function updateGridPageControls(state = "page") {
+        const page = libraryGridPage;
+        const pageNumber = Math.floor(page.offset / page.limit) + 1;
+        const pageCount = Math.max(1, Math.ceil(page.totalCount / page.limit));
+        const firstRow = page.totalCount === 0 ? 0 : page.offset + 1;
+        const lastRow = Math.min(page.totalCount, page.offset + libraryPhotos.length);
+        const range = page.totalCount === 0
+          ? "0 rows"
+          : `${firstRow}-${lastRow} of ${page.totalCount}`;
+
+        gridPageState.dataset.gridPageState = state;
+        const statusText = state === "loading"
+          ? "Loading page..."
+          : `Page ${pageNumber} of ${pageCount} · ${range}`;
+        gridPageStatus.value = statusText;
+        gridPageStatus.textContent = statusText;
+        gridPreviousPageButton.disabled = state === "loading" || state === "error" || page.offset === 0;
+        gridNextPageButton.disabled = state === "loading" || state === "error" || !page.hasNextPage;
+      }
+
+      function renderGridError(message) {
+        gridLoadingState.hidden = true;
+        gridEmptyState.hidden = true;
+        gridErrorState.hidden = false;
+        libraryGrid.hidden = true;
+        gridErrorMessage.textContent = message;
+        updateGridPageControls("error");
       }
 
       function applyLayoutPreferences(layout = {}, options = {}) {
@@ -1304,6 +1368,7 @@
 
       function renderLibraryGrid(photos, options = {}) {
         libraryPhotos = Array.isArray(photos) ? photos : [];
+        libraryGridPage = normalizedGridPage(options.page, libraryPhotos.length);
         const preferredPhotoId = options.preferredPhotoId || "";
         const preferredExists = libraryPhotos.some((photo) => photo.photoId === preferredPhotoId);
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
@@ -1313,18 +1378,22 @@
           selectedPhotoId = options.allowDefaultSelection === false ? "" : libraryPhotos[0]?.photoId ?? "";
         }
 
-        libraryPhotoCount.textContent = `${libraryPhotos.length} photos`;
-        allPhotosCount.textContent = String(libraryPhotos.length);
-        recentImportCount.textContent = String(libraryPhotos.length);
+        const totalRows = libraryGridPage.totalCount;
+        const pageRows = libraryPhotos.length;
+        libraryPhotoCount.textContent = `${totalRows} photos`;
+        allPhotosCount.textContent = String(totalRows);
+        recentImportCount.textContent = String(pageRows);
         gridPhotoSubtitle.textContent = libraryPhotos.length
-          ? `${libraryPhotos.length} catalog rows`
+          ? `${pageRows} of ${totalRows} catalog rows`
           : "No catalog rows";
         gridStateNote.textContent = libraryPhotos.length
           ? "Imported photos are displayed by catalog reference."
           : "Import a folder by reference to populate the grid.";
         gridLoadingState.hidden = true;
         gridEmptyState.hidden = libraryPhotos.length !== 0;
+        gridErrorState.hidden = true;
         libraryGrid.hidden = libraryPhotos.length === 0;
+        updateGridPageControls(libraryPhotos.length ? "page" : "empty");
 
         libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
         renderLoupeFilmstrip();
@@ -1923,24 +1992,52 @@
           return;
         }
 
+        libraryGridPage = normalizedGridPage({ ...libraryGridPage, offset: options.offset ?? libraryGridPage.offset }, libraryPhotos.length);
         gridLoadingState.hidden = false;
         gridEmptyState.hidden = true;
+        gridErrorState.hidden = true;
+        updateGridPageControls("loading");
         setStatus("Loading catalog photos...");
         try {
+          const request = libraryGridPageRequest(options);
           const response = await invoke("query_library_photos", {
             libraryPath: activeLibraryPath,
-            request: libraryGridPageRequest(options),
+            request,
           });
           if (commandFailed(response)) {
-            setStatus(responseErrorMessage(response, "Library grid failed to load."));
+            const message = responseErrorMessage(response, "Library grid failed to load.");
+            renderGridError(message);
+            setStatus(message);
             return;
           }
-          renderLibraryGrid(response.data?.photos ?? [], options);
+          renderLibraryGrid(response.data?.photos ?? [], {
+            ...options,
+            page: response.data,
+          });
           setStatus(responseMessage(response, "Library grid page loaded."));
         } catch (error) {
-          gridLoadingState.hidden = true;
-          setStatus(responseErrorMessage(error, "Library grid failed to load."));
+          const message = responseErrorMessage(error, "Library grid failed to load.");
+          renderGridError(message);
+          setStatus(message);
         }
+      }
+
+      async function loadPreviousLibraryPage() {
+        if (gridPreviousPageButton.disabled) {
+          return;
+        }
+        await loadLibraryGrid({
+          offset: Math.max(0, libraryGridPage.offset - libraryGridPage.limit),
+        });
+      }
+
+      async function loadNextLibraryPage() {
+        if (gridNextPageButton.disabled || !libraryGridPage.hasNextPage) {
+          return;
+        }
+        await loadLibraryGrid({
+          offset: libraryGridPage.offset + libraryGridPage.limit,
+        });
       }
 
       async function applySelectedFlags(patch) {
@@ -1996,7 +2093,7 @@
 
         renderLibraryGrid(libraryPhotos.map((photo) => {
           return photo.photoId === next.photoId ? next : photo;
-        }));
+        }), { page: libraryGridPage });
       }
 
       async function runCacheClearCommand() {
@@ -2192,6 +2289,8 @@
       chooseImportFolderPathButton.addEventListener("click", () => chooseDirectoryPath("import"));
       startImportButton.addEventListener("click", runImportCommand);
       clearLibraryCacheButton.addEventListener("click", runCacheClearCommand);
+      gridPreviousPageButton.addEventListener("click", () => void loadPreviousLibraryPage());
+      gridNextPageButton.addEventListener("click", () => void loadNextLibraryPage());
       ratingButtons.forEach((button) => {
         button.addEventListener("click", () => setSelectedRating(Number(button.dataset.ratingValue)));
       });
@@ -2255,7 +2354,7 @@
       [librarySearchInput, fileTypeFilterInput, minRatingFilterInput, cullingFilterInput, librarySortInput].forEach((control) => {
         control.addEventListener("input", () => {
           applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
-          setStatus("Layout preferences saved. Catalog query filtering starts with the paged query API.");
+          void loadLibraryGrid({ offset: 0 });
         });
       });
       viewImportErrorsButton.addEventListener("click", () => {

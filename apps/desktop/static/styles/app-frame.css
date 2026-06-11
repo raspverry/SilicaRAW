@@ -850,7 +850,7 @@ progress::-webkit-progress-value {
 .sr-library-grid-shell {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: var(--sr-space-md);
   overflow: hidden auto;
 }
@@ -891,8 +891,39 @@ progress::-webkit-progress-value {
   font-size: var(--sr-type-control);
 }
 
-.sr-grid-state {
+.sr-grid-page-bar {
   grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sr-space-md);
+  min-width: 0;
+  padding: var(--sr-space-sm) 0;
+  border-top: 1px solid var(--sr-border-subtle);
+  border-bottom: 1px solid var(--sr-border-subtle);
+}
+
+.sr-grid-page-bar output {
+  min-width: 0;
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-control);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--sr-line-control);
+}
+
+.sr-grid-page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sr-space-sm);
+}
+
+.sr-grid-page-actions button {
+  min-height: 32px;
+  padding: var(--sr-space-xs) var(--sr-space-md);
+}
+
+.sr-grid-state {
+  grid-row: 3;
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background: var(--sr-surface-panel);
@@ -916,7 +947,7 @@ progress::-webkit-progress-value {
 
 .sr-photo-grid {
   --sr-thumb-min: 168px;
-  grid-row: 3;
+  grid-row: 4;
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
