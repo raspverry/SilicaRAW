@@ -16,7 +16,7 @@
 ## Stable Release Gate
 
 - [ ] Signed/notarized/stapled build
-- [ ] Homebrew Cask prepared or deferred with explanation
+- [ ] Homebrew Cask and auto-update prepared or deferred with explanation ([ADR 0007](../docs/wiki/decisions/adr-0007-homebrew-and-auto-update-deferral.md))
 - [ ] Security policy exists
 - [ ] Contribution guide exists
 - [ ] Upgrade path tested

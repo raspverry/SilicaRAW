@@ -39,6 +39,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [ADR 0001: Monorepo Foundation](decisions/adr-0001-monorepo-foundation.md): initial Rust workspace and crate boundary decision.
 - [ADR 0005: Defer MLX from Local Alpha](decisions/adr-0005-mlx-deferral-for-local-alpha.md): MLX remains outside local alpha scope.
 - [ADR 0006: Unsigned Developer Preview DMG](decisions/adr-0006-unsigned-developer-preview-dmg.md): unsigned preview artifacts are allowed while Developer ID funding is blocked.
+- [ADR 0007: Defer Homebrew and Auto-Update](decisions/adr-0007-homebrew-and-auto-update-deferral.md): Homebrew Cask and updater work wait for local DMG alpha trust gates.
 
 ### Topics
 

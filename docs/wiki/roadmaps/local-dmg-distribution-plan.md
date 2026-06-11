@@ -938,13 +938,15 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
 
 ### Task 9.3: Decide Homebrew and Auto-Update Deferral
 
-- **Location:** `docs/wiki/decisions/adr-0005-homebrew-and-auto-update-deferral.md`
+- **Location:** `docs/wiki/decisions/adr-0007-homebrew-and-auto-update-deferral.md`
 - **Description:** Explicitly defer Homebrew Cask and auto-update until after local DMG alpha.
 - **Dependencies:** Phase 8
 - **Acceptance Criteria:**
   - Decision explains why DMG is first.
   - Decision lists prerequisites before revisiting auto-update.
 - **Validation:** ADR linked from release docs.
+
+**Status:** Completed on 2026-06-11. Added [ADR 0007](../decisions/adr-0007-homebrew-and-auto-update-deferral.md) to defer Homebrew Cask and auto-update until signed/notarized local DMG releases, downloaded-artifact QA, release notes, checksums, rollback policy, and updater security criteria are satisfied. This corrects the earlier planned ADR filename, which conflicted with ADR 0005 for MLX deferral.
 
 ## Parallelization Map
 
