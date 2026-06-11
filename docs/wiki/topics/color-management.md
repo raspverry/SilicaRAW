@@ -27,7 +27,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Fixture-backed color correctness claims.
 - ICC embedding proof.
 - Camera profile behavior.
-- Golden image tolerance policy.
+- Fixture-backed golden image baseline.
 - Broad user-facing color claims.
 
 ## Fixture Status
@@ -55,6 +55,14 @@ untagged raster -> no embedded ICC expected, assume_srgb policy
 ```
 
 These entries do not prove color correctness because no fixture-backed transform output, tolerance policy, or visual review evidence exists yet.
+
+## Task 10.2 Golden Image and Tolerance Policy
+
+Task 10.2 records the first [Golden Image and Tolerance Policy](../../../checklists/GOLDEN_IMAGE_TOLERANCE_POLICY.md).
+
+The policy separates byte equality, file/profile inspection, pixel or perceptual tolerance, and manual visual review. It does not add golden images, ICC parsing, pixel comparison, or color correctness proof.
+
+Color correctness claims remain blocked until fixture-backed proof, approved tolerance values, automated comparison results, and manual visual review records exist.
 
 ## Color-Dependent Tags
 

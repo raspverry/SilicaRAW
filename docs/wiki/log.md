@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Golden image tolerance policy added
+
+- Added the Task 10.2 golden image and tolerance policy baseline.
+- Separated byte equality, file/profile inspection, pixel or perceptual tolerance, and manual visual review gates.
+- Recorded that RAW support and color correctness claims remain blocked until fixture-backed evidence exists.
+
 ## [2026-06-11] phase-10 | Fixture manifest contract added
 
 - Added the RAW/color fixture manifest schema and example for Task 10.1.

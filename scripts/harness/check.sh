@@ -24,6 +24,9 @@ python3 scripts/harness/check-release-template.py
 echo "==> Checking RAW/color fixture manifest contract"
 python3 scripts/harness/check-fixture-manifest-contract.py
 
+echo "==> Checking golden image tolerance policy"
+python3 scripts/harness/check-golden-tolerance-policy.py
+
 echo "==> Checking legal QA fixtures and installed-app preflight"
 python3 scripts/harness/check-qa-fixtures.py
 
