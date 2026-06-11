@@ -1,0 +1,1102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://silicaraw.local/schemas/fixture_manifest.schema.json",
+  "title": "SilicaRAW Fixture Manifest v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "manifest_kind",
+    "source_policy",
+    "maintained_by",
+    "updated_at",
+    "fixtures",
+    "expected_source_hashes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "silica.fixture_manifest"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "manifest_kind": {
+      "type": "string",
+      "enum": [
+        "synthetic-local-alpha",
+        "raw-fixtures",
+        "color-fixtures",
+        "mixed"
+      ]
+    },
+    "source_policy": {
+      "$ref": "#/$defs/source_policy"
+    },
+    "maintained_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
+    },
+    "expected_source_hashes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)\\.\\.?(/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "source_policy": {
+      "type": "object",
+      "required": [
+        "policy",
+        "description",
+        "allows_generated",
+        "allows_committed",
+        "allows_local_ignored",
+        "allows_external_reference_only"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": [
+            "example_only_external_reference",
+            "generated_local_alpha",
+            "committed_corpus",
+            "local_ignored_corpus",
+            "mixed"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allows_generated": {
+          "type": "boolean"
+        },
+        "allows_committed": {
+          "type": "boolean"
+        },
+        "allows_local_ignored": {
+          "type": "boolean"
+        },
+        "allows_external_reference_only": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "example_only_external_reference"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "allows_generated": {
+                "const": false
+              },
+              "allows_committed": {
+                "const": false
+              },
+              "allows_local_ignored": {
+                "const": false
+              },
+              "allows_external_reference_only": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "generated_local_alpha"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "allows_generated": {
+                "const": true
+              },
+              "allows_committed": {
+                "const": false
+              },
+              "allows_local_ignored": {
+                "const": false
+              },
+              "allows_external_reference_only": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "committed_corpus"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "allows_generated": {
+                "const": false
+              },
+              "allows_committed": {
+                "const": true
+              },
+              "allows_local_ignored": {
+                "const": false
+              },
+              "allows_external_reference_only": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "local_ignored_corpus"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "allows_generated": {
+                "const": false
+              },
+              "allows_committed": {
+                "const": false
+              },
+              "allows_local_ignored": {
+                "const": true
+              },
+              "allows_external_reference_only": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "mixed"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "allows_generated": {
+                "const": true
+              },
+              "allows_committed": {
+                "const": true
+              },
+              "allows_local_ignored": {
+                "const": true
+              },
+              "allows_external_reference_only": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "name",
+        "url",
+        "acquired_at",
+        "origin"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "acquired_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "project_fixture",
+            "public_sample",
+            "camera_vendor_sample",
+            "external_reference",
+            "example_only",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "license": {
+      "type": "object",
+      "required": [
+        "name",
+        "url",
+        "rights_holder",
+        "redistribution_permission",
+        "commit_permission",
+        "reviewed_at",
+        "reviewed_by"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rights_holder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redistribution_permission": {
+          "type": "string",
+          "enum": [
+            "permitted",
+            "prohibited",
+            "external_reference_only",
+            "not_applicable_example_only",
+            "unknown"
+          ]
+        },
+        "commit_permission": {
+          "type": "boolean"
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "required": [
+        "is_user_photo",
+        "identifiable_people",
+        "model_release",
+        "gps_metadata_expected",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "is_user_photo": {
+          "type": "boolean"
+        },
+        "identifiable_people": {
+          "type": "boolean"
+        },
+        "model_release": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "yes",
+            "no",
+            "not_applicable",
+            "unknown",
+            null
+          ]
+        },
+        "gps_metadata_expected": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "sha256",
+        "size_bytes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": [
+        "extension",
+        "mime_type",
+        "width",
+        "height",
+        "orientation",
+        "bit_depth",
+        "color_profile_tag"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "extension": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "orientation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 8
+        },
+        "bit_depth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "color_profile_tag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "expected_app_state": {
+      "type": "object",
+      "required": [
+        "import_supported",
+        "preview_status",
+        "visible_alpha_path",
+        "original_mutation_allowed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "import_supported": {
+          "type": "boolean"
+        },
+        "preview_status": {
+          "type": "string",
+          "enum": [
+            "ready_by_reference",
+            "raw_decode_blocked",
+            "unsupported",
+            "missing",
+            "not_probed"
+          ]
+        },
+        "visible_alpha_path": {
+          "type": "boolean"
+        },
+        "original_mutation_allowed": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "expected_probe_state": {
+      "type": "object",
+      "required": [
+        "state",
+        "actual_result",
+        "notes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "unverified",
+            "blocked_pending_task_12",
+            "blocked_pending_task_13"
+          ]
+        },
+        "actual_result": {
+          "type": "string",
+          "enum": [
+            "not_recorded"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "raw": {
+      "type": "object",
+      "required": [
+        "format",
+        "camera_make",
+        "camera_model",
+        "apple_proraw",
+        "lens",
+        "iso",
+        "scene_tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "arw",
+            "cr2",
+            "cr3",
+            "dng",
+            "nef",
+            "orf",
+            "raf",
+            "rw2",
+            "raw",
+            "unknown"
+          ]
+        },
+        "camera_make": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "camera_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "apple_proraw": {
+          "type": "boolean"
+        },
+        "lens": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "iso": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "scene_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decode_gate": {
+      "type": "object",
+      "required": [
+        "state",
+        "blocked_until_task",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "blocked_pending_task_12",
+            "blocked_pending_task_13",
+            "unverified"
+          ]
+        },
+        "blocked_until_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "color": {
+      "type": "object",
+      "required": [
+        "subclass",
+        "fixture_intent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "subclass": {
+          "type": "string",
+          "enum": [
+            "srgb_jpeg",
+            "display_p3_jpeg",
+            "display_p3_heic",
+            "untagged_jpeg"
+          ]
+        },
+        "fixture_intent": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "profile_expectation": {
+      "type": "object",
+      "required": [
+        "embedded_icc",
+        "input_profile_expectation",
+        "untagged_policy",
+        "expected_default_export_profile",
+        "expected_default_export_embeds_icc",
+        "color_correctness_proven"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "embedded_icc": {
+          "type": "boolean"
+        },
+        "input_profile_expectation": {
+          "type": "string",
+          "enum": [
+            "srgb",
+            "display_p3",
+            "none",
+            "unknown"
+          ]
+        },
+        "untagged_policy": {
+          "type": "string",
+          "enum": [
+            "assume_srgb",
+            "not_applicable",
+            "reject",
+            "unknown"
+          ]
+        },
+        "expected_default_export_profile": {
+          "type": "string",
+          "enum": [
+            "srgb"
+          ]
+        },
+        "expected_default_export_embeds_icc": {
+          "type": "boolean"
+        },
+        "color_correctness_proven": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "required": [
+        "id",
+        "class",
+        "kind",
+        "relative_path",
+        "availability",
+        "source",
+        "license",
+        "privacy",
+        "integrity",
+        "media",
+        "expected_app_state",
+        "expected_probe_state"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "class": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "tagged_raster",
+            "untagged_raster",
+            "unsupported",
+            "raw_blocked_placeholder"
+          ]
+        },
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)\\.\\.?(/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+        },
+        "availability": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "committed",
+            "local_ignored",
+            "external_reference_only"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "license": {
+          "$ref": "#/$defs/license"
+        },
+        "privacy": {
+          "$ref": "#/$defs/privacy"
+        },
+        "integrity": {
+          "$ref": "#/$defs/integrity"
+        },
+        "media": {
+          "$ref": "#/$defs/media"
+        },
+        "expected_app_state": {
+          "$ref": "#/$defs/expected_app_state"
+        },
+        "expected_probe_state": {
+          "$ref": "#/$defs/expected_probe_state"
+        },
+        "raw": {
+          "$ref": "#/$defs/raw"
+        },
+        "decode_gate": {
+          "$ref": "#/$defs/decode_gate"
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "profile_expectation": {
+          "$ref": "#/$defs/profile_expectation"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "E"
+                ]
+              }
+            },
+            "required": [
+              "class"
+            ]
+          },
+          "then": {
+            "required": [
+              "raw",
+              "decode_gate"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "raw",
+                  "unsupported"
+                ]
+              },
+              "expected_app_state": {
+                "properties": {
+                  "import_supported": {
+                    "const": false
+                  },
+                  "preview_status": {
+                    "const": "raw_decode_blocked"
+                  },
+                  "visible_alpha_path": {
+                    "const": false
+                  }
+                }
+              },
+              "expected_probe_state": {
+                "properties": {
+                  "state": {
+                    "const": "blocked_pending_task_12"
+                  },
+                  "actual_result": {
+                    "const": "not_recorded"
+                  }
+                }
+              },
+              "decode_gate": {
+                "properties": {
+                  "state": {
+                    "const": "blocked_pending_task_12"
+                  },
+                  "blocked_until_task": {
+                    "const": "Task 12"
+                  }
+                }
+              },
+              "color": false,
+              "profile_expectation": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "raw",
+                  "raw_blocked_placeholder"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "raw",
+              "decode_gate"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "F"
+              }
+            },
+            "required": [
+              "class"
+            ]
+          },
+          "then": {
+            "required": [
+              "color",
+              "profile_expectation"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "tagged_raster",
+                  "untagged_raster"
+                ]
+              },
+              "raw": false,
+              "decode_gate": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "F"
+              },
+              "kind": {
+                "const": "tagged_raster"
+              }
+            },
+            "required": [
+              "class",
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "color": {
+                "properties": {
+                  "subclass": {
+                    "enum": [
+                      "srgb_jpeg",
+                      "display_p3_jpeg",
+                      "display_p3_heic"
+                    ]
+                  }
+                }
+              },
+              "profile_expectation": {
+                "properties": {
+                  "embedded_icc": {
+                    "const": true
+                  },
+                  "untagged_policy": {
+                    "const": "not_applicable"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "F"
+              },
+              "kind": {
+                "const": "untagged_raster"
+              }
+            },
+            "required": [
+              "class",
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "color": {
+                "properties": {
+                  "subclass": {
+                    "const": "untagged_jpeg"
+                  }
+                }
+              },
+              "profile_expectation": {
+                "properties": {
+                  "embedded_icc": {
+                    "const": false
+                  },
+                  "input_profile_expectation": {
+                    "const": "none"
+                  },
+                  "untagged_policy": {
+                    "const": "assume_srgb"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "F"
+              },
+              "color": {
+                "properties": {
+                  "subclass": {
+                    "const": "srgb_jpeg"
+                  }
+                },
+                "required": [
+                  "subclass"
+                ]
+              }
+            },
+            "required": [
+              "class",
+              "color"
+            ]
+          },
+          "then": {
+            "properties": {
+              "profile_expectation": {
+                "properties": {
+                  "input_profile_expectation": {
+                    "const": "srgb"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "F"
+              },
+              "color": {
+                "properties": {
+                  "subclass": {
+                    "enum": [
+                      "display_p3_jpeg",
+                      "display_p3_heic"
+                    ]
+                  }
+                },
+                "required": [
+                  "subclass"
+                ]
+              }
+            },
+            "required": [
+              "class",
+              "color"
+            ]
+          },
+          "then": {
+            "properties": {
+              "profile_expectation": {
+                "properties": {
+                  "input_profile_expectation": {
+                    "const": "display_p3"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "C"
+              }
+            },
+            "required": [
+              "class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "raw": {
+                "properties": {
+                  "format": {
+                    "const": "raf"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "D"
+              }
+            },
+            "required": [
+              "class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "raw": {
+                "properties": {
+                  "format": {
+                    "const": "dng"
+                  },
+                  "apple_proraw": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -2,7 +2,7 @@
 title: RAW Decoding
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-11
 source_of_truth: docs/20_v1_1_Architecture_Patch.md
 ---
 
@@ -49,6 +49,18 @@ Broad camera support: LibRaw-preferred
 ## Fixture Status
 
 The repository currently has no legally usable RAW fixtures. Spike 002 scanned for common RAW file extensions and found none, so decoder confidence is still blocked by a fixture manifest.
+
+## Task 10.1 Fixture Manifest Contract
+
+The repository has no committed legal RAW fixture corpus. Task 10.1 defines RAW fixture provenance and expected gate states only. RAW support claims remain blocked until fixture-backed Core Image probe work in Phase 12 records evidence. RAW-blocked placeholders are not decodable RAW evidence.
+
+The fixture manifest contract separates fixture metadata from decoder behavior:
+
+```txt
+RAW Class A-E entries -> provenance, license, privacy, hash, media metadata, expected app state, expected probe state, RAW metadata, blocked decode gate
+Core Image probe result -> absent until Phase 12
+RAW support claim -> forbidden until fixture-backed evidence exists
+```
 
 ## Phase 5.1 Preview Contract
 

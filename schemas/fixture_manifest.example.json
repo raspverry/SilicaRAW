@@ -1,0 +1,582 @@
+{
+  "schema": "silica.fixture_manifest",
+  "version": 1,
+  "manifest_kind": "mixed",
+  "source_policy": {
+    "policy": "example_only_external_reference",
+    "description": "Example-only manifest. Entries are external-reference placeholders and are not real committed fixture files.",
+    "allows_generated": false,
+    "allows_committed": false,
+    "allows_local_ignored": false,
+    "allows_external_reference_only": true
+  },
+  "maintained_by": "SilicaRAW maintainers",
+  "updated_at": "2026-06-11T00:00:00Z",
+  "fixtures": [
+    {
+      "id": "raw_class_a_core_image_candidate_example",
+      "class": "A",
+      "kind": "raw",
+      "relative_path": "external/raw/class_a/example_core_image_candidate.dng",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example RAW Class A external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/raw-class-a",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000a1",
+        "size_bytes": 12000000
+      },
+      "media": {
+        "extension": "dng",
+        "mime_type": "image/x-adobe-dng",
+        "width": null,
+        "height": null,
+        "orientation": null,
+        "bit_depth": null,
+        "color_profile_tag": null
+      },
+      "expected_app_state": {
+        "import_supported": false,
+        "preview_status": "raw_decode_blocked",
+        "visible_alpha_path": false,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_12",
+        "actual_result": "not_recorded",
+        "notes": "RAW probe evidence is intentionally absent until Task 12."
+      },
+      "raw": {
+        "format": "dng",
+        "camera_make": "Example Camera Maker",
+        "camera_model": "Example RAW Body",
+        "apple_proraw": false,
+        "lens": null,
+        "iso": null,
+        "scene_tags": [
+          "example",
+          "ordinary-core-image-candidate"
+        ]
+      },
+      "decode_gate": {
+        "state": "blocked_pending_task_12",
+        "blocked_until_task": "Task 12",
+        "reason": "Task 10.1 records fixture expectations only and does not add RAW decoding."
+      },
+      "notes": "Class A contract example only; not a real fixture file."
+    },
+    {
+      "id": "raw_class_b_edge_case_example",
+      "class": "B",
+      "kind": "raw",
+      "relative_path": "external/raw/class_b/example_edge_case.cr3",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example RAW Class B edge-case external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/raw-class-b-edge",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000b1",
+        "size_bytes": 26000000
+      },
+      "media": {
+        "extension": "cr3",
+        "mime_type": "image/x-canon-cr3",
+        "width": null,
+        "height": null,
+        "orientation": null,
+        "bit_depth": null,
+        "color_profile_tag": null
+      },
+      "expected_app_state": {
+        "import_supported": false,
+        "preview_status": "raw_decode_blocked",
+        "visible_alpha_path": false,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_12",
+        "actual_result": "not_recorded",
+        "notes": "High-risk RAW probe evidence is intentionally absent until Task 12."
+      },
+      "raw": {
+        "format": "cr3",
+        "camera_make": "Example Camera Maker",
+        "camera_model": "Example Edge RAW Body",
+        "apple_proraw": false,
+        "lens": null,
+        "iso": null,
+        "scene_tags": [
+          "example",
+          "high-risk-edge-case"
+        ]
+      },
+      "decode_gate": {
+        "state": "blocked_pending_task_12",
+        "blocked_until_task": "Task 12",
+        "reason": "Task 10.1 records high-risk RAW fixture expectations only and does not add RAW decoding."
+      },
+      "notes": "Class B edge-case RAW contract example only; not a real fixture file."
+    },
+    {
+      "id": "raw_class_c_fuji_raf_example",
+      "class": "C",
+      "kind": "raw",
+      "relative_path": "external/raw/class_c/example_fuji_raf.raf",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example RAW Class C Fuji RAF external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/fuji-raf",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000c1",
+        "size_bytes": 24000000
+      },
+      "media": {
+        "extension": "raf",
+        "mime_type": "image/x-fuji-raf",
+        "width": null,
+        "height": null,
+        "orientation": null,
+        "bit_depth": null,
+        "color_profile_tag": null
+      },
+      "expected_app_state": {
+        "import_supported": false,
+        "preview_status": "raw_decode_blocked",
+        "visible_alpha_path": false,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_12",
+        "actual_result": "not_recorded",
+        "notes": "Fuji RAF probe evidence is intentionally absent until Task 12."
+      },
+      "raw": {
+        "format": "raf",
+        "camera_make": "Fujifilm",
+        "camera_model": "Example RAF Body",
+        "apple_proraw": false,
+        "lens": null,
+        "iso": null,
+        "scene_tags": [
+          "example",
+          "fuji-raf"
+        ]
+      },
+      "decode_gate": {
+        "state": "blocked_pending_task_12",
+        "blocked_until_task": "Task 12",
+        "reason": "Task 10.1 records RAF fixture expectations only and does not add RAW decoding."
+      },
+      "notes": "Class C RAF contract example only; not a real fixture file."
+    },
+    {
+      "id": "raw_class_d_apple_proraw_dng_example",
+      "class": "D",
+      "kind": "raw",
+      "relative_path": "external/raw/class_d/example_apple_proraw.dng",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example RAW Class D Apple ProRAW DNG external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/apple-proraw-dng",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000d1",
+        "size_bytes": 18000000
+      },
+      "media": {
+        "extension": "dng",
+        "mime_type": "image/x-adobe-dng",
+        "width": null,
+        "height": null,
+        "orientation": null,
+        "bit_depth": null,
+        "color_profile_tag": null
+      },
+      "expected_app_state": {
+        "import_supported": false,
+        "preview_status": "raw_decode_blocked",
+        "visible_alpha_path": false,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_12",
+        "actual_result": "not_recorded",
+        "notes": "Apple ProRAW probe evidence is intentionally absent until Task 12."
+      },
+      "raw": {
+        "format": "dng",
+        "camera_make": "Apple",
+        "camera_model": "Example iPhone Pro",
+        "apple_proraw": true,
+        "lens": null,
+        "iso": null,
+        "scene_tags": [
+          "example",
+          "apple-proraw"
+        ]
+      },
+      "decode_gate": {
+        "state": "blocked_pending_task_12",
+        "blocked_until_task": "Task 12",
+        "reason": "Task 10.1 records ProRAW fixture expectations only and does not add RAW decoding."
+      },
+      "notes": "Class D Apple ProRAW DNG contract example only; not a real fixture file."
+    },
+    {
+      "id": "raw_class_e_unsupported_raw_like_example",
+      "class": "E",
+      "kind": "unsupported",
+      "relative_path": "external/raw/class_e/example_raw_like.raw",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example RAW Class E unsupported RAW-like external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/raw-class-e-unsupported",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000e1",
+        "size_bytes": 8000000
+      },
+      "media": {
+        "extension": "raw",
+        "mime_type": "application/octet-stream",
+        "width": null,
+        "height": null,
+        "orientation": null,
+        "bit_depth": null,
+        "color_profile_tag": null
+      },
+      "expected_app_state": {
+        "import_supported": false,
+        "preview_status": "raw_decode_blocked",
+        "visible_alpha_path": false,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_12",
+        "actual_result": "not_recorded",
+        "notes": "Unsupported RAW-like probe evidence is intentionally absent until Task 12."
+      },
+      "raw": {
+        "format": "unknown",
+        "camera_make": null,
+        "camera_model": null,
+        "apple_proraw": false,
+        "lens": null,
+        "iso": null,
+        "scene_tags": [
+          "example",
+          "unsupported-raw-like"
+        ]
+      },
+      "decode_gate": {
+        "state": "blocked_pending_task_12",
+        "blocked_until_task": "Task 12",
+        "reason": "Task 10.1 records unsupported RAW-like fixture expectations only and does not add RAW decoding."
+      },
+      "notes": "Class E unsupported RAW-like contract example only; not a real fixture file."
+    },
+    {
+      "id": "color_class_f_srgb_jpeg_example",
+      "class": "F",
+      "kind": "tagged_raster",
+      "relative_path": "external/color/class_f/example_srgb.jpg",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example Color Class F sRGB JPEG external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/srgb-jpeg",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000f1",
+        "size_bytes": 300000
+      },
+      "media": {
+        "extension": "jpg",
+        "mime_type": "image/jpeg",
+        "width": 1600,
+        "height": 1000,
+        "orientation": 1,
+        "bit_depth": 8,
+        "color_profile_tag": "sRGB"
+      },
+      "expected_app_state": {
+        "import_supported": true,
+        "preview_status": "ready_by_reference",
+        "visible_alpha_path": true,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_13",
+        "actual_result": "not_recorded",
+        "notes": "Color profile proof is intentionally absent until a later fixture-backed color task."
+      },
+      "color": {
+        "subclass": "srgb_jpeg",
+        "fixture_intent": "Tagged sRGB JPEG expectation for future color-management proof."
+      },
+      "profile_expectation": {
+        "embedded_icc": true,
+        "input_profile_expectation": "srgb",
+        "untagged_policy": "not_applicable",
+        "expected_default_export_profile": "srgb",
+        "expected_default_export_embeds_icc": true,
+        "color_correctness_proven": false
+      },
+      "notes": "Class F sRGB JPEG contract example only; not a real fixture file."
+    },
+    {
+      "id": "color_class_f_display_p3_jpeg_example",
+      "class": "F",
+      "kind": "tagged_raster",
+      "relative_path": "external/color/class_f/example_display_p3.jpg",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example Color Class F Display P3 JPEG external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/display-p3-jpeg",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000f2",
+        "size_bytes": 320000
+      },
+      "media": {
+        "extension": "jpg",
+        "mime_type": "image/jpeg",
+        "width": 1600,
+        "height": 1000,
+        "orientation": 1,
+        "bit_depth": 8,
+        "color_profile_tag": "Display P3"
+      },
+      "expected_app_state": {
+        "import_supported": true,
+        "preview_status": "ready_by_reference",
+        "visible_alpha_path": true,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_13",
+        "actual_result": "not_recorded",
+        "notes": "Display P3 proof is intentionally absent until a later fixture-backed color task."
+      },
+      "color": {
+        "subclass": "display_p3_jpeg",
+        "fixture_intent": "Tagged Display P3 JPEG expectation for future color-management proof."
+      },
+      "profile_expectation": {
+        "embedded_icc": true,
+        "input_profile_expectation": "display_p3",
+        "untagged_policy": "not_applicable",
+        "expected_default_export_profile": "srgb",
+        "expected_default_export_embeds_icc": true,
+        "color_correctness_proven": false
+      },
+      "notes": "Class F Display P3 JPEG contract example only; not a real fixture file."
+    },
+    {
+      "id": "color_class_f_untagged_jpeg_example",
+      "class": "F",
+      "kind": "untagged_raster",
+      "relative_path": "external/color/class_f/example_untagged.jpg",
+      "availability": "external_reference_only",
+      "source": {
+        "name": "Example Color Class F untagged JPEG external reference",
+        "url": "https://example.invalid/silicaraw/fixtures/untagged-jpeg",
+        "acquired_at": null,
+        "origin": "example_only"
+      },
+      "license": {
+        "name": "Example-only placeholder",
+        "url": "https://example.invalid/license",
+        "rights_holder": "Example placeholder rights holder",
+        "redistribution_permission": "not_applicable_example_only",
+        "commit_permission": false,
+        "reviewed_at": "2026-06-11",
+        "reviewed_by": "SilicaRAW maintainers"
+      },
+      "privacy": {
+        "is_user_photo": false,
+        "identifiable_people": false,
+        "model_release": "not_applicable",
+        "gps_metadata_expected": false,
+        "notes": "Synthetic example metadata only; no user photo is referenced."
+      },
+      "integrity": {
+        "sha256": "00000000000000000000000000000000000000000000000000000000000000f3",
+        "size_bytes": 280000
+      },
+      "media": {
+        "extension": "jpg",
+        "mime_type": "image/jpeg",
+        "width": 1600,
+        "height": 1000,
+        "orientation": 1,
+        "bit_depth": 8,
+        "color_profile_tag": null
+      },
+      "expected_app_state": {
+        "import_supported": true,
+        "preview_status": "ready_by_reference",
+        "visible_alpha_path": true,
+        "original_mutation_allowed": false
+      },
+      "expected_probe_state": {
+        "state": "blocked_pending_task_13",
+        "actual_result": "not_recorded",
+        "notes": "Untagged raster policy proof is intentionally absent until a later fixture-backed color task."
+      },
+      "color": {
+        "subclass": "untagged_jpeg",
+        "fixture_intent": "Untagged JPEG expectation for future color-management policy proof."
+      },
+      "profile_expectation": {
+        "embedded_icc": false,
+        "input_profile_expectation": "none",
+        "untagged_policy": "assume_srgb",
+        "expected_default_export_profile": "srgb",
+        "expected_default_export_embeds_icc": true,
+        "color_correctness_proven": false
+      },
+      "notes": "Class F untagged JPEG contract example only; not a real fixture file."
+    }
+  ],
+  "expected_source_hashes": {
+    "external/raw/class_a/example_core_image_candidate.dng": "00000000000000000000000000000000000000000000000000000000000000a1",
+    "external/raw/class_b/example_edge_case.cr3": "00000000000000000000000000000000000000000000000000000000000000b1",
+    "external/raw/class_c/example_fuji_raf.raf": "00000000000000000000000000000000000000000000000000000000000000c1",
+    "external/raw/class_d/example_apple_proraw.dng": "00000000000000000000000000000000000000000000000000000000000000d1",
+    "external/raw/class_e/example_raw_like.raw": "00000000000000000000000000000000000000000000000000000000000000e1",
+    "external/color/class_f/example_srgb.jpg": "00000000000000000000000000000000000000000000000000000000000000f1",
+    "external/color/class_f/example_display_p3.jpg": "00000000000000000000000000000000000000000000000000000000000000f2",
+    "external/color/class_f/example_untagged.jpg": "00000000000000000000000000000000000000000000000000000000000000f3"
+  },
+  "notes": "Example-only external-reference manifest. It does not identify real fixture files, user photos, absolute paths, decoder support, Core Image probe results, ICC parsing results, or color correctness proof.",
+  "extensions": {}
+}

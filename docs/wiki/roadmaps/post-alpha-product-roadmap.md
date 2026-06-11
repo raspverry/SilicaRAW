@@ -72,7 +72,9 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - RAW fixture classes record source, license, hash, dimensions, camera/model metadata when available, and expected decode support state.
   - Color Class F records sRGB, Display P3, and untagged raster fixtures with source, license, hash, and ICC/profile expectations.
   - User photos and unlicensed samples remain uncommitted.
+- **Status:** Completed on 2026-06-11. Added the fixture manifest schema, example, and harness contract for legal RAW classes and Color Class F fixture expectations. This records provenance, license, privacy, integrity, expected app states, and future probe expectations only; it does not add RAW decoding, Core Image probing, real fixture files, ICC parsing, or color correctness proof.
 - **Validation:**
+  - `python3 scripts/harness/check-fixture-manifest-contract.py`
   - `python3 scripts/harness/check-qa-fixtures.py`
   - Future task-specific RAW/color fixture checks once added.
 

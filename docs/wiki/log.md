@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-10
+updated: 2026-06-11
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-11] phase-10 | Fixture manifest contract added
+
+- Added the RAW/color fixture manifest schema and example for Task 10.1.
+- Added a deterministic harness check for fixture provenance, license, path, hash, RAW gate, and Color Class F expectations.
+- Recorded that manifests are provenance and expectation metadata, not RAW support or color correctness proof.
 
 ## [2026-06-11] phase-9 | Local DMG release runbook added
 
