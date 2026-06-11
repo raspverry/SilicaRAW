@@ -85,12 +85,13 @@ Automated coverage:
 
 ## Task 10.5 Backup and Restore QA Record
 
-Status: Task 10.5.1 recovery policy added on 2026-06-11. Backup archive creation and restore execution remain pending.
+Status: Task 10.5.1 recovery policy added on 2026-06-11. Task 10.5.2 backup boundary implementation added on 2026-06-11. Restore execution remains pending.
 
 Automated policy validation command:
 
 ```bash
 python3 scripts/harness/check-recovery-policy.py
+cargo test -p silica-storage backup
 ```
 
 Policy coverage:
@@ -103,11 +104,19 @@ Policy coverage:
 - [x] Newer catalog schema backups are rejected by older app builds.
 - [x] Migration failure behavior is explicit.
 
-Implementation QA still needed:
+Backup implementation coverage:
 
-- [ ] Backup excludes `thumbnails/`, `previews/`, `render-cache/`, and `ai-cache`.
-- [ ] Backup includes `catalog.db` and `sidecars/`.
-- [ ] Backup does not include original referenced photo files.
+- [x] Backup excludes `thumbnails/`, `previews/`, `render-cache/`, and `ai-cache`.
+- [x] Backup includes checkpointed `catalog.db` and `sidecars/`.
+- [x] Backup writes `backup-manifest.json` with schema/version, app version, catalog schema version, checkpoint mode, and relative file list.
+- [x] Backup does not include original referenced photo files.
+- [x] Backup does not follow export output paths.
+- [x] Backup does not copy `exports/`, `logs/`, or existing `backups/` artifacts.
+- [x] Backup does not copy temporary sidecar write files.
+- [x] Backup copies latest WAL state through checkpoint before copying `catalog.db`.
+
+Restore implementation QA still needed:
+
 - [ ] Restore preserves edit states, flags, sidecar status, export records, and migration metadata.
 - [ ] Restore does not write into original photo folders.
 - [ ] Migration failure leaves the target recoverable.

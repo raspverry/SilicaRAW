@@ -123,7 +123,9 @@ Phase 5.2 adds Rust edit graph types and schema-aware validation in `silica-edit
 
 Phase 5.3 adds active edit graph storage wiring for exposure/contrast commits. Draft preview updates do not write `edit_states`; commit/release writes the active graph.
 
-Still needed: broader edit graph storage workflows, sidecar flag mirroring, sidecar conflict UX, cache size policy, backup/checkpoint policy, recursive import policy, and original full-hash protection behavior.
+Task 10.3 adds library-local sidecar read/write foundations. Task 10.4 adds sidecar rebuild dry-run reports. Task 10.5.1 records backup/checkpoint/restore policy, and Task 10.5.2 adds checkpointed backup artifact creation for `catalog.db`, `sidecars/`, and `backup-manifest.json`.
+
+Still needed: broader edit graph storage workflows, automatic sidecar synchronization, sidecar conflict UX, cache size policy, restore execution and rollback behavior, recursive import policy, and original full-hash protection behavior.
 
 ---
 

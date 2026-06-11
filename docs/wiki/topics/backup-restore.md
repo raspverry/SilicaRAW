@@ -10,7 +10,7 @@ source_of_truth: docs/superpowers/specs/2026-06-11-phase-10-evidence-recovery-de
 
 ## Summary
 
-This page records the Task 10.5 recovery policy before backup or restore code is added.
+This page records the Task 10.5 recovery policy and the current backup boundary implementation.
 
 The policy goal is narrow: preserve a local SilicaRAW library's recoverable state without copying original referenced photo files, disposable caches, or future cloud/plugin/AI state.
 
@@ -43,6 +43,30 @@ The initial backup artifact must not contain:
 - Files reached by following arbitrary export output paths.
 
 If WAL or SHM files still contain required state after checkpoint, the backup must either include them explicitly with a manifest note or fail. It must not silently copy only part of a live SQLite state.
+
+## Current Backup Implementation
+
+Task 10.5.2 adds `silica-storage::create_library_backup`.
+
+The current backup artifact is a library-local directory:
+
+```txt
+<library_root>/backups/<backup_id>/
+├─ catalog.db
+├─ sidecars/
+└─ backup-manifest.json
+```
+
+The backup manifest uses:
+
+```txt
+schema = silica.backup
+version = 1
+```
+
+It records app version, catalog schema version, creation time, checkpoint mode, relative file list, and excluded classes. It does not include cache files, original referenced photo files, export output files, logs, nested backup artifacts, or temporary sidecar write files.
+
+The current implementation runs `PRAGMA wal_checkpoint(TRUNCATE)` before copying `catalog.db`. If the checkpoint reports a busy state, backup creation fails instead of copying a partial catalog state.
 
 ## Restore Policy
 
@@ -101,9 +125,9 @@ Rules:
 
 Task 10.5 implementation tests must prove:
 
-- Backup excludes disposable caches.
-- Backup includes catalog and sidecars.
-- Backup does not include original referenced files.
+- Backup excludes disposable caches. Covered by Task 10.5.2.
+- Backup includes catalog and sidecars. Covered by Task 10.5.2.
+- Backup does not include original referenced files. Covered by Task 10.5.2.
 - Restore preserves edit states, flags, sidecar status, export records, and migration metadata.
 - Restore does not write into original photo folders.
 - Migration failure leaves a recoverable target state.

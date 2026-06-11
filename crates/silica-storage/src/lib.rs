@@ -77,6 +77,18 @@ pub const REQUIRED_INDEXES: &[&str] = ALPHA_CATALOG_REQUIRED_INDEXES;
 /// Catalog database filename inside a SilicaRAW library folder.
 pub const CATALOG_DATABASE_FILE: &str = "catalog.db";
 
+/// Library-local directory for recovery backup artifacts.
+pub const BACKUPS_DIRECTORY: &str = "backups";
+
+/// Stable backup manifest schema marker for Task 10.5 artifacts.
+pub const BACKUP_SCHEMA: &str = "silica.backup";
+
+/// Stable backup manifest version for Task 10.5 artifacts.
+pub const BACKUP_VERSION: i64 = 1;
+
+/// Manifest filename inside each backup artifact directory.
+pub const BACKUP_MANIFEST_FILE: &str = "backup-manifest.json";
+
 /// Library-local directory for portable sidecar JSON files.
 pub const SIDECAR_DIRECTORY: &str = "sidecars";
 
@@ -104,7 +116,7 @@ pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
     "ai-cache",
     "exports",
     "logs",
-    "backups",
+    BACKUPS_DIRECTORY,
 ];
 
 /// Cache record type used for disposable Library grid thumbnails.
@@ -174,6 +186,17 @@ pub struct CacheClearSummary {
     pub recreated_directories: Vec<String>,
     pub removed_cache_records: usize,
     pub message: String,
+}
+
+/// Result of creating a checkpointed local library backup artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryBackupResult {
+    pub backup_id: String,
+    pub backup_path: PathBuf,
+    pub manifest_path: PathBuf,
+    pub created_at: String,
+    pub files: Vec<String>,
+    pub bytes_copied: u64,
 }
 
 /// Catalog export row written after an export completes.
@@ -296,6 +319,7 @@ pub enum LibraryStorageError {
     InvalidPath(PathBuf),
     InvalidSidecarPhotoId(String),
     SidecarValidation(String),
+    BackupValidation(String),
 }
 
 impl fmt::Display for LibraryStorageError {
@@ -320,6 +344,9 @@ impl fmt::Display for LibraryStorageError {
             Self::SidecarValidation(message) => {
                 write!(formatter, "sidecar validation error: {message}")
             }
+            Self::BackupValidation(message) => {
+                write!(formatter, "backup validation error: {message}")
+            }
         }
     }
 }
@@ -337,7 +364,8 @@ impl Error for LibraryStorageError {
             | Self::NotDirectory(_)
             | Self::InvalidPath(_)
             | Self::InvalidSidecarPhotoId(_)
-            | Self::SidecarValidation(_) => None,
+            | Self::SidecarValidation(_)
+            | Self::BackupValidation(_) => None,
         }
     }
 }
@@ -563,6 +591,78 @@ pub fn dry_run_catalog_rebuild_from_sidecars(
     }
 
     Ok(report)
+}
+
+/// Create a checkpointed backup artifact with catalog data, sidecars, and a manifest.
+pub fn create_library_backup(
+    library_root_path: impl AsRef<Path>,
+    app_version: &str,
+) -> Result<LibraryBackupResult, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    checkpoint_catalog_for_backup(&library.catalog_path)?;
+
+    let backup_id = current_backup_id();
+    let backups_root = library.root_path.join(BACKUPS_DIRECTORY);
+    fs::create_dir_all(&backups_root)?;
+    let backup_path = backups_root.join(&backup_id);
+    if backup_path.exists() {
+        return Err(LibraryStorageError::BackupValidation(format!(
+            "backup artifact already exists: {}",
+            backup_path.display()
+        )));
+    }
+    fs::create_dir(&backup_path)?;
+
+    let mut files = Vec::new();
+    let mut bytes_copied = 0_u64;
+    bytes_copied += copy_backup_file(
+        &library.catalog_path,
+        &backup_path.join(CATALOG_DATABASE_FILE),
+        CATALOG_DATABASE_FILE,
+        &mut files,
+    )?;
+    bytes_copied += copy_backup_directory(
+        &library.root_path.join(SIDECAR_DIRECTORY),
+        &backup_path.join(SIDECAR_DIRECTORY),
+        SIDECAR_DIRECTORY,
+        &mut files,
+    )?;
+    files.sort();
+
+    let created_at = current_timestamp_string();
+    let manifest_files = files.clone();
+    let manifest = serde_json::json!({
+        "schema": BACKUP_SCHEMA,
+        "version": BACKUP_VERSION,
+        "app_version": app_version,
+        "catalog_schema_version": library.schema_version,
+        "created_at": created_at,
+        "checkpoint": "wal_checkpoint_truncate",
+        "files": manifest_files,
+        "excluded": [
+            "original referenced photo files",
+            "thumbnails/",
+            "previews/",
+            "render-cache/",
+            "ai-cache/",
+            "exports/",
+            "logs/",
+            "backups/"
+        ]
+    });
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
+    let manifest_path = backup_path.join(BACKUP_MANIFEST_FILE);
+    fs::write(&manifest_path, &manifest_bytes)?;
+    bytes_copied += manifest_bytes.len() as u64;
+
+    Ok(LibraryBackupResult {
+        backup_id,
+        backup_path,
+        manifest_path,
+        created_at,
+        files,
+        bytes_copied,
+    })
 }
 
 /// Scan a selected folder and record file candidates by reference.
@@ -1707,6 +1807,91 @@ fn get_photo_flags_from_connection(
 fn default_rebuild_flags(photo_id: &str) -> PhotoFlags {
     PhotoFlags::new(photo_id.to_string(), 0, false, false, None)
         .expect("default rebuild flags are valid")
+}
+
+fn checkpoint_catalog_for_backup(catalog_path: &Path) -> Result<(), LibraryStorageError> {
+    let connection = open_catalog(catalog_path)?;
+    let (busy, _log_frames, _checkpointed_frames): (i64, i64, i64) =
+        connection.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+    if busy != 0 {
+        return Err(LibraryStorageError::BackupValidation(
+            "catalog WAL checkpoint could not complete cleanly".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn copy_backup_file(
+    source: &Path,
+    destination: &Path,
+    relative_path: &str,
+    files: &mut Vec<String>,
+) -> Result<u64, LibraryStorageError> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let bytes = fs::copy(source, destination)?;
+    files.push(relative_path.to_string());
+    Ok(bytes)
+}
+
+fn copy_backup_directory(
+    source_root: &Path,
+    destination_root: &Path,
+    relative_root: &str,
+    files: &mut Vec<String>,
+) -> Result<u64, LibraryStorageError> {
+    fs::create_dir_all(destination_root)?;
+    if !source_root.is_dir() {
+        return Ok(0);
+    }
+
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(source_root)? {
+        entries.push(entry?);
+    }
+    entries.sort_by(|left, right| left.file_name().cmp(&right.file_name()));
+
+    let mut bytes = 0_u64;
+    for entry in entries {
+        let file_type = entry.file_type()?;
+        let name = entry
+            .file_name()
+            .to_str()
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| LibraryStorageError::InvalidPath(entry.path()))?;
+        let relative_path = format!("{relative_root}/{name}");
+        let destination = destination_root.join(&name);
+
+        if file_type.is_symlink() {
+            return Err(LibraryStorageError::BackupValidation(format!(
+                "backup refuses symlink in durable data: {relative_path}"
+            )));
+        }
+        if file_type.is_file() && name.ends_with(".tmp") {
+            continue;
+        }
+        if file_type.is_dir() {
+            bytes += copy_backup_directory(&entry.path(), &destination, &relative_path, files)?;
+        } else if file_type.is_file() {
+            bytes += copy_backup_file(&entry.path(), &destination, &relative_path, files)?;
+        }
+    }
+
+    Ok(bytes)
+}
+
+fn current_backup_id() -> String {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::from_secs(0));
+    format!(
+        "backup-unix-{}-{}",
+        duration.as_secs(),
+        duration.subsec_nanos()
+    )
 }
 
 fn update_sidecar_status(
@@ -3209,6 +3394,190 @@ mod tests {
             Some(photo_id.as_str())
         );
 
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn creates_backup_with_catalog_sidecars_manifest_and_excludes_disposable_data() {
+        let workspace = unique_library_root("backup-boundaries");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("External Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let export_file = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+        std::fs::write(&export_file, b"exported jpeg bytes").expect("write export output");
+        let original_bytes = std::fs::read(&supported_file).expect("read original before");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("green".to_string()),
+        )
+        .expect("set flags");
+        let sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write sidecar");
+        record_export(
+            &library.root_path,
+            &photo_id,
+            &export_file,
+            r#"{"format":"jpeg","color_profile":"srgb"}"#,
+        )
+        .expect("record export");
+
+        for directory in DISPOSABLE_CACHE_DIRECTORIES {
+            let path = library.root_path.join(directory);
+            std::fs::write(path.join("sentinel.cache"), b"cache bytes").expect("write cache");
+        }
+        std::fs::write(
+            library.root_path.join("backups").join("old-backup.txt"),
+            b"old backup bytes",
+        )
+        .expect("write old backup sentinel");
+        std::fs::write(
+            library.root_path.join("logs").join("runtime.log"),
+            b"runtime log",
+        )
+        .expect("write log sentinel");
+        let sidecar_temp = library
+            .root_path
+            .join(SIDECAR_DIRECTORY)
+            .join("partial.silicaraw.sidecar.json.tmp");
+        std::fs::write(&sidecar_temp, b"partial sidecar temp").expect("write sidecar temp");
+
+        let backup = create_library_backup(&library.root_path, "0.1.0-alpha.1")
+            .expect("create library backup");
+
+        assert!(backup
+            .backup_path
+            .starts_with(library.root_path.join("backups")));
+        assert!(backup.backup_path.join(CATALOG_DATABASE_FILE).is_file());
+        assert!(backup.manifest_path.is_file());
+        assert!(backup
+            .backup_path
+            .join(&sidecar.sidecar_relative_path)
+            .is_file());
+        assert!(
+            !backup
+                .backup_path
+                .join(SIDECAR_DIRECTORY)
+                .join("partial.silicaraw.sidecar.json.tmp")
+                .exists(),
+            "sidecar temp files must not be copied into backup"
+        );
+        for directory in [
+            "thumbnails",
+            "previews",
+            "render-cache",
+            "ai-cache",
+            "exports",
+            "logs",
+            "backups",
+        ] {
+            assert!(
+                !backup.backup_path.join(directory).exists(),
+                "{directory} must not be copied into backup"
+            );
+        }
+        assert!(
+            !backup
+                .backup_path
+                .join(export_file.file_name().expect("export file name"))
+                .exists(),
+            "export output files must not be followed into backup"
+        );
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after"),
+            original_bytes
+        );
+
+        let manifest: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&backup.manifest_path).expect("read manifest"),
+        )
+        .expect("parse manifest");
+        assert_eq!(manifest["schema"], BACKUP_SCHEMA);
+        assert_eq!(manifest["version"], BACKUP_VERSION);
+        assert_eq!(manifest["app_version"], "0.1.0-alpha.1");
+        assert_eq!(manifest["catalog_schema_version"], CURRENT_SCHEMA_VERSION);
+        assert!(manifest["files"]
+            .as_array()
+            .expect("manifest file list")
+            .contains(&serde_json::Value::String(
+                CATALOG_DATABASE_FILE.to_string()
+            )));
+        assert!(manifest["files"]
+            .as_array()
+            .expect("manifest file list")
+            .contains(&serde_json::Value::String(sidecar.sidecar_relative_path)));
+
+        let backup_connection =
+            open_catalog(backup.backup_path.join(CATALOG_DATABASE_FILE)).expect("open backup db");
+        let export_count: i64 = backup_connection
+            .query_row("SELECT COUNT(*) FROM exports", [], |row| row.get(0))
+            .expect("count backup exports");
+        let sidecar_status_count: i64 = backup_connection
+            .query_row("SELECT COUNT(*) FROM sidecar_status", [], |row| row.get(0))
+            .expect("count backup sidecar status");
+        assert_eq!(export_count, 1);
+        assert_eq!(sidecar_status_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn backup_checkpoint_copies_latest_wal_state_without_wal_files() {
+        let workspace = unique_library_root("backup-wal");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write original");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let connection = open_catalog(&library.catalog_path).expect("open writer connection");
+        connection
+            .execute(
+                "UPDATE photo_flags SET rating = 5, picked = 1 WHERE photo_id = ?1",
+                params![photo_id],
+            )
+            .expect("write uncheckpointed flag state");
+
+        let backup = create_library_backup(&library.root_path, "0.1.0-alpha.1")
+            .expect("create library backup");
+
+        assert!(backup.backup_path.join(CATALOG_DATABASE_FILE).is_file());
+        assert!(!backup.backup_path.join("catalog.db-wal").exists());
+        assert!(!backup.backup_path.join("catalog.db-shm").exists());
+
+        let backup_connection =
+            open_catalog(backup.backup_path.join(CATALOG_DATABASE_FILE)).expect("open backup db");
+        let (rating, picked): (i64, i64) = backup_connection
+            .query_row(
+                "SELECT rating, picked FROM photo_flags WHERE photo_id = ?1",
+                params![stable_catalog_id(
+                    "photo",
+                    &supported_file.display().to_string()
+                )],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("read backup flags");
+        assert_eq!(rating, 5);
+        assert_eq!(picked, 1);
+
+        drop(connection);
         remove_library_root(&workspace);
     }
 

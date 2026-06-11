@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Backup boundary implementation added
+
+- Added Task 10.5.2 checkpointed backup artifact creation in `silica-storage`.
+- Backup artifacts include `catalog.db`, `sidecars/`, and `backup-manifest.json` under library `backups/` while excluding originals, disposable caches, export outputs, logs, and nested backups.
+- Verified latest WAL state is copied through checkpoint-before-copy behavior; restore execution and rollback behavior remain pending.
+
 ## [2026-06-11] phase-10 | Backup and restore policy added
 
 - Added the Task 10.5.1 backup/WAL/checkpoint/restore policy topic.

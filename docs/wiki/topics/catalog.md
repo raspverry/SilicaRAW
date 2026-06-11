@@ -24,6 +24,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 10.3 adds explicit library-local sidecar write/read behavior through `silica-storage`; `photo_flags` remains the live in-app authority until a later explicit sync task changes that policy.
 - Task 10.4 adds a catalog rebuild dry-run report from library-local sidecars. It reports what would happen and does not mutate `photos`, `photo_flags`, `edit_states`, or `sidecar_status`.
 - Task 10.5.1 records backup/WAL/checkpoint/restore policy before backup or restore code is added.
+- Task 10.5.2 adds checkpointed backup artifacts under `backups/` containing `catalog.db`, `sidecars/`, and a manifest only.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -47,6 +48,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Exposure/contrast commit/release writes the active edit graph to `edit_states`.
 - Sidecar write/read validates sidecar and nested edit graph JSON, mirrors rating/picked/rejected/color-label state only, writes under library `sidecars/`, and updates `sidecar_status` after successful writes.
 - Sidecar rebuild dry-run scans `sidecars/` in deterministic order, resolves portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults, and reports malformed sidecars, schema issues, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts without applying changes.
+- Backup creation checkpoints WAL state before copying `catalog.db`, copies `sidecars/`, writes `backup-manifest.json`, and excludes originals, disposable caches, export outputs, logs, and nested backups.
 
 ## Not Implemented Yet
 
