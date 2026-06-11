@@ -12,6 +12,9 @@ python3 scripts/harness/check-cargo-deps.py
 echo "==> Checking early-alpha scope guardrails"
 scripts/harness/check-scope-guardrails.sh
 
+echo "==> Checking release workflow guardrails"
+python3 scripts/harness/check-release-workflows.py
+
 echo "==> Checking legal QA fixtures and installed-app preflight"
 python3 scripts/harness/check-qa-fixtures.py
 
