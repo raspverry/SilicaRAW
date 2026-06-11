@@ -117,6 +117,86 @@ pub const MAX_LIBRARY_QUERY_LIMIT: u16 = 500;
 /// Cursor pagination is intentionally deferred until benchmark evidence requires it.
 pub const LIBRARY_QUERY_CURSOR_PAGINATION_DEFERRED: bool = true;
 
+/// Task 11.7.1 gate: no EXIF/metadata parser dependency is added yet.
+pub const PHOTO_METADATA_PARSER_DEPENDENCY_ADDED: bool = false;
+
+/// Domain-facing field contract for metadata storage and unavailable values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhotoMetadataFieldContract {
+    pub table: &'static str,
+    pub column: &'static str,
+    pub value_type: &'static str,
+    pub source: &'static str,
+    pub unavailable_value: &'static str,
+}
+
+/// Planned normalized metadata fields for Sprint 4.
+pub const PHOTO_METADATA_FIELD_CONTRACTS: &[PhotoMetadataFieldContract] = &[
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "width",
+        value_type: "INTEGER",
+        source: "decoded raster/header dimensions when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "height",
+        value_type: "INTEGER",
+        source: "decoded raster/header dimensions when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "orientation",
+        value_type: "TEXT",
+        source: "metadata parser when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "capture_time",
+        value_type: "TEXT",
+        source: "metadata parser when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "camera_make",
+        value_type: "TEXT",
+        source: "metadata parser when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "camera_model",
+        value_type: "TEXT",
+        source: "metadata parser when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photo_metadata",
+        column: "lens_model",
+        value_type: "TEXT",
+        source: "metadata parser when available",
+        unavailable_value: "NULL",
+    },
+    PhotoMetadataFieldContract {
+        table: "photos",
+        column: "file_size",
+        value_type: "INTEGER",
+        source: "filesystem metadata captured during import",
+        unavailable_value: "0",
+    },
+    PhotoMetadataFieldContract {
+        table: "photos",
+        column: "modified_at",
+        value_type: "TEXT",
+        source: "filesystem metadata captured during import",
+        unavailable_value: "NULL",
+    },
+];
+
 /// Whitelisted sort modes for library grid queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryQuerySort {
@@ -461,6 +541,35 @@ mod tests {
                 "missing paged query index contract {index_name}"
             );
         }
+    }
+
+    #[test]
+    fn records_photo_metadata_contract_without_parser_dependency() {
+        assert!(!PHOTO_METADATA_PARSER_DEPENDENCY_ADDED);
+        let fields: Vec<_> = PHOTO_METADATA_FIELD_CONTRACTS
+            .iter()
+            .map(|field| (field.table, field.column))
+            .collect();
+        for field in [
+            ("photo_metadata", "width"),
+            ("photo_metadata", "height"),
+            ("photo_metadata", "orientation"),
+            ("photo_metadata", "capture_time"),
+            ("photo_metadata", "camera_make"),
+            ("photo_metadata", "camera_model"),
+            ("photo_metadata", "lens_model"),
+            ("photos", "file_size"),
+            ("photos", "modified_at"),
+        ] {
+            assert!(
+                fields.contains(&field),
+                "missing metadata field contract {field:?}"
+            );
+        }
+        assert!(PHOTO_METADATA_FIELD_CONTRACTS
+            .iter()
+            .filter(|field| field.table == "photo_metadata")
+            .all(|field| field.unavailable_value == "NULL"));
     }
 
     #[test]

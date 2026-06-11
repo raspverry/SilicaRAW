@@ -254,6 +254,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core`
   - Original hash checks.
+- **Status:** In progress as of 2026-06-11. Task 11.7.1 completed the metadata schema/dependency gate: normalized metadata fields are documented, file-system metadata remains on `photos`, and no EXIF parser dependency is added yet. Backfill policy, migration, query API, and UI display remain Task 11.7.2 through Task 11.8.
 
 ### Task 11.8: Metadata Inspector, Search, and Filters
 

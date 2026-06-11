@@ -500,6 +500,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-cargo-deps.py`
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. `silica-catalog` now records the Task 11.7 metadata field contract and explicit no-parser dependency gate. The wiki, schema reference, and dependency policy document that camera make/model, lens, orientation, and EXIF capture time remain unavailable until a parser is selected and documented.
 
 ### Task 11.7.2: Metadata Backfill and JPEG-Only Extraction Policy
 

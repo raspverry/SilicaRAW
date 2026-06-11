@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Metadata schema gate recorded
+
+- Added Task 11.7.1 metadata field and dependency gate.
+- No EXIF parser dependency is added yet; camera/lens/orientation/capture metadata remains explicitly unavailable.
+- Backfill policy and migration remain Task 11.7.2 and Task 11.7.3.
+
 ## [2026-06-11] phase-11 | Multi-select grid semantics added
 
 - Added Task 11.6.4 current-page multi-selection semantics.

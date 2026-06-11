@@ -14,6 +14,10 @@ This file is the dependency and third-party license inventory for the repository
 
 Future model weights, sample assets, binary tools, or bundled runtime components must add their own license/source/hash records before they are committed or shipped.
 
+## Deferred Dependency Decisions
+
+- Task 11.7.1 does not add an EXIF or metadata parser dependency. Camera make, camera model, lens model, orientation, and capture-time metadata remain explicitly unavailable until a later task adds a parser and records it in this file.
+
 ## Required Entry Format
 
 ```txt

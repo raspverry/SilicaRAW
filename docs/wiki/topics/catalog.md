@@ -62,6 +62,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.6.2 renders only a visible page-local grid window plus overscan spacer rows and revokes grid-owned thumbnail object URLs as rows leave the rendered window.
 - Task 11.6.3 adds current-page roving-focus keyboard navigation for the product grid without changing the paged query contract.
 - Task 11.6.4 keeps product grid multi-selection page-local and UI-only: primary selection stays explicit, range/toggle selection updates visual state and counts, and batch catalog edits remain out of scope.
+- Task 11.7.1 records the metadata schema/dependency gate: no EXIF parser is added yet, and unavailable camera/lens/orientation/capture metadata must stay explicit.
 
 ## Paged Library Query Contract
 
@@ -84,6 +85,17 @@ Task 11.5 starts with a contract before storage implementation:
 - Storage must translate the typed contract internally; UI code must not pass SQL strings, column names, or raw predicates.
 - `silica-storage::query_library_photos` opens the catalog read-only, returns page metadata, and leaves compatibility full-list behavior in `list_library_photos` until the desktop grid migration is complete.
 - The desktop `query_library_photos` command accepts a typed page/sort/filter DTO, hydrates thumbnails only for rows in the requested page, and returns `photoGridPage` metadata.
+
+## Photo Metadata Contract
+
+Task 11.7 starts with a storage-shape and dependency gate before extraction:
+
+- No EXIF or camera metadata parser dependency is added in Task 11.7.1.
+- `photo_metadata` normalized fields are planned as nullable values: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
+- `photos.file_size` and `photos.modified_at` remain file-system metadata captured at import time; they are not duplicated into `photo_metadata`.
+- Until a parser is added, camera make, camera model, lens model, orientation, and EXIF capture time are stored and displayed as unavailable rather than inferred.
+- `photo_metadata.raw_json` remains parser-owned untrusted data and defaults to `{}`.
+- A later migration task owns adding missing physical columns and backfill behavior; Task 11.7.1 is the contract gate only.
 
 ## Not Implemented Yet
 
