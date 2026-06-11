@@ -2,7 +2,7 @@
 title: Local DMG Distribution Plan
 status: active
 audience: all
-updated: 2026-06-10
+updated: 2026-06-11
 source_of_truth: docs/16_Release_Distribution_Plan.md
 ---
 
@@ -852,6 +852,22 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
   - Workflow uploads the DMG, SHA256 checksum, and unsigned warning text as GitHub Actions artifacts.
   - Workflow does not reference Apple signing or notarization secrets.
 - **Validation:** `python3 scripts/harness/check-release-workflows.py`
+
+**Status:** Completed on 2026-06-11. Added the manual/tag-triggered Developer Preview macOS DMG workflow, ADR 0006, release workflow guardrails, and [Developer Preview Artifact Runbook](developer-preview-artifact-runbook.md). The workflow builds unsigned `.app` and `.dmg` artifacts with `cargo tauri build --bundles app,dmg --ci --no-sign`, uploads the DMG, SHA256 checksum, and unsigned warning note, and avoids Apple signing/notarization secrets. A manual run on `main` at commit `f357e1e98e17776150d876b591bec8f297075b13` succeeded on 2026-06-11 and produced `SilicaRAW_0.1.0_aarch64.dmg` with SHA256 `7847a29fd768f5aefdc52baef001740af0bcb46a69e2f52ecb302d38c2cbf672`.
+
+### Task 8.0.1: Document Developer Preview Artifact Operations
+
+- **Location:** `docs/wiki/roadmaps/developer-preview-artifact-runbook.md`, `scripts/harness/check-release-workflows.py`
+- **Description:** Document the unpaid developer-preview build, download, checksum verification, and reporting flow so maintainers can test DMG artifacts without implying user-ready local distribution.
+- **Dependencies:** Task 8.0
+- **Acceptance Criteria:**
+  - Runbook includes manual workflow dispatch and developer-preview tag triggers.
+  - Runbook includes artifact download and checksum verification commands.
+  - Runbook clearly states that the artifact is unsigned, not notarized, and not user-ready.
+  - Release workflow guardrails check that the runbook exists and preserves the unsigned boundary.
+- **Validation:** `python3 scripts/harness/check-release-workflows.py`
+
+**Status:** Completed on 2026-06-11. Added [Developer Preview Artifact Runbook](developer-preview-artifact-runbook.md), linked it from the wiki index, and extended the release workflow guardrail to require the runbook and its unsigned/notarized/user-ready boundary language.
 
 ### Task 8.1: Add Release Build Workflow
 

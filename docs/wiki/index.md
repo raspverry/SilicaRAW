@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-10
+updated: 2026-06-11
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -30,6 +30,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Architecture](overview/architecture.md): high-level system boundaries and guardrails.
 - [Roadmap](overview/roadmap.md): current execution order and gate logic.
 - [Local DMG Distribution Plan](roadmaps/local-dmg-distribution-plan.md): phased plan for GitHub-hosted macOS DMG distribution.
+- [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
 
 ### Decisions
