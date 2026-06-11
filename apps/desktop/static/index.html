@@ -389,7 +389,14 @@
         <section class="sr-inspector-section">
           <div class="sr-panel-heading">Metadata</div>
           <div class="sr-metadata-row"><span>File</span><span id="selectedPhotoName">None</span></div>
-          <div class="sr-metadata-row"><span>Type</span><span>Catalog</span></div>
+          <div class="sr-metadata-row"><span>Type</span><strong id="metadataFileType" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Dimensions</span><strong id="metadataDimensions" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Captured</span><strong id="metadataCaptureTime" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Camera</span><strong id="metadataCamera" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Lens</span><strong id="metadataLens" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Modified</span><strong id="metadataModifiedAt" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Size</span><strong id="metadataFileSize" data-metadata-state="unavailable">Unavailable</strong></div>
+          <output class="sr-metadata-status" id="metadataStatus" aria-live="polite">Select a photo to inspect stored metadata.</output>
         </section>
       </aside>
 
@@ -509,6 +516,14 @@
       const allPhotosCount = document.querySelector("#allPhotosCount");
       const selectedPhotoName = document.querySelector("#selectedPhotoName");
       const selectedPhotoRating = document.querySelector("#selectedPhotoRating");
+      const metadataFileType = document.querySelector("#metadataFileType");
+      const metadataDimensions = document.querySelector("#metadataDimensions");
+      const metadataCaptureTime = document.querySelector("#metadataCaptureTime");
+      const metadataCamera = document.querySelector("#metadataCamera");
+      const metadataLens = document.querySelector("#metadataLens");
+      const metadataModifiedAt = document.querySelector("#metadataModifiedAt");
+      const metadataFileSize = document.querySelector("#metadataFileSize");
+      const metadataStatus = document.querySelector("#metadataStatus");
       const recentImportCount = document.querySelector("#recentImportCount");
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
@@ -591,6 +606,7 @@
       let layoutSaveTimer = 0;
       let gridVirtualRenderFrame = 0;
       let gridVirtualWindow = { start: 0, end: 0 };
+      let metadataRequestSequence = 0;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const pageThumbnailObjectUrls = new Map();
@@ -1101,6 +1117,128 @@
         }
         const mark = photo.picked ? "Picked" : photo.rejected ? "Rejected" : "Unmarked";
         return `Rating ${Number(photo.rating) || 0}. ${mark}.`;
+      }
+
+      function metadataUnavailableText(field) {
+        return field?.state === "unknown" ? "Unavailable" : "Unavailable";
+      }
+
+      function setMetadataText(element, text, state = "unavailable") {
+        element.textContent = text;
+        element.dataset.metadataState = state;
+      }
+
+      function metadataFieldText(field, formatter = (value) => String(value)) {
+        if (!field || field.state !== "known" || field.value === null || field.value === undefined || field.value === "") {
+          return { text: metadataUnavailableText(field), state: field?.state || "unavailable" };
+        }
+        return { text: formatter(field.value), state: "known" };
+      }
+
+      function applyMetadataField(element, field, formatter) {
+        const rendered = metadataFieldText(field, formatter);
+        setMetadataText(element, rendered.text, rendered.state);
+      }
+
+      function formatFileSize(bytes) {
+        const value = Number(bytes);
+        if (!Number.isFinite(value) || value < 0) {
+          return "Unavailable";
+        }
+        if (value >= 1024 * 1024) {
+          return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+        }
+        if (value >= 1024) {
+          return `${(value / 1024).toFixed(1)} KB`;
+        }
+        return `${value} B`;
+      }
+
+      function formatDimensions(metadata) {
+        const width = metadata?.width;
+        const height = metadata?.height;
+        if (width?.state === "known" && height?.state === "known") {
+          return { text: `${width.value} x ${height.value}`, state: "known" };
+        }
+        const state = width?.state === "unknown" || height?.state === "unknown" ? "unknown" : "unavailable";
+        return { text: "Unavailable", state };
+      }
+
+      function formatCamera(metadata) {
+        const make = metadataFieldText(metadata?.cameraMake).text;
+        const model = metadataFieldText(metadata?.cameraModel).text;
+        if (make === "Unavailable" && model === "Unavailable") {
+          return { text: "Unavailable", state: metadata?.cameraMake?.state || metadata?.cameraModel?.state || "unavailable" };
+        }
+        return { text: [make, model].filter((part) => part !== "Unavailable").join(" "), state: "known" };
+      }
+
+      function renderMetadataFallback(photo, status = "") {
+        selectedPhotoName.textContent = photo?.fileName ?? "None";
+        setMetadataText(metadataFileType, photo?.fileType || "Unavailable", photo ? "known" : "unavailable");
+        setMetadataText(metadataDimensions, "Unavailable");
+        setMetadataText(metadataCaptureTime, "Unavailable");
+        setMetadataText(metadataCamera, "Unavailable");
+        setMetadataText(metadataLens, "Unavailable");
+        setMetadataText(metadataModifiedAt, "Unavailable");
+        setMetadataText(metadataFileSize, "Unavailable");
+        metadataStatus.value = status || (photo ? "Stored metadata unavailable in static preview." : "Select a photo to inspect stored metadata.");
+        metadataStatus.textContent = metadataStatus.value;
+      }
+
+      function renderPhotoMetadata(metadata) {
+        selectedPhotoName.textContent = metadata.fileName || selectedPhoto()?.fileName || "None";
+        setMetadataText(metadataFileType, metadata.fileType || "Unavailable", metadata.fileType ? "known" : "unavailable");
+        const dimensions = formatDimensions(metadata);
+        setMetadataText(metadataDimensions, dimensions.text, dimensions.state);
+        applyMetadataField(metadataCaptureTime, metadata.captureTime);
+        const camera = formatCamera(metadata);
+        setMetadataText(metadataCamera, camera.text, camera.state);
+        applyMetadataField(metadataLens, metadata.lensModel);
+        applyMetadataField(metadataModifiedAt, metadata.modifiedAt);
+        applyMetadataField(metadataFileSize, metadata.fileSize, formatFileSize);
+        const selectionNote = selectedPhotoIds.size > 1 ? ` Primary photo only; ${selectedPhotoIds.size} selected.` : "";
+        metadataStatus.value = `Metadata loaded from catalog.${selectionNote}`;
+        metadataStatus.textContent = metadataStatus.value;
+      }
+
+      async function refreshSelectedMetadata() {
+        const requestId = ++metadataRequestSequence;
+        const photo = selectedPhoto();
+        const selectionNote = selectedPhotoIds.size > 1 ? ` Primary photo only; ${selectedPhotoIds.size} selected.` : "";
+        renderMetadataFallback(photo, photo ? `Metadata waits for catalog query.${selectionNote}` : "");
+        if (!photo) {
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          return;
+        }
+
+        try {
+          const response = await invoke("get_photo_metadata", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+          });
+          if (requestId !== metadataRequestSequence) {
+            return;
+          }
+          if (commandFailed(response)) {
+            metadataStatus.value = responseErrorMessage(response, "Metadata unavailable.");
+            metadataStatus.textContent = metadataStatus.value;
+            return;
+          }
+          if (!response.data) {
+            renderMetadataFallback(photo, "Catalog photo metadata was not found.");
+            return;
+          }
+          renderPhotoMetadata(response.data);
+        } catch (error) {
+          if (requestId !== metadataRequestSequence) {
+            return;
+          }
+          metadataStatus.value = responseErrorMessage(error, "Metadata unavailable.");
+          metadataStatus.textContent = metadataStatus.value;
+        }
       }
 
       function updateCullingControls(photo = selectedPhoto()) {
@@ -1779,6 +1917,7 @@
         selectedPhotoName.textContent = selected?.fileName ?? "None";
         selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         syncSelectionSummary();
+        void refreshSelectedMetadata();
         loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         updateCullingControls(selected);

@@ -143,7 +143,7 @@ Task 5.5.5 replaces the placeholder grid with the M003 Library Grid MVP:
 - Rating, Pick, and Reject inspector actions route through the existing `set_photo_flags` command.
 - Empty and loading states are represented without copying or decoding originals.
 - Static thumbnail art remains a UI placeholder until real thumbnail cache generation and virtualization are scoped.
-- Loupe opening, full metadata population, advanced filters, and real histogram values remain future work.
+- Loupe opening, advanced filters, and real histogram values remain future work in this baseline. Phase 11 later replaces placeholder metadata rows with catalog-backed metadata inspector UI.
 
 ## Task 5.5.6 Preview/Loupe
 
@@ -155,7 +155,7 @@ Task 5.5.6 adds the M004 Loupe MVP inside Library mode:
 - RAW candidates render the blocked decode state and must not imply RAW decoding is implemented.
 - Unsupported catalog entries render a clear unsupported state.
 - The bottom filmstrip mirrors the current grid selection and keeps M004 navigation visible.
-- Real image pixels, Metal output, RAW decoding, full metadata, and Develop edits remain future work.
+- Real image pixels, Metal output, RAW decoding, and Develop edits remain future work in this baseline. Phase 11 later shares the catalog-backed metadata inspector with Loupe.
 
 ## Task 5.5.7 Develop Panel
 

@@ -557,6 +557,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-static-ui.py`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. The shared Library/Loupe inspector now calls `get_photo_metadata`, displays stored file facts and metadata with honest `Unavailable` states, and reports multi-selection as primary-photo-only instead of aggregating fields. Static UI and workflow smoke harnesses now cover the metadata rows and command wiring.
 
 ### Task 11.8.2: Metadata Search and Filters
 

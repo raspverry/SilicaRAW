@@ -68,6 +68,7 @@ Final screenshot review:
 - M008-minimal is represented by the local-alpha maintenance/cache-clear subset with precise destructive-scope copy.
 - M009 Import progress keeps overall and per-step progress states synchronized.
 - M010/M011/M012 cover Phase 11 sidebar-collapsed, inspector-collapsed, and reset layout states with no horizontal overflow or clipped controls.
+- Task 11.8.1 adds catalog-backed metadata rows to the shared Library/Loupe inspector; full visual regression screenshots remain covered by later visual QA runs.
 
 Fixes from this final pass:
 

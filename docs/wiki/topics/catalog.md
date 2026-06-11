@@ -67,6 +67,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.7.2 records the backfill/extraction policy: no open/restore backfill, existing unknown metadata stays unknown until explicit import/backfill work, and JPEG/JPG dimensions may use the existing raster path without implying RAW decode support.
 - Task 11.7.3 adds migration 4 plus import-time metadata persistence: JPEG/JPG width and height are stored when available, RAW rows stay explicitly unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
 - Task 11.7.4 adds typed metadata read APIs through storage, core, and desktop command boundaries. Query responses use explicit `known`, `unknown`, and `unavailable` field states and read only the catalog, not original files.
+- Task 11.8.1 wires the Library/Loupe inspector to `get_photo_metadata` and keeps multi-selection metadata primary-photo-only.
 
 ## Paged Library Query Contract
 
@@ -112,7 +113,6 @@ Task 11.7 starts with a storage-shape and dependency gate before extraction:
 
 - Recursive folder scanning.
 - Camera metadata extraction.
-- Metadata inspector UI.
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
 - Automatic sidecar synchronization.

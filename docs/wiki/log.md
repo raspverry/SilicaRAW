@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Metadata inspector UI added
+
+- Added Task 11.8.1 Library and Loupe metadata inspector UI.
+- The inspector now uses the `get_photo_metadata` command and shows unavailable values honestly when metadata is missing.
+- Multi-selection keeps metadata primary-photo-only instead of inventing aggregate metadata.
+
 ## [2026-06-11] phase-11 | Metadata query API added
 
 - Added Task 11.7.4 typed metadata query APIs across storage, core, and desktop.
