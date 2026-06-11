@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Sidecar rebuild dry-run added
+
+- Added Task 10.4 catalog rebuild dry-run reports from library-local sidecars.
+- Resolved portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults while reporting malformed/schema-invalid sidecars, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts.
+- Kept applied restore, catalog overwrite, conflict UI, broad rescanning, backup archives, RAW/color proof, and export proof out of scope.
+
 ## [2026-06-11] phase-10 | Sidecar v1 foundation added
 
 - Added Task 10.3 sidecar v1 read/write foundation for library-local sidecars.
