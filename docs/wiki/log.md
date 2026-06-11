@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Session, library, and metadata design added
+
+- Added the Phase 11 design gate after consulting architecture, storage, frontend, and test agents.
+- Split Phase 11 into atomic app-session, recents, relaunch restore, layout preference, paged query, virtual grid, metadata, and recursive import tasks.
+- Recorded stop gates for app-session storage boundaries, query safety, truthful metadata, recursive import, and original-file preservation.
+
 ## [2026-06-11] phase-10 | Public trust package completed
 
 - Added Task 10.6.2 contribution and security docs with public issue templates and PR public-trust checks.
