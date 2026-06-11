@@ -16,7 +16,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 pub use silica_catalog::PhotoFlags;
 use silica_catalog::{
     is_supported_photo_extension, CatalogFlagError, ImportCandidate,
@@ -471,6 +471,34 @@ pub fn open_local_library(
 
     ensure_library_directories(root_path)?;
     open_library_catalog(root_path, &catalog_path)
+}
+
+/// Inspect an existing local library for relaunch restore without migrations or repair.
+pub fn inspect_local_library_for_restore(
+    root_path: impl AsRef<Path>,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let schema_version = connection.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |row| row.get(0),
+    )?;
+
+    Ok(LocalLibrary {
+        root_path: root_path.to_path_buf(),
+        catalog_path,
+        schema_version,
+    })
 }
 
 /// Resolve the library-local sidecar path for a catalog photo id.

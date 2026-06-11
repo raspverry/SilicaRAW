@@ -645,6 +645,67 @@
         }
       }
 
+      function launchRestoreStatus(fallbackReason) {
+        switch (fallbackReason) {
+          case "missingLibrary":
+            return "Last library folder is unavailable.";
+          case "missingCatalog":
+            return "Last library catalog is unavailable.";
+          case "invalidCatalog":
+            return "Last library catalog cannot be restored.";
+          case "noLastLibrary":
+          case "missing":
+          default:
+            return "Choose or create a local library.";
+        }
+      }
+
+      async function resolveLaunchRestore() {
+        if (!invoke) {
+          renderRecentLibraries([]);
+          renderLibraryGrid(initialGridPhotos);
+          setLibraryState("welcome");
+          setMode("library");
+          return;
+        }
+
+        try {
+          const response = await invoke("resolve_launch_restore");
+          if (commandFailed(response)) {
+            renderRecentLibraries([]);
+            renderLibraryGrid(initialGridPhotos);
+            setLibraryState("welcome");
+            setMode("library");
+            setStatus(responseErrorMessage(response, "Launch restore failed."));
+            return;
+          }
+
+          const restore = response.data ?? {};
+          renderRecentLibraries(restore.session?.recents ?? []);
+          if (restore.state !== "library" || !restore.libraryRootPath) {
+            activeLibraryPath = "";
+            setLibraryState("welcome");
+            renderLibraryGrid(initialGridPhotos);
+            setMode("library");
+            setStatus(launchRestoreStatus(restore.fallbackReason));
+            return;
+          }
+
+          activeLibraryPath = restore.libraryRootPath;
+          pathInput.value = restore.libraryRootPath;
+          setLibraryState("open");
+          await loadLibraryGrid();
+          setMode(restore.resolvedMode || "library");
+          setStatus("Restored last library.");
+        } catch (error) {
+          renderRecentLibraries([]);
+          renderLibraryGrid(initialGridPhotos);
+          setLibraryState("welcome");
+          setMode("library");
+          setStatus(responseErrorMessage(error, "Launch restore failed."));
+        }
+      }
+
       async function openRecentLibrary(recent = firstAvailableRecent()) {
         if (!recent?.rootPath || recent.available === false) {
           setStatus("Recent library is unavailable.");
@@ -2000,8 +2061,7 @@
           setStatus(`${button.dataset.statusAction} are deferred for this local alpha.`);
         });
       });
-      loadAppSession();
-      renderLibraryGrid(initialGridPhotos);
+      resolveLaunchRestore();
     </script>
   </body>
 </html>

@@ -189,6 +189,29 @@ pub struct AppSessionWriteResult {
     pub bytes_written: u64,
 }
 
+/// Relaunch restore state after validating the last app-session library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppSessionRestoreStatus {
+    NoLastLibrary,
+    MissingLibrary,
+    MissingCatalog,
+    InvalidCatalog,
+    Restored,
+}
+
+/// Relaunch restore plan that does not create, migrate, import, or repair libraries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSessionRestorePlan {
+    pub session: AppSession,
+    pub warnings: Vec<AppSessionWarning>,
+    pub status: AppSessionRestoreStatus,
+    pub library_root_path: Option<PathBuf>,
+    pub catalog_path: Option<PathBuf>,
+    pub schema_version: Option<i64>,
+    pub requested_mode: AppSessionMode,
+    pub resolved_mode: AppSessionMode,
+}
+
 /// Local library session returned by core commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibrarySession {
@@ -545,6 +568,77 @@ pub fn record_app_session_recent_library(
     write_app_session(session_path, &session)?;
 
     Ok(AppSessionLoadResult { session, warnings })
+}
+
+/// Plan app relaunch restore from app-session state without opening a writable library.
+pub fn plan_app_session_restore(
+    session_path: impl AsRef<Path>,
+) -> Result<AppSessionRestorePlan, CoreError> {
+    let loaded = load_app_session(session_path)?;
+    let requested_mode = loaded.session.last_mode;
+    let Some(last_library_root_path) = loaded.session.last_library_root_path.clone() else {
+        return Ok(AppSessionRestorePlan {
+            session: loaded.session,
+            warnings: loaded.warnings,
+            status: AppSessionRestoreStatus::NoLastLibrary,
+            library_root_path: None,
+            catalog_path: None,
+            schema_version: None,
+            requested_mode,
+            resolved_mode: AppSessionMode::Library,
+        });
+    };
+
+    match silica_storage::inspect_local_library_for_restore(&last_library_root_path) {
+        Ok(library) => {
+            let status = if library.schema_version == silica_storage::CURRENT_SCHEMA_VERSION {
+                AppSessionRestoreStatus::Restored
+            } else {
+                AppSessionRestoreStatus::InvalidCatalog
+            };
+            let restored = status == AppSessionRestoreStatus::Restored;
+            Ok(AppSessionRestorePlan {
+                session: loaded.session,
+                warnings: loaded.warnings,
+                status,
+                library_root_path: restored.then_some(library.root_path),
+                catalog_path: restored.then_some(library.catalog_path),
+                schema_version: restored.then_some(library.schema_version),
+                requested_mode,
+                resolved_mode: AppSessionMode::Library,
+            })
+        }
+        Err(silica_storage::LibraryStorageError::NotDirectory(_)) => Ok(AppSessionRestorePlan {
+            session: loaded.session,
+            warnings: loaded.warnings,
+            status: AppSessionRestoreStatus::MissingLibrary,
+            library_root_path: None,
+            catalog_path: None,
+            schema_version: None,
+            requested_mode,
+            resolved_mode: AppSessionMode::Library,
+        }),
+        Err(silica_storage::LibraryStorageError::MissingCatalog(_)) => Ok(AppSessionRestorePlan {
+            session: loaded.session,
+            warnings: loaded.warnings,
+            status: AppSessionRestoreStatus::MissingCatalog,
+            library_root_path: None,
+            catalog_path: None,
+            schema_version: None,
+            requested_mode,
+            resolved_mode: AppSessionMode::Library,
+        }),
+        Err(_) => Ok(AppSessionRestorePlan {
+            session: loaded.session,
+            warnings: loaded.warnings,
+            status: AppSessionRestoreStatus::InvalidCatalog,
+            library_root_path: None,
+            catalog_path: None,
+            schema_version: None,
+            requested_mode,
+            resolved_mode: AppSessionMode::Library,
+        }),
+    }
 }
 
 /// Create a local SilicaRAW library through the core command boundary.
@@ -1756,6 +1850,88 @@ mod tests {
         );
         assert!(!workspace.join("catalog.db").exists());
         assert!(!workspace.join("sidecars").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_restore_plans_existing_library_without_support_dir_repair() {
+        let workspace = unique_library_root("app-session-restore-existing");
+        let session_path = workspace.join("app-session.json");
+        let library_root = workspace.join("restore-library");
+        create_library(&library_root).expect("create library");
+        std::fs::remove_dir_all(library_root.join("thumbnails")).expect("remove thumbnails");
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_root.clone());
+        session.last_mode = AppSessionMode::Develop;
+        write_app_session(&session_path, &session).expect("write app session");
+
+        let restored = plan_app_session_restore(&session_path).expect("plan restore");
+
+        assert_eq!(restored.status, AppSessionRestoreStatus::Restored);
+        assert_eq!(restored.requested_mode, AppSessionMode::Develop);
+        assert_eq!(restored.resolved_mode, AppSessionMode::Library);
+        assert_eq!(
+            restored.library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
+        assert_eq!(
+            restored.catalog_path.as_deref(),
+            Some(library_root.join("catalog.db").as_path())
+        );
+        assert!(!library_root.join("thumbnails").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_restore_falls_back_for_missing_library_or_catalog() {
+        let workspace = unique_library_root("app-session-restore-missing");
+        let session_path = workspace.join("app-session.json");
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(workspace.join("missing-library"));
+        session.last_mode = AppSessionMode::Export;
+        write_app_session(&session_path, &session).expect("write missing library app session");
+
+        let missing_library_restore =
+            plan_app_session_restore(&session_path).expect("plan missing library restore");
+        assert_eq!(
+            missing_library_restore.status,
+            AppSessionRestoreStatus::MissingLibrary
+        );
+        assert_eq!(
+            missing_library_restore.requested_mode,
+            AppSessionMode::Export
+        );
+        assert_eq!(
+            missing_library_restore.resolved_mode,
+            AppSessionMode::Library
+        );
+        assert!(missing_library_restore.library_root_path.is_none());
+
+        let library_without_catalog = workspace.join("library-without-catalog");
+        std::fs::create_dir_all(&library_without_catalog).expect("create library dir");
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_without_catalog);
+        write_app_session(&session_path, &session).expect("write missing catalog app session");
+
+        let missing_catalog_restore =
+            plan_app_session_restore(&session_path).expect("plan missing catalog restore");
+        assert_eq!(
+            missing_catalog_restore.status,
+            AppSessionRestoreStatus::MissingCatalog
+        );
+        assert_eq!(
+            missing_catalog_restore.requested_mode,
+            AppSessionMode::Library
+        );
+        assert_eq!(
+            missing_catalog_restore.resolved_mode,
+            AppSessionMode::Library
+        );
+        assert!(missing_catalog_restore.catalog_path.is_none());
 
         remove_library_root(&workspace);
     }

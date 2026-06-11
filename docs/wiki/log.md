@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Launch restore resolver added
+
+- Added Task 11.3.1 launch restore resolution from app-session state.
+- The resolver validates the last library and catalog without opening the normal migrate/repair path, and the UI applies Welcome vs Library state on boot without calling `open_library`.
+- Selected-photo restore and true Develop/Export mode restore remain Task 11.3.2.
+
 ## [2026-06-11] phase-11 | Welcome recent libraries connected
 
 - Added Task 11.2.2 Welcome recents rendering from real app-session data.

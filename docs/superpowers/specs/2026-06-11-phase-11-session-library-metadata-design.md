@@ -269,6 +269,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core app_session_restore`
   - `python3 scripts/harness/check-connected-runtime-smoke.py`
+- **Status:** Completed on 2026-06-11. Added a read-only launch restore resolver that validates the last library directory and `catalog.db` without creating support directories, migrating, importing, rescanning, sidecar-syncing, or backup/restore. Desktop exposes the decision through `resolve_launch_restore`, and the UI applies Welcome vs Library state on boot without calling `open_library`. Requested Develop/Export mode is preserved in the response but resolves to Library until Task 11.3.2 verifies selected-photo restore.
 
 ### Task 11.3.2: Selected Photo Restore
 

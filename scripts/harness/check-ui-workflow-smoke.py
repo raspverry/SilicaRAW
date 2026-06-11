@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "apps/desktop/static/index.html"
 
 ALLOWED_COMMANDS = {
+    "resolve_launch_restore",
     "read_app_session",
     "create_library",
     "open_library",
@@ -316,6 +317,10 @@ def main():
         "recentLibraryList",
         "renderRecentLibraries",
         "openRecentLibrary",
+        "resolveLaunchRestore",
+        "resolve_launch_restore",
+        "fallbackReason",
+        "resolvedMode",
         "read_app_session",
         "Unavailable",
         "No recent libraries yet",

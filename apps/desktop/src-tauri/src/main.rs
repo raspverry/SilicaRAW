@@ -84,6 +84,19 @@ enum DesktopCommandData {
         exists: bool,
         warnings: Vec<String>,
     },
+    LaunchRestore {
+        session_path: String,
+        session: DesktopAppSession,
+        warnings: Vec<String>,
+        status: String,
+        state: String,
+        fallback_reason: Option<String>,
+        requested_mode: String,
+        resolved_mode: String,
+        library_root_path: Option<String>,
+        catalog_path: Option<String>,
+        schema_version: Option<i64>,
+    },
     ImportSummary {
         folder_path: String,
         scanned_files: usize,
@@ -158,6 +171,7 @@ impl DesktopCommandData {
             Self::AppSession { .. } => "appSession",
             Self::AppSessionWrite { .. } => "appSessionWrite",
             Self::AppSessionInspection { .. } => "appSessionInspection",
+            Self::LaunchRestore { .. } => "launchRestore",
             Self::ImportSummary { .. } => "importSummary",
             Self::PhotoGrid { .. } => "photoGrid",
             Self::PhotoFlags { .. } => "photoFlags",
@@ -506,6 +520,18 @@ fn inspect_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
         Ok(session_path) => inspect_app_session_at_path(session_path),
         Err(error) => DesktopCommandResponse::error(
             "inspect_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn resolve_launch_restore(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => resolve_launch_restore_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "resolve_launch_restore",
             error,
             DesktopCommandContext::default(),
         ),
@@ -1019,6 +1045,47 @@ fn inspect_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse 
     }
 }
 
+fn resolve_launch_restore_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "resolve_launch_restore";
+    match silica_core::plan_app_session_restore(&session_path) {
+        Ok(plan) => {
+            let status = app_session_restore_status_string(plan.status).to_string();
+            let state = if plan.status == silica_core::AppSessionRestoreStatus::Restored {
+                "library".to_string()
+            } else {
+                "welcome".to_string()
+            };
+            let fallback_reason = if state == "welcome" {
+                Some(status.clone())
+            } else {
+                None
+            };
+            DesktopCommandResponse::ok(
+                command,
+                "Launch restore resolved.",
+                DesktopCommandData::LaunchRestore {
+                    session_path: session_path.display().to_string(),
+                    session: DesktopAppSession::from_core(plan.session),
+                    warnings: app_session_warning_strings(&plan.warnings),
+                    status,
+                    state,
+                    fallback_reason,
+                    requested_mode: app_session_mode_string(plan.requested_mode).to_string(),
+                    resolved_mode: app_session_mode_string(plan.resolved_mode).to_string(),
+                    library_root_path: plan
+                        .library_root_path
+                        .map(|path| path.display().to_string()),
+                    catalog_path: plan.catalog_path.map(|path| path.display().to_string()),
+                    schema_version: plan.schema_version,
+                },
+            )
+        }
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
 fn app_session_data(
     session_path: PathBuf,
     loaded: silica_core::AppSessionLoadResult,
@@ -1051,6 +1118,16 @@ fn app_session_warning_strings(warnings: &[silica_core::AppSessionWarning]) -> V
         })
         .map(str::to_string)
         .collect()
+}
+
+fn app_session_restore_status_string(status: silica_core::AppSessionRestoreStatus) -> &'static str {
+    match status {
+        silica_core::AppSessionRestoreStatus::NoLastLibrary => "noLastLibrary",
+        silica_core::AppSessionRestoreStatus::MissingLibrary => "missingLibrary",
+        silica_core::AppSessionRestoreStatus::MissingCatalog => "missingCatalog",
+        silica_core::AppSessionRestoreStatus::InvalidCatalog => "invalidCatalog",
+        silica_core::AppSessionRestoreStatus::Restored => "restored",
+    }
 }
 
 fn parse_desktop_app_session_mode(
@@ -1146,6 +1223,7 @@ fn main() {
             write_app_session,
             reset_app_session,
             inspect_app_session,
+            resolve_launch_restore,
             create_library,
             open_library,
             import_folder,
@@ -1293,6 +1371,65 @@ mod tests {
         assert_eq!(error.kind, "appSession");
         assert!(error.message.contains("invalid app session mode"));
         assert!(!session_path.exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_launch_restore_returns_existing_library_without_repair() {
+        let workspace = unique_library_root("desktop-app-session-restore");
+        let library_root = workspace.join("SilicaRAW Library");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(created.ok);
+
+        let mut session = super::DesktopAppSession::default();
+        session.last_library_root_path = Some(library_root.display().to_string());
+        session.last_mode = "develop".to_string();
+        let written = super::write_app_session_at_path(session_path.clone(), session);
+        assert!(written.ok);
+        std::fs::remove_dir_all(library_root.join("thumbnails")).expect("remove thumbnails");
+
+        let restored = super::resolve_launch_restore_at_path(session_path);
+
+        assert!(restored.ok);
+        assert_eq!(restored.command, "resolve_launch_restore");
+        match response_data(&restored) {
+            super::DesktopCommandData::LaunchRestore {
+                status,
+                state,
+                requested_mode,
+                resolved_mode,
+                library_root_path,
+                catalog_path,
+                ..
+            } => {
+                assert_eq!(status, "restored");
+                assert_eq!(state, "library");
+                assert_eq!(requested_mode, "develop");
+                assert_eq!(resolved_mode, "library");
+                assert_eq!(
+                    library_root_path.as_deref(),
+                    Some(library_root.display().to_string().as_str())
+                );
+                assert_eq!(
+                    catalog_path.as_deref(),
+                    Some(
+                        library_root
+                            .join("catalog.db")
+                            .display()
+                            .to_string()
+                            .as_str()
+                    )
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(!library_root.join("thumbnails").exists());
 
         remove_library_root(&workspace);
     }
