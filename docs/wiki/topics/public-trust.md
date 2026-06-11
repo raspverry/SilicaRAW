@@ -51,9 +51,9 @@ Unsigned developer-preview DMGs may be built for internal testing only. Gatekeep
 - No redistributable RAW/color fixture assets are committed as product fixtures.
 - Future model weights, sample assets, binary tools, or bundled runtime components need explicit source, license, rights, and hash records before they are committed or shipped.
 
-## Remaining Task 10.6 Work
+## Contribution and Security Package
 
-Task 10.6.2 still needs the public contribution guide, security policy, issue templates, PR template updates, and static checks that keep the trust package from regressing.
+Task 10.6.2 added the public contribution guide, security policy, issue templates, PR template trust checks, and static harness regression checks for this trust package.
 
 ## Notes for LLM Agents
 

@@ -1,12 +1,12 @@
 # Security Policy Draft
 
-## Supported Versions
+Status: superseded by [SECURITY.md](../SECURITY.md).
 
-SilicaRAW is pre-alpha. Security support policy will be finalized before public beta.
+This draft is retained only as historical planning context. Use the root security policy for current public reporting guidance.
 
-## Reporting a Vulnerability
+## Historical Notes
 
-Please do not open public issues for vulnerabilities involving:
+Security-sensitive areas include:
 
 - Plugin permission bypass
 - MCP permission bypass
@@ -16,13 +16,9 @@ Please do not open public issues for vulnerabilities involving:
 - Model/plugin downloads
 - Catalog corruption/data loss
 
-Use the private security reporting channel once configured.
-
 ## Security Principles
 
-- MCP off by default
-- Plugins permissioned
 - No original file mutation
 - No telemetry by default
 - No cloud upload by default
-- No arbitrary executable plugins in v1
+- Deferred MLX, MCP, plugin, auto-update, and distribution surfaces require explicit security review before implementation.
