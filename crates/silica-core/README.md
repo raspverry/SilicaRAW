@@ -16,4 +16,6 @@ Phase 5.1 adds a preview session API that reads a catalog photo, asks `silica-de
 
 Phase 5.3 adds exposure/contrast edit flow APIs. Draft preview updates validate an edited graph and return a render request without writing to SQLite; commit/release persists the final active edit graph through `silica-storage`.
 
-Core delegates SQLite and filesystem details to `silica-storage`. It does not decode RAW files, render pixels, write sidecars, expose plugins/MCP, or run MLX behavior.
+Core delegates SQLite, filesystem details, and sidecar JSON validation to `silica-storage`. It does not decode RAW files, render pixels, write sidecars next to originals, expose plugins/MCP, run MLX behavior, or perform automatic sidecar sync.
+
+Task 10.3 adds thin sidecar workflow wrappers for explicit sidecar write/read. Core does not duplicate sidecar path or schema logic.

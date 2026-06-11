@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Sidecar v1 foundation added
+
+- Added Task 10.3 sidecar v1 read/write foundation for library-local sidecars.
+- Validated sidecar and nested edit graph payloads while keeping `photo_flags` catalog-authoritative during normal app operation.
+- Preserved original-file safety and kept automatic sync, rebuild, backup/restore, conflict UI, RAW/color proof, and export proof out of scope.
+
 ## [2026-06-11] phase-10 | Evidence and recovery design added
 
 - Added the Phase 10 evidence and recovery design gate for Task 10.3 through Task 10.6.

@@ -14,6 +14,8 @@ pub const CRATE_NAME: &str = "silica-core";
 
 pub use silica_storage::LibraryPhotoGridItem;
 pub use silica_storage::PhotoFlags;
+pub use silica_storage::SidecarWriteResult;
+pub use silica_storage::ValidatedSidecar;
 
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
@@ -329,6 +331,27 @@ pub fn get_photo_flags(
     photo_id: &str,
 ) -> Result<Option<silica_storage::PhotoFlags>, CoreError> {
     silica_storage::get_photo_flags(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Write a library-local sidecar through the core command boundary.
+pub fn write_photo_sidecar(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    app_version: &str,
+) -> Result<Option<SidecarWriteResult>, CoreError> {
+    match silica_storage::write_photo_sidecar(library_root_path, photo_id, app_version) {
+        Ok(result) => Ok(Some(result)),
+        Err(silica_storage::LibraryStorageError::MissingPhoto(_)) => Ok(None),
+        Err(error) => Err(CoreError::from(error)),
+    }
+}
+
+/// Read a validated library-local sidecar through the core command boundary.
+pub fn read_photo_sidecar(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<ValidatedSidecar>, CoreError> {
+    silica_storage::read_photo_sidecar(library_root_path, photo_id).map_err(CoreError::from)
 }
 
 /// Build the preview session for one catalog photo.
@@ -1259,6 +1282,56 @@ mod tests {
             )
             .expect("exported flag");
         assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn writes_and_reads_photo_sidecar_through_core() {
+        let workspace = unique_library_root("core-sidecar");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+        set_photo_flags(
+            &created.root_path,
+            photo_id.clone(),
+            2,
+            true,
+            false,
+            Some("blue".to_string()),
+        )
+        .expect("set flags");
+
+        let written = write_photo_sidecar(&created.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write sidecar")
+            .expect("sidecar write result");
+        assert_eq!(written.photo_id, photo_id);
+        assert!(written.sidecar_path.is_file());
+        assert_original_hash(&jpeg_file, &original_hash, "core sidecar write");
+
+        let read = read_photo_sidecar(&created.root_path, &photo_id)
+            .expect("read sidecar")
+            .expect("sidecar exists");
+        assert_eq!(read.photo_id, photo_id);
+        assert_eq!(read.flags.rating, 2);
+        assert_eq!(read.flags.color_label.as_deref(), Some("blue"));
+        assert_original_hash(&jpeg_file, &original_hash, "core sidecar read");
 
         remove_library_root(&workspace);
     }

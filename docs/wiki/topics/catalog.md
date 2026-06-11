@@ -21,6 +21,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Phase 4.3 adds non-recursive folder import scanning through `silica-catalog` and `silica-storage`.
 - Phase 4.4 adds catalog-authoritative rating, picked, rejected, and color label persistence through `photo_flags`.
 - Phase 5.3 adds active edit graph persistence through `edit_states` on exposure/contrast commit.
+- Task 10.3 adds explicit library-local sidecar write/read behavior through `silica-storage`; `photo_flags` remains the live in-app authority until a later explicit sync task changes that policy.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -42,6 +43,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Restart tests cover flag persistence after reopening the local library.
 - Exposure/contrast draft preview updates do not write SQLite.
 - Exposure/contrast commit/release writes the active edit graph to `edit_states`.
+- Sidecar write/read validates sidecar and nested edit graph JSON, mirrors rating/picked/rejected/color-label state only, writes under library `sidecars/`, and updates `sidecar_status` after successful writes.
 
 ## Not Implemented Yet
 
@@ -49,8 +51,9 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Camera metadata extraction.
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
-- Sidecar read/write and conflict handling.
-- Sidecar flag mirroring.
+- Automatic sidecar synchronization.
+- Catalog rebuild from sidecars.
+- Sidecar conflict handling and conflict UI.
 - Full edit history and undo/redo persistence.
 - Cache clear safety.
 - Broad catalog UI screens and visual culling controls.
@@ -67,4 +70,4 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 
 ## Notes for LLM Agents
 
-Do not treat folder import, flag persistence, or active edit graph commits as RAW decoding, thumbnail generation, sidecar writing, cache behavior, or library grid behavior. `photo_flags` is the live in-app authority until sidecar mirroring is implemented by an explicit later task.
+Do not treat folder import, flag persistence, active edit graph commits, or explicit sidecar writes as RAW decoding, thumbnail generation, automatic sidecar sync, cache behavior, or library grid behavior. `photo_flags` is the live in-app authority until sidecar synchronization is implemented by an explicit later task.
