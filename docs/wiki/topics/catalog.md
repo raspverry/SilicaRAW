@@ -112,8 +112,32 @@ Task 11.7 starts with a storage-shape and dependency gate before extraction:
 - `silica-storage::get_photo_metadata`, the core wrapper, and desktop `get_photo_metadata` command expose stored metadata only. A missing metadata row reports nullable extraction fields as `unknown`; a present metadata row with `NULL` values reports them as `unavailable`; stored values report `known`.
 - Metadata query APIs use the read-only catalog query path and must not touch original files during inspector display.
 
+## Import Error and Recursive Import Policy
+
+Task 11.9 requires reviewable import errors before recursive import exists:
+
+- Folder import remains non-recursive by default. Recursive import must be an explicit user-selected option and must never be enabled silently by restore, relaunch, recents, or folder drag/open behavior.
+- Originals remain referenced by path only. Import scanning must not copy, move, rewrite, hash-whole-file by default, write sidecars next to originals, or modify source folders.
+- Browsing must continue after recoverable import issues. A scan may return accepted catalog rows plus a reviewable issue list in the same summary.
+- Unsupported files are reviewable entries, not crashes and not fake photo metadata. Existing unsupported catalog rows remain visible in the Library grid.
+- Recoverable issue categories for the current and recursive paths:
+  - `unsupported_file`: file extension is outside the accepted alpha photo list.
+  - `hidden_entry_skipped`: dotfile or dot-directory skipped by policy.
+  - `package_directory_skipped`: macOS package-like directory skipped by policy.
+  - `symlink_entry_skipped`: symbolic link skipped by policy.
+  - `directory_read_failed`: a directory cannot be read, usually permissions or removal during scan.
+  - `entry_metadata_failed`: a directory entry exists but file metadata cannot be read.
+  - `max_depth_exceeded`: recursive scan reached the alpha depth limit.
+- Symlink directories are not followed. Symlink files are also skipped and reported as `symlink_entry_skipped` so recursive scans cannot loop or escape the selected tree.
+- Hidden files and hidden directories are skipped and reviewable. Later preferences may change this only with an explicit task and UI control.
+- macOS package directories are skipped and reviewable. The alpha treats `.app`, `.photoslibrary`, `.aplibrary`, `.lrdata`, `.library`, and other package-like directories as containers, not folders to descend into.
+- Recursive import alpha max depth is `20` directory levels below the selected root. Entries past the limit are not scanned and are reported as `max_depth_exceeded`.
+- Permission and file-system race errors are recoverable at entry/directory granularity. The scan continues with siblings when possible.
+
 ## Not Implemented Yet
 
+- Structured import error model.
+- Import error review UI.
 - Recursive folder scanning.
 - Camera metadata extraction.
 - Thumbnail or preview generation during import.

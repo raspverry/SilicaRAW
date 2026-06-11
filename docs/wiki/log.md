@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Import error policy added
+
+- Added Task 11.9.1 import error and recursive import policy.
+- Recursive import remains explicit and defaults off.
+- Recoverable issues, unsupported files, symlinks, hidden entries, packages, max depth, and permission errors now have documented review behavior.
+
 ## [2026-06-11] phase-11 | Metadata-backed filter added
 
 - Added Task 11.8.2 `has_dimensions` grid filter backed by stored metadata.

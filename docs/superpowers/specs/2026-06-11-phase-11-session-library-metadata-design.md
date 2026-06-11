@@ -596,6 +596,7 @@ Demo/Validation:
   - Originals remain referenced by path only.
 - **Validation:**
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. The catalog wiki and post-alpha roadmap now define import issue categories, non-recursive default behavior, opt-in recursive behavior, symlink skip policy, hidden/package/max-depth/permission handling, and the rule that originals remain referenced by path only.
 
 ### Task 11.9.2: Structured Import Error Model
 
