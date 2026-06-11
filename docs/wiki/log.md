@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Backup and restore policy added
+
+- Added the Task 10.5.1 backup/WAL/checkpoint/restore policy topic.
+- Recorded checkpoint-before-copy backup behavior, durable and disposable recovery boundaries, restore target rules, and migration failure handling.
+- Added a recovery-policy harness guard while keeping backup archive creation, restore execution, conflict UI, and original-file mutation out of scope.
+
 ## [2026-06-11] phase-10 | Sidecar rebuild dry-run added
 
 - Added Task 10.4 catalog rebuild dry-run reports from library-local sidecars.

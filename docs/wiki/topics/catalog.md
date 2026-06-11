@@ -23,6 +23,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Phase 5.3 adds active edit graph persistence through `edit_states` on exposure/contrast commit.
 - Task 10.3 adds explicit library-local sidecar write/read behavior through `silica-storage`; `photo_flags` remains the live in-app authority until a later explicit sync task changes that policy.
 - Task 10.4 adds a catalog rebuild dry-run report from library-local sidecars. It reports what would happen and does not mutate `photos`, `photo_flags`, `edit_states`, or `sidecar_status`.
+- Task 10.5.1 records backup/WAL/checkpoint/restore policy before backup or restore code is added.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -67,6 +68,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [Data Safety](data-safety.md)
+- [Backup and Restore](backup-restore.md)
 - [`silica-catalog` README](../../../crates/silica-catalog/README.md)
 - [`silica-storage` README](../../../crates/silica-storage/README.md)
 

@@ -25,6 +25,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Phase 6.2 adds a core workflow hash QA that verifies one original fixture hash stays unchanged across import by reference, culling flags, preview, draft edit, committed edit, JPEG sRGB export, simulated cache-directory clearing, and library reopen.
 - Task 10.3 writes sidecars only under the library `sidecars/` directory, validates sidecar and nested edit graph JSON, updates `sidecar_status` only after a successful write, and verifies original referenced files remain unchanged.
 - Task 10.4 adds a rebuild dry-run report that reads library-local sidecars as untrusted input and reports rebuild actions/issues without mutating the live catalog or original files.
+- Task 10.5.1 records the [Backup and Restore](backup-restore.md) policy: checkpoint-before-copy, no original referenced photo files in backups, disposable cache exclusion, rollback-aware restore targets, and explicit migration failure behavior.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -39,6 +40,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Edit graph serialization.
 - Sidecar read/write safety. Task 10.3 covers library-local paths, schema-aware validation, status update after success, malformed/mismatched read rejection, and original hash preservation.
 - Sidecar rebuild dry-run safety. Task 10.4 covers deterministic output, catalog non-mutation, precedence from `sidecar.flags` to `edit_graph.metadata` to defaults, and conflict/malformed-sidecar reporting.
+- Recovery policy safety. Task 10.5.1 covers backup boundaries, WAL checkpoint policy, restore target rules, disposable cache exclusion, and migration failure behavior.
 - Cache clear safety. Phase 6.2 simulates the currently scoped cache safety surface by deleting disposable library cache directories because no product cache-clear command exists yet.
 
 ## Links
@@ -49,6 +51,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - [Agent Rules](../../../codex/AGENT_RULES.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [Catalog](catalog.md)
+- [Backup and Restore](backup-restore.md)
 
 ## Notes for LLM Agents
 
