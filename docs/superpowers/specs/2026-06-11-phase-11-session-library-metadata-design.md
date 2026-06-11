@@ -361,7 +361,7 @@ Demo/Validation:
   - No arbitrary SQL, column names, or raw predicates can cross from UI to storage.
 - **Validation:**
   - `cargo test -p silica-catalog library_query`
-- **Status:** Completed on 2026-06-11. Added typed `silica-catalog` request/response contracts for bounded offset library queries, whitelisted sort and filter enums, deterministic order fields with explicit tie breakers, and a cursor-pagination deferral marker. Storage indexes and query execution remain Task 11.5.2 and Task 11.5.3.
+- **Status:** Completed on 2026-06-11. Added typed `silica-catalog` request/response contracts for bounded offset library queries, whitelisted sort and filter enums, deterministic order fields with explicit tie breakers, and a cursor-pagination deferral marker. Storage indexes and storage/core query execution were later completed by Task 11.5.2 and Task 11.5.3.
 
 ### Task 11.5.2: Query Index and Migration Plan
 
@@ -375,7 +375,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage query_index`
   - `cargo test -p silica-catalog`
-- **Status:** Completed on 2026-06-11. Raised the catalog schema contract to version 3, added a normalized `photos.file_type` migration/backfill for `jpeg`, `raw`, and `unsupported`, and added the accepted paged-query indexes for imported-time sorting, filename/path sorting, file-type filtering, and rating sorting. Storage/core query execution remains Task 11.5.3.
+- **Status:** Completed on 2026-06-11. Raised the catalog schema contract to version 3, added a normalized `photos.file_type` migration/backfill for `jpeg`, `raw`, and `unsupported`, and added the accepted paged-query indexes for imported-time sorting, filename/path sorting, file-type filtering, and rating sorting. Storage/core query execution was later completed by Task 11.5.3.
 
 ### Task 11.5.3: Storage and Core Paged Query API
 
@@ -390,6 +390,7 @@ Demo/Validation:
   - Query does not mutate originals, catalog state, sidecars, caches, or thumbnails.
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core library_query`
+- **Status:** Completed on 2026-06-11. Added read-only `silica-storage` paged library queries with bounded rows, total-count metadata, deterministic empty pages, normalized `photos.file_type` filtering, fixed enum-backed sort clauses, and a `silica-core` wrapper that does not hydrate thumbnails or mutate cache/catalog state. Desktop command wiring remains Task 11.5.4.
 
 ### Task 11.5.4: Desktop Paged Grid Command
 

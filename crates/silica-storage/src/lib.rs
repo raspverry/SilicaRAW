@@ -16,12 +16,15 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
-pub use silica_catalog::PhotoFlags;
+use rusqlite::{named_params, params, Connection, OpenFlags, OptionalExtension};
 use silica_catalog::{
     is_supported_photo_extension, CatalogFlagError, ImportCandidate,
     ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
     ALPHA_MAX_RATING,
+};
+pub use silica_catalog::{
+    LibraryQueryFileType, LibraryQueryFilters, LibraryQueryPage, LibraryQueryRequest,
+    LibraryQuerySort, PhotoFlags,
 };
 
 /// Stable crate name used by scaffold verification.
@@ -330,6 +333,7 @@ pub enum LibraryStorageError {
     EditGraph(silica_edit::EditGraphValidationError),
     MissingCatalog(PathBuf),
     MissingPhoto(String),
+    CatalogSchemaVersion { expected: i64, found: i64 },
     NotDirectory(PathBuf),
     InvalidPath(PathBuf),
     InvalidSidecarPhotoId(String),
@@ -349,6 +353,10 @@ impl fmt::Display for LibraryStorageError {
                 write!(formatter, "missing catalog database at {}", path.display())
             }
             Self::MissingPhoto(photo_id) => write!(formatter, "missing catalog photo: {photo_id}"),
+            Self::CatalogSchemaVersion { expected, found } => write!(
+                formatter,
+                "catalog schema version mismatch: expected {expected}, found {found}"
+            ),
             Self::NotDirectory(path) => write!(formatter, "not a directory: {}", path.display()),
             Self::InvalidPath(path) => {
                 write!(formatter, "path is not valid UTF-8: {}", path.display())
@@ -376,6 +384,7 @@ impl Error for LibraryStorageError {
             Self::EditGraph(error) => Some(error),
             Self::MissingCatalog(_)
             | Self::MissingPhoto(_)
+            | Self::CatalogSchemaVersion { .. }
             | Self::NotDirectory(_)
             | Self::InvalidPath(_)
             | Self::InvalidSidecarPhotoId(_)
@@ -846,6 +855,54 @@ pub fn list_library_photos(
 
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(LibraryStorageError::from)
+}
+
+/// Query imported catalog photos by bounded page without mutating catalog state.
+pub fn query_library_photos(
+    library_root_path: impl AsRef<Path>,
+    request: LibraryQueryRequest,
+) -> Result<LibraryQueryPage<LibraryPhotoGridItem>, LibraryStorageError> {
+    let request = LibraryQueryRequest::new(
+        request.offset,
+        request.limit,
+        request.sort,
+        request.filters.clone(),
+    );
+    let (_library, connection) = open_existing_library_for_read_only_query(library_root_path)?;
+    let filter = LibraryQuerySqlFilter::from(&request.filters);
+    let order_clause = library_query_order_clause(request.sort);
+
+    let total_count = query_library_photo_count(&connection, &filter)?;
+    let limit = i64::from(request.limit);
+    let offset = i64::try_from(request.offset).unwrap_or(i64::MAX);
+    let query_sql =
+        format!("{LIBRARY_QUERY_SELECT_SQL}\n{order_clause}\nLIMIT :limit OFFSET :offset");
+    let mut statement = connection.prepare(&query_sql)?;
+    let rows = statement.query_map(
+        named_params! {
+            ":thumbnail_cache_type": THUMBNAIL_CACHE_TYPE,
+            ":library_id": LOCAL_LIBRARY_ID,
+            ":min_rating": filter.min_rating,
+            ":picked": filter.picked,
+            ":rejected": filter.rejected,
+            ":file_type": filter.file_type,
+            ":search": filter.search.as_deref(),
+            ":limit": limit,
+            ":offset": offset,
+        },
+        library_photo_grid_item_from_row,
+    )?;
+    let items = rows.collect::<Result<Vec<_>, _>>()?;
+    let has_next_page = request.offset.saturating_add(u64::from(request.limit)) < total_count;
+
+    Ok(LibraryQueryPage {
+        items,
+        offset: request.offset,
+        limit: request.limit,
+        total_count,
+        has_next_page,
+        order_fields: request.order_fields(),
+    })
 }
 
 /// Record a disposable JPEG thumbnail cache file for a catalog photo.
@@ -2440,6 +2497,45 @@ fn open_existing_library_for_read(
     })
 }
 
+fn open_existing_library_for_read_only_query(
+    root_path: impl AsRef<Path>,
+) -> Result<(LocalLibrary, Connection), LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection.busy_timeout(Duration::from_secs(5))?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    let schema_version = connection.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if schema_version != CURRENT_SCHEMA_VERSION {
+        return Err(LibraryStorageError::CatalogSchemaVersion {
+            expected: CURRENT_SCHEMA_VERSION,
+            found: schema_version,
+        });
+    }
+
+    Ok((
+        LocalLibrary {
+            root_path: root_path.to_path_buf(),
+            catalog_path,
+            schema_version,
+        },
+        connection,
+    ))
+}
+
 fn upsert_local_library_row(
     connection: &Connection,
     root_path: &Path,
@@ -3038,6 +3134,130 @@ CREATE INDEX IF NOT EXISTS idx_photo_flags_rating_photo_id
   ON photo_flags(rating DESC, photo_id ASC);
 "#;
 
+const LIBRARY_QUERY_COUNT_SQL: &str = r#"
+SELECT COUNT(*)
+FROM photos
+LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+WHERE photos.library_id = :library_id
+  AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
+  AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
+  AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
+  AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :search IS NULL
+    OR lower(photos.file_name) LIKE :search ESCAPE '\'
+    OR lower(photos.path) LIKE :search ESCAPE '\'
+  )
+"#;
+
+const LIBRARY_QUERY_SELECT_SQL: &str = r#"
+SELECT
+  photos.id,
+  photos.file_name,
+  photos.path,
+  photos.missing,
+  photos.unsupported,
+  photo_flags.rating,
+  photo_flags.picked,
+  photo_flags.rejected,
+  photo_flags.color_label,
+  thumbnail_cache.path,
+  thumbnail_cache.cache_key
+FROM photos
+LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+LEFT JOIN cache_records AS thumbnail_cache
+  ON thumbnail_cache.photo_id = photos.id
+  AND thumbnail_cache.cache_type = :thumbnail_cache_type
+WHERE photos.library_id = :library_id
+  AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
+  AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
+  AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
+  AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :search IS NULL
+    OR lower(photos.file_name) LIKE :search ESCAPE '\'
+    OR lower(photos.path) LIKE :search ESCAPE '\'
+  )
+"#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LibraryQuerySqlFilter {
+    min_rating: Option<i64>,
+    picked: Option<i64>,
+    rejected: Option<i64>,
+    file_type: Option<&'static str>,
+    search: Option<String>,
+}
+
+impl From<&LibraryQueryFilters> for LibraryQuerySqlFilter {
+    fn from(filters: &LibraryQueryFilters) -> Self {
+        Self {
+            min_rating: filters.min_rating.map(i64::from),
+            picked: filters.picked.map(bool_to_sql),
+            rejected: filters.rejected.map(bool_to_sql),
+            file_type: filters.file_type.map(library_query_file_type_value),
+            search: library_query_search_pattern(&filters.search),
+        }
+    }
+}
+
+fn query_library_photo_count(
+    connection: &Connection,
+    filter: &LibraryQuerySqlFilter,
+) -> rusqlite::Result<u64> {
+    let count: i64 = connection.query_row(
+        LIBRARY_QUERY_COUNT_SQL,
+        named_params! {
+            ":library_id": LOCAL_LIBRARY_ID,
+            ":min_rating": filter.min_rating,
+            ":picked": filter.picked,
+            ":rejected": filter.rejected,
+            ":file_type": filter.file_type,
+            ":search": filter.search.as_deref(),
+        },
+        |row| row.get(0),
+    )?;
+
+    Ok(u64::try_from(count).unwrap_or(0))
+}
+
+fn library_query_order_clause(sort: LibraryQuerySort) -> &'static str {
+    match sort {
+        LibraryQuerySort::ImportedAtDesc => "ORDER BY photos.imported_at DESC, photos.id ASC",
+        LibraryQuerySort::FileNameAsc => {
+            "ORDER BY photos.file_name ASC, photos.path ASC, photos.id ASC"
+        }
+        LibraryQuerySort::RatingDesc => {
+            "ORDER BY COALESCE(photo_flags.rating, 0) DESC, photos.id ASC"
+        }
+    }
+}
+
+fn library_query_file_type_value(file_type: LibraryQueryFileType) -> &'static str {
+    match file_type {
+        LibraryQueryFileType::Jpeg => "jpeg",
+        LibraryQueryFileType::Raw => "raw",
+        LibraryQueryFileType::Unsupported => "unsupported",
+    }
+}
+
+fn library_query_search_pattern(search: &str) -> Option<String> {
+    let search = search.trim();
+    if search.is_empty() {
+        return None;
+    }
+
+    let mut pattern = String::from("%");
+    for character in search.to_ascii_lowercase().chars() {
+        if matches!(character, '\\' | '%' | '_') {
+            pattern.push('\\');
+        }
+        pattern.push(character);
+    }
+    pattern.push('%');
+    Some(pattern)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3206,6 +3426,90 @@ mod tests {
                 .expect("file type");
             assert_eq!(actual, expected);
         }
+    }
+
+    #[test]
+    fn library_query_returns_bounded_pages_and_normalized_filters() {
+        let workspace = unique_library_root("library-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("portrait.jpg");
+        let raw_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&jpeg_file, b"jpeg candidate").expect("write jpeg");
+        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+        std::fs::write(&unsupported_file, b"unsupported").expect("write unsupported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let raw_id = stable_catalog_id("photo", &raw_file.display().to_string());
+        set_photo_flags(&library.root_path, raw_id.clone(), 4, true, false, None)
+            .expect("set raw flags");
+
+        let first_page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                0,
+                2,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query first page");
+
+        assert_eq!(first_page.offset, 0);
+        assert_eq!(first_page.limit, 2);
+        assert_eq!(first_page.total_count, 3);
+        assert!(first_page.has_next_page);
+        assert_eq!(
+            first_page.order_fields,
+            LibraryQuerySort::FileNameAsc.order_fields()
+        );
+        assert_eq!(first_page.items.len(), 2);
+        assert_eq!(first_page.items[0].file_name, "notes.txt");
+        assert_eq!(first_page.items[1].file_name, "portrait.jpg");
+
+        let raw_page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                0,
+                10,
+                LibraryQuerySort::RatingDesc,
+                LibraryQueryFilters {
+                    min_rating: Some(4),
+                    picked: Some(true),
+                    rejected: Some(false),
+                    file_type: Some(LibraryQueryFileType::Raw),
+                    search: "sample".to_string(),
+                },
+            ),
+        )
+        .expect("query filtered page");
+        assert_eq!(raw_page.total_count, 1);
+        assert_eq!(raw_page.items.len(), 1);
+        assert_eq!(raw_page.items[0].photo_id, raw_id);
+        assert_eq!(raw_page.items[0].rating, 4);
+        assert!(raw_page.items[0].picked);
+        assert!(!raw_page.has_next_page);
+
+        let empty_page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                99,
+                10,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query empty page");
+        assert!(empty_page.items.is_empty());
+        assert_eq!(empty_page.offset, 99);
+        assert_eq!(empty_page.total_count, 3);
+        assert!(!empty_page.has_next_page);
+
+        remove_library_root(&workspace);
     }
 
     #[test]

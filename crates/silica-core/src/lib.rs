@@ -20,6 +20,11 @@ pub use silica_storage::CatalogRebuildDryRunIssueKind;
 pub use silica_storage::CatalogRebuildDryRunReport;
 pub use silica_storage::CatalogRebuildFlagSource;
 pub use silica_storage::LibraryPhotoGridItem;
+pub use silica_storage::LibraryQueryFileType;
+pub use silica_storage::LibraryQueryFilters;
+pub use silica_storage::LibraryQueryPage;
+pub use silica_storage::LibraryQueryRequest;
+pub use silica_storage::LibraryQuerySort;
 pub use silica_storage::PhotoFlags;
 pub use silica_storage::SidecarWriteResult;
 pub use silica_storage::ValidatedSidecar;
@@ -832,6 +837,14 @@ pub fn list_library_photos(
     let library_root_path = library_root_path.as_ref();
     ensure_jpeg_thumbnail_cache(library_root_path)?;
     silica_storage::list_library_photos(library_root_path).map_err(CoreError::from)
+}
+
+/// Query imported catalog photos by bounded page without cache hydration.
+pub fn query_library_photos(
+    library_root_path: impl AsRef<Path>,
+    request: silica_storage::LibraryQueryRequest,
+) -> Result<silica_storage::LibraryQueryPage<silica_storage::LibraryPhotoGridItem>, CoreError> {
+    silica_storage::query_library_photos(library_root_path, request).map_err(CoreError::from)
 }
 
 /// Persist photo culling and label flags through the core command boundary.
@@ -2288,6 +2301,45 @@ mod tests {
         assert!(rows.iter().any(|row| {
             row["fileName"] == "notes.txt" && row["fileType"] == "TXT" && row["unsupported"] == true
         }));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn library_query_returns_page_without_cache_hydration() {
+        let workspace = unique_library_root("core-library-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+        let raw_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+
+        let page = query_library_photos(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                0,
+                1,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query page through core");
+
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.total_count, 2);
+        assert!(page.has_next_page);
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let cache_records: i64 = connection
+            .query_row("SELECT COUNT(*) FROM cache_records", [], |row| row.get(0))
+            .expect("count cache records");
+        assert_eq!(cache_records, 0);
 
         remove_library_root(&workspace);
     }

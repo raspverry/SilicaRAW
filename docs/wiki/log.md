@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Storage/core paged query added
+
+- Added Task 11.5.3 read-only paged library query APIs in `silica-storage` and `silica-core`.
+- Query responses include bounded rows, total-count metadata, deterministic order fields, and deterministic empty pages.
+- Desktop command wiring remains Task 11.5.4.
+
 ## [2026-06-11] phase-11 | Paged query indexes added
 
 - Added Task 11.5.2 catalog schema version 3 for paged library queries.
 - Storage migration 3 adds normalized `photos.file_type` values and query indexes for accepted sort/filter fields.
-- Storage/core paged query execution remains Task 11.5.3.
+- At the time, storage/core paged query execution remained Task 11.5.3.
 
 ## [2026-06-11] phase-11 | Paged query contract added
 
