@@ -254,7 +254,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core`
   - Original hash checks.
-- **Status:** In progress as of 2026-06-11. Task 11.7.1 completed the metadata schema/dependency gate: normalized metadata fields are documented, file-system metadata remains on `photos`, and no EXIF parser dependency is added yet. Task 11.7.2 recorded the no-open/restore-backfill policy and JPEG-only dimension extraction policy without implying RAW decode support. Migration, query API, and UI display remain Task 11.7.3 through Task 11.8.
+- **Status:** Completed on 2026-06-11. Task 11.7.1 completed the metadata schema/dependency gate: normalized metadata fields are documented, file-system metadata remains on `photos`, and no EXIF parser dependency is added yet. Task 11.7.2 recorded the no-open/restore-backfill policy and JPEG-only dimension extraction policy without implying RAW decode support. Task 11.7.3 added the metadata migration and JPEG/JPG dimension extraction without mutating originals. Task 11.7.4 exposed typed metadata queries with explicit `known`, `unknown`, and `unavailable` field states.
 
 ### Task 11.8: Metadata Inspector, Search, and Filters
 
@@ -266,6 +266,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Search/filter behavior never implies unavailable metadata exists.
   - Empty and missing states are clear.
 - **Validation:** UI workflow smoke.
+- **Status:** Completed on 2026-06-11. Task 11.8.1 wired stored metadata into the shared Library/Loupe inspector with honest unavailable states, and Task 11.8.2 added the stored `has_dimensions` metadata filter without implying camera/lens parser support.
 
 ### Task 11.9: Reviewable Import Errors and Recursive Import
 
