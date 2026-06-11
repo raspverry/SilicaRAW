@@ -103,7 +103,9 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - `sidecar.flags` mirrors rating, picked, rejected, and color label only.
   - Catalog-only `edited` and `exported` flags are not written into `sidecar.flags`.
   - Original photo files remain unchanged.
+- **Status:** Completed on 2026-06-11. Added explicit library-local sidecar v1 read/write behavior for catalog photo state, active/default edit graph payloads, portable rating/picked/rejected/color-label flags, nested edit graph validation, atomic file writes, validated reads, and `sidecar_status` updates after successful writes. This does not add automatic sidecar sync, catalog rebuild, backup/restore, conflict UI, RAW decoding, color proof, or export proof.
 - **Validation:**
+  - `python3 scripts/harness/check-sidecar-contract.py`
   - `cargo test -p silica-storage -p silica-core`
   - `scripts/harness/check.sh`
 
