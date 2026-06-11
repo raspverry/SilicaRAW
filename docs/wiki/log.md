@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Evidence and recovery design added
+
+- Added the Phase 10 evidence and recovery design gate for Task 10.3 through Task 10.6.
+- Defined sidecar, rebuild dry-run, backup/restore, and public OSS trust boundaries before implementation.
+- Recorded RAW, color, export, auto-sync, next-to-original sidecar, Homebrew, auto-update, MLX, plugin, and MCP exclusions.
+
 ## [2026-06-11] phase-10 | Golden image tolerance policy added
 
 - Added the Task 10.2 golden image and tolerance policy baseline.

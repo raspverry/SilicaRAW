@@ -97,6 +97,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `schemas/sidecar.schema.json`, `docs/wiki/topics/catalog.md`
 - **Description:** Write and read validated sidecars for edit graph state and portable culling flags.
 - **Dependencies:** Task 10.2
+- **Design Gate:** [Phase 10 Evidence and Recovery Design](../../superpowers/specs/2026-06-11-phase-10-evidence-recovery-design.md) defines the Task 10.3 through Task 10.6 boundaries before sidecar implementation begins.
 - **Acceptance Criteria:**
   - Sidecars validate against `schemas/sidecar.schema.json`.
   - `sidecar.flags` mirrors rating, picked, rejected, and color label only.
@@ -111,6 +112,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `checklists/QA_CHECKLIST.md`
 - **Description:** Add a deterministic dry-run that reports how a catalog would rebuild from sidecars without mutating the live catalog.
 - **Dependencies:** Task 10.3
+- **Design Gate:** [Phase 10 Evidence and Recovery Design](../../superpowers/specs/2026-06-11-phase-10-evidence-recovery-design.md) requires dry-run rebuild semantics before backup/restore work.
 - **Acceptance Criteria:**
   - Rebuild precedence follows `sidecar.flags`, then `edit_graph.metadata`, then defaults.
   - Conflicts are reported, not silently overwritten.
@@ -123,6 +125,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-storage`, `docs/wiki/topics/data-safety.md`, `checklists/QA_CHECKLIST.md`
 - **Description:** Define and test backup/restore behavior for catalogs, sidecars, edit states, export records, and migrations.
 - **Dependencies:** Task 10.4
+- **Design Gate:** [Phase 10 Evidence and Recovery Design](../../superpowers/specs/2026-06-11-phase-10-evidence-recovery-design.md) separates durable recovery data from disposable caches and original referenced files.
 - **Acceptance Criteria:**
   - Catalog backup does not include disposable caches.
   - Restore preserves edit states, flags, sidecar status, and export history.
@@ -136,6 +139,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `LICENSE`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.github/`, `docs/DEPENDENCIES.md`
 - **Description:** Complete the public open-source trust package before inviting broad contributors or public beta users.
 - **Dependencies:** Task 10.5
+- **Design Gate:** [Phase 10 Evidence and Recovery Design](../../superpowers/specs/2026-06-11-phase-10-evidence-recovery-design.md) defines which public claims remain allowed or forbidden after the recovery layer is implemented.
 - **Acceptance Criteria:**
   - Final project license is selected.
   - Dependency/license inventory is current.
