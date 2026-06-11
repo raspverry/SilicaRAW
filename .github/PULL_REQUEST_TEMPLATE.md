@@ -26,6 +26,14 @@
 - [ ] Updates `docs/DEPENDENCIES.md` for every new dependency.
 - [ ] Updates docs/wiki decisions or roadmap when behavior or scope changes.
 
+## Public Trust
+
+- [ ] Does not claim production readiness.
+- [ ] Does not claim broad RAW support without fixture-backed evidence.
+- [ ] Does not claim color correctness without tagged fixtures and tolerance checks.
+- [ ] Does not treat unsigned developer-preview DMGs as user-ready releases.
+- [ ] Keeps deferred MLX, MCP, plugin, Homebrew, auto-update, cloud sync, telemetry, and Mac App Store surfaces clearly marked as deferred unless explicitly scoped.
+
 ## Release Blocker Check
 
 - [ ] No app launch failure.

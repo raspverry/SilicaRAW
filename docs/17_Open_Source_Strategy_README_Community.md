@@ -84,4 +84,4 @@ Before public beta:
 
 GO WITH CONDITIONS.
 
-Task 10.6.1 selected the MIT License and added public trust boundaries. Still need CONTRIBUTING, SECURITY, issue templates, screenshots/GIFs, and sample asset manifest before broad public beta.
+Task 10.6 selected the MIT License, added public trust boundaries, and added CONTRIBUTING, SECURITY, issue templates, PR trust checks, and static trust-package verification. Still need screenshots/GIFs and sample asset manifest before broad public beta.

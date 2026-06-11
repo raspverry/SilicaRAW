@@ -64,7 +64,8 @@ The public, LLM-readable project wiki starts at [`docs/wiki/index.md`](docs/wiki
 - License: [MIT](LICENSE).
 - Dependency and third-party license inventory: [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
 - Public trust boundaries: [`docs/wiki/topics/public-trust.md`](docs/wiki/topics/public-trust.md).
-- Security reporting policy and contribution templates are scheduled for Task 10.6.2.
+- Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Security policy: [`SECURITY.md`](SECURITY.md).
 
 ## Known Limitations
 

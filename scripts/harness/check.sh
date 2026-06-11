@@ -33,6 +33,9 @@ python3 scripts/harness/check-sidecar-contract.py
 echo "==> Checking recovery policy"
 python3 scripts/harness/check-recovery-policy.py
 
+echo "==> Checking public trust package"
+python3 scripts/harness/check-public-trust-package.py
+
 echo "==> Checking legal QA fixtures and installed-app preflight"
 python3 scripts/harness/check-qa-fixtures.py
 
