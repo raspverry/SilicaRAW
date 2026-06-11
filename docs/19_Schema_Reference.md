@@ -13,6 +13,8 @@ schemas/edit_graph.schema.json
 schemas/edit_graph.example.json
 schemas/sidecar.schema.json
 schemas/sidecar.example.json
+schemas/fixture_manifest.schema.json
+schemas/fixture_manifest.example.json
 schemas/plugin_manifest.schema.json
 schemas/model_manifest.schema.json
 schemas/mcp_tool_manifest.schema.json
@@ -29,6 +31,24 @@ schemas/mcp_tool_manifest.schema.json
 6. Model manifests must include license/source/hash/preprocessing/output metadata.
 7. MCP tools must declare permission, side effects, confirmation behavior, and undo behavior.
 8. Experimental data belongs under `extensions`.
+```
+
+## Fixture Manifest v1
+
+`schemas/fixture_manifest.schema.json` is the authoritative contract for post-alpha RAW/color fixture manifests.
+
+`schemas/fixture_manifest.example.json` is an example-only external-reference manifest. It does not identify real local sample files and must not be treated as a committed fixture corpus.
+
+The fixture manifest records legal RAW/color fixture provenance, licensing, integrity, expected app behavior, and future probe expectations. It does not prove RAW support or color correctness.
+
+Required fixture guardrails:
+
+```txt
+- RAW fixture classes A-E record source, license, privacy, integrity, media metadata, expected app state, expected probe state, RAW metadata, and a blocked decode gate.
+- RAW decode gates remain blocked until fixture-backed Core Image probe work records evidence in the later RAW proof phase.
+- Color Class F records tagged sRGB, tagged Display P3, and untagged raster expectations with profile policy metadata.
+- User photos and unlicensed samples must not be committed.
+- Fixture paths must be relative POSIX paths without absolute prefixes, dot segments, backslashes, or double slashes.
 ```
 
 ## Edit Graph v0.1 Required Sections

@@ -2,7 +2,7 @@
 title: Color Management
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-11
 source_of_truth: docs/09_Color_Management_Specification.md
 ---
 
@@ -41,6 +41,20 @@ untagged JPEG
 ```
 
 The repository currently contains app icons and UI mockup PNGs, not color-management fixtures.
+
+## Task 10.1 Color Class F Contract
+
+Color Class F covers tagged sRGB, tagged Display P3, and untagged raster fixture expectations. Hashes, profile declarations, and manifest entries do not prove color correctness. Color correctness claims remain blocked until fixture-backed proof and tolerance policy exist.
+
+Task 10.1 records the future fixture contract only:
+
+```txt
+tagged sRGB raster -> embedded ICC expected, sRGB input expectation
+tagged Display P3 raster -> embedded ICC expected, Display P3 input expectation
+untagged raster -> no embedded ICC expected, assume_srgb policy
+```
+
+These entries do not prove color correctness because no fixture-backed transform output, tolerance policy, or visual review evidence exists yet.
 
 ## Color-Dependent Tags
 
