@@ -239,6 +239,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core recent`
   - `cargo test -p silica-desktop recent`
+- **Status:** Completed on 2026-06-11. Added app-session recent recording after successful core library sessions, with dedupe, a documented cap, last-library update, and desktop create/open integration. Failed create/open paths do not update the app-session file. Welcome rendering remains Task 11.2.2.
 
 ### Task 11.2.2: Welcome Recent Libraries UI
 

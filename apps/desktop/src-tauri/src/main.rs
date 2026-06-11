@@ -509,14 +509,47 @@ fn inspect_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
 }
 
 #[tauri::command]
-fn create_library(path: String) -> DesktopCommandResponse {
+fn create_library(app: tauri::AppHandle, path: String) -> DesktopCommandResponse {
+    let session_path = match resolve_app_session_path(&app) {
+        Ok(session_path) => Some(session_path),
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                "create_library",
+                error,
+                DesktopCommandContext {
+                    library_path: Some(path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    create_library_at_path(path, session_path)
+}
+
+fn create_library_at_path(path: String, session_path: Option<PathBuf>) -> DesktopCommandResponse {
     let command = "create_library";
     match silica_core::create_library(PathBuf::from(&path)) {
-        Ok(session) => DesktopCommandResponse::ok(
-            command,
-            format!("Library created: {}", session.root_path.display()),
-            library_session_data(session),
-        ),
+        Ok(session) => {
+            if let Some(session_path) = session_path {
+                if let Err(error) =
+                    silica_core::record_app_session_recent_library(&session_path, &session)
+                {
+                    return DesktopCommandResponse::error(
+                        command,
+                        error,
+                        DesktopCommandContext {
+                            library_path: Some(path),
+                            ..DesktopCommandContext::default()
+                        },
+                    );
+                }
+            }
+            DesktopCommandResponse::ok(
+                command,
+                format!("Library created: {}", session.root_path.display()),
+                library_session_data(session),
+            )
+        }
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -529,14 +562,47 @@ fn create_library(path: String) -> DesktopCommandResponse {
 }
 
 #[tauri::command]
-fn open_library(path: String) -> DesktopCommandResponse {
+fn open_library(app: tauri::AppHandle, path: String) -> DesktopCommandResponse {
+    let session_path = match resolve_app_session_path(&app) {
+        Ok(session_path) => Some(session_path),
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                "open_library",
+                error,
+                DesktopCommandContext {
+                    library_path: Some(path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    open_library_at_path(path, session_path)
+}
+
+fn open_library_at_path(path: String, session_path: Option<PathBuf>) -> DesktopCommandResponse {
     let command = "open_library";
     match silica_core::open_library(PathBuf::from(&path)) {
-        Ok(session) => DesktopCommandResponse::ok(
-            command,
-            format!("Library opened: {}", session.root_path.display()),
-            library_session_data(session),
-        ),
+        Ok(session) => {
+            if let Some(session_path) = session_path {
+                if let Err(error) =
+                    silica_core::record_app_session_recent_library(&session_path, &session)
+                {
+                    return DesktopCommandResponse::error(
+                        command,
+                        error,
+                        DesktopCommandContext {
+                            library_path: Some(path),
+                            ..DesktopCommandContext::default()
+                        },
+                    );
+                }
+            }
+            DesktopCommandResponse::ok(
+                command,
+                format!("Library opened: {}", session.root_path.display()),
+                library_session_data(session),
+            )
+        }
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -1222,11 +1288,76 @@ mod tests {
     }
 
     #[test]
+    fn desktop_create_open_records_real_recent_after_success() {
+        let workspace = unique_library_root("desktop-real-recents");
+        let library_root = workspace.join("SilicaRAW Library");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(created.ok);
+
+        let loaded = super::read_app_session_at_path(session_path.clone());
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(
+                    session.last_library_root_path.as_deref(),
+                    Some(library_root.display().to_string().as_str())
+                );
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let opened = super::open_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(opened.ok);
+        let loaded = super::read_app_session_at_path(session_path.clone());
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let failed = super::open_library_at_path(
+            workspace.join("Missing Library").display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(!failed.ok);
+        let loaded = super::read_app_session_at_path(session_path);
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn desktop_commands_create_and_open_library() {
         let root = unique_library_root("desktop");
 
-        let created = super::create_library(root.display().to_string());
-        let opened = super::open_library(root.display().to_string());
+        let created = super::create_library_at_path(root.display().to_string(), None);
+        let opened = super::open_library_at_path(root.display().to_string(), None);
 
         assert!(created.ok);
         assert!(created.error.is_none());
@@ -1246,7 +1377,7 @@ mod tests {
             response_data(&created).catalog_path()
         );
 
-        let missing = super::open_library(root.join("missing").display().to_string());
+        let missing = super::open_library_at_path(root.join("missing").display().to_string(), None);
         assert!(!missing.ok);
         assert_eq!(missing.command, "open_library");
         let error = missing.error.as_ref().expect("structured error");
@@ -1730,10 +1861,10 @@ mod tests {
             unsupported_original.clone(),
         ]);
 
-        let created = super::create_library(library_root.display().to_string());
+        let created = super::create_library_at_path(library_root.display().to_string(), None);
         assert!(created.ok, "create library failed: {created:?}");
         assert_eq!(response_data(&created).kind(), "librarySession");
-        let opened = super::open_library(library_root.display().to_string());
+        let opened = super::open_library_at_path(library_root.display().to_string(), None);
         assert!(opened.ok, "open library failed: {opened:?}");
         assert_originals_unchanged(&originals, "create/open library");
 
@@ -1962,7 +2093,7 @@ mod tests {
         }
         assert_originals_unchanged(&originals, "cache clear");
 
-        let reopened = super::open_library(library_root.display().to_string());
+        let reopened = super::open_library_at_path(library_root.display().to_string(), None);
         assert!(reopened.ok, "reopen library failed: {reopened:?}");
         let restored_flags =
             super::get_photo_flags(library_root.display().to_string(), photo_id.clone());

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Real recent recording added
+
+- Added Task 11.2.1 app-session recent recording after successful library create/open.
+- Recent entries dedupe, cap at the documented limit, update last-library state, and remain outside library catalogs and sidecars.
+- Welcome recents rendering and unavailable-path UI remain Task 11.2.2.
+
 ## [2026-06-11] phase-11 | Desktop app session commands added
 
 - Added Task 11.1.3 desktop app-session command boundary.

@@ -41,6 +41,8 @@ pub const DEFAULT_APP_SESSION_THUMBNAIL_SIZE: u16 = 168;
 pub const MIN_APP_SESSION_THUMBNAIL_SIZE: u16 = 132;
 /// Maximum accepted Library grid thumbnail size preference in pixels.
 pub const MAX_APP_SESSION_THUMBNAIL_SIZE: u16 = 220;
+/// Maximum number of recent libraries retained in app-level session state.
+pub const APP_SESSION_RECENTS_LIMIT: usize = 10;
 
 /// Last active desktop mode persisted outside every library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -509,6 +511,40 @@ pub fn write_app_session(
         session_path: session_path.to_path_buf(),
         bytes_written: bytes.len() as u64,
     })
+}
+
+/// Record a successful library create/open in app-level desktop session state.
+pub fn record_app_session_recent_library(
+    session_path: impl AsRef<Path>,
+    library: &LibrarySession,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    let recent_key = app_session_recent_key(&library.root_path);
+    let opened_at = current_timestamp_string();
+    session.last_library_root_path = Some(library.root_path.clone());
+    session
+        .recents
+        .retain(|recent| app_session_recent_key(&recent.root_path) != recent_key);
+    session.recents.insert(
+        0,
+        AppRecentLibrary {
+            root_path: library.root_path.clone(),
+            display_name: app_session_library_display_name(&library.root_path),
+            last_opened_at: opened_at,
+        },
+    );
+    session.recents.truncate(APP_SESSION_RECENTS_LIMIT);
+
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
 }
 
 /// Create a local SilicaRAW library through the core command boundary.
@@ -1406,6 +1442,22 @@ fn parse_thumbnail_size(value: Option<&serde_json::Value>, invalid_values: &mut 
     ) as u16
 }
 
+fn app_session_recent_key(root_path: &Path) -> String {
+    std::fs::canonicalize(root_path)
+        .unwrap_or_else(|_| root_path.to_path_buf())
+        .display()
+        .to_string()
+}
+
+fn app_session_library_display_name(root_path: &Path) -> String {
+    root_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("SilicaRAW Library")
+        .to_string()
+}
+
 fn is_jpeg_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
@@ -1635,6 +1687,75 @@ mod tests {
         assert_eq!(per_library.last_mode, AppSessionMode::Library);
         assert_eq!(per_library.selected_photo_id.as_deref(), Some("photo-2"));
         assert_eq!(loaded.warnings, vec![AppSessionWarning::InvalidValues]);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_records_recents_with_dedupe_and_cap() {
+        let workspace = unique_library_root("app-session-recents");
+        let session_path = workspace.join("app-session.json");
+
+        for index in 0..12 {
+            let root_path = workspace.join(format!("Library {index}"));
+            let session = LibrarySession {
+                root_path: root_path.clone(),
+                catalog_path: root_path.join("catalog.db"),
+                schema_version: 1,
+            };
+            record_app_session_recent_library(&session_path, &session).expect("record app recent");
+        }
+
+        let loaded = load_app_session(&session_path).expect("load recents");
+        assert!(loaded.warnings.is_empty());
+        assert_eq!(loaded.session.recents.len(), APP_SESSION_RECENTS_LIMIT);
+        assert_eq!(
+            loaded.session.last_library_root_path.as_deref(),
+            Some(workspace.join("Library 11").as_path())
+        );
+        assert_eq!(
+            loaded
+                .session
+                .recents
+                .first()
+                .map(|recent| recent.root_path.as_path()),
+            Some(workspace.join("Library 11").as_path())
+        );
+        assert!(!loaded
+            .session
+            .recents
+            .iter()
+            .any(|recent| recent.root_path == workspace.join("Library 0")));
+
+        let repeated = LibrarySession {
+            root_path: workspace.join("Library 5"),
+            catalog_path: workspace.join("Library 5").join("catalog.db"),
+            schema_version: 1,
+        };
+        record_app_session_recent_library(&session_path, &repeated)
+            .expect("record repeated recent");
+        let loaded = load_app_session(&session_path).expect("reload recents");
+
+        assert_eq!(loaded.session.recents.len(), APP_SESSION_RECENTS_LIMIT);
+        assert_eq!(
+            loaded
+                .session
+                .recents
+                .first()
+                .map(|recent| recent.root_path.as_path()),
+            Some(workspace.join("Library 5").as_path())
+        );
+        assert_eq!(
+            loaded
+                .session
+                .recents
+                .iter()
+                .filter(|recent| recent.root_path == workspace.join("Library 5"))
+                .count(),
+            1
+        );
+        assert!(!workspace.join("catalog.db").exists());
+        assert!(!workspace.join("sidecars").exists());
 
         remove_library_root(&workspace);
     }
