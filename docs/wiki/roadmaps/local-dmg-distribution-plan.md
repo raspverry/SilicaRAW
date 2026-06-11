@@ -804,6 +804,8 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
   - GitHub Secrets include certificate, certificate password, keychain password, and notarization credentials.
 - **Validation:** CI can import certificate into a temporary keychain.
 
+**Prerequisite Audit Status:** Blocked on 2026-06-11. The local keychain currently has an `Apple Development` identity, but no `Developer ID Application` identity. `gh secret list` reports no required repository signing/notarization secrets. Added [Signing and Notarization Prep](../../../checklists/SIGNING_NOTARIZATION_PREP.md) and `scripts/harness/check-signing-prereqs.py` to make the blocker repeatable without exposing secret values.
+
 ### Task 7.2: Configure Hardened Runtime and Entitlements
 
 - **Location:** Tauri/macOS bundle config
@@ -928,7 +930,8 @@ Exact names may change during implementation, but the release workflow should ne
 - `APPLE_CERTIFICATE_PASSWORD`
 - `KEYCHAIN_PASSWORD`
 - `APPLE_SIGNING_IDENTITY`
-- `APPLE_ID` and app-specific password, or App Store Connect API credentials
+- `APPLE_ID`
+- `APPLE_PASSWORD` as the Apple ID app-specific password, or App Store Connect API credentials
 - `APPLE_TEAM_ID`
 
 Do not store signing certificates or private keys directly in the repository.

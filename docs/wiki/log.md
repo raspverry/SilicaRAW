@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-7 | Signing prerequisite audit added
+
+- Checked local code signing identities and GitHub repository secret names for Phase 7.1.
+- Recorded that signing/notarization is blocked: the local keychain has an Apple Development identity, no Developer ID Application identity, and no required GitHub signing secrets.
+- Added a signing/notarization prep checklist and repeatable preflight script that records secret names only, never secret values.
+
 ## [2026-06-11] phase-6 | Local build-Mac DMG smoke recorded
 
 - Built a developer unsigned DMG locally and verified its SHA256, mount behavior, mounted app presence, installed app hash match, installed-app preflight, and GUI launch from `/Applications`.
