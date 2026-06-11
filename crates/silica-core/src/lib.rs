@@ -199,6 +199,14 @@ pub enum AppSessionRestoreStatus {
     Restored,
 }
 
+/// Selected-photo restore outcome for the last library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppSessionSelectedPhotoStatus {
+    None,
+    Missing,
+    Restored,
+}
+
 /// Relaunch restore plan that does not create, migrate, import, or repair libraries.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppSessionRestorePlan {
@@ -208,6 +216,8 @@ pub struct AppSessionRestorePlan {
     pub library_root_path: Option<PathBuf>,
     pub catalog_path: Option<PathBuf>,
     pub schema_version: Option<i64>,
+    pub selected_photo_id: Option<String>,
+    pub selected_photo_status: AppSessionSelectedPhotoStatus,
     pub requested_mode: AppSessionMode,
     pub resolved_mode: AppSessionMode,
 }
@@ -584,6 +594,8 @@ pub fn plan_app_session_restore(
             library_root_path: None,
             catalog_path: None,
             schema_version: None,
+            selected_photo_id: None,
+            selected_photo_status: AppSessionSelectedPhotoStatus::None,
             requested_mode,
             resolved_mode: AppSessionMode::Library,
         });
@@ -597,6 +609,47 @@ pub fn plan_app_session_restore(
                 AppSessionRestoreStatus::InvalidCatalog
             };
             let restored = status == AppSessionRestoreStatus::Restored;
+            let per_library = restored
+                .then(|| app_session_recent_key(&library.root_path))
+                .and_then(|key| loaded.session.per_library.get(&key));
+            let requested_mode = per_library
+                .map(|session| session.last_mode)
+                .unwrap_or(requested_mode);
+            let selected_candidate =
+                per_library.and_then(|session| session.selected_photo_id.clone());
+            let (selected_photo_id, selected_photo_status) =
+                if let Some(photo_id) = selected_candidate {
+                    match silica_storage::catalog_photo_exists_for_restore(
+                        &library.root_path,
+                        &photo_id,
+                    ) {
+                        Ok(true) => (Some(photo_id), AppSessionSelectedPhotoStatus::Restored),
+                        Ok(false) => (None, AppSessionSelectedPhotoStatus::Missing),
+                        Err(_) => {
+                            return Ok(AppSessionRestorePlan {
+                                session: loaded.session,
+                                warnings: loaded.warnings,
+                                status: AppSessionRestoreStatus::InvalidCatalog,
+                                library_root_path: None,
+                                catalog_path: None,
+                                schema_version: None,
+                                selected_photo_id: None,
+                                selected_photo_status: AppSessionSelectedPhotoStatus::None,
+                                requested_mode,
+                                resolved_mode: AppSessionMode::Library,
+                            })
+                        }
+                    }
+                } else {
+                    (None, AppSessionSelectedPhotoStatus::None)
+                };
+            let resolved_mode = if requested_mode == AppSessionMode::Library
+                || selected_photo_status == AppSessionSelectedPhotoStatus::Restored
+            {
+                requested_mode
+            } else {
+                AppSessionMode::Library
+            };
             Ok(AppSessionRestorePlan {
                 session: loaded.session,
                 warnings: loaded.warnings,
@@ -604,8 +657,10 @@ pub fn plan_app_session_restore(
                 library_root_path: restored.then_some(library.root_path),
                 catalog_path: restored.then_some(library.catalog_path),
                 schema_version: restored.then_some(library.schema_version),
+                selected_photo_id,
+                selected_photo_status,
                 requested_mode,
-                resolved_mode: AppSessionMode::Library,
+                resolved_mode,
             })
         }
         Err(silica_storage::LibraryStorageError::NotDirectory(_)) => Ok(AppSessionRestorePlan {
@@ -615,6 +670,8 @@ pub fn plan_app_session_restore(
             library_root_path: None,
             catalog_path: None,
             schema_version: None,
+            selected_photo_id: None,
+            selected_photo_status: AppSessionSelectedPhotoStatus::None,
             requested_mode,
             resolved_mode: AppSessionMode::Library,
         }),
@@ -625,6 +682,8 @@ pub fn plan_app_session_restore(
             library_root_path: None,
             catalog_path: None,
             schema_version: None,
+            selected_photo_id: None,
+            selected_photo_status: AppSessionSelectedPhotoStatus::None,
             requested_mode,
             resolved_mode: AppSessionMode::Library,
         }),
@@ -635,10 +694,46 @@ pub fn plan_app_session_restore(
             library_root_path: None,
             catalog_path: None,
             schema_version: None,
+            selected_photo_id: None,
+            selected_photo_status: AppSessionSelectedPhotoStatus::None,
             requested_mode,
             resolved_mode: AppSessionMode::Library,
         }),
     }
+}
+
+/// Record the active library selection and mode in app-level desktop session state.
+pub fn record_app_session_library_state(
+    session_path: impl AsRef<Path>,
+    library_root_path: impl AsRef<Path>,
+    selected_photo_id: Option<String>,
+    mode: AppSessionMode,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    let library_root_path = library_root_path.as_ref().to_path_buf();
+    let key = app_session_recent_key(&library_root_path);
+    let opened_at = current_timestamp_string();
+    session.last_library_root_path = Some(library_root_path);
+    session.last_mode = mode;
+    session.per_library.insert(
+        key,
+        AppPerLibrarySession {
+            selected_photo_id,
+            last_mode: mode,
+            last_opened_at: opened_at,
+        },
+    );
+
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
 }
 
 /// Create a local SilicaRAW library through the core command boundary.
@@ -1932,6 +2027,68 @@ mod tests {
             AppSessionMode::Library
         );
         assert!(missing_catalog_restore.catalog_path.is_none());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn selected_photo_restore_keeps_existing_photo_and_clears_missing_photo() {
+        let workspace = unique_library_root("selected-photo-restore");
+        let session_path = workspace.join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let photo_id = list_library_photos(&created.root_path)
+            .expect("list photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.jpg")
+            .map(|photo| photo.photo_id)
+            .expect("imported photo id");
+
+        record_app_session_library_state(
+            &session_path,
+            &created.root_path,
+            Some(photo_id.clone()),
+            AppSessionMode::Develop,
+        )
+        .expect("record selected photo");
+
+        let restored = plan_app_session_restore(&session_path).expect("restore selected photo");
+        assert_eq!(restored.status, AppSessionRestoreStatus::Restored);
+        assert_eq!(
+            restored.selected_photo_status,
+            AppSessionSelectedPhotoStatus::Restored
+        );
+        assert_eq!(
+            restored.selected_photo_id.as_deref(),
+            Some(photo_id.as_str())
+        );
+        assert_eq!(restored.requested_mode, AppSessionMode::Develop);
+        assert_eq!(restored.resolved_mode, AppSessionMode::Develop);
+
+        record_app_session_library_state(
+            &session_path,
+            &created.root_path,
+            Some("missing-photo".to_string()),
+            AppSessionMode::Export,
+        )
+        .expect("record missing selected photo");
+
+        let restored = plan_app_session_restore(&session_path).expect("restore missing selection");
+        assert_eq!(restored.status, AppSessionRestoreStatus::Restored);
+        assert_eq!(
+            restored.selected_photo_status,
+            AppSessionSelectedPhotoStatus::Missing
+        );
+        assert!(restored.selected_photo_id.is_none());
+        assert_eq!(restored.requested_mode, AppSessionMode::Export);
+        assert_eq!(restored.resolved_mode, AppSessionMode::Library);
 
         remove_library_root(&workspace);
     }

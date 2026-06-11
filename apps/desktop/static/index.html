@@ -564,6 +564,21 @@
         return !response || response.ok === false;
       }
 
+      async function recordActiveSessionState(mode = appFrame.dataset.activeMode || "library") {
+        if (!invoke || !activeLibraryPath) {
+          return;
+        }
+        try {
+          await invoke("record_app_session_selection", {
+            libraryPath: activeLibraryPath,
+            selectedPhotoId: selectedPhotoId || null,
+            mode,
+          });
+        } catch (_error) {
+          // Session restore is helpful state, not a blocker for the editor workflow.
+        }
+      }
+
       function recentDisplayName(recent) {
         return recent?.displayName || recent?.rootPath?.split(/[\\/]/).filter(Boolean).pop() || "Local Library";
       }
@@ -665,7 +680,7 @@
           renderRecentLibraries([]);
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
-          setMode("library");
+          setMode("library", { persist: false });
           return;
         }
 
@@ -675,7 +690,7 @@
             renderRecentLibraries([]);
             renderLibraryGrid(initialGridPhotos);
             setLibraryState("welcome");
-            setMode("library");
+            setMode("library", { persist: false });
             setStatus(responseErrorMessage(response, "Launch restore failed."));
             return;
           }
@@ -686,7 +701,7 @@
             activeLibraryPath = "";
             setLibraryState("welcome");
             renderLibraryGrid(initialGridPhotos);
-            setMode("library");
+            setMode("library", { persist: false });
             setStatus(launchRestoreStatus(restore.fallbackReason));
             return;
           }
@@ -694,14 +709,22 @@
           activeLibraryPath = restore.libraryRootPath;
           pathInput.value = restore.libraryRootPath;
           setLibraryState("open");
-          await loadLibraryGrid();
-          setMode(restore.resolvedMode || "library");
-          setStatus("Restored last library.");
+          await loadLibraryGrid({
+            preferredPhotoId: restore.selectedPhotoId || "",
+            allowDefaultSelection: restore.selectedPhotoStatus !== "missing",
+            persistSelection: false,
+          });
+          setMode(restore.resolvedMode || "library", { persist: false });
+          setStatus(
+            restore.selectedPhotoStatus === "missing"
+              ? "Restored last library. Previous photo is unavailable."
+              : "Restored last library.",
+          );
         } catch (error) {
           renderRecentLibraries([]);
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
-          setMode("library");
+          setMode("library", { persist: false });
           setStatus(responseErrorMessage(error, "Launch restore failed."));
         }
       }
@@ -1116,10 +1139,16 @@
         exportPreviewCard.prepend(image);
       }
 
-      function renderLibraryGrid(photos) {
-        libraryPhotos = photos;
+      function renderLibraryGrid(photos, options = {}) {
+        libraryPhotos = Array.isArray(photos) ? photos : [];
+        const preferredPhotoId = options.preferredPhotoId || "";
+        const preferredExists = libraryPhotos.some((photo) => photo.photoId === preferredPhotoId);
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
-        selectedPhotoId = selectedExists ? selectedPhotoId : libraryPhotos[0]?.photoId ?? "";
+        if (preferredExists) {
+          selectedPhotoId = preferredPhotoId;
+        } else if (!selectedExists) {
+          selectedPhotoId = options.allowDefaultSelection === false ? "" : libraryPhotos[0]?.photoId ?? "";
+        }
 
         libraryPhotoCount.textContent = `${libraryPhotos.length} photos`;
         allPhotosCount.textContent = String(libraryPhotos.length);
@@ -1137,7 +1166,7 @@
         libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
         renderLoupeFilmstrip();
         renderDevelopFilmstrip();
-        selectPhoto(selectedPhotoId);
+        selectPhoto(selectedPhotoId, { persist: options.persistSelection === true });
       }
 
       function createPhotoCard(photo, index) {
@@ -1178,7 +1207,7 @@
         return card;
       }
 
-      function selectPhoto(photoId) {
+      function selectPhoto(photoId, options = {}) {
         selectedPhotoId = photoId;
         const selected = selectedPhoto();
         Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
@@ -1202,6 +1231,9 @@
         }
         if (appFrame.dataset.activeMode === "develop") {
           readPersistedDevelopState(selected).then(() => previewDevelopEdit());
+        }
+        if (options.persist !== false) {
+          void recordActiveSessionState();
         }
       }
 
@@ -1722,9 +1754,9 @@
         setStatus("Library grid loaded.");
       }
 
-      async function loadLibraryGrid() {
+      async function loadLibraryGrid(options = {}) {
         if (!activeLibraryPath || !invoke) {
-          renderLibraryGrid(libraryPhotos);
+          renderLibraryGrid(libraryPhotos, options);
           return;
         }
 
@@ -1737,7 +1769,7 @@
             setStatus(responseErrorMessage(response, "Library grid failed to load."));
             return;
           }
-          renderLibraryGrid(response.data?.photos ?? []);
+          renderLibraryGrid(response.data?.photos ?? [], options);
           setStatus(responseMessage(response, "Library grid loaded."));
         } catch (error) {
           gridLoadingState.hidden = true;
@@ -1839,7 +1871,7 @@
         }
       }
 
-      function setMode(mode) {
+      function setMode(mode, options = {}) {
         appFrame.dataset.activeMode = mode;
         modeButtons.forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
@@ -1856,6 +1888,9 @@
         }
         if (mode === "export") {
           openExportDialog();
+        }
+        if (options.persist !== false) {
+          void recordActiveSessionState(mode);
         }
       }
 

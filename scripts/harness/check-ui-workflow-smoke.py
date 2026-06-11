@@ -10,6 +10,7 @@ INDEX = ROOT / "apps/desktop/static/index.html"
 
 ALLOWED_COMMANDS = {
     "resolve_launch_restore",
+    "record_app_session_selection",
     "read_app_session",
     "create_library",
     "open_library",
@@ -321,6 +322,9 @@ def main():
         "resolve_launch_restore",
         "fallbackReason",
         "resolvedMode",
+        "selectedPhotoStatus",
+        "recordActiveSessionState",
+        "record_app_session_selection",
         "read_app_session",
         "Unavailable",
         "No recent libraries yet",

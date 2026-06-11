@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Selected photo restore added
+
+- Added Task 11.3.2 selected-photo restore from app-session state.
+- User-driven selection and mode changes now record to app-session JSON, and launch restore validates the saved photo id through a read-only catalog probe before applying it.
+- Missing selected photos clear selection and resolve mode back to Library without crashing or opening write-side workflows.
+
 ## [2026-06-11] phase-11 | Launch restore resolver added
 
 - Added Task 11.3.1 launch restore resolution from app-session state.

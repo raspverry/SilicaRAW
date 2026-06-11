@@ -283,6 +283,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core selected_photo_restore`
   - connected runtime smoke update
+- **Status:** Completed on 2026-06-11. Added read-only selected-photo validation for launch restore, app-session selection/mode recording through `record_app_session_selection`, and UI restore wiring that applies the saved selected photo before mode restore. Existing selected photos restore, missing selected photos clear selection and resolve mode back to Library, and launch restore still avoids normal open/migrate/write-side workflows.
 
 ## Sprint 2: Layout Preferences
 

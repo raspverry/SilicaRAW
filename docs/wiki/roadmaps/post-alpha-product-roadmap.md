@@ -200,7 +200,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Missing library or missing photo does not crash the app.
   - Static/demo rows remain absent.
 - **Validation:** Connected runtime smoke.
-- **Status:** In progress on 2026-06-11. Task 11.3.1 now resolves launch restore read-only, restoring the last valid library shell state without invoking create/open migrations or write-side workflows. Selected-photo restore and true Develop/Export mode restore remain Task 11.3.2 because they require verifying the saved selected photo still exists.
+- **Status:** Completed on 2026-06-11. Task 11.3 now resolves launch restore read-only, restores the last valid library shell state, records user-driven selected-photo and mode state in app-session JSON, restores the saved selected photo only when the catalog row still exists, and falls back to Library when selection is missing. Layout preference persistence remains Task 11.4.
 
 ### Task 11.4: Persist Workspace Layout Preferences
 

@@ -501,6 +501,33 @@ pub fn inspect_local_library_for_restore(
     })
 }
 
+/// Check catalog photo existence for relaunch restore without migrations or repair.
+pub fn catalog_photo_exists_for_restore(
+    root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<bool, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection
+        .query_row(
+            "SELECT 1 FROM photos WHERE id = ?1 LIMIT 1",
+            [photo_id],
+            |_| Ok(()),
+        )
+        .optional()
+        .map(|result| result.is_some())
+        .map_err(LibraryStorageError::from)
+}
+
 /// Resolve the library-local sidecar path for a catalog photo id.
 pub fn sidecar_path_for_photo(
     library_root_path: impl AsRef<Path>,

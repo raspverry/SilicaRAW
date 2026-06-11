@@ -93,6 +93,8 @@ enum DesktopCommandData {
         fallback_reason: Option<String>,
         requested_mode: String,
         resolved_mode: String,
+        selected_photo_id: Option<String>,
+        selected_photo_status: String,
         library_root_path: Option<String>,
         catalog_path: Option<String>,
         schema_version: Option<i64>,
@@ -532,6 +534,28 @@ fn resolve_launch_restore(app: tauri::AppHandle) -> DesktopCommandResponse {
         Ok(session_path) => resolve_launch_restore_at_path(session_path),
         Err(error) => DesktopCommandResponse::error(
             "resolve_launch_restore",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn record_app_session_selection(
+    app: tauri::AppHandle,
+    library_path: String,
+    selected_photo_id: Option<String>,
+    mode: String,
+) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => record_app_session_selection_at_path(
+            session_path,
+            library_path,
+            selected_photo_id,
+            mode,
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            "record_app_session_selection",
             error,
             DesktopCommandContext::default(),
         ),
@@ -1072,6 +1096,11 @@ fn resolve_launch_restore_at_path(session_path: PathBuf) -> DesktopCommandRespon
                     fallback_reason,
                     requested_mode: app_session_mode_string(plan.requested_mode).to_string(),
                     resolved_mode: app_session_mode_string(plan.resolved_mode).to_string(),
+                    selected_photo_id: plan.selected_photo_id,
+                    selected_photo_status: app_session_selected_photo_status_string(
+                        plan.selected_photo_status,
+                    )
+                    .to_string(),
                     library_root_path: plan
                         .library_root_path
                         .map(|path| path.display().to_string()),
@@ -1083,6 +1112,44 @@ fn resolve_launch_restore_at_path(session_path: PathBuf) -> DesktopCommandRespon
         Err(error) => {
             DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
         }
+    }
+}
+
+fn record_app_session_selection_at_path(
+    session_path: PathBuf,
+    library_path: String,
+    selected_photo_id: Option<String>,
+    mode: String,
+) -> DesktopCommandResponse {
+    let command = "record_app_session_selection";
+    let mode = match parse_desktop_app_session_mode(&mode) {
+        Ok(mode) => mode,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+    let selected_photo_id =
+        selected_photo_id.and_then(|photo_id| (!photo_id.trim().is_empty()).then_some(photo_id));
+
+    match silica_core::record_app_session_library_state(
+        &session_path,
+        PathBuf::from(&library_path),
+        selected_photo_id,
+        mode,
+    ) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session selection recorded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
     }
 }
 
@@ -1127,6 +1194,16 @@ fn app_session_restore_status_string(status: silica_core::AppSessionRestoreStatu
         silica_core::AppSessionRestoreStatus::MissingCatalog => "missingCatalog",
         silica_core::AppSessionRestoreStatus::InvalidCatalog => "invalidCatalog",
         silica_core::AppSessionRestoreStatus::Restored => "restored",
+    }
+}
+
+fn app_session_selected_photo_status_string(
+    status: silica_core::AppSessionSelectedPhotoStatus,
+) -> &'static str {
+    match status {
+        silica_core::AppSessionSelectedPhotoStatus::None => "none",
+        silica_core::AppSessionSelectedPhotoStatus::Missing => "missing",
+        silica_core::AppSessionSelectedPhotoStatus::Restored => "restored",
     }
 }
 
@@ -1224,6 +1301,7 @@ fn main() {
             reset_app_session,
             inspect_app_session,
             resolve_launch_restore,
+            record_app_session_selection,
             create_library,
             open_library,
             import_folder,
@@ -1430,6 +1508,60 @@ mod tests {
             other => panic!("unexpected response data: {other:?}"),
         }
         assert!(!library_root.join("thumbnails").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_launch_restore_returns_recorded_selected_photo() {
+        let workspace = unique_library_root("desktop-selected-photo-restore");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let supported_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(created.ok);
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = silica_core::list_library_photos(&library_root)
+            .expect("list photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.DNG")
+            .map(|photo| photo.photo_id)
+            .expect("photo id");
+
+        let recorded = super::record_app_session_selection_at_path(
+            session_path.clone(),
+            library_root.display().to_string(),
+            Some(photo_id.clone()),
+            "develop".to_string(),
+        );
+        assert!(recorded.ok);
+
+        let restored = super::resolve_launch_restore_at_path(session_path);
+
+        assert!(restored.ok);
+        match response_data(&restored) {
+            super::DesktopCommandData::LaunchRestore {
+                selected_photo_id,
+                selected_photo_status,
+                requested_mode,
+                resolved_mode,
+                ..
+            } => {
+                assert_eq!(selected_photo_id.as_deref(), Some(photo_id.as_str()));
+                assert_eq!(selected_photo_status, "restored");
+                assert_eq!(requested_mode, "develop");
+                assert_eq!(resolved_mode, "develop");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
         remove_library_root(&workspace);
     }
