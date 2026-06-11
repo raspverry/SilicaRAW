@@ -13,9 +13,9 @@ README hero:
 ```md
 # SilicaRAW
 
-Open-source RAW photo editing for Apple Silicon.
+Early-stage open-source RAW photo editing for Apple Silicon.
 
-Metal-first editing. Local-first workflow. MLX-powered tools when you need them.
+Local-first workflow. Non-destructive editing goals. RAW, color, Metal, MLX, plugins, and MCP advance only when fixture-backed evidence supports them.
 ```
 
 ## First 10 Seconds
@@ -42,18 +42,21 @@ A GitHub visitor should see:
 - Issue templates
 - PR template
 
-## Star Hooks
+## Current Star Hooks
 
 - Rust
 - Tauri
-- Metal
-- MLX
 - Apple Silicon
 - RAW editor
 - Local-first
 - Open source
 - Apple-like UI
-- MCP-ready later
+
+## Future Star Hooks
+
+- Metal-first product viewer after the native bridge contract is implemented.
+- MLX-assisted tools after the editor core is trustworthy.
+- MCP-ready integrations after permissioning and security gates exist.
 
 ## Avoid Overhype
 
@@ -81,4 +84,4 @@ Before public beta:
 
 GO WITH CONDITIONS.
 
-Need final license, README draft, CONTRIBUTING, SECURITY, issue templates, screenshots/GIFs, sample asset manifest.
+Task 10.6.1 selected the MIT License and added public trust boundaries. Still need CONTRIBUTING, SECURITY, issue templates, screenshots/GIFs, and sample asset manifest before broad public beta.

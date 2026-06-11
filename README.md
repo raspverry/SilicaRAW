@@ -4,6 +4,8 @@ SilicaRAW is an early-stage, open-source RAW photo editor for Apple Silicon.
 
 The current delivery target is a local macOS alpha that can be installed from a DMG and complete a minimal JPEG/JPG editor workflow without modifying original photo files. Broad RAW decoding, the product Metal viewer, MLX, MCP, plugins, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are intentionally out of the current alpha scope.
 
+SilicaRAW is not production-ready. Current repository claims are limited to fixture-backed behavior in the harness and documented manual checks.
+
 ## Current Scope
 
 - Rust workspace root
@@ -56,6 +58,21 @@ schemas/            Authoritative JSON schemas
 ## Wiki
 
 The public, LLM-readable project wiki starts at [`docs/wiki/index.md`](docs/wiki/index.md).
+
+## Public Trust
+
+- License: [MIT](LICENSE).
+- Dependency and third-party license inventory: [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md).
+- Public trust boundaries: [`docs/wiki/topics/public-trust.md`](docs/wiki/topics/public-trust.md).
+- Security reporting policy and contribution templates are scheduled for Task 10.6.2.
+
+## Known Limitations
+
+- RAW decoding is not implemented in the product workflow yet.
+- Color correctness is not claimed until tagged fixture evidence and tolerance checks exist.
+- The product Metal viewer is not implemented yet.
+- MLX, MCP, plugins, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are deferred.
+- Signed and notarized release DMGs are blocked until Developer ID funding and credentials are available.
 
 ## Development
 

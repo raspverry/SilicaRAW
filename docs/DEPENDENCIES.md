@@ -6,6 +6,14 @@ Status: REQUIRED FOR CODEX IMPLEMENTATION
 
 Codex / Claude Code must not add a new dependency without updating this file.
 
+## Project License and Inventory Status
+
+SilicaRAW source code and project documentation are licensed under the MIT License unless a file states otherwise.
+
+This file is the dependency and third-party license inventory for the repository. As of Task 10.6.1, the current Rust/Tauri dependency set is recorded below, no model weights are bundled, and no sample assets are committed as redistributable product fixtures.
+
+Future model weights, sample assets, binary tools, or bundled runtime components must add their own license/source/hash records before they are committed or shipped.
+
 ## Required Entry Format
 
 ```txt

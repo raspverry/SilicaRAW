@@ -33,7 +33,7 @@
     "category": "Photography",
     "shortDescription": "Local-first RAW editor packaging spike.",
     "longDescription": "SilicaRAW local desktop shell for validating macOS app and DMG packaging.",
-    "copyright": "Copyright 2026 SilicaRAW contributors. Project license pending.",
+    "copyright": "Copyright 2026 SilicaRAW contributors. Licensed under MIT.",
     "icon": [
       "icons/icon.png"
     ],

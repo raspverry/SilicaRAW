@@ -41,6 +41,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [ADR 0005: Defer MLX from Local Alpha](decisions/adr-0005-mlx-deferral-for-local-alpha.md): MLX remains outside local alpha scope.
 - [ADR 0006: Unsigned Developer Preview DMG](decisions/adr-0006-unsigned-developer-preview-dmg.md): unsigned preview artifacts are allowed while Developer ID funding is blocked.
 - [ADR 0007: Defer Homebrew and Auto-Update](decisions/adr-0007-homebrew-and-auto-update-deferral.md): Homebrew Cask and updater work wait for local DMG alpha trust gates.
+- [ADR 0008: Project License](decisions/adr-0008-project-license.md): SilicaRAW source code and project documentation use the MIT License.
 
 ### Topics
 
@@ -50,6 +51,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Catalog](topics/catalog.md)
 - [Data Safety](topics/data-safety.md)
 - [Backup and Restore](topics/backup-restore.md)
+- [Public Trust](topics/public-trust.md)
 - [UI Mockups](topics/ui-mockups.md)
 - [UI MVP Baseline](topics/ui-mvp-baseline.md)
 - [UI Visual and Responsive QA](topics/ui-visual-responsive-qa.md)

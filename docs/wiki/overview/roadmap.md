@@ -2,7 +2,7 @@
 title: Roadmap Overview
 status: active
 audience: all
-updated: 2026-06-10
+updated: 2026-06-11
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -65,6 +65,8 @@ The current implementation order starts with:
 - Phase 5.5 completed the UI MVP vertical slice as screen structure plus command wiring. It is not the final installed-app readiness gate because several surfaces still use placeholder pixels, typed paths, string command parsing, and static/demo state.
 - Phase 5.6 is now the required Product Alpha Runtime Completion pass before Phase 6 clean-Mac install QA. Its first task records the runtime gap audit and narrows the installed-alpha guaranteed visible photo path to JPEG/JPG until additional codecs are explicitly implemented and tested.
 - The local DMG distribution plan runs through Phase 9. After that, the post-alpha product roadmap continues with evidence and trust gates before broad RAW, Metal, Develop, MLX, plugin, or MCP work.
+- Phase 10 has completed fixture manifest, golden tolerance policy, sidecar v1, rebuild dry-run, and backup/restore boundaries through Task 10.5.3.
+- Task 10.6.1 selected the MIT project license and added public trust docs. Task 10.6.2 still needs contribution/security templates and static trust regression checks.
 
 ## Links
 
@@ -81,6 +83,7 @@ The current implementation order starts with:
 - [UI MVP Baseline](../topics/ui-mvp-baseline.md)
 - [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md)
+- [Public Trust](../topics/public-trust.md)
 
 ## Notes for LLM Agents
 

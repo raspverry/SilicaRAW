@@ -156,6 +156,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - `python3 scripts/harness/check-md-links.py`
   - `python3 scripts/harness/check-cargo-deps.py`
+- **Status:** In progress. Task 10.6.1 selected the MIT License, added the root `LICENSE`, added [ADR 0008](../decisions/adr-0008-project-license.md), and documented current public trust boundaries in [Public Trust](../topics/public-trust.md). Task 10.6.2 still needs contribution/security templates and static regression checks.
 
 ## Phase 11: Session, Library, and Metadata Foundation
 

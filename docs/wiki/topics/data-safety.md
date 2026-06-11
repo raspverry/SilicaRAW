@@ -2,7 +2,7 @@
 title: Data Safety
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-11
 source_of_truth: docs/10_Data_Model_and_Storage_Specification.md
 ---
 
