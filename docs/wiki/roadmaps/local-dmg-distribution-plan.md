@@ -936,6 +936,8 @@ Phase 6 is not a substitute for missing app behavior. Tasks 6.1 and 6.2 created 
   - Includes checksum verification command.
 - **Validation:** Template used in draft release.
 
+**Status:** Completed on 2026-06-11. Added `.github/release-template.md` with local alpha install steps, checksum verification, known issues, local-only privacy statement, QA evidence fields, rollback guidance, and explicit unsigned developer-preview warnings. Added `scripts/harness/check-release-template.py` so the project harness keeps the template from losing the required install, privacy, checksum, original-file safety, and unsigned-boundary language.
+
 ### Task 9.3: Decide Homebrew and Auto-Update Deferral
 
 - **Location:** `docs/wiki/decisions/adr-0007-homebrew-and-auto-update-deferral.md`

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-9 | Release notes template added
+
+- Added `.github/release-template.md` for local alpha DMG release notes.
+- Included install steps, checksum verification, known issues, privacy, QA evidence, rollback, and unsigned developer-preview boundary language.
+- Added a harness check so release notes do not lose required local-distribution safety fields.
+
 ## [2026-06-11] phase-9 | Homebrew and auto-update deferral recorded
 
 - Added ADR 0007 to defer Homebrew Cask and auto-update until local DMG alpha trust gates are met.

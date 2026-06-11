@@ -15,6 +15,9 @@ scripts/harness/check-scope-guardrails.sh
 echo "==> Checking release workflow guardrails"
 python3 scripts/harness/check-release-workflows.py
 
+echo "==> Checking release template guardrails"
+python3 scripts/harness/check-release-template.py
+
 echo "==> Checking legal QA fixtures and installed-app preflight"
 python3 scripts/harness/check-qa-fixtures.py
 
