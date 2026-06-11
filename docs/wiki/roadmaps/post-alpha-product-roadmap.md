@@ -162,7 +162,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Make launch, relaunch, browsing, metadata, and selection behavior real and scalable.
 
-**Design Gate:** [Phase 11 Session, Library, and Metadata Design](../../superpowers/specs/2026-06-11-phase-11-session-library-metadata-design.md) defines the app-session boundary, atomic task order, query scalability gate, metadata truth gate, recursive import policy gate, and validation strategy before Phase 11 implementation begins.
+**Design Gate:** [Phase 11 Session, Library, and Metadata Design](../../superpowers/specs/2026-06-11-phase-11-session-library-metadata-design.md) defines the app-session boundary, atomic task order, bounded offset query gate, page-scoped thumbnail gate, metadata truth gate, import-error-before-recursive gate, and validation strategy before Phase 11 implementation begins.
 
 ### Task 11.1: App Session and Recents Contract
 
@@ -219,7 +219,9 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Dependencies:** Task 11.4
 - **Acceptance Criteria:**
   - Grid does not require loading every photo at once.
+  - Product grid thumbnail hydration is page- or viewport-scoped, not whole-catalog eager work.
   - Sort/filter fields use columns and indexes where appropriate.
+  - Query uses bounded offset pagination with deterministic tie breakers.
   - Query shape is documented.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
 
@@ -249,7 +251,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 ### Task 11.8: Metadata Inspector, Search, and Filters
 
-- **Location:** `apps/desktop/static/`, `crates/silica-core`
+- **Location:** `apps/desktop/static/`, `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`
 - **Description:** Wire real metadata into Library and Loupe inspector/search/filter surfaces.
 - **Dependencies:** Task 11.7
 - **Acceptance Criteria:**
@@ -258,14 +260,15 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Empty and missing states are clear.
 - **Validation:** UI workflow smoke.
 
-### Task 11.9: Recursive Import and Reviewable Errors
+### Task 11.9: Reviewable Import Errors and Recursive Import
 
 - **Location:** `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`, `apps/desktop/static/`
-- **Description:** Add an explicit recursive import option and reviewable import errors.
+- **Description:** Add reviewable import errors first, then an explicit recursive import option.
 - **Dependencies:** Task 11.8
 - **Acceptance Criteria:**
-  - Recursive import is user-selected, not silent.
+  - Structured import errors exist for the current non-recursive path before recursive scanning lands.
   - Unsupported and failed files are visible in an error review surface.
+  - Recursive import is user-selected, not silent.
   - Browsing can continue after recoverable import errors.
 - **Validation:** Connected runtime smoke.
 

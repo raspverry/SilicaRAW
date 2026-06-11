@@ -602,6 +602,7 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
         silica_core::CoreError::EditGraph(_) => "editGraph",
         silica_core::CoreError::Export(_) => "export",
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
+        silica_core::CoreError::AppSession(_) => "appSession",
     }
 }
 

@@ -2,6 +2,7 @@
 //!
 //! Phase 4.2 starts the local library command surface.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 use std::path::Path;
@@ -29,6 +30,162 @@ const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
 const LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY: u8 = 88;
 const LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE: u32 = 2048;
 const LOCAL_ALPHA_DEVELOP_PREVIEW_QUALITY: u8 = 86;
+
+/// App-level desktop session schema identifier.
+pub const APP_SESSION_SCHEMA: &str = "silica.desktop_session";
+/// App-level desktop session schema version.
+pub const APP_SESSION_VERSION: i64 = 1;
+/// Default Library grid thumbnail size preference in pixels.
+pub const DEFAULT_APP_SESSION_THUMBNAIL_SIZE: u16 = 168;
+/// Minimum accepted Library grid thumbnail size preference in pixels.
+pub const MIN_APP_SESSION_THUMBNAIL_SIZE: u16 = 132;
+/// Maximum accepted Library grid thumbnail size preference in pixels.
+pub const MAX_APP_SESSION_THUMBNAIL_SIZE: u16 = 220;
+
+/// Last active desktop mode persisted outside every library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppSessionMode {
+    Library,
+    Develop,
+    Export,
+}
+
+/// Library grid sort order persisted in app-level session state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppLibrarySort {
+    ImportedAtDesc,
+    FileNameAsc,
+    RatingDesc,
+}
+
+/// Optional file-type filter persisted in app-level session state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppFileTypeFilter {
+    Jpeg,
+    Raw,
+    Unsupported,
+}
+
+/// Library grid filters persisted in app-level session state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSessionFilters {
+    pub min_rating: Option<u8>,
+    pub picked: Option<bool>,
+    pub rejected: Option<bool>,
+    pub file_type: Option<AppFileTypeFilter>,
+    pub search: String,
+}
+
+impl Default for AppSessionFilters {
+    fn default() -> Self {
+        Self {
+            min_rating: None,
+            picked: None,
+            rejected: None,
+            file_type: None,
+            search: String::new(),
+        }
+    }
+}
+
+/// Workspace layout preferences persisted in app-level session state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppLayoutPreferences {
+    pub sidebar_collapsed: bool,
+    pub inspector_collapsed: bool,
+    pub filmstrip_visible: bool,
+    pub thumbnail_size: u16,
+    pub sort: AppLibrarySort,
+    pub filters: AppSessionFilters,
+}
+
+impl Default for AppLayoutPreferences {
+    fn default() -> Self {
+        Self {
+            sidebar_collapsed: false,
+            inspector_collapsed: false,
+            filmstrip_visible: true,
+            thumbnail_size: DEFAULT_APP_SESSION_THUMBNAIL_SIZE,
+            sort: AppLibrarySort::ImportedAtDesc,
+            filters: AppSessionFilters::default(),
+        }
+    }
+}
+
+/// One recent library entry persisted after successful create/open only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppRecentLibrary {
+    pub root_path: PathBuf,
+    pub display_name: String,
+    pub last_opened_at: String,
+}
+
+/// Per-library session state keyed by library root path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppPerLibrarySession {
+    pub selected_photo_id: Option<String>,
+    pub last_mode: AppSessionMode,
+    pub last_opened_at: String,
+}
+
+impl Default for AppPerLibrarySession {
+    fn default() -> Self {
+        Self {
+            selected_photo_id: None,
+            last_mode: AppSessionMode::Library,
+            last_opened_at: String::new(),
+        }
+    }
+}
+
+/// Versioned app-level desktop session state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSession {
+    pub schema: String,
+    pub version: i64,
+    pub last_library_root_path: Option<PathBuf>,
+    pub last_mode: AppSessionMode,
+    pub recents: Vec<AppRecentLibrary>,
+    pub layout: AppLayoutPreferences,
+    pub per_library: BTreeMap<String, AppPerLibrarySession>,
+}
+
+impl Default for AppSession {
+    fn default() -> Self {
+        Self {
+            schema: APP_SESSION_SCHEMA.to_string(),
+            version: APP_SESSION_VERSION,
+            last_library_root_path: None,
+            last_mode: AppSessionMode::Library,
+            recents: Vec::new(),
+            layout: AppLayoutPreferences::default(),
+            per_library: BTreeMap::new(),
+        }
+    }
+}
+
+/// Non-fatal app-session load warnings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AppSessionWarning {
+    Missing,
+    Corrupt,
+    UnsupportedVersion,
+    InvalidValues,
+}
+
+/// Result of loading app-level desktop session state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSessionLoadResult {
+    pub session: AppSession,
+    pub warnings: Vec<AppSessionWarning>,
+}
+
+/// Result of atomically writing app-level desktop session state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSessionWriteResult {
+    pub session_path: PathBuf,
+    pub bytes_written: u64,
+}
 
 /// Local library session returned by core commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -213,6 +370,7 @@ pub enum CoreError {
     EditGraph(silica_edit::EditGraphValidationError),
     Export(silica_export::ExportError),
     ExportBlocked(String),
+    AppSession(String),
 }
 
 impl fmt::Display for CoreError {
@@ -222,6 +380,7 @@ impl fmt::Display for CoreError {
             Self::EditGraph(error) => write!(formatter, "{error}"),
             Self::Export(error) => write!(formatter, "{error}"),
             Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
+            Self::AppSession(message) => write!(formatter, "app session error: {message}"),
         }
     }
 }
@@ -233,6 +392,7 @@ impl Error for CoreError {
             Self::EditGraph(error) => Some(error),
             Self::Export(error) => Some(error),
             Self::ExportBlocked(_) => None,
+            Self::AppSession(_) => None,
         }
     }
 }
@@ -253,6 +413,102 @@ impl From<silica_export::ExportError> for CoreError {
     fn from(error: silica_export::ExportError) -> Self {
         Self::Export(error)
     }
+}
+
+/// Load app-level desktop session state from a caller-provided path.
+pub fn load_app_session(session_path: impl AsRef<Path>) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    if !session_path.exists() {
+        return Ok(AppSessionLoadResult {
+            session: AppSession::default(),
+            warnings: vec![AppSessionWarning::Missing],
+        });
+    }
+
+    let bytes = std::fs::read(session_path).map_err(|error| {
+        CoreError::AppSession(format!("read {}: {error}", session_path.display()))
+    })?;
+    let value: serde_json::Value = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(_) => {
+            return Ok(AppSessionLoadResult {
+                session: AppSession::default(),
+                warnings: vec![AppSessionWarning::Corrupt],
+            });
+        }
+    };
+    let Some(object) = value.as_object() else {
+        return Ok(AppSessionLoadResult {
+            session: AppSession::default(),
+            warnings: vec![AppSessionWarning::Corrupt],
+        });
+    };
+
+    if object.get("schema").and_then(serde_json::Value::as_str) != Some(APP_SESSION_SCHEMA)
+        || object.get("version").and_then(serde_json::Value::as_i64) != Some(APP_SESSION_VERSION)
+    {
+        return Ok(AppSessionLoadResult {
+            session: AppSession::default(),
+            warnings: vec![AppSessionWarning::UnsupportedVersion],
+        });
+    }
+
+    let mut invalid_values = false;
+    let session = AppSession {
+        schema: APP_SESSION_SCHEMA.to_string(),
+        version: APP_SESSION_VERSION,
+        last_library_root_path: parse_optional_path(
+            object.get("last_library_root_path"),
+            &mut invalid_values,
+        ),
+        last_mode: parse_app_session_mode(object.get("last_mode"), &mut invalid_values),
+        recents: parse_app_session_recents(object.get("recents"), &mut invalid_values),
+        layout: parse_app_layout(object.get("layout"), &mut invalid_values),
+        per_library: parse_app_per_library(object.get("per_library"), &mut invalid_values),
+    };
+
+    let warnings = if invalid_values {
+        vec![AppSessionWarning::InvalidValues]
+    } else {
+        Vec::new()
+    };
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
+/// Atomically write app-level desktop session state to a caller-provided path.
+pub fn write_app_session(
+    session_path: impl AsRef<Path>,
+    session: &AppSession,
+) -> Result<AppSessionWriteResult, CoreError> {
+    let session_path = session_path.as_ref();
+    if let Some(parent) = session_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent).map_err(|error| {
+            CoreError::AppSession(format!("create {}: {error}", parent.display()))
+        })?;
+    }
+
+    let bytes = serde_json::to_vec_pretty(&app_session_to_json(session))
+        .map_err(|error| CoreError::AppSession(format!("serialize app session: {error}")))?;
+    let temp_path = session_path.with_extension("tmp");
+    std::fs::write(&temp_path, &bytes).map_err(|error| {
+        CoreError::AppSession(format!("write {}: {error}", temp_path.display()))
+    })?;
+    std::fs::rename(&temp_path, session_path).map_err(|error| {
+        CoreError::AppSession(format!(
+            "rename {} to {}: {error}",
+            temp_path.display(),
+            session_path.display()
+        ))
+    })?;
+
+    Ok(AppSessionWriteResult {
+        session_path: session_path.to_path_buf(),
+        bytes_written: bytes.len() as u64,
+    })
 }
 
 /// Create a local SilicaRAW library through the core command boundary.
@@ -778,6 +1034,378 @@ fn is_jpeg_thumbnail_candidate(photo: &silica_storage::LibraryPhotoGridItem) -> 
     !photo.missing && !photo.unsupported && matches!(photo.file_type.as_str(), "JPG" | "JPEG")
 }
 
+fn app_session_to_json(session: &AppSession) -> serde_json::Value {
+    let recents = session
+        .recents
+        .iter()
+        .map(|recent| {
+            serde_json::json!({
+                "root_path": recent.root_path.display().to_string(),
+                "display_name": recent.display_name,
+                "last_opened_at": recent.last_opened_at,
+            })
+        })
+        .collect::<Vec<_>>();
+    let per_library = session
+        .per_library
+        .iter()
+        .map(|(key, value)| {
+            (
+                key.clone(),
+                serde_json::json!({
+                    "selected_photo_id": value.selected_photo_id,
+                    "last_mode": app_session_mode_string(value.last_mode),
+                    "last_opened_at": value.last_opened_at,
+                }),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+
+    serde_json::json!({
+        "schema": APP_SESSION_SCHEMA,
+        "version": APP_SESSION_VERSION,
+        "last_library_root_path": session.last_library_root_path.as_ref().map(|path| path.display().to_string()),
+        "last_mode": app_session_mode_string(session.last_mode),
+        "recents": recents,
+        "layout": {
+            "sidebar_collapsed": session.layout.sidebar_collapsed,
+            "inspector_collapsed": session.layout.inspector_collapsed,
+            "filmstrip_visible": session.layout.filmstrip_visible,
+            "thumbnail_size": session.layout.thumbnail_size,
+            "sort": app_library_sort_string(session.layout.sort),
+            "filters": {
+                "min_rating": session.layout.filters.min_rating,
+                "picked": session.layout.filters.picked,
+                "rejected": session.layout.filters.rejected,
+                "file_type": session.layout.filters.file_type.map(app_file_type_filter_string),
+                "search": session.layout.filters.search,
+            }
+        },
+        "per_library": per_library,
+    })
+}
+
+fn parse_optional_path(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> Option<PathBuf> {
+    match value {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => match value.as_str() {
+            Some(path) => Some(PathBuf::from(path)),
+            None => {
+                *invalid_values = true;
+                None
+            }
+        },
+    }
+}
+
+fn parse_app_session_mode(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppSessionMode {
+    match value.and_then(serde_json::Value::as_str) {
+        None | Some("library") => AppSessionMode::Library,
+        Some("develop") => AppSessionMode::Develop,
+        Some("export") => AppSessionMode::Export,
+        Some(_) => {
+            *invalid_values = true;
+            AppSessionMode::Library
+        }
+    }
+}
+
+fn app_session_mode_string(mode: AppSessionMode) -> &'static str {
+    match mode {
+        AppSessionMode::Library => "library",
+        AppSessionMode::Develop => "develop",
+        AppSessionMode::Export => "export",
+    }
+}
+
+fn parse_app_library_sort(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppLibrarySort {
+    match value.and_then(serde_json::Value::as_str) {
+        None | Some("imported_at_desc") => AppLibrarySort::ImportedAtDesc,
+        Some("file_name_asc") => AppLibrarySort::FileNameAsc,
+        Some("rating_desc") => AppLibrarySort::RatingDesc,
+        Some(_) => {
+            *invalid_values = true;
+            AppLibrarySort::ImportedAtDesc
+        }
+    }
+}
+
+fn app_library_sort_string(sort: AppLibrarySort) -> &'static str {
+    match sort {
+        AppLibrarySort::ImportedAtDesc => "imported_at_desc",
+        AppLibrarySort::FileNameAsc => "file_name_asc",
+        AppLibrarySort::RatingDesc => "rating_desc",
+    }
+}
+
+fn parse_app_file_type_filter(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> Option<AppFileTypeFilter> {
+    match value {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => match value.as_str() {
+            Some("jpeg") => Some(AppFileTypeFilter::Jpeg),
+            Some("raw") => Some(AppFileTypeFilter::Raw),
+            Some("unsupported") => Some(AppFileTypeFilter::Unsupported),
+            Some(_) | None => {
+                *invalid_values = true;
+                None
+            }
+        },
+    }
+}
+
+fn app_file_type_filter_string(filter: AppFileTypeFilter) -> &'static str {
+    match filter {
+        AppFileTypeFilter::Jpeg => "jpeg",
+        AppFileTypeFilter::Raw => "raw",
+        AppFileTypeFilter::Unsupported => "unsupported",
+    }
+}
+
+fn parse_app_session_recents(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> Vec<AppRecentLibrary> {
+    let Some(value) = value else {
+        return Vec::new();
+    };
+    let Some(entries) = value.as_array() else {
+        *invalid_values = true;
+        return Vec::new();
+    };
+
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let object = match entry.as_object() {
+                Some(object) => object,
+                None => {
+                    *invalid_values = true;
+                    return None;
+                }
+            };
+            let root_path = match object.get("root_path").and_then(serde_json::Value::as_str) {
+                Some(root_path) => PathBuf::from(root_path),
+                None => {
+                    *invalid_values = true;
+                    return None;
+                }
+            };
+            let display_name = object
+                .get("display_name")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            let last_opened_at = object
+                .get("last_opened_at")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+
+            Some(AppRecentLibrary {
+                root_path,
+                display_name,
+                last_opened_at,
+            })
+        })
+        .collect()
+}
+
+fn parse_app_layout(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppLayoutPreferences {
+    let Some(object) = value.and_then(serde_json::Value::as_object) else {
+        if value.is_some() {
+            *invalid_values = true;
+        }
+        return AppLayoutPreferences::default();
+    };
+    let defaults = AppLayoutPreferences::default();
+
+    AppLayoutPreferences {
+        sidebar_collapsed: parse_bool_or_default(
+            object.get("sidebar_collapsed"),
+            defaults.sidebar_collapsed,
+            invalid_values,
+        ),
+        inspector_collapsed: parse_bool_or_default(
+            object.get("inspector_collapsed"),
+            defaults.inspector_collapsed,
+            invalid_values,
+        ),
+        filmstrip_visible: parse_bool_or_default(
+            object.get("filmstrip_visible"),
+            defaults.filmstrip_visible,
+            invalid_values,
+        ),
+        thumbnail_size: parse_thumbnail_size(object.get("thumbnail_size"), invalid_values),
+        sort: parse_app_library_sort(object.get("sort"), invalid_values),
+        filters: parse_app_session_filters(object.get("filters"), invalid_values),
+    }
+}
+
+fn parse_app_session_filters(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppSessionFilters {
+    let Some(object) = value.and_then(serde_json::Value::as_object) else {
+        if value.is_some() {
+            *invalid_values = true;
+        }
+        return AppSessionFilters::default();
+    };
+
+    AppSessionFilters {
+        min_rating: parse_min_rating(object.get("min_rating"), invalid_values),
+        picked: parse_optional_bool(object.get("picked"), invalid_values),
+        rejected: parse_optional_bool(object.get("rejected"), invalid_values),
+        file_type: parse_app_file_type_filter(object.get("file_type"), invalid_values),
+        search: parse_search_string(object.get("search"), invalid_values),
+    }
+}
+
+fn parse_app_per_library(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> BTreeMap<String, AppPerLibrarySession> {
+    let Some(object) = value.and_then(serde_json::Value::as_object) else {
+        if value.is_some() {
+            *invalid_values = true;
+        }
+        return BTreeMap::new();
+    };
+
+    object
+        .iter()
+        .filter_map(|(key, value)| {
+            let entry = match value.as_object() {
+                Some(entry) => entry,
+                None => {
+                    *invalid_values = true;
+                    return None;
+                }
+            };
+            let selected_photo_id = match entry.get("selected_photo_id") {
+                None | Some(serde_json::Value::Null) => None,
+                Some(value) => match value.as_str() {
+                    Some(photo_id) => Some(photo_id.to_string()),
+                    None => {
+                        *invalid_values = true;
+                        None
+                    }
+                },
+            };
+            let last_opened_at = entry
+                .get("last_opened_at")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            Some((
+                key.clone(),
+                AppPerLibrarySession {
+                    selected_photo_id,
+                    last_mode: parse_app_session_mode(entry.get("last_mode"), invalid_values),
+                    last_opened_at,
+                },
+            ))
+        })
+        .collect()
+}
+
+fn parse_bool_or_default(
+    value: Option<&serde_json::Value>,
+    default: bool,
+    invalid_values: &mut bool,
+) -> bool {
+    match value {
+        None => default,
+        Some(value) => match value.as_bool() {
+            Some(value) => value,
+            None => {
+                *invalid_values = true;
+                default
+            }
+        },
+    }
+}
+
+fn parse_optional_bool(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> Option<bool> {
+    match value {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => match value.as_bool() {
+            Some(value) => Some(value),
+            None => {
+                *invalid_values = true;
+                None
+            }
+        },
+    }
+}
+
+fn parse_min_rating(value: Option<&serde_json::Value>, invalid_values: &mut bool) -> Option<u8> {
+    match value {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => {
+            if let Some(value) = value.as_i64() {
+                if !(0..=5).contains(&value) {
+                    *invalid_values = true;
+                }
+                Some(value.clamp(0, 5) as u8)
+            } else {
+                *invalid_values = true;
+                None
+            }
+        }
+    }
+}
+
+fn parse_search_string(value: Option<&serde_json::Value>, invalid_values: &mut bool) -> String {
+    match value {
+        None => String::new(),
+        Some(value) => match value.as_str() {
+            Some(value) => value.to_string(),
+            None => {
+                *invalid_values = true;
+                String::new()
+            }
+        },
+    }
+}
+
+fn parse_thumbnail_size(value: Option<&serde_json::Value>, invalid_values: &mut bool) -> u16 {
+    let Some(value) = value else {
+        return DEFAULT_APP_SESSION_THUMBNAIL_SIZE;
+    };
+    let Some(value) = value.as_i64() else {
+        *invalid_values = true;
+        return DEFAULT_APP_SESSION_THUMBNAIL_SIZE;
+    };
+    if value < MIN_APP_SESSION_THUMBNAIL_SIZE as i64
+        || value > MAX_APP_SESSION_THUMBNAIL_SIZE as i64
+    {
+        *invalid_values = true;
+    }
+    value.clamp(
+        MIN_APP_SESSION_THUMBNAIL_SIZE as i64,
+        MAX_APP_SESSION_THUMBNAIL_SIZE as i64,
+    ) as u16
+}
+
 fn is_jpeg_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
@@ -855,6 +1483,160 @@ mod tests {
     #[test]
     fn exposes_crate_name() {
         assert_eq!(CRATE_NAME, "silica-core");
+    }
+
+    #[test]
+    fn app_session_missing_file_returns_safe_defaults() {
+        let workspace = unique_library_root("app-session-missing");
+        let session_path = workspace
+            .join("Application Support")
+            .join("dev.silicaraw.desktop")
+            .join("app-session.json");
+
+        let loaded = load_app_session(&session_path).expect("load missing session");
+
+        assert_eq!(loaded.session.schema, APP_SESSION_SCHEMA);
+        assert_eq!(loaded.session.version, APP_SESSION_VERSION);
+        assert_eq!(loaded.session.last_mode, AppSessionMode::Library);
+        assert!(loaded.session.last_library_root_path.is_none());
+        assert!(loaded.session.recents.is_empty());
+        assert!(loaded.session.per_library.is_empty());
+        assert_eq!(
+            loaded.session.layout.thumbnail_size,
+            DEFAULT_APP_SESSION_THUMBNAIL_SIZE
+        );
+        assert_eq!(loaded.warnings, vec![AppSessionWarning::Missing]);
+        assert!(!session_path.exists());
+        assert!(!workspace.join("catalog.db").exists());
+        assert!(!workspace.join("sidecars").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_round_trips_typed_state_with_atomic_write() {
+        let workspace = unique_library_root("app-session-roundtrip");
+        let session_path = workspace
+            .join("Application Support")
+            .join("dev.silicaraw.desktop")
+            .join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_root.clone());
+        session.last_mode = AppSessionMode::Develop;
+        session.recents.push(AppRecentLibrary {
+            root_path: library_root.clone(),
+            display_name: "SilicaRAW Library".to_string(),
+            last_opened_at: "unix:42".to_string(),
+        });
+        session.per_library.insert(
+            library_root.display().to_string(),
+            AppPerLibrarySession {
+                selected_photo_id: Some("photo-1".to_string()),
+                last_mode: AppSessionMode::Develop,
+                last_opened_at: "unix:42".to_string(),
+            },
+        );
+
+        let written = write_app_session(&session_path, &session).expect("write app session");
+        assert_eq!(written.session_path, session_path);
+        assert!(written.bytes_written > 0);
+        assert!(session_path.is_file());
+        assert!(!session_path.with_extension("tmp").exists());
+
+        let loaded = load_app_session(&session_path).expect("load written session");
+        assert!(loaded.warnings.is_empty());
+        assert_eq!(loaded.session, session);
+
+        let raw = std::fs::read_to_string(&session_path).expect("read app session json");
+        assert!(raw.contains("\"schema\": \"silica.desktop_session\""));
+        assert!(raw.contains("\"last_mode\": \"develop\""));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_corrupt_or_newer_files_return_defaults_with_warnings() {
+        let workspace = unique_library_root("app-session-invalid");
+        let session_path = workspace.join("app-session.json");
+        std::fs::create_dir_all(&workspace).expect("create session workspace");
+
+        std::fs::write(&session_path, b"{not json").expect("write corrupt session");
+        let corrupt = load_app_session(&session_path).expect("load corrupt session");
+        assert_eq!(corrupt.session, AppSession::default());
+        assert_eq!(corrupt.warnings, vec![AppSessionWarning::Corrupt]);
+
+        std::fs::write(
+            &session_path,
+            r#"{"schema":"silica.desktop_session","version":999,"recents":[],"per_library":{}}"#,
+        )
+        .expect("write newer session");
+        let newer = load_app_session(&session_path).expect("load newer session");
+        assert_eq!(newer.session, AppSession::default());
+        assert_eq!(newer.warnings, vec![AppSessionWarning::UnsupportedVersion]);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_invalid_values_are_clamped_to_safe_defaults() {
+        let workspace = unique_library_root("app-session-clamp");
+        let session_path = workspace.join("app-session.json");
+        std::fs::create_dir_all(&workspace).expect("create session workspace");
+        std::fs::write(
+            &session_path,
+            r#"{
+              "schema": "silica.desktop_session",
+              "version": 1,
+              "last_library_root_path": "/tmp/SilicaRAW Library",
+              "last_mode": "unknown-mode",
+              "recents": [],
+              "layout": {
+                "sidebar_collapsed": true,
+                "inspector_collapsed": true,
+                "filmstrip_visible": false,
+                "thumbnail_size": 9999,
+                "sort": "unknown-sort",
+                "filters": {
+                  "min_rating": 99,
+                  "picked": true,
+                  "rejected": false,
+                  "file_type": "unsupported",
+                  "search": 123
+                }
+              },
+              "per_library": {
+                "/tmp/SilicaRAW Library": {
+                  "selected_photo_id": "photo-2",
+                  "last_mode": "not-real",
+                  "last_opened_at": "unix:44"
+                }
+              }
+            }"#,
+        )
+        .expect("write invalid value session");
+
+        let loaded = load_app_session(&session_path).expect("load invalid value session");
+
+        assert_eq!(loaded.session.last_mode, AppSessionMode::Library);
+        assert_eq!(
+            loaded.session.layout.thumbnail_size,
+            MAX_APP_SESSION_THUMBNAIL_SIZE
+        );
+        assert_eq!(loaded.session.layout.sort, AppLibrarySort::ImportedAtDesc);
+        assert_eq!(loaded.session.layout.filters.min_rating, Some(5));
+        assert_eq!(loaded.session.layout.filters.search, "");
+        let per_library = loaded
+            .session
+            .per_library
+            .get("/tmp/SilicaRAW Library")
+            .expect("per-library state");
+        assert_eq!(per_library.last_mode, AppSessionMode::Library);
+        assert_eq!(per_library.selected_photo_id.as_deref(), Some("photo-2"));
+        assert_eq!(loaded.warnings, vec![AppSessionWarning::InvalidValues]);
+
+        remove_library_root(&workspace);
     }
 
     #[test]

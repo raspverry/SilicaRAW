@@ -14,6 +14,18 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | App session core types added
+
+- Added Task 11.1.2 core app-session v1 types and JSON read/write helpers.
+- Kept app session state outside `catalog.db`, sidecars, and frontend-only storage; desktop path commands, recents, and restore behavior remain next tasks.
+- Verified the targeted `silica-core` app-session tests and full `silica-core` crate tests before moving on.
+
+## [2026-06-11] phase-11 | Plan tightening after agent re-audit
+
+- Re-audited the Phase 11 plan with architecture, storage, preview/export, and release/harness agents.
+- Tightened the existing plan without changing the product direction: bounded offset pagination, page-scoped thumbnail hydration, metadata backfill policy, and import-error review before recursive scanning.
+- Reaffirmed lean validation: task-specific checks during development and `scripts/harness/check.sh` as the PR completion gate, without broad fallback systems or large test matrices.
+
 ## [2026-06-11] phase-11 | Session, library, and metadata design added
 
 - Added the Phase 11 design gate after consulting architecture, storage, frontend, and test agents.
