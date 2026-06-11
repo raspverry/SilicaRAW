@@ -2,7 +2,7 @@
 title: Project Overview
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-11
 source_of_truth: docs/01_Vision_and_Positioning.md
 ---
 
@@ -16,12 +16,11 @@ AI, MLX, plugins, and MCP are secondary extensions. They should support the edit
 
 ## Current State
 
-- The repository has planning documents, schemas, mockups, and a Rust workspace scaffold.
+- The repository has planning documents, schemas, mockups, a Rust workspace, a Tauri desktop shell, storage/core/export boundaries, and the local-alpha UI/runtime path.
 - The project is not production-ready.
-- The app shell, initial catalog migration foundation, local library create/open path, folder import scanner, catalog-backed flag persistence, minimal preview readiness path, typed edit graph validation, command/API-level exposure/contrast edit flow, and command/API-level JPEG sRGB export exist.
-- RAW decoding, the product Metal viewer bridge, color fixture proof, and local alpha UI workflow screens still require explicit implementation tasks.
-- `MockupUI/` contains the high-fidelity target screens. M004 Library Loupe and M005 Develop are the relevant preview consumers, but they are not implemented as product screens yet.
-- Task 5.5 starts the UI MVP vertical slice before local install QA; Task 5.5.1 establishes the token/source baseline but does not yet implement the product screens.
+- The app shell, initial catalog migration foundation, local library create/open path, folder import scanner, catalog-backed flag persistence, preview readiness path, typed edit graph validation, exposure/contrast edit flow, JPEG sRGB export, UI MVP vertical slice, product alpha runtime loop, backup artifacts, staged restore boundaries, and public trust docs exist.
+- RAW decoding, the product Metal viewer bridge, color fixture proof, and signed/notarized user-ready DMG release still require explicit implementation or external credentials.
+- `MockupUI/` contains the high-fidelity target screens used by the UI MVP baseline and visual QA work.
 - MLX is deferred from local alpha by ADR 0005.
 
 ## Project Identity

@@ -65,7 +65,12 @@ License gate:
 - [Release and Distribution Plan](../../16_Release_Distribution_Plan.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [ADR 0005: Defer MLX from Local Alpha](adr-0005-mlx-deferral-for-local-alpha.md)
+- [ADR 0008: Project License](adr-0008-project-license.md)
 - [Open Questions](../questions/open-questions.md)
+
+## Follow-Up
+
+ADR 0008 selected the MIT License for SilicaRAW source code and project documentation on 2026-06-11. Dependency, model, and sample-asset license inventories remain separate release checks.
 
 ## Notes for LLM Agents
 

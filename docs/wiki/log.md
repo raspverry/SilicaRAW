@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-10 | Public trust docs started
+
+- Added Task 10.6.1 public trust docs with the MIT project license, root `LICENSE`, and ADR 0008.
+- Recorded allowed and forbidden public claims for the current local alpha, including unsigned developer-preview limits and deferred RAW/color/Metal/MLX/MCP/plugin distribution claims.
+- Left contribution/security templates and static trust regression checks for Task 10.6.2.
+
 ## [2026-06-11] phase-10 | Restore boundary implementation added
 
 - Added Task 10.5.3 staged restore behavior in `silica-storage`.

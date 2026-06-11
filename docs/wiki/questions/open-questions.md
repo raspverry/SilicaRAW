@@ -2,7 +2,7 @@
 title: Open Questions
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-11
 source_of_truth: docs/18_Final_Master_Plan.md
 ---
 
@@ -30,8 +30,6 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 
 ## License and Distribution
 
-- What provisional project license will be selected before Gate A?
-- What final project license will be selected before public beta?
 - How will sample asset licenses be tracked?
 - How will model licenses be tracked if models are included after local alpha?
 
@@ -52,6 +50,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Phase 4.1 recorded the local alpha catalog schema contract in `silica-catalog` on 2026-06-08.
 - Phase 4.2 added local library create/open through Core, Storage, and the Tauri shell on 2026-06-08.
 - Phase 4.3 added non-recursive folder import scanning and unsupported-file catalog records on 2026-06-08.
+- ADR 0008 selected MIT for SilicaRAW source code and project documentation on 2026-06-11.
 
 ## Links
 
