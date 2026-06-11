@@ -2,7 +2,7 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-10
+updated: 2026-06-11
 source_of_truth: docs/wiki/topics/ui-mvp-baseline.md
 ---
 
@@ -46,14 +46,17 @@ Final checked surfaces:
 | Export | `M007_Export_Dialog.png`, `M015`, `M016` |
 | Maintenance minimal | `M008_Preferences_Appearance.png` as the local-alpha maintenance subset |
 | Import progress | `M009_Import_Progress.png` |
+| Sidebar collapsed | Phase 11 layout persistence state |
+| Inspector collapsed | Phase 11 layout persistence state |
+| Layout reset | Phase 11 layout persistence state |
 
 Final DOM results:
 
 | Viewport | Surfaces | Horizontal Overflow | Toolbar Overlap | Control Clipping | Result |
 |---|---:|---|---|---|---|
-| `1280x800` | 8 | false | false | 0 | Pass |
-| `1440x900` | 8 | false | false | 0 | Pass |
-| `1728x965` | 8 | false | false | 0 | Pass |
+| `1280x800` | 11 | false | false | 0 | Pass |
+| `1440x900` | 11 | false | false | 0 | Pass |
+| `1728x965` | 11 | false | false | 0 | Pass |
 
 Final screenshot review:
 
@@ -64,6 +67,7 @@ Final screenshot review:
 - M007 Export shows selected-photo thumbnail pixels in the dialog preview instead of placeholder art.
 - M008-minimal is represented by the local-alpha maintenance/cache-clear subset with precise destructive-scope copy.
 - M009 Import progress keeps overall and per-step progress states synchronized.
+- M010/M011/M012 cover Phase 11 sidebar-collapsed, inspector-collapsed, and reset layout states with no horizontal overflow or clipped controls.
 
 Fixes from this final pass:
 

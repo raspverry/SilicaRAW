@@ -214,7 +214,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - Static UI check.
   - Visual responsive QA.
-- **Status:** In progress on 2026-06-11. Task 11.4.1 established the core layout default/reset model, and Task 11.4.2 wired desktop/sidebar/inspector/filmstrip/thumbnail/sort/filter persistence to app-session state. Dedicated layout visual QA remains Task 11.4.3.
+- **Status:** Completed on 2026-06-11. Task 11.4 established the core layout default/reset model, wired desktop/sidebar/inspector/filmstrip/thumbnail/sort/filter persistence to app-session state, and extended visual QA with sidebar-collapsed, inspector-collapsed, and reset layout states across `1280x800`, `1440x900`, and `1728x965`.
 
 ### Task 11.5: Paged, Sorted, and Filtered Library Query API
 

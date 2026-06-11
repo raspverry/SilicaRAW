@@ -334,6 +334,7 @@ Demo/Validation:
   - No horizontal overflow or clipped controls.
 - **Validation:**
   - visual responsive QA runner
+- **Status:** Completed on 2026-06-11. Extended `scripts/harness/run-final-visual-qa.py` with sidebar-collapsed, inspector-collapsed, and layout-reset states across `1280x800`, `1440x900`, and `1728x965`. The runner now asserts the expected layout state metrics and passed with 33 screenshots, zero horizontal overflow, zero toolbar overlap, and zero clipped controls.
 
 ## Sprint 3: Paged Queries and Scalable Grid
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Layout visual QA states added
+
+- Added Task 11.4.3 visual QA states for sidebar collapsed, inspector collapsed, and layout reset.
+- The final visual QA runner now captures 11 surfaces across `1280x800`, `1440x900`, and `1728x965`.
+- Latest run produced 33 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or layout-state assertion failures.
+
 ## [2026-06-11] phase-11 | Layout interactions persisted
 
 - Added Task 11.4.2 desktop commands for recording and resetting app-session layout preferences.

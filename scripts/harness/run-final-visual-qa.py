@@ -32,6 +32,9 @@ SURFACES = [
     ("M007-export", "export"),
     ("M008-minimal-maintenance", "maintenance"),
     ("M009-import-progress", "import"),
+    ("M010-layout-sidebar-collapsed", "layout-sidebar-collapsed"),
+    ("M011-layout-inspector-collapsed", "layout-inspector-collapsed"),
+    ("M012-layout-reset", "layout-reset"),
 ]
 
 
@@ -107,6 +110,21 @@ def state_script(state):
   const loupeViewer = document.querySelector("#loupeViewer");
   const developSurface = document.querySelector("#developPreviewSurface");
   const exportDialog = document.querySelector("#exportDialog");
+
+  function setLayout(sidebarCollapsed, inspectorCollapsed, filmstripVisible, thumbnailSize = 168) {{
+    app.dataset.sidebarCollapsed = String(sidebarCollapsed);
+    app.dataset.inspectorCollapsed = String(inspectorCollapsed);
+    app.dataset.filmstripVisible = String(filmstripVisible);
+    document.querySelector("#toggleSidebar")?.setAttribute("aria-pressed", String(sidebarCollapsed));
+    document.querySelector("#toggleInspector")?.setAttribute("aria-pressed", String(inspectorCollapsed));
+    document.querySelector("#toggleFilmstrip")?.setAttribute("aria-pressed", String(filmstripVisible));
+    const thumbnail = document.querySelector("#thumbnailSize");
+    if (thumbnail) {{
+      thumbnail.value = String(thumbnailSize);
+    }}
+    grid.style.setProperty("--sr-thumb-min", `${{thumbnailSize}}px`);
+    grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${{thumbnailSize}}px, 1fr))`;
+  }}
 
   function setMode(mode) {{
     app.dataset.activeMode = mode;
@@ -243,6 +261,7 @@ def state_script(state):
 
   setMode("library");
   setLibraryState("welcome");
+  setLayout(false, false, true);
   exportDialog.hidden = true;
 
   if (state === "welcome") {{
@@ -306,6 +325,15 @@ def state_script(state):
     document.querySelector("#exportStatus").value = "Enter an output path, then export the selected photo.";
     document.querySelector("#exportSummaryFile").textContent = "synthetic-gradient_SilicaRAW.jpg";
     renderExportPreview();
+  }} else if (state === "layout-sidebar-collapsed") {{
+    openLibraryBase(true);
+    setLayout(true, false, true, 168);
+  }} else if (state === "layout-inspector-collapsed") {{
+    openLibraryBase(true);
+    setLayout(false, true, true, 168);
+  }} else if (state === "layout-reset") {{
+    openLibraryBase(true);
+    setLayout(false, false, true, 168);
   }}
 }})()
 """
@@ -335,9 +363,10 @@ def metric_script(surface):
     .map((element) => {{
       const id = element.id ? `#${{element.id}}` : element.className || element.tagName.toLowerCase();
       return `${{element.tagName.toLowerCase()}}${{id}}`;
-    }})
+  }})
     .slice(0, 12);
   const dialog = box("#exportDialog");
+  const app = document.querySelector("#appFrame");
   return {{
     surface: {json.dumps(surface)},
     viewport: {{ width: innerWidth, height: innerHeight }},
@@ -348,8 +377,13 @@ def metric_script(surface):
     visibleFilmstripCards: Array.from(document.querySelectorAll(".sr-filmstrip-card")).filter(visible).length,
     visibleImages: Array.from(document.querySelectorAll(".sr-thumb-image, .sr-loupe-image, .sr-develop-image")).filter(visible).length,
     exportDialogWithinViewport: !dialog || (dialog.left >= 0 && dialog.right <= innerWidth && dialog.top >= 0 && dialog.bottom <= innerHeight),
-    activeMode: document.querySelector("#appFrame").dataset.activeMode,
-    libraryState: document.querySelector("#appFrame").dataset.libraryState,
+    activeMode: app.dataset.activeMode,
+    libraryState: app.dataset.libraryState,
+    sidebarCollapsed: app.dataset.sidebarCollapsed,
+    inspectorCollapsed: app.dataset.inspectorCollapsed,
+    filmstripVisible: app.dataset.filmstripVisible,
+    sidebarVisible: Boolean(box("#leftSidebar")),
+    inspectorVisible: Boolean(box("#rightInspector")),
   }};
 }})()
 """
@@ -382,6 +416,22 @@ def capture(url):
                 )
             if not metrics["exportDialogWithinViewport"]:
                 failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
+            if state == "layout-sidebar-collapsed" and (
+                metrics["sidebarCollapsed"] != "true" or metrics["sidebarVisible"]
+            ):
+                failures.append(f"{viewport_name} {surface_name}: sidebar collapse state not applied")
+            if state == "layout-inspector-collapsed" and (
+                metrics["inspectorCollapsed"] != "true" or metrics["inspectorVisible"]
+            ):
+                failures.append(f"{viewport_name} {surface_name}: inspector collapse state not applied")
+            if state == "layout-reset" and (
+                metrics["sidebarCollapsed"] != "false"
+                or metrics["inspectorCollapsed"] != "false"
+                or metrics["filmstripVisible"] != "true"
+                or not metrics["sidebarVisible"]
+                or not metrics["inspectorVisible"]
+            ):
+                failures.append(f"{viewport_name} {surface_name}: layout reset state not applied")
     return results, failures
 
 
