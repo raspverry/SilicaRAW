@@ -22,6 +22,7 @@ use silica_catalog::{
     ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
     ALPHA_MAX_RATING,
 };
+pub use silica_catalog::{ImportIssue, ImportIssueKind};
 pub use silica_catalog::{
     LibraryQueryFileType, LibraryQueryFilters, LibraryQueryMetadataFilter, LibraryQueryOrderField,
     LibraryQueryPage, LibraryQueryRequest, LibraryQuerySort, PhotoFlags,
@@ -268,6 +269,7 @@ pub struct FolderImportSummary {
     pub supported_files: usize,
     pub unsupported_files: usize,
     pub candidates: Vec<ImportCandidate>,
+    pub issues: Vec<ImportIssue>,
 }
 
 /// Catalog row data needed to open a preview for one photo.
@@ -937,8 +939,13 @@ pub fn import_folder(
         return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
     }
 
-    let mut candidates = scan_import_candidates(folder_path)?;
+    let (mut candidates, mut issues) = scan_import_candidates(folder_path)?;
     candidates.sort_by(|left, right| left.path.cmp(&right.path));
+    issues.sort_by(|left, right| {
+        left.path
+            .cmp(&right.path)
+            .then(left.kind.as_str().cmp(right.kind.as_str()))
+    });
 
     let mut connection = open_catalog(&library.catalog_path)?;
     record_import_candidates(&mut connection, folder_path, &candidates)?;
@@ -955,6 +962,7 @@ pub fn import_folder(
         supported_files: scanned_files - unsupported_files,
         unsupported_files,
         candidates,
+        issues,
     })
 }
 
@@ -2792,35 +2800,164 @@ fn upsert_local_library_row(
     Ok(())
 }
 
-fn scan_import_candidates(folder_path: &Path) -> Result<Vec<ImportCandidate>, LibraryStorageError> {
+fn scan_import_candidates(
+    folder_path: &Path,
+) -> Result<(Vec<ImportCandidate>, Vec<ImportIssue>), LibraryStorageError> {
     let mut candidates = Vec::new();
+    let mut issues = Vec::new();
 
     for entry in fs::read_dir(folder_path)? {
-        let entry = entry?;
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    folder_path,
+                    None,
+                    format!("failed to read directory entry: {error}"),
+                ));
+                continue;
+            }
+        };
         let path = entry.path();
-        if !path.is_file() {
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read entry type: {error}"),
+                ));
+                continue;
+            }
+        };
+
+        if file_type.is_symlink() {
+            issues.push(import_issue(
+                ImportIssueKind::SymlinkEntrySkipped,
+                &path,
+                Some(file_name),
+                "symbolic links are skipped by import policy",
+            ));
             continue;
         }
 
-        let metadata = entry.metadata()?;
-        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if is_hidden_entry(&file_name) {
+            issues.push(import_issue(
+                ImportIssueKind::HiddenEntrySkipped,
+                &path,
+                Some(file_name),
+                "hidden entries are skipped by import policy",
+            ));
+            continue;
+        }
+
+        if file_type.is_dir() {
+            if is_package_directory(&path) {
+                issues.push(import_issue(
+                    ImportIssueKind::PackageDirectorySkipped,
+                    &path,
+                    Some(file_name),
+                    "package directories are skipped by import policy",
+                ));
+            }
+            continue;
+        }
+
+        if !file_type.is_file() {
+            continue;
+        }
+
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read file metadata: {error}"),
+                ));
+                continue;
+            }
+        };
         let extension = path
             .extension()
             .and_then(|value| value.to_str())
             .unwrap_or("");
         let unsupported = !is_supported_photo_extension(extension);
+        let partial_hash = match partial_file_hash(&path) {
+            Ok(hash) => hash,
+            Err(error) => {
+                issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read file fingerprint: {error}"),
+                ));
+                continue;
+            }
+        };
+
+        if unsupported {
+            issues.push(import_issue(
+                ImportIssueKind::UnsupportedFile,
+                &path,
+                Some(file_name.clone()),
+                "file extension is unsupported by the local alpha",
+            ));
+        }
 
         candidates.push(ImportCandidate {
             file_name,
             path: path_to_string(&path)?,
             file_size: metadata.len() as i64,
             modified_at: modified_at_string(&metadata),
-            partial_hash: partial_file_hash(&path)?,
+            partial_hash,
             unsupported,
         });
     }
 
-    Ok(candidates)
+    Ok((candidates, issues))
+}
+
+fn import_issue(
+    kind: ImportIssueKind,
+    path: &Path,
+    file_name: Option<String>,
+    message: impl Into<String>,
+) -> ImportIssue {
+    ImportIssue {
+        kind,
+        path: path.display().to_string(),
+        file_name,
+        message: message.into(),
+    }
+}
+
+fn is_hidden_entry(file_name: &str) -> bool {
+    file_name.starts_with('.') && file_name != "." && file_name != ".."
+}
+
+fn is_package_directory(path: &Path) -> bool {
+    const PACKAGE_EXTENSIONS: &[&str] = &[
+        "app",
+        "aplibrary",
+        "framework",
+        "library",
+        "lrdata",
+        "photoslibrary",
+        "plugin",
+    ];
+
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|extension| {
+            PACKAGE_EXTENSIONS
+                .iter()
+                .any(|package| extension.eq_ignore_ascii_case(package))
+        })
 }
 
 fn record_import_candidates(
@@ -5284,6 +5421,62 @@ mod tests {
     }
 
     #[test]
+    fn import_error_summary_reports_recoverable_issues_without_blocking_browse() {
+        let workspace = unique_library_root("import-errors");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+        let hidden_file = import_root.join(".hidden.jpg");
+        let package_dir = import_root.join("Archive.photoslibrary");
+        let symlink_path = import_root.join("linked");
+
+        std::fs::create_dir_all(&package_dir).expect("create package directory");
+        std::fs::write(&supported_file, b"supported jpeg candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        std::fs::write(&hidden_file, b"hidden jpeg candidate").expect("write hidden");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&supported_file, &symlink_path).expect("create symlink");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let summary = import_folder(&library.root_path, &import_root).expect("import folder");
+
+        assert_eq!(summary.scanned_files, 2);
+        assert_eq!(summary.supported_files, 1);
+        assert_eq!(summary.unsupported_files, 1);
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::UnsupportedFile,
+            "notes.txt",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::HiddenEntrySkipped,
+            ".hidden.jpg",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::PackageDirectorySkipped,
+            "Archive.photoslibrary",
+        );
+        #[cfg(unix)]
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::SymlinkEntrySkipped,
+            "linked",
+        );
+
+        let items = list_library_photos(&library.root_path).expect("list imported rows");
+        assert!(items.iter().any(|item| item.file_name == "sample.jpg"));
+        assert!(items
+            .iter()
+            .any(|item| item.file_name == "notes.txt" && item.unsupported));
+        assert!(!items.iter().any(|item| item.file_name == ".hidden.jpg"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn lists_library_photo_grid_items_with_flags_and_states() {
         let workspace = unique_library_root("grid-items");
         let library_root = workspace.join("SilicaRAW Library");
@@ -5811,6 +6004,15 @@ mod tests {
 
     fn remove_library_root(path: &Path) {
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    fn assert_issue_kind(issues: &[ImportIssue], kind: ImportIssueKind, file_name: &str) {
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.kind == kind && issue.file_name.as_deref() == Some(file_name)),
+            "missing {kind:?} for {file_name}: {issues:?}"
+        );
     }
 
     fn count_edit_states(connection: &Connection) -> i64 {

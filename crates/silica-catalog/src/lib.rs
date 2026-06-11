@@ -108,6 +108,41 @@ pub struct ImportCandidate {
     pub unsupported: bool,
 }
 
+/// Reviewable import issue category for recoverable scanner outcomes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportIssueKind {
+    UnsupportedFile,
+    HiddenEntrySkipped,
+    PackageDirectorySkipped,
+    SymlinkEntrySkipped,
+    DirectoryReadFailed,
+    EntryMetadataFailed,
+    MaxDepthExceeded,
+}
+
+impl ImportIssueKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UnsupportedFile => "unsupported_file",
+            Self::HiddenEntrySkipped => "hidden_entry_skipped",
+            Self::PackageDirectorySkipped => "package_directory_skipped",
+            Self::SymlinkEntrySkipped => "symlink_entry_skipped",
+            Self::DirectoryReadFailed => "directory_read_failed",
+            Self::EntryMetadataFailed => "entry_metadata_failed",
+            Self::MaxDepthExceeded => "max_depth_exceeded",
+        }
+    }
+}
+
+/// Reviewable import issue returned alongside accepted catalog candidates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportIssue {
+    pub kind: ImportIssueKind,
+    pub path: String,
+    pub file_name: Option<String>,
+    pub message: String,
+}
+
 /// Highest rating value allowed by the local alpha catalog contract.
 pub const ALPHA_MAX_RATING: u8 = 5;
 

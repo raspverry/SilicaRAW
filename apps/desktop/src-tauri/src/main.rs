@@ -104,6 +104,7 @@ enum DesktopCommandData {
         scanned_files: usize,
         supported_files: usize,
         unsupported_files: usize,
+        issues: Vec<DesktopImportIssue>,
         originals_unchanged: bool,
     },
     PhotoGrid {
@@ -522,6 +523,15 @@ impl DesktopLibraryQueryFilters {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct DesktopImportIssue {
+    kind: &'static str,
+    path: String,
+    file_name: Option<String>,
+    message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DesktopPhotoGridItem {
     photo_id: String,
     file_name: String,
@@ -813,6 +823,11 @@ fn import_folder(library_path: String, folder_path: String) -> DesktopCommandRes
                 scanned_files: summary.scanned_files,
                 supported_files: summary.supported_files,
                 unsupported_files: summary.unsupported_files,
+                issues: summary
+                    .issues
+                    .into_iter()
+                    .map(desktop_import_issue)
+                    .collect(),
                 originals_unchanged: true,
             },
         ),
@@ -1420,6 +1435,15 @@ fn photo_metadata_data(metadata: silica_core::PhotoMetadata) -> DesktopCommandDa
         camera_make: metadata_field(metadata.camera_make),
         camera_model: metadata_field(metadata.camera_model),
         lens_model: metadata_field(metadata.lens_model),
+    }
+}
+
+fn desktop_import_issue(issue: silica_core::ImportIssue) -> DesktopImportIssue {
+    DesktopImportIssue {
+        kind: issue.kind.as_str(),
+        path: issue.path,
+        file_name: issue.file_name,
+        message: issue.message,
     }
 }
 
@@ -2207,12 +2231,15 @@ mod tests {
                 scanned_files,
                 supported_files,
                 unsupported_files,
+                issues,
                 originals_unchanged,
                 ..
             } => {
                 assert_eq!(*scanned_files, 2);
                 assert_eq!(*supported_files, 1);
                 assert_eq!(*unsupported_files, 1);
+                assert!(issues.iter().any(|issue| issue.kind == "unsupported_file"
+                    && issue.file_name == Some("notes.txt".to_string())));
                 assert!(*originals_unchanged);
             }
             other => panic!("unexpected response data: {other:?}"),

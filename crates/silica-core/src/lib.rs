@@ -19,6 +19,8 @@ pub use silica_storage::CatalogRebuildDryRunIssue;
 pub use silica_storage::CatalogRebuildDryRunIssueKind;
 pub use silica_storage::CatalogRebuildDryRunReport;
 pub use silica_storage::CatalogRebuildFlagSource;
+pub use silica_storage::ImportIssue;
+pub use silica_storage::ImportIssueKind;
 pub use silica_storage::LibraryPhotoGridItem;
 pub use silica_storage::LibraryQueryFileType;
 pub use silica_storage::LibraryQueryFilters;
@@ -2470,6 +2472,40 @@ mod tests {
         assert_eq!(page.total_count, 1);
         assert_eq!(page.items.len(), 1);
         assert_eq!(page.items[0].file_name, "sample.jpg");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn import_error_summary_survives_core_metadata_step() {
+        let workspace = unique_library_root("core-import-errors");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+        let hidden_file = import_root.join(".hidden.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        std::fs::write(&hidden_file, b"hidden jpeg").expect("write hidden");
+
+        let created = create_library(&library_root).expect("create library through core");
+        let summary = import_folder(&created.root_path, &import_root).expect("import through core");
+
+        assert_eq!(summary.supported_files, 1);
+        assert_eq!(summary.unsupported_files, 1);
+        assert!(summary
+            .issues
+            .iter()
+            .any(|issue| issue.kind == ImportIssueKind::UnsupportedFile));
+        assert!(summary
+            .issues
+            .iter()
+            .any(|issue| issue.kind == ImportIssueKind::HiddenEntrySkipped));
+
+        let rows = list_library_photos(&created.root_path).expect("browse after import issues");
+        assert_eq!(rows.len(), 2);
 
         remove_library_root(&workspace);
     }

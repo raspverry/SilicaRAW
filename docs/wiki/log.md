@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Structured import issues added
+
+- Added Task 11.9.2 structured import issue model.
+- `FolderImportSummary.issues` now returns recoverable `ImportIssue` records for the non-recursive import path.
+- The desktop import command forwards the issue list in its response data for Task 11.9.3.
+- Unsupported files, hidden entries, package directories, symlinks, and entry metadata/read failures are reviewable without blocking library browsing.
+
 ## [2026-06-11] phase-11 | Import error policy added
 
 - Added Task 11.9.1 import error and recursive import policy.

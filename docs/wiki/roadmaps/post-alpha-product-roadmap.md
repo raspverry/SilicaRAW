@@ -278,7 +278,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Recursive import is user-selected, not silent.
   - Browsing can continue after recoverable import errors.
 - **Validation:** Connected runtime smoke.
-- **Status:** In progress as of 2026-06-11. Task 11.9.1 documents the import-error policy before implementation: recursive import defaults off, recoverable errors and unsupported files are reviewable, symlink entries are skipped, hidden/package/max-depth/permission behavior is explicit, and originals remain referenced by path only.
+- **Status:** In progress as of 2026-06-11. Task 11.9.1 documents the import-error policy before implementation: recursive import defaults off, recoverable errors and unsupported files are reviewable, symlink entries are skipped, hidden/package/max-depth/permission behavior is explicit, and originals remain referenced by path only. Task 11.9.2 adds structured `ImportIssue` records to `FolderImportSummary.issues` and forwards them through the desktop import response for the current non-recursive import path, so unsupported files and recoverable skipped/read-error entries can be reviewed while accepted rows remain browseable.
 
 ## Phase 12: Core Image RAW Decode Proof
 

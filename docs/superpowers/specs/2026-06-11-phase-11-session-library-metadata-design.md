@@ -610,6 +610,7 @@ Demo/Validation:
   - Non-recursive behavior remains the default.
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core import_error`
+- **Status:** Completed on 2026-06-11. The catalog/storage/core boundary now exposes structured `ImportIssue` records through `FolderImportSummary.issues` for the current non-recursive import path, and the desktop command response carries the same list for the later review UI. Unsupported files, hidden entries, package directories, symlink entries, and per-entry metadata/read failures are recoverable review entries while accepted rows remain browseable.
 
 ### Task 11.9.3: Import Error Review UI
 

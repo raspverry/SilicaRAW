@@ -53,6 +53,16 @@ def main():
     failures = []
 
     require(parser.styles == 0, "index.html must not use inline <style> blocks", failures)
+    require(
+        "function countImportErrorIssues" in source,
+        "index.html must separate error issue counting from unsupported/skipped issue counting",
+        failures,
+    )
+    require(
+        "response.data?.issues?.length" not in source,
+        "#importErrorCount must not count every structured import issue as an error",
+        failures,
+    )
     for href in [
         "./styles/tokens.css",
         "./styles/base.css",

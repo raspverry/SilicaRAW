@@ -594,6 +594,10 @@
       const initialGridPhotos = Array.from(document.querySelectorAll(".sr-photo-card")).map(photoFromCard);
       const LIBRARY_GRID_PAGE_LIMIT = 100;
       const GRID_OVERSCAN_ROWS = 2;
+      const IMPORT_ERROR_ISSUE_KINDS = new Set([
+        "directory_read_failed",
+        "entry_metadata_failed",
+      ]);
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
       let selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
@@ -657,6 +661,13 @@
 
       function commandFailed(response) {
         return !response || response.ok === false;
+      }
+
+      function countImportErrorIssues(issues = []) {
+        if (!Array.isArray(issues)) {
+          return 0;
+        }
+        return issues.filter((issue) => IMPORT_ERROR_ISSUE_KINDS.has(issue?.kind)).length;
       }
 
       function clampThumbnailSize(value) {
@@ -2741,7 +2752,7 @@
           }
           importedCount.textContent = String(response.data?.supportedFiles ?? 0);
           unsupportedCount.textContent = String(response.data?.unsupportedFiles ?? 0);
-          importErrorCount.textContent = "0";
+          importErrorCount.textContent = String(countImportErrorIssues(response.data?.issues));
           setImportProgress(100, "Completed");
           setImportStepState(100, "Completed");
           setStatus(responseMessage(response));
