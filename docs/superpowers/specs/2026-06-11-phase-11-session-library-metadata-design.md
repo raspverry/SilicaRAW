@@ -361,6 +361,7 @@ Demo/Validation:
   - No arbitrary SQL, column names, or raw predicates can cross from UI to storage.
 - **Validation:**
   - `cargo test -p silica-catalog library_query`
+- **Status:** Completed on 2026-06-11. Added typed `silica-catalog` request/response contracts for bounded offset library queries, whitelisted sort and filter enums, deterministic order fields with explicit tie breakers, and a cursor-pagination deferral marker. Storage indexes and query execution remain Task 11.5.2 and Task 11.5.3.
 
 ### Task 11.5.2: Query Index and Migration Plan
 

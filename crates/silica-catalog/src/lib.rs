@@ -106,6 +106,143 @@ pub struct ImportCandidate {
 /// Highest rating value allowed by the local alpha catalog contract.
 pub const ALPHA_MAX_RATING: u8 = 5;
 
+/// Default bounded page size for library grid queries.
+pub const DEFAULT_LIBRARY_QUERY_LIMIT: u16 = 100;
+/// Maximum accepted page size for offset-based library grid queries.
+pub const MAX_LIBRARY_QUERY_LIMIT: u16 = 500;
+/// Cursor pagination is intentionally deferred until benchmark evidence requires it.
+pub const LIBRARY_QUERY_CURSOR_PAGINATION_DEFERRED: bool = true;
+
+/// Whitelisted sort modes for library grid queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryQuerySort {
+    ImportedAtDesc,
+    FileNameAsc,
+    RatingDesc,
+}
+
+/// Whitelisted file type filters for library grid queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryQueryFileType {
+    Jpeg,
+    Raw,
+    Unsupported,
+}
+
+/// Whitelisted filter set for library grid queries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryQueryFilters {
+    pub min_rating: Option<u8>,
+    pub picked: Option<bool>,
+    pub rejected: Option<bool>,
+    pub file_type: Option<LibraryQueryFileType>,
+    pub search: String,
+}
+
+impl Default for LibraryQueryFilters {
+    fn default() -> Self {
+        Self {
+            min_rating: None,
+            picked: None,
+            rejected: None,
+            file_type: None,
+            search: String::new(),
+        }
+    }
+}
+
+/// Offset-paginated library query request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryQueryRequest {
+    pub offset: u64,
+    pub limit: u16,
+    pub sort: LibraryQuerySort,
+    pub filters: LibraryQueryFilters,
+}
+
+impl LibraryQueryRequest {
+    /// Create a bounded offset-paginated query request.
+    pub fn new(
+        offset: u64,
+        limit: u16,
+        sort: LibraryQuerySort,
+        filters: LibraryQueryFilters,
+    ) -> Self {
+        Self {
+            offset,
+            limit: limit.clamp(1, MAX_LIBRARY_QUERY_LIMIT),
+            sort,
+            filters: normalize_library_query_filters(filters),
+        }
+    }
+
+    /// Return the deterministic order fields storage must implement.
+    pub fn order_fields(&self) -> &'static [LibraryQueryOrderField] {
+        self.sort.order_fields()
+    }
+}
+
+impl Default for LibraryQueryRequest {
+    fn default() -> Self {
+        Self::new(
+            0,
+            DEFAULT_LIBRARY_QUERY_LIMIT,
+            LibraryQuerySort::ImportedAtDesc,
+            LibraryQueryFilters::default(),
+        )
+    }
+}
+
+/// Deterministic order fields for accepted query sort modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryQueryOrderField {
+    ImportedAtDesc,
+    FileNameAsc,
+    RatingDesc,
+    PhotoIdAsc,
+    PathAsc,
+}
+
+impl LibraryQuerySort {
+    /// Return the primary sort plus explicit tie breakers.
+    pub fn order_fields(self) -> &'static [LibraryQueryOrderField] {
+        match self {
+            Self::ImportedAtDesc => &[
+                LibraryQueryOrderField::ImportedAtDesc,
+                LibraryQueryOrderField::PhotoIdAsc,
+            ],
+            Self::FileNameAsc => &[
+                LibraryQueryOrderField::FileNameAsc,
+                LibraryQueryOrderField::PathAsc,
+                LibraryQueryOrderField::PhotoIdAsc,
+            ],
+            Self::RatingDesc => &[
+                LibraryQueryOrderField::RatingDesc,
+                LibraryQueryOrderField::PhotoIdAsc,
+            ],
+        }
+    }
+}
+
+/// Page response contract for storage/core library queries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryQueryPage<T> {
+    pub items: Vec<T>,
+    pub offset: u64,
+    pub limit: u16,
+    pub total_count: u64,
+    pub has_next_page: bool,
+    pub order_fields: &'static [LibraryQueryOrderField],
+}
+
+fn normalize_library_query_filters(mut filters: LibraryQueryFilters) -> LibraryQueryFilters {
+    filters.min_rating = filters
+        .min_rating
+        .map(|rating| rating.min(ALPHA_MAX_RATING));
+    filters.search = filters.search.trim().to_string();
+    filters
+}
+
 /// Domain-facing culling and label flags for one photo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoFlags {
@@ -244,6 +381,66 @@ mod tests {
         assert!(candidate.unsupported);
         assert_eq!(candidate.file_name, "notes.txt");
         assert_eq!(candidate.partial_hash, "hash");
+    }
+
+    #[test]
+    fn records_paged_library_query_contract() {
+        let mut filters = LibraryQueryFilters {
+            min_rating: Some(9),
+            picked: Some(true),
+            rejected: None,
+            file_type: Some(LibraryQueryFileType::Jpeg),
+            search: "  portrait  ".to_string(),
+        };
+
+        let request = LibraryQueryRequest::new(
+            500,
+            MAX_LIBRARY_QUERY_LIMIT + 100,
+            LibraryQuerySort::FileNameAsc,
+            filters.clone(),
+        );
+
+        assert_eq!(request.offset, 500);
+        assert_eq!(request.limit, MAX_LIBRARY_QUERY_LIMIT);
+        assert_eq!(request.filters.min_rating, Some(ALPHA_MAX_RATING));
+        assert_eq!(request.filters.search, "portrait");
+        assert_eq!(
+            request.order_fields(),
+            &[
+                LibraryQueryOrderField::FileNameAsc,
+                LibraryQueryOrderField::PathAsc,
+                LibraryQueryOrderField::PhotoIdAsc,
+            ]
+        );
+        assert!(LIBRARY_QUERY_CURSOR_PAGINATION_DEFERRED);
+
+        filters.min_rating = None;
+        let defaulted = LibraryQueryRequest::new(0, 0, LibraryQuerySort::ImportedAtDesc, filters);
+        assert_eq!(defaulted.limit, 1);
+        assert_eq!(
+            defaulted.order_fields(),
+            &[
+                LibraryQueryOrderField::ImportedAtDesc,
+                LibraryQueryOrderField::PhotoIdAsc,
+            ]
+        );
+
+        let page = LibraryQueryPage {
+            items: vec!["photo-1".to_string()],
+            offset: defaulted.offset,
+            limit: defaulted.limit,
+            total_count: 2,
+            has_next_page: true,
+            order_fields: LibraryQuerySort::RatingDesc.order_fields(),
+        };
+        assert_eq!(
+            page.order_fields,
+            &[
+                LibraryQueryOrderField::RatingDesc,
+                LibraryQueryOrderField::PhotoIdAsc,
+            ]
+        );
+        assert!(page.has_next_page);
     }
 
     #[test]

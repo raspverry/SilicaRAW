@@ -228,6 +228,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Query uses bounded offset pagination with deterministic tie breakers.
   - Query shape is documented.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
+- **Status:** In progress on 2026-06-11. Task 11.5.1 added the typed paged query contract in `silica-catalog`; storage indexes, storage/core execution, desktop DTOs, and UI consumption remain the next Task 11.5 slices.
 
 ### Task 11.6: Virtualized Grid, Keyboard, and Multi-Select
 

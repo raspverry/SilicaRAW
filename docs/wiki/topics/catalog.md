@@ -2,7 +2,7 @@
 title: Catalog
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-11
 source_of_truth: docs/10_Data_Model_and_Storage_Specification.md
 ---
 
@@ -51,6 +51,22 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Sidecar rebuild dry-run scans `sidecars/` in deterministic order, resolves portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults, and reports malformed sidecars, schema issues, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts without applying changes.
 - Backup creation checkpoints WAL state before copying `catalog.db`, copies `sidecars/`, writes `backup-manifest.json`, and excludes originals, disposable caches, export outputs, logs, and nested backups.
 - Restore copies only `catalog.db` and `sidecars/` from validated backup artifacts, verifies through normal open/migration flow, and creates rollback copies before replacing existing target state.
+- Task 11.5.1 defines the typed paged query contract in `silica-catalog`: bounded offset pagination, whitelisted sort/filter enums, deterministic tie breakers, and no UI-provided SQL, column names, or raw predicates.
+
+## Paged Library Query Contract
+
+Task 11.5 starts with a contract before storage implementation:
+
+- Pagination is offset-based with `DEFAULT_LIBRARY_QUERY_LIMIT = 100` and `MAX_LIBRARY_QUERY_LIMIT = 500`.
+- Cursor pagination is explicitly deferred until benchmark evidence requires it.
+- Accepted sort modes are `imported_at_desc`, `file_name_asc`, and `rating_desc`.
+- Deterministic ordering includes explicit tie breakers:
+  - imported-at descending, then photo id ascending
+  - file name ascending, then path ascending, then photo id ascending
+  - rating descending, then photo id ascending
+- Accepted filters are minimum rating, picked, rejected, file type, and search text.
+- File type is a whitelisted enum: JPEG, RAW, or unsupported.
+- Storage must translate the typed contract internally; UI code must not pass SQL strings, column names, or raw predicates.
 
 ## Not Implemented Yet
 
@@ -63,7 +79,8 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Sidecar conflict handling and conflict UI.
 - Full edit history and undo/redo persistence.
 - Cache clear safety.
-- Broad catalog UI screens and visual culling controls.
+- Paged query storage execution, indexes, and desktop wiring.
+- Broad catalog UI screens beyond the local alpha workflow.
 - Plugin or MCP catalog access.
 
 ## Links

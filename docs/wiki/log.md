@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Paged query contract added
+
+- Added Task 11.5.1 typed `silica-catalog` request and page contracts for bounded offset library queries.
+- Whitelisted sort/filter enums and deterministic tie breakers now define what storage may implement.
+- Query indexes and storage/core execution remain Task 11.5.2 and Task 11.5.3.
+
 ## [2026-06-11] phase-11 | Layout visual QA states added
 
 - Added Task 11.4.3 visual QA states for sidebar collapsed, inspector collapsed, and layout reset.
