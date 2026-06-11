@@ -517,6 +517,33 @@ fn reset_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
 }
 
 #[tauri::command]
+fn record_app_session_layout(
+    app: tauri::AppHandle,
+    layout: DesktopLayoutPreferences,
+) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => record_app_session_layout_at_path(session_path, layout),
+        Err(error) => DesktopCommandResponse::error(
+            "record_app_session_layout",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn reset_app_session_layout(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => reset_app_session_layout_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "reset_app_session_layout",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
 fn inspect_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
     match resolve_app_session_path(&app) {
         Ok(session_path) => inspect_app_session_at_path(session_path),
@@ -1050,6 +1077,44 @@ fn reset_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
     }
 }
 
+fn record_app_session_layout_at_path(
+    session_path: PathBuf,
+    layout: DesktopLayoutPreferences,
+) -> DesktopCommandResponse {
+    let command = "record_app_session_layout";
+    let layout = match layout.into_core() {
+        Ok(layout) => layout,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+
+    match silica_core::record_app_session_layout(&session_path, layout) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session layout recorded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn reset_app_session_layout_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "reset_app_session_layout";
+    match silica_core::reset_app_session_layout(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session layout reset.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
 fn inspect_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
     let command = "inspect_app_session";
     let exists = session_path.is_file();
@@ -1299,6 +1364,8 @@ fn main() {
             read_app_session,
             write_app_session,
             reset_app_session,
+            record_app_session_layout,
+            reset_app_session_layout,
             inspect_app_session,
             resolve_launch_restore,
             record_app_session_selection,
@@ -1449,6 +1516,62 @@ mod tests {
         assert_eq!(error.kind, "appSession");
         assert!(error.message.contains("invalid app session mode"));
         assert!(!session_path.exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_layout_commands_round_trip_and_reset() {
+        let workspace = unique_library_root("desktop-layout-preferences");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let mut layout = super::DesktopLayoutPreferences::from_core(
+            silica_core::default_app_layout_preferences(),
+        );
+        layout.sidebar_collapsed = true;
+        layout.inspector_collapsed = true;
+        layout.filmstrip_visible = false;
+        layout.thumbnail_size = 220;
+        layout.sort = "rating_desc".to_string();
+        layout.filters.min_rating = Some(4);
+        layout.filters.file_type = Some("jpeg".to_string());
+        layout.filters.search = "portrait".to_string();
+
+        let recorded = super::record_app_session_layout_at_path(session_path.clone(), layout);
+
+        assert!(recorded.ok);
+        assert_eq!(recorded.command, "record_app_session_layout");
+        match response_data(&recorded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert!(session.layout.sidebar_collapsed);
+                assert!(session.layout.inspector_collapsed);
+                assert!(!session.layout.filmstrip_visible);
+                assert_eq!(session.layout.thumbnail_size, 220);
+                assert_eq!(session.layout.sort, "rating_desc");
+                assert_eq!(session.layout.filters.min_rating, Some(4));
+                assert_eq!(session.layout.filters.file_type.as_deref(), Some("jpeg"));
+                assert_eq!(session.layout.filters.search, "portrait");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let reset = super::reset_app_session_layout_at_path(session_path);
+
+        assert!(reset.ok);
+        assert_eq!(reset.command, "reset_app_session_layout");
+        match response_data(&reset) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert!(!session.layout.sidebar_collapsed);
+                assert!(!session.layout.inspector_collapsed);
+                assert!(session.layout.filmstrip_visible);
+                assert_eq!(session.layout.thumbnail_size, 168);
+                assert_eq!(session.layout.sort, "imported_at_desc");
+                assert_eq!(session.layout.filters.min_rating, None);
+                assert_eq!(session.layout.filters.file_type, None);
+                assert_eq!(session.layout.filters.search, "");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
 
         remove_library_root(&workspace);
     }

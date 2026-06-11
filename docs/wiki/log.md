@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Layout interactions persisted
+
+- Added Task 11.4.2 desktop commands for recording and resetting app-session layout preferences.
+- Wired sidebar, inspector, filmstrip, thumbnail size, sort, and filter controls to app-session layout state without adding catalog query filtering ahead of Task 11.5.
+- Dedicated layout screenshot states remain Task 11.4.3.
+
 ## [2026-06-11] phase-11 | Layout preference model documented
 
 - Added Task 11.4.1 core helpers for layout defaults and layout reset.

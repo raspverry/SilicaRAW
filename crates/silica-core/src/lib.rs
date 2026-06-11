@@ -603,6 +603,25 @@ pub fn reset_app_session_layout(
     Ok(AppSessionLoadResult { session, warnings })
 }
 
+/// Record workspace layout preferences in app-level desktop session state.
+pub fn record_app_session_layout(
+    session_path: impl AsRef<Path>,
+    layout: AppLayoutPreferences,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    session.layout = layout;
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
 /// Plan app relaunch restore from app-session state without opening a writable library.
 pub fn plan_app_session_restore(
     session_path: impl AsRef<Path>,
@@ -1919,14 +1938,19 @@ mod tests {
 
         let mut session = AppSession::default();
         session.last_library_root_path = Some(library_root.clone());
-        session.layout.sidebar_collapsed = true;
-        session.layout.inspector_collapsed = true;
-        session.layout.filmstrip_visible = false;
-        session.layout.thumbnail_size = MAX_APP_SESSION_THUMBNAIL_SIZE;
-        session.layout.sort = AppLibrarySort::RatingDesc;
-        session.layout.filters.min_rating = Some(4);
-        session.layout.filters.search = "portrait".to_string();
         write_app_session(&session_path, &session).expect("write app session");
+
+        let mut changed_layout = default_app_layout_preferences();
+        changed_layout.sidebar_collapsed = true;
+        changed_layout.inspector_collapsed = true;
+        changed_layout.filmstrip_visible = false;
+        changed_layout.thumbnail_size = MAX_APP_SESSION_THUMBNAIL_SIZE;
+        changed_layout.sort = AppLibrarySort::RatingDesc;
+        changed_layout.filters.min_rating = Some(4);
+        changed_layout.filters.search = "portrait".to_string();
+        let recorded = record_app_session_layout(&session_path, changed_layout.clone())
+            .expect("record layout");
+        assert_eq!(recorded.session.layout, changed_layout);
 
         let reset = reset_app_session_layout(&session_path).expect("reset layout");
 

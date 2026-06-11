@@ -6,6 +6,8 @@ body {
 }
 
 .app-frame {
+  --sr-sidebar-width: 64px;
+  --sr-inspector-width: 280px;
   width: 100vw;
   height: 100vh;
   display: grid;
@@ -13,8 +15,26 @@ body {
     "toolbar toolbar toolbar" 60px
     "sidebar main inspector" minmax(0, 1fr)
     "status status status" 52px
-    / 64px minmax(0, 1fr) 280px;
+    / var(--sr-sidebar-width) minmax(0, 1fr) var(--sr-inspector-width);
   background: var(--sr-bg-primary);
+}
+
+.app-frame[data-sidebar-collapsed="true"] {
+  --sr-sidebar-width: 0px;
+}
+
+.app-frame[data-inspector-collapsed="true"] {
+  --sr-inspector-width: 0px;
+}
+
+.app-frame[data-sidebar-collapsed="true"] .sr-sidebar,
+.app-frame[data-inspector-collapsed="true"] .sr-inspector {
+  display: none;
+}
+
+.app-frame[data-filmstrip-visible="false"] .sr-loupe-filmstrip,
+.app-frame[data-filmstrip-visible="false"] .sr-develop-filmstrip {
+  display: none;
 }
 
 .app-frame[data-active-mode="library"][data-library-state="welcome"] {
@@ -857,6 +877,18 @@ progress::-webkit-progress-value {
   display: flex;
   align-items: center;
   gap: var(--sr-space-sm);
+}
+
+.sr-grid-tools select {
+  min-height: 32px;
+  max-width: 132px;
+  padding: 0 var(--sr-space-md);
+  border: 1px solid var(--sr-border-default);
+  border-radius: var(--sr-radius-sm);
+  background: var(--sr-surface-control);
+  color: var(--sr-text-secondary);
+  font: inherit;
+  font-size: var(--sr-type-control);
 }
 
 .sr-grid-state {

@@ -214,7 +214,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - Static UI check.
   - Visual responsive QA.
-- **Status:** In progress on 2026-06-11. Task 11.4.1 established the core layout default/reset model and documented invalid-value behavior. Desktop persistence wiring and responsive QA remain Task 11.4.2 and Task 11.4.3.
+- **Status:** In progress on 2026-06-11. Task 11.4.1 established the core layout default/reset model, and Task 11.4.2 wired desktop/sidebar/inspector/filmstrip/thumbnail/sort/filter persistence to app-session state. Dedicated layout visual QA remains Task 11.4.3.
 
 ### Task 11.5: Paged, Sorted, and Filtered Library Query API
 

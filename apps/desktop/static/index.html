@@ -10,14 +10,14 @@
     <link rel="stylesheet" href="./styles/app-frame.css">
   </head>
   <body>
-    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome">
+    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome" data-sidebar-collapsed="false" data-inspector-collapsed="false" data-filmstrip-visible="true">
       <header class="sr-toolbar" id="appToolbar" role="banner">
         <div class="sr-window-cluster" aria-hidden="true">
           <span class="sr-window-dot sr-window-dot-red"></span>
           <span class="sr-window-dot sr-window-dot-yellow"></span>
           <span class="sr-window-dot sr-window-dot-green"></span>
         </div>
-        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar" data-status-action="Sidebar layout controls">
+        <button class="sr-icon-button" id="toggleSidebar" type="button" aria-label="Toggle sidebar" aria-pressed="false">
           <span class="sr-glyph sr-glyph-sidebar" aria-hidden="true"></span>
         </button>
         <div class="sr-toolbar-title">SilicaRAW</div>
@@ -27,11 +27,11 @@
           <button id="modeExport" type="button" data-mode="export" aria-pressed="false">Export</button>
         </nav>
         <div class="sr-toolbar-actions" aria-label="Toolbar actions">
-          <input class="sr-search" type="search" aria-label="Search photos" placeholder="Search" disabled title="Search is deferred until real recents and filters are implemented.">
+          <input class="sr-search" id="librarySearch" type="search" aria-label="Search photos" placeholder="Search" title="Search preference is saved; catalog query filtering starts with the paged query API.">
           <button class="sr-icon-button" type="button" aria-label="Grid view" data-status-action="Grid view options">
             <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
           </button>
-          <button class="sr-icon-button" type="button" aria-label="Inspector" data-status-action="Inspector layout controls">
+          <button class="sr-icon-button" id="toggleInspector" type="button" aria-label="Toggle inspector" aria-pressed="false">
             <span class="sr-glyph sr-glyph-panel" aria-hidden="true"></span>
           </button>
           <button class="sr-fit-action" type="button" data-status-action="Fit zoom controls">Fit</button>
@@ -198,9 +198,30 @@
                   <span id="gridPhotoSubtitle">Preview catalog rows</span>
                 </div>
                 <div class="sr-grid-tools">
-                  <button type="button" disabled title="File filters are deferred for the local alpha.">All Files</button>
-                  <button type="button" aria-label="Minimum rating" disabled title="Rating filters are deferred for the local alpha.">*****</button>
-                  <button type="button" disabled title="Sort controls are deferred for the local alpha.">Capture Time</button>
+                  <select id="fileTypeFilter" aria-label="File type filter">
+                    <option value="">All Files</option>
+                    <option value="jpeg">JPEG</option>
+                    <option value="raw">RAW</option>
+                    <option value="unsupported">Unsupported</option>
+                  </select>
+                  <select id="minRatingFilter" aria-label="Minimum rating">
+                    <option value="">Any Rating</option>
+                    <option value="1">1+ Stars</option>
+                    <option value="2">2+ Stars</option>
+                    <option value="3">3+ Stars</option>
+                    <option value="4">4+ Stars</option>
+                    <option value="5">5 Stars</option>
+                  </select>
+                  <select id="cullingFilter" aria-label="Culling filter">
+                    <option value="">All Culling</option>
+                    <option value="picked">Picked</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <select id="librarySort" aria-label="Library sort">
+                    <option value="imported_at_desc">Imported</option>
+                    <option value="file_name_asc">File Name</option>
+                    <option value="rating_desc">Rating</option>
+                  </select>
                 </div>
               </div>
               <div class="sr-grid-state" id="gridLoadingState" hidden>
@@ -361,7 +382,8 @@
           <button class="sr-icon-button" type="button" aria-label="Grid">
             <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
           </button>
-          <button class="sr-icon-button" type="button" aria-label="Loupe">1:1</button>
+          <button class="sr-icon-button" id="toggleFilmstrip" type="button" aria-label="Toggle filmstrip" aria-pressed="true">Film</button>
+          <button class="sr-icon-button" id="resetLayout" type="button" aria-label="Reset layout">Reset</button>
         </div>
         <div class="sr-status-right">
           <output id="appStatus" aria-live="polite">No library open</output>
@@ -509,6 +531,15 @@
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
+      const toggleSidebarButton = document.querySelector("#toggleSidebar");
+      const toggleInspectorButton = document.querySelector("#toggleInspector");
+      const toggleFilmstripButton = document.querySelector("#toggleFilmstrip");
+      const resetLayoutButton = document.querySelector("#resetLayout");
+      const librarySearchInput = document.querySelector("#librarySearch");
+      const fileTypeFilterInput = document.querySelector("#fileTypeFilter");
+      const minRatingFilterInput = document.querySelector("#minRatingFilter");
+      const cullingFilterInput = document.querySelector("#cullingFilter");
+      const librarySortInput = document.querySelector("#librarySort");
 
       const invoke = window.__TAURI__?.core?.invoke;
       const dialogApi = window.__TAURI__?.dialog;
@@ -519,6 +550,8 @@
       let recentLibraries = [];
       let developPreviewSequence = 0;
       let controlsBusy = false;
+      let layoutHydrating = false;
+      let layoutSaveTimer = 0;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
@@ -562,6 +595,118 @@
 
       function commandFailed(response) {
         return !response || response.ok === false;
+      }
+
+      function clampThumbnailSize(value) {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isNaN(parsed)) {
+          return 168;
+        }
+        return Math.min(220, Math.max(132, parsed));
+      }
+
+      function normalizeLayoutPreferences(layout = {}) {
+        const filters = layout.filters ?? {};
+        return {
+          sidebarCollapsed: Boolean(layout.sidebarCollapsed),
+          inspectorCollapsed: Boolean(layout.inspectorCollapsed),
+          filmstripVisible: layout.filmstripVisible !== false,
+          thumbnailSize: clampThumbnailSize(layout.thumbnailSize ?? 168),
+          sort: ["imported_at_desc", "file_name_asc", "rating_desc"].includes(layout.sort)
+            ? layout.sort
+            : "imported_at_desc",
+          filters: {
+            minRating: [1, 2, 3, 4, 5].includes(Number(filters.minRating)) ? Number(filters.minRating) : null,
+            picked: typeof filters.picked === "boolean" ? filters.picked : null,
+            rejected: typeof filters.rejected === "boolean" ? filters.rejected : null,
+            fileType: ["jpeg", "raw", "unsupported"].includes(filters.fileType) ? filters.fileType : null,
+            search: typeof filters.search === "string" ? filters.search : "",
+          },
+        };
+      }
+
+      function currentLayoutPreferences() {
+        const cullingFilter = cullingFilterInput.value;
+        return normalizeLayoutPreferences({
+          sidebarCollapsed: appFrame.dataset.sidebarCollapsed === "true",
+          inspectorCollapsed: appFrame.dataset.inspectorCollapsed === "true",
+          filmstripVisible: appFrame.dataset.filmstripVisible !== "false",
+          thumbnailSize: thumbnailSizeInput.value,
+          sort: librarySortInput.value,
+          filters: {
+            minRating: minRatingFilterInput.value ? Number(minRatingFilterInput.value) : null,
+            picked: cullingFilter === "picked" ? true : null,
+            rejected: cullingFilter === "rejected" ? true : null,
+            fileType: fileTypeFilterInput.value || null,
+            search: librarySearchInput.value,
+          },
+        });
+      }
+
+      function applyLayoutPreferences(layout = {}, options = {}) {
+        const normalized = normalizeLayoutPreferences(layout);
+        layoutHydrating = true;
+        appFrame.dataset.sidebarCollapsed = String(normalized.sidebarCollapsed);
+        appFrame.dataset.inspectorCollapsed = String(normalized.inspectorCollapsed);
+        appFrame.dataset.filmstripVisible = String(normalized.filmstripVisible);
+        toggleSidebarButton.setAttribute("aria-pressed", String(normalized.sidebarCollapsed));
+        toggleInspectorButton.setAttribute("aria-pressed", String(normalized.inspectorCollapsed));
+        toggleFilmstripButton.setAttribute("aria-pressed", String(normalized.filmstripVisible));
+        thumbnailSizeInput.value = String(normalized.thumbnailSize);
+        libraryGrid.style.setProperty("--sr-thumb-min", `${normalized.thumbnailSize}px`);
+        libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${normalized.thumbnailSize}px, 1fr))`;
+        librarySortInput.value = normalized.sort;
+        fileTypeFilterInput.value = normalized.filters.fileType ?? "";
+        minRatingFilterInput.value = normalized.filters.minRating ? String(normalized.filters.minRating) : "";
+        cullingFilterInput.value = normalized.filters.picked ? "picked" : normalized.filters.rejected ? "rejected" : "";
+        librarySearchInput.value = normalized.filters.search;
+        layoutHydrating = false;
+        if (options.persist) {
+          scheduleLayoutPersistence();
+        }
+      }
+
+      function scheduleLayoutPersistence() {
+        if (layoutHydrating || !invoke) {
+          return;
+        }
+        window.clearTimeout(layoutSaveTimer);
+        layoutSaveTimer = window.setTimeout(() => recordLayoutPreferences(), 180);
+      }
+
+      async function recordLayoutPreferences() {
+        if (!invoke) {
+          return;
+        }
+        try {
+          const response = await invoke("record_app_session_layout", {
+            layout: currentLayoutPreferences(),
+          });
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Layout preferences failed to save."));
+          }
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "Layout preferences failed to save."));
+        }
+      }
+
+      async function resetLayoutPreferences() {
+        if (!invoke) {
+          applyLayoutPreferences({}, { persist: false });
+          setStatus("Layout reset.");
+          return;
+        }
+        try {
+          const response = await invoke("reset_app_session_layout");
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Layout reset failed."));
+            return;
+          }
+          applyLayoutPreferences(response.data?.session?.layout ?? {}, { persist: false });
+          setStatus("Layout reset.");
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "Layout reset failed."));
+        }
       }
 
       async function recordActiveSessionState(mode = appFrame.dataset.activeMode || "library") {
@@ -654,7 +799,9 @@
             renderRecentLibraries([]);
             return;
           }
-          renderRecentLibraries(response.data?.session?.recents ?? []);
+          const session = response.data?.session ?? {};
+          renderRecentLibraries(session.recents ?? []);
+          applyLayoutPreferences(session.layout ?? {}, { persist: false });
         } catch (_error) {
           renderRecentLibraries([]);
         }
@@ -678,6 +825,7 @@
       async function resolveLaunchRestore() {
         if (!invoke) {
           renderRecentLibraries([]);
+          applyLayoutPreferences({}, { persist: false });
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
           setMode("library", { persist: false });
@@ -688,6 +836,7 @@
           const response = await invoke("resolve_launch_restore");
           if (commandFailed(response)) {
             renderRecentLibraries([]);
+            applyLayoutPreferences({}, { persist: false });
             renderLibraryGrid(initialGridPhotos);
             setLibraryState("welcome");
             setMode("library", { persist: false });
@@ -697,6 +846,7 @@
 
           const restore = response.data ?? {};
           renderRecentLibraries(restore.session?.recents ?? []);
+          applyLayoutPreferences(restore.session?.layout ?? {}, { persist: false });
           if (restore.state !== "library" || !restore.libraryRootPath) {
             activeLibraryPath = "";
             setLibraryState("welcome");
@@ -722,6 +872,7 @@
           );
         } catch (error) {
           renderRecentLibraries([]);
+          applyLayoutPreferences({}, { persist: false });
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
           setMode("library", { persist: false });
@@ -2070,9 +2221,27 @@
         exportOutputPath.dataset.autofilled = "false";
         syncExportDialog();
       });
+      toggleSidebarButton.addEventListener("click", () => {
+        appFrame.dataset.sidebarCollapsed = String(appFrame.dataset.sidebarCollapsed !== "true");
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      toggleInspectorButton.addEventListener("click", () => {
+        appFrame.dataset.inspectorCollapsed = String(appFrame.dataset.inspectorCollapsed !== "true");
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      toggleFilmstripButton.addEventListener("click", () => {
+        appFrame.dataset.filmstripVisible = String(appFrame.dataset.filmstripVisible === "false");
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      resetLayoutButton.addEventListener("click", resetLayoutPreferences);
       thumbnailSizeInput.addEventListener("input", () => {
-        libraryGrid.style.setProperty("--sr-thumb-min", `${thumbnailSizeInput.value}px`);
-        libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${thumbnailSizeInput.value}px, 1fr))`;
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      [librarySearchInput, fileTypeFilterInput, minRatingFilterInput, cullingFilterInput, librarySortInput].forEach((control) => {
+        control.addEventListener("input", () => {
+          applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+          setStatus("Layout preferences saved. Catalog query filtering starts with the paged query API.");
+        });
       });
       viewImportErrorsButton.addEventListener("click", () => {
         setStatus("Unsupported and failed files will be reviewable after import.");

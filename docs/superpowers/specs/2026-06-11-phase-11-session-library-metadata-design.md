@@ -321,6 +321,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-static-ui.py`
   - targeted visual responsive QA
+- **Status:** Completed on 2026-06-11. Added desktop layout record/reset commands, wired sidebar, inspector, filmstrip, thumbnail size, sort, and filter controls to app-session layout state, and restored saved layout preferences on launch/app-session reads. The static UI and workflow smoke checks cover the interaction contract; dedicated layout screenshots remain Task 11.4.3.
 
 ### Task 11.4.3: Layout Visual QA States
 
