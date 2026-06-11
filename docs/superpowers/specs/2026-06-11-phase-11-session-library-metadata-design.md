@@ -198,6 +198,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-md-links.py`
   - `scripts/harness/check.sh`
+- **Status:** Completed on 2026-06-11. Added this Phase 11 design gate, documented persistence boundaries, atomic task order, stop gates, validation strategy, and linked it from the post-alpha roadmap before implementation work.
 
 ### Task 11.1.2: App Session Schema and Core Types
 
