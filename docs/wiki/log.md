@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Paged query indexes added
+
+- Added Task 11.5.2 catalog schema version 3 for paged library queries.
+- Storage migration 3 adds normalized `photos.file_type` values and query indexes for accepted sort/filter fields.
+- Storage/core paged query execution remains Task 11.5.3.
+
 ## [2026-06-11] phase-11 | Paged query contract added
 
 - Added Task 11.5.1 typed `silica-catalog` request and page contracts for bounded offset library queries.
 - Whitelisted sort/filter enums and deterministic tie breakers now define what storage may implement.
-- Query indexes and storage/core execution remain Task 11.5.2 and Task 11.5.3.
+- At the time, query indexes and storage/core execution remained Task 11.5.2 and Task 11.5.3.
 
 ## [2026-06-11] phase-11 | Layout visual QA states added
 

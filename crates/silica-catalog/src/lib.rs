@@ -10,7 +10,7 @@ use std::fmt;
 pub const CRATE_NAME: &str = "silica-catalog";
 
 /// Current local alpha catalog schema version.
-pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 2;
+pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 3;
 
 /// Migration bookkeeping table required in every catalog database.
 pub const SCHEMA_MIGRATIONS_TABLE: &str = "schema_migrations";
@@ -42,9 +42,13 @@ pub const ALPHA_CATALOG_REQUIRED_INDEXES: &[&str] = &[
     "idx_photos_folder_id",
     "idx_photos_capture_time",
     "idx_photos_imported_at",
+    "idx_photos_library_imported_id",
+    "idx_photos_library_file_name_path_id",
+    "idx_photos_library_file_type_id",
     "idx_photos_missing",
     "idx_photos_unsupported",
     "idx_photo_flags_rating",
+    "idx_photo_flags_rating_photo_id",
     "idx_photo_flags_rejected",
     "idx_photo_flags_picked",
     "idx_photo_flags_label",
@@ -327,7 +331,7 @@ mod tests {
 
     #[test]
     fn records_phase_4_1_catalog_schema_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 2);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 3);
         assert_eq!(ALPHA_CATALOG_SCHEMA.migration_table, "schema_migrations");
         assert_eq!(
             ALPHA_CATALOG_SCHEMA.required_tables,
@@ -441,6 +445,22 @@ mod tests {
             ]
         );
         assert!(page.has_next_page);
+    }
+
+    #[test]
+    fn records_paged_query_index_contract() {
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 3);
+        for index_name in [
+            "idx_photos_library_imported_id",
+            "idx_photos_library_file_name_path_id",
+            "idx_photos_library_file_type_id",
+            "idx_photo_flags_rating_photo_id",
+        ] {
+            assert!(
+                ALPHA_CATALOG_SCHEMA.required_indexes.contains(&index_name),
+                "missing paged query index contract {index_name}"
+            );
+        }
     }
 
     #[test]

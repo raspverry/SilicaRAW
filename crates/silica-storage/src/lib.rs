@@ -433,6 +433,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "required_catalog_indexes",
         sql: REQUIRED_INDEXES_SQL,
     },
+    Migration {
+        version: 3,
+        name: "paged_library_query_indexes",
+        sql: PAGED_LIBRARY_QUERY_INDEXES_SQL,
+    },
 ];
 
 /// Open a catalog database and apply all embedded migrations.
@@ -2520,9 +2525,10 @@ fn record_import_candidates(
               modified_at,
               missing,
               unsupported,
+              file_type,
               partial_hash
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10)
             ON CONFLICT(library_id, path) DO UPDATE SET
               folder_id = excluded.folder_id,
               file_name = excluded.file_name,
@@ -2530,6 +2536,7 @@ fn record_import_candidates(
               modified_at = excluded.modified_at,
               missing = 0,
               unsupported = excluded.unsupported,
+              file_type = excluded.file_type,
               partial_hash = excluded.partial_hash
             "#,
             params![
@@ -2541,6 +2548,7 @@ fn record_import_candidates(
                 candidate.file_size,
                 candidate.modified_at,
                 bool_to_sql(candidate.unsupported),
+                catalog_file_type_for_path(&candidate.path, candidate.unsupported),
                 candidate.partial_hash,
             ],
         )?;
@@ -2557,6 +2565,25 @@ fn record_import_candidates(
 
     transaction.commit()?;
     Ok(())
+}
+
+fn catalog_file_type_for_path(path: &str, unsupported: bool) -> &'static str {
+    if unsupported {
+        return "unsupported";
+    }
+
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+
+    if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
+        "jpeg"
+    } else if is_supported_photo_extension(extension) {
+        "raw"
+    } else {
+        "unsupported"
+    }
 }
 
 fn photo_flags_from_row(
@@ -2953,6 +2980,64 @@ CREATE INDEX IF NOT EXISTS idx_action_log_created_at
   ON action_log(created_at);
 "#;
 
+const PAGED_LIBRARY_QUERY_INDEXES_SQL: &str = r#"
+ALTER TABLE photos
+  ADD COLUMN file_type TEXT NOT NULL DEFAULT 'unsupported'
+  CHECK (file_type IN ('jpeg', 'raw', 'unsupported'));
+
+UPDATE photos
+SET file_type = CASE
+  WHEN unsupported = 1 THEN 'unsupported'
+  WHEN lower(file_name) GLOB '*.jpg'
+    OR lower(file_name) GLOB '*.jpeg'
+    OR lower(path) GLOB '*.jpg'
+    OR lower(path) GLOB '*.jpeg'
+    THEN 'jpeg'
+  WHEN lower(file_name) GLOB '*.dng'
+    OR lower(file_name) GLOB '*.cr2'
+    OR lower(file_name) GLOB '*.cr3'
+    OR lower(file_name) GLOB '*.nef'
+    OR lower(file_name) GLOB '*.arw'
+    OR lower(file_name) GLOB '*.raf'
+    OR lower(file_name) GLOB '*.orf'
+    OR lower(file_name) GLOB '*.rw2'
+    OR lower(file_name) GLOB '*.pef'
+    OR lower(file_name) GLOB '*.srw'
+    OR lower(file_name) GLOB '*.raw'
+    OR lower(file_name) GLOB '*.tif'
+    OR lower(file_name) GLOB '*.tiff'
+    OR lower(file_name) GLOB '*.heic'
+    OR lower(path) GLOB '*.dng'
+    OR lower(path) GLOB '*.cr2'
+    OR lower(path) GLOB '*.cr3'
+    OR lower(path) GLOB '*.nef'
+    OR lower(path) GLOB '*.arw'
+    OR lower(path) GLOB '*.raf'
+    OR lower(path) GLOB '*.orf'
+    OR lower(path) GLOB '*.rw2'
+    OR lower(path) GLOB '*.pef'
+    OR lower(path) GLOB '*.srw'
+    OR lower(path) GLOB '*.raw'
+    OR lower(path) GLOB '*.tif'
+    OR lower(path) GLOB '*.tiff'
+    OR lower(path) GLOB '*.heic'
+    THEN 'raw'
+  ELSE 'unsupported'
+END;
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_imported_id
+  ON photos(library_id, imported_at DESC, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_file_name_path_id
+  ON photos(library_id, file_name ASC, path ASC, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_file_type_id
+  ON photos(library_id, file_type, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photo_flags_rating_photo_id
+  ON photo_flags(rating DESC, photo_id ASC);
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3028,6 +3113,99 @@ mod tests {
             CURRENT_SCHEMA_VERSION
         );
         assert!(catalog_object_exists(&connection, "idx_photos_library_id").expect("index lookup"));
+    }
+
+    #[test]
+    fn query_index_migration_adds_normalized_file_type_and_indexes() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations(&mut connection).expect("run migrations");
+
+        let file_type_columns: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('photos') WHERE name = 'file_type'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("file_type column count");
+        assert_eq!(file_type_columns, 1);
+
+        for index_name in [
+            "idx_photos_library_imported_id",
+            "idx_photos_library_file_name_path_id",
+            "idx_photos_library_file_type_id",
+            "idx_photo_flags_rating_photo_id",
+        ] {
+            assert!(
+                catalog_object_exists(&connection, index_name).expect("index lookup"),
+                "missing paged query index {index_name}"
+            );
+        }
+
+        run_migrations(&mut connection).expect("rerun migrations");
+        assert_eq!(
+            current_schema_version(&connection).expect("schema version"),
+            CURRENT_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn query_index_migration_backfills_photo_file_type() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations_through(&mut connection, 2).expect("run v2 migrations");
+
+        connection
+            .execute(
+                "INSERT INTO libraries(id, root_path) VALUES ('local', '/tmp/library')",
+                [],
+            )
+            .expect("insert library");
+        connection
+            .execute(
+                "INSERT INTO folders(id, library_id, path) VALUES ('folder', 'local', '/tmp/import')",
+                [],
+            )
+            .expect("insert folder");
+        for (id, file_name, unsupported) in [
+            ("photo-jpeg", "portrait.JPG", 0_i64),
+            ("photo-raw", "sample.DNG", 0_i64),
+            ("photo-unsupported", "notes.txt", 1_i64),
+        ] {
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO photos(
+                      id, library_id, folder_id, file_name, path, unsupported
+                    )
+                    VALUES (?1, 'local', 'folder', ?2, ?3, ?4)
+                    "#,
+                    params![
+                        id,
+                        file_name,
+                        format!("/tmp/import/{file_name}"),
+                        unsupported
+                    ],
+                )
+                .expect("insert v2 photo");
+        }
+
+        run_migrations(&mut connection).expect("upgrade to current");
+
+        for (id, expected) in [
+            ("photo-jpeg", "jpeg"),
+            ("photo-raw", "raw"),
+            ("photo-unsupported", "unsupported"),
+        ] {
+            let actual: String = connection
+                .query_row(
+                    "SELECT file_type FROM photos WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .expect("file type");
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]
@@ -4191,26 +4369,42 @@ mod tests {
             .expect("count photos");
         assert_eq!(imported_count, 2);
 
-        let (path, file_size, unsupported, partial_hash): (String, i64, i64, String) = connection
+        let (path, file_size, unsupported, file_type, partial_hash): (
+            String,
+            i64,
+            i64,
+            String,
+            String,
+        ) = connection
             .query_row(
-                "SELECT path, file_size, unsupported, partial_hash FROM photos WHERE file_name = 'sample.DNG'",
+                "SELECT path, file_size, unsupported, file_type, partial_hash FROM photos WHERE file_name = 'sample.DNG'",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
             )
             .expect("supported row");
         assert_eq!(path, supported_file.display().to_string());
         assert_eq!(file_size, supported_before.len() as i64);
         assert_eq!(unsupported, 0);
+        assert_eq!(file_type, "raw");
         assert!(!partial_hash.is_empty());
 
-        let unsupported: i64 = connection
+        let (unsupported, file_type): (i64, String) = connection
             .query_row(
-                "SELECT unsupported FROM photos WHERE file_name = 'notes.txt'",
+                "SELECT unsupported, file_type FROM photos WHERE file_name = 'notes.txt'",
                 [],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .expect("unsupported row");
         assert_eq!(unsupported, 1);
+        assert_eq!(file_type, "unsupported");
 
         assert_eq!(
             std::fs::read(&supported_file).expect("read supported after"),

@@ -375,6 +375,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage query_index`
   - `cargo test -p silica-catalog`
+- **Status:** Completed on 2026-06-11. Raised the catalog schema contract to version 3, added a normalized `photos.file_type` migration/backfill for `jpeg`, `raw`, and `unsupported`, and added the accepted paged-query indexes for imported-time sorting, filename/path sorting, file-type filtering, and rating sorting. Storage/core query execution remains Task 11.5.3.
 
 ### Task 11.5.3: Storage and Core Paged Query API
 

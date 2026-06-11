@@ -26,15 +26,17 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 10.5.1 records backup/WAL/checkpoint/restore policy before backup or restore code is added.
 - Task 10.5.2 adds checkpointed backup artifacts under `backups/` containing `catalog.db`, `sidecars/`, and a manifest only.
 - Task 10.5.3 adds staged restore from backup artifacts with rollback copies for existing target libraries.
+- Task 11.5.2 adds catalog schema version 3 for paged-query support: normalized `photos.file_type` values and query indexes for accepted sort/filter fields.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
 ## Implemented Foundation
 
-- Current alpha schema version: `2`.
+- Current alpha schema version: `3`.
 - Migration table: `schema_migrations`.
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
+- Migration 3 adds `photos.file_type`, backfills `jpeg`, `raw`, and `unsupported`, and creates the accepted paged-query indexes.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
@@ -52,6 +54,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Backup creation checkpoints WAL state before copying `catalog.db`, copies `sidecars/`, writes `backup-manifest.json`, and excludes originals, disposable caches, export outputs, logs, and nested backups.
 - Restore copies only `catalog.db` and `sidecars/` from validated backup artifacts, verifies through normal open/migration flow, and creates rollback copies before replacing existing target state.
 - Task 11.5.1 defines the typed paged query contract in `silica-catalog`: bounded offset pagination, whitelisted sort/filter enums, deterministic tie breakers, and no UI-provided SQL, column names, or raw predicates.
+- Task 11.5.2 represents the paged-query indexes in the catalog schema contract and applies them through embedded storage migration 3.
 
 ## Paged Library Query Contract
 
@@ -65,7 +68,12 @@ Task 11.5 starts with a contract before storage implementation:
   - file name ascending, then path ascending, then photo id ascending
   - rating descending, then photo id ascending
 - Accepted filters are minimum rating, picked, rejected, file type, and search text.
-- File type is a whitelisted enum: JPEG, RAW, or unsupported.
+- File type is a whitelisted enum: JPEG, RAW, or unsupported. Storage records this as normalized `photos.file_type` values `jpeg`, `raw`, and `unsupported`; in the local alpha, `raw` means supported non-JPEG photo candidates until later metadata extraction expands the taxonomy.
+- Required query indexes are:
+  - `idx_photos_library_imported_id`
+  - `idx_photos_library_file_name_path_id`
+  - `idx_photos_library_file_type_id`
+  - `idx_photo_flags_rating_photo_id`
 - Storage must translate the typed contract internally; UI code must not pass SQL strings, column names, or raw predicates.
 
 ## Not Implemented Yet
@@ -79,7 +87,7 @@ Task 11.5 starts with a contract before storage implementation:
 - Sidecar conflict handling and conflict UI.
 - Full edit history and undo/redo persistence.
 - Cache clear safety.
-- Paged query storage execution, indexes, and desktop wiring.
+- Paged query storage execution and desktop wiring.
 - Broad catalog UI screens beyond the local alpha workflow.
 - Plugin or MCP catalog access.
 
