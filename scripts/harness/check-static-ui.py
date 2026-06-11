@@ -104,6 +104,7 @@ def main():
         "importProgress",
         "importSummary",
         "unsupportedCount",
+        "importRecursive",
         "importIssueReview",
         "importIssueReviewTitle",
         "importIssueReviewSummary",
@@ -253,6 +254,18 @@ def main():
     require(exposure_slider.get("min") == "-5", "#developExposureSlider min must match edit graph exposure", failures)
     require(exposure_slider.get("max") == "5", "#developExposureSlider max must match edit graph exposure", failures)
     require(exposure_slider.get("step") == "0.05", "#developExposureSlider step must support precise exposure edits", failures)
+
+    import_recursive = parser.ids.get("importRecursive", {})
+    require(
+        import_recursive.get("type") == "checkbox",
+        "#importRecursive must be a checkbox",
+        failures,
+    )
+    require(
+        "checked" not in import_recursive,
+        "#importRecursive must default off",
+        failures,
+    )
 
     contrast_slider = parser.ids.get("developContrastSlider", {})
     require(contrast_slider.get("type") == "range", "#developContrastSlider must be a range input", failures)

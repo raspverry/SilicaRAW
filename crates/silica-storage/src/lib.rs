@@ -272,6 +272,12 @@ pub struct FolderImportSummary {
     pub issues: Vec<ImportIssue>,
 }
 
+/// Options for folder import scanning.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FolderImportOptions {
+    pub recursive: bool,
+}
+
 /// Catalog row data needed to open a preview for one photo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoPreviewCandidate {
@@ -933,13 +939,30 @@ pub fn import_folder(
     library_root_path: impl AsRef<Path>,
     folder_path: impl AsRef<Path>,
 ) -> Result<FolderImportSummary, LibraryStorageError> {
+    import_folder_with_options(
+        library_root_path,
+        folder_path,
+        FolderImportOptions::default(),
+    )
+}
+
+/// Scan a selected folder and record file candidates by reference.
+pub fn import_folder_with_options(
+    library_root_path: impl AsRef<Path>,
+    folder_path: impl AsRef<Path>,
+    options: FolderImportOptions,
+) -> Result<FolderImportSummary, LibraryStorageError> {
     let library = open_existing_library_for_read(library_root_path)?;
     let folder_path = folder_path.as_ref();
+    let root_policy_issue = import_root_policy_issue(folder_path)?;
+    if let Some(issue) = root_policy_issue {
+        return Ok(empty_import_summary(folder_path.to_path_buf(), vec![issue]));
+    }
     if !folder_path.is_dir() {
         return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
     }
 
-    let (mut candidates, mut issues) = scan_import_candidates(folder_path)?;
+    let (mut candidates, mut issues) = scan_import_candidates(folder_path, options)?;
     candidates.sort_by(|left, right| left.path.cmp(&right.path));
     issues.sort_by(|left, right| {
         left.path
@@ -964,6 +987,17 @@ pub fn import_folder(
         candidates,
         issues,
     })
+}
+
+fn empty_import_summary(folder_path: PathBuf, issues: Vec<ImportIssue>) -> FolderImportSummary {
+    FolderImportSummary {
+        folder_path,
+        scanned_files: 0,
+        supported_files: 0,
+        unsupported_files: 0,
+        candidates: Vec::new(),
+        issues,
+    }
 }
 
 /// Insert or update normalized metadata for an imported photo by original path.
@@ -2800,17 +2834,55 @@ fn upsert_local_library_row(
     Ok(())
 }
 
+const IMPORT_RECURSIVE_MAX_DEPTH: usize = 20;
+
+struct ImportScanState {
+    candidates: Vec<ImportCandidate>,
+    issues: Vec<ImportIssue>,
+    recursive: bool,
+}
+
 fn scan_import_candidates(
     folder_path: &Path,
+    options: FolderImportOptions,
 ) -> Result<(Vec<ImportCandidate>, Vec<ImportIssue>), LibraryStorageError> {
-    let mut candidates = Vec::new();
-    let mut issues = Vec::new();
+    let mut state = ImportScanState {
+        candidates: Vec::new(),
+        issues: Vec::new(),
+        recursive: options.recursive,
+    };
+    scan_import_directory(folder_path, 0, true, &mut state)?;
+    Ok((state.candidates, state.issues))
+}
 
-    for entry in fs::read_dir(folder_path)? {
+fn scan_import_directory(
+    folder_path: &Path,
+    depth: usize,
+    is_root: bool,
+    state: &mut ImportScanState,
+) -> Result<(), LibraryStorageError> {
+    let entries = match fs::read_dir(folder_path) {
+        Ok(entries) => entries,
+        Err(error) if is_root => return Err(LibraryStorageError::from(error)),
+        Err(error) => {
+            state.issues.push(import_issue(
+                ImportIssueKind::DirectoryReadFailed,
+                folder_path,
+                folder_path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(ToOwned::to_owned),
+                format!("failed to read directory: {error}"),
+            ));
+            return Ok(());
+        }
+    };
+
+    for entry in entries {
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
-                issues.push(import_issue(
+                state.issues.push(import_issue(
                     ImportIssueKind::EntryMetadataFailed,
                     folder_path,
                     None,
@@ -2824,7 +2896,7 @@ fn scan_import_candidates(
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(error) => {
-                issues.push(import_issue(
+                state.issues.push(import_issue(
                     ImportIssueKind::EntryMetadataFailed,
                     &path,
                     Some(file_name),
@@ -2835,7 +2907,7 @@ fn scan_import_candidates(
         };
 
         if file_type.is_symlink() {
-            issues.push(import_issue(
+            state.issues.push(import_issue(
                 ImportIssueKind::SymlinkEntrySkipped,
                 &path,
                 Some(file_name),
@@ -2845,7 +2917,7 @@ fn scan_import_candidates(
         }
 
         if is_hidden_entry(&file_name) {
-            issues.push(import_issue(
+            state.issues.push(import_issue(
                 ImportIssueKind::HiddenEntrySkipped,
                 &path,
                 Some(file_name),
@@ -2856,12 +2928,23 @@ fn scan_import_candidates(
 
         if file_type.is_dir() {
             if is_package_directory(&path) {
-                issues.push(import_issue(
+                state.issues.push(import_issue(
                     ImportIssueKind::PackageDirectorySkipped,
                     &path,
                     Some(file_name),
                     "package directories are skipped by import policy",
                 ));
+            } else if state.recursive {
+                if depth >= IMPORT_RECURSIVE_MAX_DEPTH {
+                    state.issues.push(import_issue(
+                        ImportIssueKind::MaxDepthExceeded,
+                        &path,
+                        Some(file_name),
+                        "recursive import reached the local alpha depth limit",
+                    ));
+                } else {
+                    scan_import_directory(&path, depth + 1, false, state)?;
+                }
             }
             continue;
         }
@@ -2873,7 +2956,7 @@ fn scan_import_candidates(
         let metadata = match entry.metadata() {
             Ok(metadata) => metadata,
             Err(error) => {
-                issues.push(import_issue(
+                state.issues.push(import_issue(
                     ImportIssueKind::EntryMetadataFailed,
                     &path,
                     Some(file_name),
@@ -2890,7 +2973,7 @@ fn scan_import_candidates(
         let partial_hash = match partial_file_hash(&path) {
             Ok(hash) => hash,
             Err(error) => {
-                issues.push(import_issue(
+                state.issues.push(import_issue(
                     ImportIssueKind::EntryMetadataFailed,
                     &path,
                     Some(file_name),
@@ -2901,7 +2984,7 @@ fn scan_import_candidates(
         };
 
         if unsupported {
-            issues.push(import_issue(
+            state.issues.push(import_issue(
                 ImportIssueKind::UnsupportedFile,
                 &path,
                 Some(file_name.clone()),
@@ -2909,7 +2992,7 @@ fn scan_import_candidates(
             ));
         }
 
-        candidates.push(ImportCandidate {
+        state.candidates.push(ImportCandidate {
             file_name,
             path: path_to_string(&path)?,
             file_size: metadata.len() as i64,
@@ -2919,7 +3002,7 @@ fn scan_import_candidates(
         });
     }
 
-    Ok((candidates, issues))
+    Ok(())
 }
 
 fn import_issue(
@@ -2934,6 +3017,53 @@ fn import_issue(
         file_name,
         message: message.into(),
     }
+}
+
+fn import_root_policy_issue(
+    folder_path: &Path,
+) -> Result<Option<ImportIssue>, LibraryStorageError> {
+    let metadata = match fs::symlink_metadata(folder_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
+        }
+        Err(error) => return Err(LibraryStorageError::from(error)),
+    };
+    let file_name = folder_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .map(ToOwned::to_owned);
+
+    if metadata.file_type().is_symlink() {
+        return Ok(Some(import_issue(
+            ImportIssueKind::SymlinkEntrySkipped,
+            folder_path,
+            file_name,
+            "symbolic links are skipped by import policy",
+        )));
+    }
+
+    if let Some(name) = file_name.as_deref() {
+        if is_hidden_entry(name) {
+            return Ok(Some(import_issue(
+                ImportIssueKind::HiddenEntrySkipped,
+                folder_path,
+                file_name,
+                "hidden entries are skipped by import policy",
+            )));
+        }
+    }
+
+    if metadata.is_dir() && is_package_directory(folder_path) {
+        return Ok(Some(import_issue(
+            ImportIssueKind::PackageDirectorySkipped,
+            folder_path,
+            file_name,
+            "package directories are skipped by import policy",
+        )));
+    }
+
+    Ok(None)
 }
 
 fn is_hidden_entry(file_name: &str) -> bool {
@@ -5472,6 +5602,139 @@ mod tests {
             .iter()
             .any(|item| item.file_name == "notes.txt" && item.unsupported));
         assert!(!items.iter().any(|item| item.file_name == ".hidden.jpg"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recursive_import_opt_in_scans_nested_entries_and_reports_issues() {
+        let workspace = unique_library_root("recursive-import");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let root_file = import_root.join("root.jpg");
+        let nested_root = import_root.join("Nested");
+        let nested_file = nested_root.join("child.jpg");
+        let nested_unsupported = nested_root.join("notes.txt");
+        let hidden_file = nested_root.join(".hidden.jpg");
+        let package_dir = nested_root.join("Archive.photoslibrary");
+        let symlink_path = nested_root.join("linked");
+
+        std::fs::create_dir_all(&package_dir).expect("create nested package directory");
+        std::fs::write(&root_file, b"root jpeg candidate").expect("write root");
+        std::fs::write(&nested_file, b"nested jpeg candidate").expect("write nested");
+        std::fs::write(&nested_unsupported, b"unsupported note").expect("write unsupported");
+        std::fs::write(&hidden_file, b"hidden jpeg candidate").expect("write hidden");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&nested_file, &symlink_path).expect("create symlink");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let default_summary =
+            import_folder(&library.root_path, &import_root).expect("default import");
+        assert_eq!(default_summary.scanned_files, 1);
+        assert!(!default_summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "child.jpg"));
+
+        let summary = import_folder_with_options(
+            &library.root_path,
+            &import_root,
+            FolderImportOptions { recursive: true },
+        )
+        .expect("recursive import");
+
+        assert_eq!(summary.scanned_files, 3);
+        assert_eq!(summary.supported_files, 2);
+        assert_eq!(summary.unsupported_files, 1);
+        assert!(summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "child.jpg"));
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::UnsupportedFile,
+            "notes.txt",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::HiddenEntrySkipped,
+            ".hidden.jpg",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::PackageDirectorySkipped,
+            "Archive.photoslibrary",
+        );
+        #[cfg(unix)]
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::SymlinkEntrySkipped,
+            "linked",
+        );
+
+        let items = list_library_photos(&library.root_path).expect("list recursive rows");
+        assert!(items.iter().any(|item| item.file_name == "root.jpg"));
+        assert!(items.iter().any(|item| item.file_name == "child.jpg"));
+        assert!(items
+            .iter()
+            .any(|item| item.file_name == "notes.txt" && item.unsupported));
+        assert!(!items.iter().any(|item| item.file_name == ".hidden.jpg"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recursive_import_skips_policy_rejected_selected_root_without_descending() {
+        let workspace = unique_library_root("recursive-root-policy");
+        let library_root = workspace.join("SilicaRAW Library");
+        let package_root = workspace.join("Archive.photoslibrary");
+        let package_file = package_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&package_root).expect("create package root");
+        std::fs::write(&package_file, b"package jpeg candidate").expect("write package file");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let summary = import_folder_with_options(
+            &library.root_path,
+            &package_root,
+            FolderImportOptions { recursive: true },
+        )
+        .expect("skip package root");
+
+        assert_eq!(summary.scanned_files, 0);
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::PackageDirectorySkipped,
+            "Archive.photoslibrary",
+        );
+        let items = list_library_photos(&library.root_path).expect("list package skip rows");
+        assert!(items.is_empty());
+
+        #[cfg(unix)]
+        {
+            let real_root = workspace.join("RealOriginals");
+            let real_file = real_root.join("linked.jpg");
+            let symlink_root = workspace.join("LinkedOriginals");
+            std::fs::create_dir_all(&real_root).expect("create real root");
+            std::fs::write(&real_file, b"linked jpeg candidate").expect("write linked file");
+            std::os::unix::fs::symlink(&real_root, &symlink_root).expect("create root symlink");
+
+            let symlink_summary = import_folder_with_options(
+                &library.root_path,
+                &symlink_root,
+                FolderImportOptions { recursive: true },
+            )
+            .expect("skip symlink root");
+
+            assert_eq!(symlink_summary.scanned_files, 0);
+            assert_issue_kind(
+                &symlink_summary.issues,
+                ImportIssueKind::SymlinkEntrySkipped,
+                "LinkedOriginals",
+            );
+            let items = list_library_photos(&library.root_path).expect("list symlink skip rows");
+            assert!(items.is_empty());
+        }
 
         remove_library_root(&workspace);
     }

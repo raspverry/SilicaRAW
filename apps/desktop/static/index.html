@@ -143,6 +143,11 @@
                     <button class="sr-path-picker-button" id="chooseImportFolderPath" type="button">Choose Folder</button>
                     <button class="primary" id="startImport" type="button">Import by Reference</button>
                   </div>
+                  <label class="sr-import-recursive-option" for="importRecursive">
+                    <input id="importRecursive" name="importRecursive" type="checkbox">
+                    <span>Include subfolders</span>
+                    <small>Recursive import stays off unless selected.</small>
+                  </label>
                 </form>
 
                 <div class="sr-import-overall">
@@ -492,6 +497,7 @@
       const statusActionButtons = Array.from(document.querySelectorAll("[data-status-action]"));
       const pathInput = document.querySelector("#libraryPath");
       const importPathInput = document.querySelector("#importFolderPath");
+      const importRecursiveInput = document.querySelector("#importRecursive");
       const statusOutput = document.querySelector("#appStatus");
       const welcomeStatus = document.querySelector("#welcomeStatus");
       const importStatus = document.querySelector("#importStatus");
@@ -2763,6 +2769,7 @@
         chooseLibraryPathButton.disabled = isBusy;
         chooseImportFolderPathButton.disabled = isBusy;
         startImportButton.disabled = isBusy;
+        importRecursiveInput.disabled = isBusy;
         openLoupeButton.disabled = isBusy;
         clearLibraryCacheButton.disabled = isBusy || !activeLibraryPath;
         updateCullingControls(selectedPhoto());
@@ -2849,6 +2856,7 @@
           const response = await invoke("import_folder", {
             libraryPath: activeLibraryPath,
             folderPath,
+            recursive: importRecursiveInput.checked,
           });
           if (commandFailed(response)) {
             setImportIssues([{

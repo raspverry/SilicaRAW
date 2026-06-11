@@ -19,6 +19,7 @@ pub use silica_storage::CatalogRebuildDryRunIssue;
 pub use silica_storage::CatalogRebuildDryRunIssueKind;
 pub use silica_storage::CatalogRebuildDryRunReport;
 pub use silica_storage::CatalogRebuildFlagSource;
+pub use silica_storage::FolderImportOptions;
 pub use silica_storage::ImportIssue;
 pub use silica_storage::ImportIssueKind;
 pub use silica_storage::LibraryPhotoGridItem;
@@ -817,8 +818,22 @@ pub fn import_folder(
     library_root_path: impl AsRef<Path>,
     folder_path: impl AsRef<Path>,
 ) -> Result<silica_storage::FolderImportSummary, CoreError> {
+    import_folder_with_options(
+        library_root_path,
+        folder_path,
+        FolderImportOptions::default(),
+    )
+}
+
+/// Scan a folder by reference through the core command boundary.
+pub fn import_folder_with_options(
+    library_root_path: impl AsRef<Path>,
+    folder_path: impl AsRef<Path>,
+    options: FolderImportOptions,
+) -> Result<silica_storage::FolderImportSummary, CoreError> {
     let library_root_path = library_root_path.as_ref().to_path_buf();
-    let summary = silica_storage::import_folder(&library_root_path, folder_path)?;
+    let summary =
+        silica_storage::import_folder_with_options(&library_root_path, folder_path, options)?;
     persist_imported_photo_metadata(&library_root_path, &summary)?;
     Ok(summary)
 }
@@ -2506,6 +2521,48 @@ mod tests {
 
         let rows = list_library_photos(&created.root_path).expect("browse after import issues");
         assert_eq!(rows.len(), 2);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recursive_import_opt_in_through_core_imports_nested_rows() {
+        let workspace = unique_library_root("core-recursive-import");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let nested_root = import_root.join("Nested");
+        let nested_file = nested_root.join("child.jpg");
+        let unsupported_file = nested_root.join("notes.txt");
+
+        std::fs::create_dir_all(&nested_root).expect("create nested import directory");
+        write_source_jpeg(&nested_file);
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+
+        let created = create_library(&library_root).expect("create library through core");
+        let default_summary =
+            import_folder(&created.root_path, &import_root).expect("default import");
+        assert_eq!(default_summary.scanned_files, 0);
+
+        let summary = import_folder_with_options(
+            &created.root_path,
+            &import_root,
+            FolderImportOptions { recursive: true },
+        )
+        .expect("recursive import through core");
+
+        assert_eq!(summary.supported_files, 1);
+        assert_eq!(summary.unsupported_files, 1);
+        assert!(summary
+            .issues
+            .iter()
+            .any(|issue| issue.kind == ImportIssueKind::UnsupportedFile));
+
+        let rows = list_library_photos(&created.root_path).expect("browse recursive rows");
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().any(|row| row.file_name == "child.jpg"));
+        assert!(rows
+            .iter()
+            .any(|row| row.file_name == "notes.txt" && row.unsupported));
 
         remove_library_root(&workspace);
     }

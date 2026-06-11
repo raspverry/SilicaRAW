@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Opt-in recursive import added
+
+- Added Task 11.9.4 opt-in recursive import.
+- Recursive scanning is disabled by default and only runs when `FolderImportOptions.recursive` or the desktop `Include subfolders` checkbox is selected.
+- Recursive issues reuse the structured import issue model and skip symlinks instead of following them.
+
 ## [2026-06-11] phase-11 | Import issue review UI added
 
 - Added Task 11.9.3 import issue review UI.

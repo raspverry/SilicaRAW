@@ -809,9 +809,20 @@ fn open_library_at_path(path: String, session_path: Option<PathBuf>) -> DesktopC
 }
 
 #[tauri::command]
-fn import_folder(library_path: String, folder_path: String) -> DesktopCommandResponse {
+fn import_folder(
+    library_path: String,
+    folder_path: String,
+    recursive: Option<bool>,
+) -> DesktopCommandResponse {
     let command = "import_folder";
-    match silica_core::import_folder(PathBuf::from(&library_path), PathBuf::from(&folder_path)) {
+    let options = silica_core::FolderImportOptions {
+        recursive: recursive.unwrap_or(false),
+    };
+    match silica_core::import_folder_with_options(
+        PathBuf::from(&library_path),
+        PathBuf::from(&folder_path),
+        options,
+    ) {
         Ok(summary) => DesktopCommandResponse::ok(
             command,
             format!(
@@ -2223,6 +2234,7 @@ mod tests {
         let imported = super::import_folder(
             library_root.display().to_string(),
             import_root.display().to_string(),
+            None,
         );
 
         assert!(imported.ok);
@@ -2746,6 +2758,7 @@ mod tests {
         let imported = super::import_folder(
             library_root.display().to_string(),
             import_root.display().to_string(),
+            None,
         );
         assert!(imported.ok, "import folder failed: {imported:?}");
         match response_data(&imported) {

@@ -640,6 +640,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core recursive_import`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. Recursive import is now an explicit opt-in checkbox in the import panel and remains off by default. Storage/core expose `FolderImportOptions { recursive }`; recursive scans use the same structured issue model for unsupported, hidden, package, symlink, directory-read, entry-metadata, and max-depth outcomes while accepted nested rows remain browseable. Symlinks are skipped rather than followed.
 
 ### Task 11.9.5: Connected Runtime Smoke for Phase 11
 

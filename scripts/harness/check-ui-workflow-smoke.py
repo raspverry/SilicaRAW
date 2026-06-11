@@ -49,6 +49,7 @@ WORKFLOW_STEPS = [
             "importFolderPath",
             "chooseImportFolderPath",
             "startImport",
+            "importRecursive",
             "importStatus",
             "importSafetyNote",
             "importIssueReview",
@@ -59,6 +60,8 @@ WORKFLOW_STEPS = [
         "commands": ["import_folder"],
         "text": [
             "Import by Reference",
+            "Include subfolders",
+            "Recursive import stays off unless selected",
             "Review Issues",
             "Import issue review",
             "Unsupported file",
@@ -312,6 +315,8 @@ def main():
         "openImportIssueReview",
         "closeImportIssueReview",
         "countImportErrorIssues",
+        "importRecursiveInput",
+        "recursive: importRecursiveInput.checked",
     ]:
         require(marker in source, f"import progress step marker missing: {marker}", failures)
     require(

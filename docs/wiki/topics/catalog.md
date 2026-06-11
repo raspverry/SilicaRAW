@@ -135,10 +135,10 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - Permission and file-system race errors are recoverable at entry/directory granularity. The scan continues with siblings when possible.
 - Task 11.9.2 implements the structured model for the current non-recursive path. `FolderImportSummary.issues` returns reviewable `ImportIssue` records alongside accepted catalog rows, `silica-core` re-exports the model, and the desktop import command forwards the issue list.
 - Task 11.9.3 adds the desktop import issue review surface. The review list displays unsupported files, skipped entries, and failed entries from the latest import while the library grid remains loaded behind the import panel. It does not enable recursive scanning.
+- Task 11.9.4 adds opt-in recursive scanning through `FolderImportOptions { recursive: true }` and the desktop `Include subfolders` checkbox. The default import path remains non-recursive. Recursive scans keep the same issue model and skip symlinks rather than following them.
 
 ## Not Implemented Yet
 
-- Recursive folder scanning.
 - Camera metadata extraction.
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
