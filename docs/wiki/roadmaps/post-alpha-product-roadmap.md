@@ -162,6 +162,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Make launch, relaunch, browsing, metadata, and selection behavior real and scalable.
 
+**Design Gate:** [Phase 11 Session, Library, and Metadata Design](../../superpowers/specs/2026-06-11-phase-11-session-library-metadata-design.md) defines the app-session boundary, atomic task order, query scalability gate, metadata truth gate, recursive import policy gate, and validation strategy before Phase 11 implementation begins.
+
 ### Task 11.1: App Session and Recents Contract
 
 - **Location:** `docs/wiki/topics/catalog.md`, `crates/silica-core`, `apps/desktop/src-tauri`
