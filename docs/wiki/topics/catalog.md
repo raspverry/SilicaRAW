@@ -32,12 +32,13 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 
 ## Implemented Foundation
 
-- Current alpha schema version: `4`.
+- Current alpha schema version: `5`.
 - Migration table: `schema_migrations`.
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
 - Migration 3 adds `photos.file_type`, backfills `jpeg`, `raw`, and `unsupported`, and creates the accepted paged-query indexes.
 - Migration 4 adds nullable `photo_metadata.width`, `photo_metadata.height`, and `photo_metadata.orientation` columns for import-time metadata extraction.
+- Migration 5 adds `idx_photo_metadata_dimensions_photo_id` for the accepted `has_dimensions` metadata filter.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
@@ -68,6 +69,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.7.3 adds migration 4 plus import-time metadata persistence: JPEG/JPG width and height are stored when available, RAW rows stay explicitly unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
 - Task 11.7.4 adds typed metadata read APIs through storage, core, and desktop command boundaries. Query responses use explicit `known`, `unknown`, and `unavailable` field states and read only the catalog, not original files.
 - Task 11.8.1 wires the Library/Loupe inspector to `get_photo_metadata` and keeps multi-selection metadata primary-photo-only.
+- Task 11.8.2 adds the first metadata-backed query filter: `has_dimensions`, backed by stored `photo_metadata.width` and `photo_metadata.height`. Camera/lens filters remain unavailable until parser/index support exists.
 
 ## Paged Library Query Contract
 
@@ -80,12 +82,13 @@ Task 11.5 starts with a contract before storage implementation:
   - imported-at descending, then photo id ascending
   - file name ascending, then path ascending, then photo id ascending
   - rating descending, then photo id ascending
-- Accepted filters are minimum rating, picked, rejected, file type, and search text.
+- Accepted filters are minimum rating, picked, rejected, file type, `has_dimensions`, and search text.
 - File type is a whitelisted enum: JPEG, RAW, or unsupported. Storage records this as normalized `photos.file_type` values `jpeg`, `raw`, and `unsupported`; in the local alpha, `raw` means supported non-JPEG photo candidates until later metadata extraction expands the taxonomy.
 - Required query indexes are:
   - `idx_photos_library_imported_id`
   - `idx_photos_library_file_name_path_id`
   - `idx_photos_library_file_type_id`
+  - `idx_photo_metadata_dimensions_photo_id`
   - `idx_photo_flags_rating_photo_id`
 - Storage must translate the typed contract internally; UI code must not pass SQL strings, column names, or raw predicates.
 - `silica-storage::query_library_photos` opens the catalog read-only, returns page metadata, and leaves compatibility full-list behavior in `list_library_photos` until the desktop grid migration is complete.

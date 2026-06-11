@@ -411,6 +411,7 @@ struct DesktopSessionFilters {
     picked: Option<bool>,
     rejected: Option<bool>,
     file_type: Option<String>,
+    metadata: Option<String>,
     search: String,
 }
 
@@ -423,6 +424,10 @@ impl DesktopSessionFilters {
             file_type: filters
                 .file_type
                 .map(app_file_type_filter_string)
+                .map(str::to_string),
+            metadata: filters
+                .metadata
+                .map(app_metadata_filter_string)
                 .map(str::to_string),
             search: filters.search,
         }
@@ -444,6 +449,11 @@ impl DesktopSessionFilters {
                 .file_type
                 .as_deref()
                 .map(parse_desktop_app_file_type_filter)
+                .transpose()?,
+            metadata: self
+                .metadata
+                .as_deref()
+                .map(parse_desktop_app_metadata_filter)
                 .transpose()?,
             search: self.search,
         })
@@ -478,6 +488,7 @@ struct DesktopLibraryQueryFilters {
     picked: Option<bool>,
     rejected: Option<bool>,
     file_type: Option<String>,
+    metadata: Option<String>,
     search: String,
 }
 
@@ -498,6 +509,11 @@ impl DesktopLibraryQueryFilters {
                 .file_type
                 .as_deref()
                 .map(parse_desktop_library_query_file_type)
+                .transpose()?,
+            metadata: self
+                .metadata
+                .as_deref()
+                .map(parse_desktop_library_query_metadata)
                 .transpose()?,
             search: self.search,
         })
@@ -1540,6 +1556,23 @@ fn app_file_type_filter_string(filter: silica_core::AppFileTypeFilter) -> &'stat
     }
 }
 
+fn parse_desktop_app_metadata_filter(
+    metadata: &str,
+) -> Result<silica_core::AppMetadataFilter, silica_core::CoreError> {
+    match metadata {
+        "has_dimensions" => Ok(silica_core::AppMetadataFilter::HasDimensions),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app metadata filter: {other}"
+        ))),
+    }
+}
+
+fn app_metadata_filter_string(filter: silica_core::AppMetadataFilter) -> &'static str {
+    match filter {
+        silica_core::AppMetadataFilter::HasDimensions => "has_dimensions",
+    }
+}
+
 fn parse_desktop_library_query_sort(
     sort: &str,
 ) -> Result<silica_core::LibraryQuerySort, silica_core::CoreError> {
@@ -1562,6 +1595,17 @@ fn parse_desktop_library_query_file_type(
         "unsupported" => Ok(silica_core::LibraryQueryFileType::Unsupported),
         other => Err(silica_core::CoreError::AppSession(format!(
             "invalid library query file type: {other}"
+        ))),
+    }
+}
+
+fn parse_desktop_library_query_metadata(
+    metadata: &str,
+) -> Result<silica_core::LibraryQueryMetadataFilter, silica_core::CoreError> {
+    match metadata {
+        "has_dimensions" => Ok(silica_core::LibraryQueryMetadataFilter::HasDimensions),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid library query metadata filter: {other}"
         ))),
     }
 }
@@ -1778,6 +1822,7 @@ mod tests {
         layout.sort = "rating_desc".to_string();
         layout.filters.min_rating = Some(4);
         layout.filters.file_type = Some("jpeg".to_string());
+        layout.filters.metadata = Some("has_dimensions".to_string());
         layout.filters.search = "portrait".to_string();
 
         let recorded = super::record_app_session_layout_at_path(session_path.clone(), layout);
@@ -1793,6 +1838,10 @@ mod tests {
                 assert_eq!(session.layout.sort, "rating_desc");
                 assert_eq!(session.layout.filters.min_rating, Some(4));
                 assert_eq!(session.layout.filters.file_type.as_deref(), Some("jpeg"));
+                assert_eq!(
+                    session.layout.filters.metadata.as_deref(),
+                    Some("has_dimensions")
+                );
                 assert_eq!(session.layout.filters.search, "portrait");
             }
             other => panic!("unexpected response data: {other:?}"),
@@ -1811,6 +1860,7 @@ mod tests {
                 assert_eq!(session.layout.sort, "imported_at_desc");
                 assert_eq!(session.layout.filters.min_rating, None);
                 assert_eq!(session.layout.filters.file_type, None);
+                assert_eq!(session.layout.filters.metadata, None);
                 assert_eq!(session.layout.filters.search, "");
             }
             other => panic!("unexpected response data: {other:?}"),
@@ -2257,6 +2307,7 @@ mod tests {
                     picked: Some(true),
                     rejected: None,
                     file_type: Some("raw".to_string()),
+                    metadata: None,
                     search: "sample".to_string(),
                 },
             },
@@ -2302,6 +2353,27 @@ mod tests {
             error.context.library_path.as_deref(),
             Some(library_root.to_string_lossy().as_ref())
         );
+
+        let invalid_metadata = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 1,
+                sort: "file_name_asc".to_string(),
+                filters: super::DesktopLibraryQueryFilters {
+                    metadata: Some("camera_make".to_string()),
+                    ..super::DesktopLibraryQueryFilters::default()
+                },
+            },
+        );
+        assert!(!invalid_metadata.ok);
+        assert_eq!(invalid_metadata.command, "query_library_photos");
+        assert!(invalid_metadata
+            .error
+            .as_ref()
+            .expect("metadata error")
+            .message
+            .contains("invalid library query metadata filter"));
 
         remove_library_root(&workspace);
     }

@@ -22,6 +22,7 @@ pub use silica_storage::CatalogRebuildFlagSource;
 pub use silica_storage::LibraryPhotoGridItem;
 pub use silica_storage::LibraryQueryFileType;
 pub use silica_storage::LibraryQueryFilters;
+pub use silica_storage::LibraryQueryMetadataFilter;
 pub use silica_storage::LibraryQueryOrderField;
 pub use silica_storage::LibraryQueryPage;
 pub use silica_storage::LibraryQueryRequest;
@@ -77,6 +78,12 @@ pub enum AppFileTypeFilter {
     Unsupported,
 }
 
+/// Optional metadata-backed filter persisted in app-level session state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppMetadataFilter {
+    HasDimensions,
+}
+
 /// Library grid filters persisted in app-level session state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppSessionFilters {
@@ -84,6 +91,7 @@ pub struct AppSessionFilters {
     pub picked: Option<bool>,
     pub rejected: Option<bool>,
     pub file_type: Option<AppFileTypeFilter>,
+    pub metadata: Option<AppMetadataFilter>,
     pub search: String,
 }
 
@@ -94,6 +102,7 @@ impl Default for AppSessionFilters {
             picked: None,
             rejected: None,
             file_type: None,
+            metadata: None,
             search: String::new(),
         }
     }
@@ -1431,6 +1440,7 @@ fn app_session_to_json(session: &AppSession) -> serde_json::Value {
                 "picked": session.layout.filters.picked,
                 "rejected": session.layout.filters.rejected,
                 "file_type": session.layout.filters.file_type.map(app_file_type_filter_string),
+                "metadata": session.layout.filters.metadata.map(app_metadata_filter_string),
                 "search": session.layout.filters.search,
             }
         },
@@ -1523,6 +1533,28 @@ fn app_file_type_filter_string(filter: AppFileTypeFilter) -> &'static str {
         AppFileTypeFilter::Jpeg => "jpeg",
         AppFileTypeFilter::Raw => "raw",
         AppFileTypeFilter::Unsupported => "unsupported",
+    }
+}
+
+fn parse_app_metadata_filter(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> Option<AppMetadataFilter> {
+    match value {
+        None | Some(serde_json::Value::Null) => None,
+        Some(value) => match value.as_str() {
+            Some("has_dimensions") => Some(AppMetadataFilter::HasDimensions),
+            Some(_) | None => {
+                *invalid_values = true;
+                None
+            }
+        },
+    }
+}
+
+fn app_metadata_filter_string(filter: AppMetadataFilter) -> &'static str {
+    match filter {
+        AppMetadataFilter::HasDimensions => "has_dimensions",
     }
 }
 
@@ -1625,6 +1657,7 @@ fn parse_app_session_filters(
         picked: parse_optional_bool(object.get("picked"), invalid_values),
         rejected: parse_optional_bool(object.get("rejected"), invalid_values),
         file_type: parse_app_file_type_filter(object.get("file_type"), invalid_values),
+        metadata: parse_app_metadata_filter(object.get("metadata"), invalid_values),
         search: parse_search_string(object.get("search"), invalid_values),
     }
 }
@@ -1972,6 +2005,7 @@ mod tests {
                   "picked": true,
                   "rejected": false,
                   "file_type": "unsupported",
+                  "metadata": "not-indexed",
                   "search": 123
                 }
               },
@@ -2033,6 +2067,7 @@ mod tests {
         changed_layout.thumbnail_size = MAX_APP_SESSION_THUMBNAIL_SIZE;
         changed_layout.sort = AppLibrarySort::RatingDesc;
         changed_layout.filters.min_rating = Some(4);
+        changed_layout.filters.metadata = Some(AppMetadataFilter::HasDimensions);
         changed_layout.filters.search = "portrait".to_string();
         let recorded = record_app_session_layout(&session_path, changed_layout.clone())
             .expect("record layout");
@@ -2397,6 +2432,44 @@ mod tests {
             metadata.capture_time.state,
             PhotoMetadataFieldState::Unavailable
         );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_filter_returns_only_photos_with_dimensions() {
+        let workspace = unique_library_root("core-metadata-filter");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+        let raw_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&raw_file, b"raw placeholder bytes").expect("write raw");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+        std::fs::remove_file(&jpeg_file).expect("remove original after dimension import");
+        std::fs::remove_file(&raw_file).expect("remove raw original before metadata filter query");
+
+        let page = query_library_photos(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                0,
+                100,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters {
+                    metadata: Some(LibraryQueryMetadataFilter::HasDimensions),
+                    ..LibraryQueryFilters::default()
+                },
+            ),
+        )
+        .expect("query metadata-backed filter");
+
+        assert_eq!(page.total_count, 1);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].file_name, "sample.jpg");
 
         remove_library_root(&workspace);
     }

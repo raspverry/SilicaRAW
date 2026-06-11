@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Metadata-backed filter added
+
+- Added Task 11.8.2 `has_dimensions` grid filter backed by stored metadata.
+- Catalog schema version 5 adds the dimension filter index.
+- Camera/lens metadata filters remain disabled until parser and indexed query support exist.
+
 ## [2026-06-11] phase-11 | Metadata inspector UI added
 
 - Added Task 11.8.1 Library and Loupe metadata inspector UI.

@@ -204,6 +204,11 @@
                     <option value="raw">RAW</option>
                     <option value="unsupported">Unsupported</option>
                   </select>
+                  <select id="metadataFilter" aria-label="Metadata filter">
+                    <option value="">Any Metadata</option>
+                    <option value="has_dimensions">Has Dimensions</option>
+                    <option value="" disabled>Camera/lens unavailable</option>
+                  </select>
                   <select id="minRatingFilter" aria-label="Minimum rating">
                     <option value="">Any Rating</option>
                     <option value="1">1+ Stars</option>
@@ -579,6 +584,7 @@
       const resetLayoutButton = document.querySelector("#resetLayout");
       const librarySearchInput = document.querySelector("#librarySearch");
       const fileTypeFilterInput = document.querySelector("#fileTypeFilter");
+      const metadataFilterInput = document.querySelector("#metadataFilter");
       const minRatingFilterInput = document.querySelector("#minRatingFilter");
       const cullingFilterInput = document.querySelector("#cullingFilter");
       const librarySortInput = document.querySelector("#librarySort");
@@ -676,6 +682,7 @@
             picked: typeof filters.picked === "boolean" ? filters.picked : null,
             rejected: typeof filters.rejected === "boolean" ? filters.rejected : null,
             fileType: ["jpeg", "raw", "unsupported"].includes(filters.fileType) ? filters.fileType : null,
+            metadata: filters.metadata === "has_dimensions" ? "has_dimensions" : null,
             search: typeof filters.search === "string" ? filters.search : "",
           },
         };
@@ -694,6 +701,7 @@
             picked: cullingFilter === "picked" ? true : null,
             rejected: cullingFilter === "rejected" ? true : null,
             fileType: fileTypeFilterInput.value || null,
+            metadata: metadataFilterInput.value || null,
             search: librarySearchInput.value,
           },
         });
@@ -768,6 +776,7 @@
         fileTypeFilterInput.value = normalized.filters.fileType ?? "";
         minRatingFilterInput.value = normalized.filters.minRating ? String(normalized.filters.minRating) : "";
         cullingFilterInput.value = normalized.filters.picked ? "picked" : normalized.filters.rejected ? "rejected" : "";
+        metadataFilterInput.value = normalized.filters.metadata ?? "";
         librarySearchInput.value = normalized.filters.search;
         layoutHydrating = false;
         if (options.persist) {
@@ -1605,7 +1614,9 @@
           : "No catalog rows";
         gridStateNote.textContent = libraryPhotos.length
           ? "Imported photos are displayed by catalog reference."
-          : "Import a folder by reference to populate the grid.";
+          : currentLayoutPreferences().filters.metadata
+            ? "No catalog rows match the active metadata filter."
+            : "Import a folder by reference to populate the grid.";
         gridLoadingState.hidden = true;
         gridEmptyState.hidden = libraryPhotos.length !== 0;
         gridErrorState.hidden = true;
@@ -2820,7 +2831,7 @@
       thumbnailSizeInput.addEventListener("input", () => {
         applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
       });
-      [librarySearchInput, fileTypeFilterInput, minRatingFilterInput, cullingFilterInput, librarySortInput].forEach((control) => {
+      [librarySearchInput, fileTypeFilterInput, metadataFilterInput, minRatingFilterInput, cullingFilterInput, librarySortInput].forEach((control) => {
         control.addEventListener("input", () => {
           applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
           void loadLibraryGrid({ offset: 0 });

@@ -10,7 +10,7 @@ use std::fmt;
 pub const CRATE_NAME: &str = "silica-catalog";
 
 /// Current local alpha catalog schema version.
-pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 4;
+pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 5;
 
 /// Migration bookkeeping table required in every catalog database.
 pub const SCHEMA_MIGRATIONS_TABLE: &str = "schema_migrations";
@@ -45,6 +45,7 @@ pub const ALPHA_CATALOG_REQUIRED_INDEXES: &[&str] = &[
     "idx_photos_library_imported_id",
     "idx_photos_library_file_name_path_id",
     "idx_photos_library_file_type_id",
+    "idx_photo_metadata_dimensions_photo_id",
     "idx_photos_missing",
     "idx_photos_unsupported",
     "idx_photo_flags_rating",
@@ -213,6 +214,12 @@ pub enum LibraryQueryFileType {
     Unsupported,
 }
 
+/// Whitelisted metadata-backed filters for library grid queries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryQueryMetadataFilter {
+    HasDimensions,
+}
+
 /// Whitelisted filter set for library grid queries.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibraryQueryFilters {
@@ -220,6 +227,7 @@ pub struct LibraryQueryFilters {
     pub picked: Option<bool>,
     pub rejected: Option<bool>,
     pub file_type: Option<LibraryQueryFileType>,
+    pub metadata: Option<LibraryQueryMetadataFilter>,
     pub search: String,
 }
 
@@ -230,6 +238,7 @@ impl Default for LibraryQueryFilters {
             picked: None,
             rejected: None,
             file_type: None,
+            metadata: None,
             search: String::new(),
         }
     }
@@ -411,7 +420,7 @@ mod tests {
 
     #[test]
     fn records_phase_4_1_catalog_schema_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 4);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 5);
         assert_eq!(ALPHA_CATALOG_SCHEMA.migration_table, "schema_migrations");
         assert_eq!(
             ALPHA_CATALOG_SCHEMA.required_tables,
@@ -474,6 +483,7 @@ mod tests {
             picked: Some(true),
             rejected: None,
             file_type: Some(LibraryQueryFileType::Jpeg),
+            metadata: Some(LibraryQueryMetadataFilter::HasDimensions),
             search: "  portrait  ".to_string(),
         };
 
@@ -488,6 +498,10 @@ mod tests {
         assert_eq!(request.limit, MAX_LIBRARY_QUERY_LIMIT);
         assert_eq!(request.filters.min_rating, Some(ALPHA_MAX_RATING));
         assert_eq!(request.filters.search, "portrait");
+        assert_eq!(
+            request.filters.metadata,
+            Some(LibraryQueryMetadataFilter::HasDimensions)
+        );
         assert_eq!(
             request.order_fields(),
             &[
@@ -529,11 +543,12 @@ mod tests {
 
     #[test]
     fn records_paged_query_index_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 4);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 5);
         for index_name in [
             "idx_photos_library_imported_id",
             "idx_photos_library_file_name_path_id",
             "idx_photos_library_file_type_id",
+            "idx_photo_metadata_dimensions_photo_id",
             "idx_photo_flags_rating_photo_id",
         ] {
             assert!(

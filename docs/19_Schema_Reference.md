@@ -109,6 +109,7 @@ Rating/reject/pick display
 Smart collections
 Culling workflows
 Fast queries
+Metadata-backed `has_dimensions` filtering when indexed
 ```
 
 ### Edit Graph `metadata`
@@ -157,6 +158,7 @@ Task 11.7 records the local alpha metadata contract without adding a parser depe
 - `photo_metadata.raw_json` is parser-owned untrusted data and defaults to `{}`.
 - Unsupported files must not receive fake metadata rows. Existing imports are not backfilled on library open or session restore.
 - Metadata read APIs serialize each displayed field with an explicit `known`, `unknown`, or `unavailable` state and must not read original files during query.
+- The first metadata-backed grid filter is `has_dimensions`, defined as stored `photo_metadata.width IS NOT NULL AND photo_metadata.height IS NOT NULL`. It must not infer dimensions from original files during query.
 
 ---
 

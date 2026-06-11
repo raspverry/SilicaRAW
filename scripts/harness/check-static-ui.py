@@ -115,6 +115,7 @@ def main():
         "resetLayout",
         "librarySearch",
         "fileTypeFilter",
+        "metadataFilter",
         "minRatingFilter",
         "cullingFilter",
         "librarySort",

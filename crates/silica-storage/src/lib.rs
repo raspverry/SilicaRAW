@@ -23,8 +23,8 @@ use silica_catalog::{
     ALPHA_MAX_RATING,
 };
 pub use silica_catalog::{
-    LibraryQueryFileType, LibraryQueryFilters, LibraryQueryOrderField, LibraryQueryPage,
-    LibraryQueryRequest, LibraryQuerySort, PhotoFlags,
+    LibraryQueryFileType, LibraryQueryFilters, LibraryQueryMetadataFilter, LibraryQueryOrderField,
+    LibraryQueryPage, LibraryQueryRequest, LibraryQuerySort, PhotoFlags,
 };
 
 /// Stable crate name used by scaffold verification.
@@ -577,6 +577,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "photo_metadata_normalized_fields",
         sql: PHOTO_METADATA_NORMALIZED_FIELDS_SQL,
     },
+    Migration {
+        version: 5,
+        name: "photo_metadata_query_indexes",
+        sql: PHOTO_METADATA_QUERY_INDEXES_SQL,
+    },
 ];
 
 /// Open a catalog database and apply all embedded migrations.
@@ -1116,6 +1121,7 @@ pub fn query_library_photos(
             ":picked": filter.picked,
             ":rejected": filter.rejected,
             ":file_type": filter.file_type,
+            ":metadata_filter": filter.metadata,
             ":search": filter.search.as_deref(),
             ":limit": limit,
             ":offset": offset,
@@ -3412,15 +3418,29 @@ ALTER TABLE photo_metadata
   ADD COLUMN orientation TEXT;
 "#;
 
+const PHOTO_METADATA_QUERY_INDEXES_SQL: &str = r#"
+CREATE INDEX IF NOT EXISTS idx_photo_metadata_dimensions_photo_id
+  ON photo_metadata(width, height, photo_id);
+"#;
+
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
 SELECT COUNT(*)
 FROM photos
 LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+LEFT JOIN photo_metadata ON photo_metadata.photo_id = photos.id
 WHERE photos.library_id = :library_id
   AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
   AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
   AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
   AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :metadata_filter IS NULL
+    OR (
+      :metadata_filter = 'has_dimensions'
+      AND photo_metadata.width IS NOT NULL
+      AND photo_metadata.height IS NOT NULL
+    )
+  )
   AND (
     :search IS NULL
     OR lower(photos.file_name) LIKE :search ESCAPE '\'
@@ -3443,6 +3463,7 @@ SELECT
   thumbnail_cache.cache_key
 FROM photos
 LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+LEFT JOIN photo_metadata ON photo_metadata.photo_id = photos.id
 LEFT JOIN cache_records AS thumbnail_cache
   ON thumbnail_cache.photo_id = photos.id
   AND thumbnail_cache.cache_type = :thumbnail_cache_type
@@ -3451,6 +3472,14 @@ WHERE photos.library_id = :library_id
   AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
   AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
   AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :metadata_filter IS NULL
+    OR (
+      :metadata_filter = 'has_dimensions'
+      AND photo_metadata.width IS NOT NULL
+      AND photo_metadata.height IS NOT NULL
+    )
+  )
   AND (
     :search IS NULL
     OR lower(photos.file_name) LIKE :search ESCAPE '\'
@@ -3464,6 +3493,7 @@ struct LibraryQuerySqlFilter {
     picked: Option<i64>,
     rejected: Option<i64>,
     file_type: Option<&'static str>,
+    metadata: Option<&'static str>,
     search: Option<String>,
 }
 
@@ -3474,6 +3504,7 @@ impl From<&LibraryQueryFilters> for LibraryQuerySqlFilter {
             picked: filters.picked.map(bool_to_sql),
             rejected: filters.rejected.map(bool_to_sql),
             file_type: filters.file_type.map(library_query_file_type_value),
+            metadata: filters.metadata.map(library_query_metadata_filter_value),
             search: library_query_search_pattern(&filters.search),
         }
     }
@@ -3491,6 +3522,7 @@ fn query_library_photo_count(
             ":picked": filter.picked,
             ":rejected": filter.rejected,
             ":file_type": filter.file_type,
+            ":metadata_filter": filter.metadata,
             ":search": filter.search.as_deref(),
         },
         |row| row.get(0),
@@ -3516,6 +3548,12 @@ fn library_query_file_type_value(file_type: LibraryQueryFileType) -> &'static st
         LibraryQueryFileType::Jpeg => "jpeg",
         LibraryQueryFileType::Raw => "raw",
         LibraryQueryFileType::Unsupported => "unsupported",
+    }
+}
+
+fn library_query_metadata_filter_value(metadata: LibraryQueryMetadataFilter) -> &'static str {
+    match metadata {
+        LibraryQueryMetadataFilter::HasDimensions => "has_dimensions",
     }
 }
 
@@ -3673,6 +3711,62 @@ mod tests {
         assert_eq!(width, Some(2));
         assert_eq!(height, Some(3));
         assert_eq!(camera_make, None);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_filter_index_and_query_use_stored_dimensions_only() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations(&mut connection).expect("run migrations");
+        assert!(
+            catalog_object_exists(&connection, "idx_photo_metadata_dimensions_photo_id")
+                .expect("index lookup"),
+            "missing metadata dimension filter index"
+        );
+
+        let workspace = unique_library_root("metadata-filter");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let known_file = import_root.join("known.jpg");
+        let unknown_file = import_root.join("unknown.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&known_file, b"known jpeg bytes").expect("write known");
+        std::fs::write(&unknown_file, b"unknown jpeg bytes").expect("write unknown");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        upsert_photo_metadata_by_path(
+            &library.root_path,
+            &known_file,
+            PhotoMetadataUpdate {
+                width: Some(24),
+                height: Some(36),
+                ..PhotoMetadataUpdate::unavailable()
+            },
+        )
+        .expect("upsert known metadata");
+        std::fs::remove_file(&known_file).expect("remove original after metadata persist");
+
+        let page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                0,
+                100,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters {
+                    metadata: Some(LibraryQueryMetadataFilter::HasDimensions),
+                    ..LibraryQueryFilters::default()
+                },
+            ),
+        )
+        .expect("query metadata-backed filter");
+
+        assert_eq!(page.total_count, 1);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].file_name, "known.jpg");
 
         remove_library_root(&workspace);
     }
@@ -3947,6 +4041,7 @@ mod tests {
                     rejected: Some(false),
                     file_type: Some(LibraryQueryFileType::Raw),
                     search: "sample".to_string(),
+                    ..LibraryQueryFilters::default()
                 },
             ),
         )

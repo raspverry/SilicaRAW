@@ -571,6 +571,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core metadata_filter`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. Added an indexed `has_dimensions` metadata query filter backed only by stored `photo_metadata.width` and `photo_metadata.height`, wired through core, desktop DTOs, persisted layout state, and the static Library toolbar. Camera/lens filters stay disabled until parser and index support exists.
 
 ## Sprint 5: Reviewable Import Errors and Recursive Import
 
