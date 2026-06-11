@@ -63,6 +63,11 @@ def main():
         "#importErrorCount must not count every structured import issue as an error",
         failures,
     )
+    require(
+        "Unsupported and failed files will be reviewable after import." not in source,
+        "import issue review must not be placeholder status text",
+        failures,
+    )
     for href in [
         "./styles/tokens.css",
         "./styles/base.css",
@@ -99,6 +104,11 @@ def main():
         "importProgress",
         "importSummary",
         "unsupportedCount",
+        "importIssueReview",
+        "importIssueReviewTitle",
+        "importIssueReviewSummary",
+        "importIssueList",
+        "closeImportIssues",
         "viewImportErrors",
         "libraryGrid",
         "gridEmptyState",

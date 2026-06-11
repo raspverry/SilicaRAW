@@ -133,11 +133,11 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - macOS package directories are skipped and reviewable. The alpha treats `.app`, `.photoslibrary`, `.aplibrary`, `.lrdata`, `.library`, and other package-like directories as containers, not folders to descend into.
 - Recursive import alpha max depth is `20` directory levels below the selected root. Entries past the limit are not scanned and are reported as `max_depth_exceeded`.
 - Permission and file-system race errors are recoverable at entry/directory granularity. The scan continues with siblings when possible.
-- Task 11.9.2 implements the structured model for the current non-recursive path. `FolderImportSummary.issues` returns reviewable `ImportIssue` records alongside accepted catalog rows, `silica-core` re-exports the model, and the desktop import command forwards the issue list for the later review UI.
+- Task 11.9.2 implements the structured model for the current non-recursive path. `FolderImportSummary.issues` returns reviewable `ImportIssue` records alongside accepted catalog rows, `silica-core` re-exports the model, and the desktop import command forwards the issue list.
+- Task 11.9.3 adds the desktop import issue review surface. The review list displays unsupported files, skipped entries, and failed entries from the latest import while the library grid remains loaded behind the import panel. It does not enable recursive scanning.
 
 ## Not Implemented Yet
 
-- Import error review UI.
 - Recursive folder scanning.
 - Camera metadata extraction.
 - Thumbnail or preview generation during import.

@@ -624,6 +624,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
   - visual QA for import-error state
+- **Status:** Completed on 2026-06-11. The desktop import panel now has a real import issue review surface backed by the structured `issues` response. It shows unsupported, skipped, and failed entries from the latest import without enabling recursive scanning or hiding the Library grid. Static UI and workflow smoke checks enforce the review surface, and final visual QA now includes an import-issue-review surface.
 
 ### Task 11.9.4: Opt-In Recursive Scanner
 

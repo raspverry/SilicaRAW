@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Import issue review UI added
+
+- Added Task 11.9.3 import issue review UI.
+- The import panel now renders structured unsupported, skipped, and failed import issues from the latest import response.
+- UI workflow smoke and final visual QA cover the import issue review surface without enabling recursive import.
+
 ## [2026-06-11] phase-11 | Structured import issues added
 
 - Added Task 11.9.2 structured import issue model.

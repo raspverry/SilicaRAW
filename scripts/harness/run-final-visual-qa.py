@@ -32,6 +32,7 @@ SURFACES = [
     ("M007-export", "export"),
     ("M008-minimal-maintenance", "maintenance"),
     ("M009-import-progress", "import"),
+    ("M013-import-issue-review", "import-review"),
     ("M010-layout-sidebar-collapsed", "layout-sidebar-collapsed"),
     ("M011-layout-inspector-collapsed", "layout-inspector-collapsed"),
     ("M012-layout-reset", "layout-reset"),
@@ -289,6 +290,55 @@ def state_script(state):
     document.querySelectorAll("[data-import-step-output]").forEach((output) => {{
       output.textContent = "Completed";
     }});
+  }} else if (state === "import-review") {{
+    openLibraryBase(true);
+    importPanel.hidden = false;
+    document.querySelector("#importProgress").value = 100;
+    document.querySelector("#importProgressLabel").textContent = "Needs Review";
+    document.querySelector("#importStatus").value = "Imported 5 supported file(s) by reference; originals unchanged.";
+    document.querySelector("#importedCount").textContent = "5";
+    document.querySelector("#unsupportedCount").textContent = "1";
+    document.querySelector("#importErrorCount").textContent = "1";
+    document.querySelector("#viewImportErrors").disabled = false;
+    document.querySelector("#viewImportErrors").setAttribute("aria-expanded", "true");
+    const review = document.querySelector("#importIssueReview");
+    const summary = document.querySelector("#importIssueReviewSummary");
+    const list = document.querySelector("#importIssueList");
+    review.hidden = false;
+    summary.value = "3 issue(s): 1 unsupported, 1 skipped, 1 failed.";
+    list.replaceChildren(
+      ...[
+        ["unsupported", "Unsupported file", "notes.txt", "/Import/notes.txt", "file extension is unsupported by the local alpha"],
+        ["skipped", "Skipped entry", "Archive.photoslibrary", "/Import/Archive.photoslibrary", "package directories are skipped by import policy"],
+        ["error", "Failed entry", "locked-folder", "/Import/locked-folder", "failed to read directory entry: permission denied"],
+      ].map(([tone, label, name, path, message]) => {{
+        const row = document.createElement("article");
+        row.className = "sr-import-issue-row";
+        row.dataset.issueTone = tone;
+        row.setAttribute("role", "listitem");
+        const badge = document.createElement("span");
+        badge.className = "sr-import-issue-badge";
+        badge.textContent = label;
+        const body = document.createElement("div");
+        body.className = "sr-import-issue-body";
+        const title = document.createElement("strong");
+        title.textContent = name;
+        const pathElement = document.createElement("span");
+        pathElement.textContent = path;
+        const detail = document.createElement("small");
+        detail.textContent = message;
+        body.append(title, pathElement, detail);
+        row.append(badge, body);
+        return row;
+      }})
+    );
+    document.querySelectorAll("[data-import-step-progress]").forEach((progress) => {{
+      progress.value = 100;
+      progress.textContent = "100%";
+    }});
+    document.querySelectorAll("[data-import-step-output]").forEach((output) => {{
+      output.textContent = "Completed";
+    }});
   }} else if (state === "loupe") {{
     openLibraryBase(true);
     gridShell.hidden = true;
@@ -376,6 +426,8 @@ def metric_script(surface):
     visiblePhotoCards: Array.from(document.querySelectorAll(".sr-photo-card")).filter(visible).length,
     visibleFilmstripCards: Array.from(document.querySelectorAll(".sr-filmstrip-card")).filter(visible).length,
     visibleImages: Array.from(document.querySelectorAll(".sr-thumb-image, .sr-loupe-image, .sr-develop-image")).filter(visible).length,
+    importIssueReviewVisible: Boolean(box("#importIssueReview")),
+    visibleImportIssueRows: Array.from(document.querySelectorAll(".sr-import-issue-row")).filter(visible).length,
     exportDialogWithinViewport: !dialog || (dialog.left >= 0 && dialog.right <= innerWidth && dialog.top >= 0 && dialog.bottom <= innerHeight),
     activeMode: app.dataset.activeMode,
     libraryState: app.dataset.libraryState,
@@ -416,6 +468,10 @@ def capture(url):
                 )
             if not metrics["exportDialogWithinViewport"]:
                 failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
+            if state == "import-review" and (
+                not metrics["importIssueReviewVisible"] or metrics["visibleImportIssueRows"] < 3
+            ):
+                failures.append(f"{viewport_name} {surface_name}: import issue review not visible")
             if state == "layout-sidebar-collapsed" and (
                 metrics["sidebarCollapsed"] != "true" or metrics["sidebarVisible"]
             ):

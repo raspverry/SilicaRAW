@@ -176,8 +176,19 @@
                   <div><span>Imported</span><strong id="importedCount">0</strong></div>
                   <div><span>Unsupported</span><strong id="unsupportedCount">0</strong></div>
                   <div><span>Errors</span><strong id="importErrorCount">0</strong></div>
-                  <button id="viewImportErrors" type="button">View Errors</button>
+                  <button id="viewImportErrors" type="button" aria-controls="importIssueReview" aria-expanded="false" disabled>Review Issues</button>
                 </div>
+                <section class="sr-import-review" id="importIssueReview" aria-labelledby="importIssueReviewTitle" hidden>
+                  <div class="sr-import-review-header">
+                    <div>
+                      <h3 id="importIssueReviewTitle">Import issue review</h3>
+                      <p>Unsupported file, Skipped entry, and Failed entry details from the latest import.</p>
+                    </div>
+                    <button id="closeImportIssues" type="button">Close</button>
+                  </div>
+                  <output class="sr-import-review-summary" id="importIssueReviewSummary" aria-live="polite">No import issues to review.</output>
+                  <div class="sr-import-issue-list" id="importIssueList" role="list"></div>
+                </section>
               </div>
             </section>
             <section class="sr-cache-maintenance" id="cacheMaintenance" aria-labelledby="cacheMaintenanceTitle">
@@ -491,6 +502,9 @@
       const importedCount = document.querySelector("#importedCount");
       const unsupportedCount = document.querySelector("#unsupportedCount");
       const importErrorCount = document.querySelector("#importErrorCount");
+      const importIssueReview = document.querySelector("#importIssueReview");
+      const importIssueReviewSummary = document.querySelector("#importIssueReviewSummary");
+      const importIssueList = document.querySelector("#importIssueList");
       const libraryGrid = document.querySelector("#libraryGrid");
       const gridEmptyState = document.querySelector("#gridEmptyState");
       const gridLoadingState = document.querySelector("#gridLoadingState");
@@ -539,6 +553,7 @@
       const chooseImportFolderPathButton = document.querySelector("#chooseImportFolderPath");
       const startImportButton = document.querySelector("#startImport");
       const viewImportErrorsButton = document.querySelector("#viewImportErrors");
+      const closeImportIssuesButton = document.querySelector("#closeImportIssues");
       const showImportPanelButton = document.querySelector("#showImportPanel");
       const minimizeImportButton = document.querySelector("#minimizeImport");
       const clearLibraryCacheButton = document.querySelector("#clearLibraryCache");
@@ -617,6 +632,7 @@
       let gridVirtualRenderFrame = 0;
       let gridVirtualWindow = { start: 0, end: 0 };
       let metadataRequestSequence = 0;
+      let lastImportIssues = [];
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const pageThumbnailObjectUrls = new Map();
@@ -663,11 +679,100 @@
         return !response || response.ok === false;
       }
 
+      function normalizeImportIssues(issues = []) {
+        if (!Array.isArray(issues)) {
+          return [];
+        }
+        return issues
+          .filter((issue) => issue && typeof issue === "object")
+          .map((issue) => ({
+            kind: typeof issue.kind === "string" ? issue.kind : "entry_metadata_failed",
+            path: typeof issue.path === "string" ? issue.path : "",
+            fileName: typeof issue.fileName === "string" ? issue.fileName : "",
+            message: typeof issue.message === "string" ? issue.message : "Import issue recorded.",
+          }));
+      }
+
+      function importIssueCategory(kind) {
+        if (kind === "unsupported_file") {
+          return { label: "Unsupported file", tone: "unsupported" };
+        }
+        if (IMPORT_ERROR_ISSUE_KINDS.has(kind)) {
+          return { label: "Failed entry", tone: "error" };
+        }
+        return { label: "Skipped entry", tone: "skipped" };
+      }
+
       function countImportErrorIssues(issues = []) {
         if (!Array.isArray(issues)) {
           return 0;
         }
         return issues.filter((issue) => IMPORT_ERROR_ISSUE_KINDS.has(issue?.kind)).length;
+      }
+
+      function renderImportIssueReview() {
+        importIssueList.replaceChildren();
+        viewImportErrorsButton.disabled = lastImportIssues.length === 0;
+
+        if (lastImportIssues.length === 0) {
+          importIssueReviewSummary.value = "No import issues to review.";
+          importIssueReview.hidden = true;
+          viewImportErrorsButton.setAttribute("aria-expanded", "false");
+          return;
+        }
+
+        const unsupported = lastImportIssues.filter((issue) => issue.kind === "unsupported_file").length;
+        const failed = countImportErrorIssues(lastImportIssues);
+        const skipped = lastImportIssues.length - unsupported - failed;
+        importIssueReviewSummary.value = `${lastImportIssues.length} issue(s): ${unsupported} unsupported, ${skipped} skipped, ${failed} failed.`;
+
+        lastImportIssues.forEach((issue) => {
+          const category = importIssueCategory(issue.kind);
+          const row = document.createElement("article");
+          row.className = "sr-import-issue-row";
+          row.dataset.issueTone = category.tone;
+          row.setAttribute("role", "listitem");
+
+          const badge = document.createElement("span");
+          badge.className = "sr-import-issue-badge";
+          badge.textContent = category.label;
+
+          const body = document.createElement("div");
+          body.className = "sr-import-issue-body";
+
+          const title = document.createElement("strong");
+          title.textContent = issue.fileName || issue.path || "Import entry";
+
+          const path = document.createElement("span");
+          path.textContent = issue.path || "Path unavailable";
+
+          const message = document.createElement("small");
+          message.textContent = issue.message;
+
+          body.append(title, path, message);
+          row.append(badge, body);
+          importIssueList.append(row);
+        });
+      }
+
+      function setImportIssues(issues = []) {
+        lastImportIssues = normalizeImportIssues(issues);
+        renderImportIssueReview();
+      }
+
+      function openImportIssueReview() {
+        if (lastImportIssues.length === 0) {
+          setStatus("No import issues to review.");
+          return;
+        }
+        importIssueReview.hidden = false;
+        viewImportErrorsButton.setAttribute("aria-expanded", "true");
+        setStatus(importIssueReviewSummary.value);
+      }
+
+      function closeImportIssueReview() {
+        importIssueReview.hidden = true;
+        viewImportErrorsButton.setAttribute("aria-expanded", "false");
       }
 
       function clampThumbnailSize(value) {
@@ -2738,29 +2843,44 @@
         setStatus("Importing by reference...");
         setImportProgress(45, "Scanning");
         setImportStepState(45, "Scanning");
+        closeImportIssueReview();
+        setImportIssues([]);
         try {
           const response = await invoke("import_folder", {
             libraryPath: activeLibraryPath,
             folderPath,
           });
           if (commandFailed(response)) {
+            setImportIssues([{
+              kind: "directory_read_failed",
+              path: folderPath,
+              message: responseErrorMessage(response, "Import failed."),
+            }]);
             importErrorCount.textContent = "1";
             setImportProgress(100, "Needs Review");
             setImportStepState(100, "Needs Review");
+            openImportIssueReview();
             setStatus(responseErrorMessage(response, "Import failed."));
             return;
           }
+          setImportIssues(response.data?.issues);
           importedCount.textContent = String(response.data?.supportedFiles ?? 0);
           unsupportedCount.textContent = String(response.data?.unsupportedFiles ?? 0);
-          importErrorCount.textContent = String(countImportErrorIssues(response.data?.issues));
+          importErrorCount.textContent = String(countImportErrorIssues(lastImportIssues));
           setImportProgress(100, "Completed");
           setImportStepState(100, "Completed");
           setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
+          setImportIssues([{
+            kind: "directory_read_failed",
+            path: folderPath,
+            message: responseErrorMessage(error, "Import failed."),
+          }]);
           importErrorCount.textContent = "1";
           setImportProgress(100, "Needs Review");
           setImportStepState(100, "Needs Review");
+          openImportIssueReview();
           setStatus(responseErrorMessage(error, "Import failed."));
         } finally {
           setBusy(false);
@@ -2775,6 +2895,8 @@
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
       chooseImportFolderPathButton.addEventListener("click", () => chooseDirectoryPath("import"));
       startImportButton.addEventListener("click", runImportCommand);
+      viewImportErrorsButton.addEventListener("click", openImportIssueReview);
+      closeImportIssuesButton.addEventListener("click", closeImportIssueReview);
       clearLibraryCacheButton.addEventListener("click", runCacheClearCommand);
       gridPreviousPageButton.addEventListener("click", () => void loadPreviousLibraryPage());
       gridNextPageButton.addEventListener("click", () => void loadNextLibraryPage());
@@ -2847,9 +2969,6 @@
           applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
           void loadLibraryGrid({ offset: 0 });
         });
-      });
-      viewImportErrorsButton.addEventListener("click", () => {
-        setStatus("Unsupported and failed files will be reviewable after import.");
       });
       showImportPanelButton.addEventListener("click", () => {
         document.querySelector("#importPanel").hidden = false;
