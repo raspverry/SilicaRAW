@@ -14,11 +14,17 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-11] phase-11 | Metadata backfill policy added
+
+- Added Task 11.7.2 metadata backfill and JPEG-only extraction policy.
+- Library open/session restore do not run metadata backfill; existing unknown metadata stays unknown until explicit import or backfill work.
+- JPEG/JPG dimensions may use the existing raster path; RAW metadata does not imply RAW decode support.
+
 ## [2026-06-11] phase-11 | Metadata schema gate recorded
 
 - Added Task 11.7.1 metadata field and dependency gate.
 - No EXIF parser dependency is added yet; camera/lens/orientation/capture metadata remains explicitly unavailable.
-- Backfill policy and migration remain Task 11.7.2 and Task 11.7.3.
+- Backfill policy was later completed by Task 11.7.2; migration remains Task 11.7.3.
 
 ## [2026-06-11] phase-11 | Multi-select grid semantics added
 

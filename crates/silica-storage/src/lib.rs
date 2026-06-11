@@ -127,6 +127,46 @@ pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
 /// Cache record type used for disposable Loupe preview images.
 pub const PREVIEW_CACHE_TYPE: &str = "preview";
 
+/// Task 11.7.2 policy: no metadata scan runs during library open or session restore.
+pub const METADATA_BACKFILL_ON_OPEN_OR_RESTORE: bool = false;
+/// Existing imports remain unknown until import-time extraction or explicit scoped backfill.
+pub const EXISTING_IMPORTS_WITHOUT_METADATA_STAY_UNKNOWN: bool = true;
+
+/// Source allowed for dimension metadata in the current metadata policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetadataDimensionSource {
+    ExistingRasterPath,
+    Unavailable,
+}
+
+/// File-level metadata extraction policy selected before the migration task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MetadataExtractionPolicy {
+    pub dimension_source: MetadataDimensionSource,
+    pub raw_decode_supported: bool,
+    pub camera_lens_available: bool,
+}
+
+/// Return the metadata extraction policy for one original path.
+pub fn metadata_extraction_policy_for_path(path: &Path) -> MetadataExtractionPolicy {
+    let is_jpeg = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
+        });
+
+    MetadataExtractionPolicy {
+        dimension_source: if is_jpeg {
+            MetadataDimensionSource::ExistingRasterPath
+        } else {
+            MetadataDimensionSource::Unavailable
+        },
+        raw_decode_supported: false,
+        camera_lens_available: false,
+    }
+}
+
 /// Opened or newly created local library paths and schema state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalLibrary {
@@ -3284,6 +3324,54 @@ mod tests {
             SPIKE_004_STORAGE_GATE.current_schema_version,
             CURRENT_SCHEMA_VERSION
         );
+    }
+
+    #[test]
+    fn records_metadata_backfill_policy_without_automatic_open_work() {
+        assert!(!METADATA_BACKFILL_ON_OPEN_OR_RESTORE);
+        assert!(EXISTING_IMPORTS_WITHOUT_METADATA_STAY_UNKNOWN);
+
+        let jpeg_policy = metadata_extraction_policy_for_path(Path::new("sample.jpg"));
+        assert_eq!(
+            jpeg_policy.dimension_source,
+            MetadataDimensionSource::ExistingRasterPath
+        );
+        assert!(!jpeg_policy.raw_decode_supported);
+
+        let raw_policy = metadata_extraction_policy_for_path(Path::new("sample.DNG"));
+        assert_eq!(
+            raw_policy.dimension_source,
+            MetadataDimensionSource::Unavailable
+        );
+        assert!(!raw_policy.raw_decode_supported);
+        assert!(!raw_policy.camera_lens_available);
+
+        let workspace = unique_library_root("metadata-policy");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let before_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_metadata", [], |row| row.get(0))
+            .expect("count metadata before reopen");
+        assert_eq!(before_count, 0);
+        drop(connection);
+
+        open_local_library(&library.root_path).expect("reopen library");
+        let connection = open_catalog(&library.catalog_path).expect("open reopened catalog");
+        let after_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_metadata", [], |row| row.get(0))
+            .expect("count metadata after reopen");
+        assert_eq!(after_count, 0);
+
+        remove_library_root(&workspace);
     }
 
     #[test]

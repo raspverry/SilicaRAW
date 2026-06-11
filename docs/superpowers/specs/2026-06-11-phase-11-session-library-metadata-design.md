@@ -515,6 +515,7 @@ Demo/Validation:
   - Camera and lens remain unavailable unless a documented parser dependency is added.
 - **Validation:**
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. `silica-storage` and `silica-core` now expose a metadata extraction policy without running backfill: library open/session restore do not populate `photo_metadata`, existing unknown metadata remains unknown until explicit import/backfill work, JPEG/JPG dimensions may use the existing raster path, and RAW/camera/lens metadata does not imply RAW decode or parser support.
 
 ### Task 11.7.3: Metadata Migration and Extraction
 

@@ -806,6 +806,13 @@ pub fn import_folder(
     silica_storage::import_folder(library_root_path, folder_path).map_err(CoreError::from)
 }
 
+/// Return metadata extraction policy without running any backfill work.
+pub fn metadata_extraction_policy_for_path(
+    path: impl AsRef<Path>,
+) -> silica_storage::MetadataExtractionPolicy {
+    silica_storage::metadata_extraction_policy_for_path(path.as_ref())
+}
+
 /// List imported catalog photos as JSON for the desktop Library grid.
 pub fn list_library_photos_json(library_root_path: impl AsRef<Path>) -> Result<String, CoreError> {
     let photos = list_library_photos(library_root_path)?;
@@ -2214,6 +2221,24 @@ mod tests {
         assert_eq!(restored.resolved_mode, AppSessionMode::Library);
 
         remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn exposes_metadata_policy_without_raw_decode_claim() {
+        let jpeg_policy = metadata_extraction_policy_for_path(Path::new("sample.jpeg"));
+        assert_eq!(
+            jpeg_policy.dimension_source,
+            silica_storage::MetadataDimensionSource::ExistingRasterPath
+        );
+        assert!(!jpeg_policy.raw_decode_supported);
+
+        let raw_policy = metadata_extraction_policy_for_path(Path::new("sample.ARW"));
+        assert_eq!(
+            raw_policy.dimension_source,
+            silica_storage::MetadataDimensionSource::Unavailable
+        );
+        assert!(!raw_policy.raw_decode_supported);
+        assert!(!raw_policy.camera_lens_available);
     }
 
     #[test]
