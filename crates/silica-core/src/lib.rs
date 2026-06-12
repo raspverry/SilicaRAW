@@ -43,6 +43,13 @@ pub fn plan_product_raw_decode(
     silica_decode::plan_product_raw_decode(source_path)
 }
 
+pub fn plan_product_raw_decode_from_probe(
+    fixture_class: impl AsRef<str>,
+    probe: &silica_decode::RawProbeResult,
+) -> silica_decode::ProductRawDecodePlan {
+    silica_decode::plan_product_raw_decode_from_probe(fixture_class, probe)
+}
+
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
 const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
@@ -1923,6 +1930,35 @@ mod tests {
             plan.status,
             silica_decode::ProductRawDecodeStatus::Supported
         );
+    }
+
+    #[test]
+    fn product_raw_decode_probe_plan_wraps_supported_fixture_evidence() {
+        let probe = silica_decode::RawProbeResult {
+            backend: silica_decode::RawProbeBackend::CoreImageRaw,
+            platform: silica_decode::RawProbePlatform::Macos,
+            macos_version: Some("26.4".to_string()),
+            source_path: "/tmp/sample.cr2".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            original_file_size: Some(1024),
+            original_modified_at: Some("2026-06-12T00:00:00Z".to_string()),
+            status: silica_decode::RawProbeStatus::Success,
+            width: Some(5184),
+            height: Some(3456),
+            orientation: None,
+            error_category: None,
+            message: "Core Image opened the RAW source.".to_string(),
+        };
+
+        let plan = plan_product_raw_decode_from_probe("A", &probe);
+
+        assert_eq!(plan.source_path, "/tmp/sample.cr2");
+        assert_eq!(
+            plan.status,
+            silica_decode::ProductRawDecodeStatus::Supported
+        );
+        assert_eq!(plan.width, Some(5184));
+        assert_eq!(plan.height, Some(3456));
     }
 
     #[test]

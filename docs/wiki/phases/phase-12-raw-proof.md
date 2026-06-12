@@ -43,6 +43,7 @@ When the task adds or changes dependencies, also read:
 3. [Task 12.3: Core Image Support Matrix and LibRaw Gate](../tasks/12.3-core-image-support-matrix.md)
 4. [Task 12.4: Product RAW Decode API Contract](../tasks/12.4-product-raw-decode-api-contract.md)
 5. [Task 12.5: Legal RAW Fixture Evidence](../tasks/12.5-legal-raw-fixture-evidence.md)
+6. [Task 12.6: Product RAW Support Mapping](../tasks/12.6-product-raw-support-mapping.md)
 
 ## Scope
 
@@ -51,6 +52,7 @@ When the task adds or changes dependencies, also read:
 - Record structured, fixture-backed results.
 - Decide which fixture classes can graduate from blocked to Core Image supported.
 - Define the product decode API contract after evidence exists.
+- Map fixture-backed probe results to metadata-only product RAW support plans.
 
 ## Non-Goals
 
@@ -75,6 +77,7 @@ Stop if:
 - Task 12.2: `SILICARAW_RAW_FIXTURE_MANIFEST=... cargo test -p silica-decode --features core-image-raw-probe -- --ignored`
 - Task 12.3: `python3 scripts/harness/check-md-links.py` and `python3 scripts/harness/check-cargo-deps.py`
 - Task 12.4: `cargo test -p silica-decode -p silica-core`
+- Task 12.6: `cargo test -p silica-decode -p silica-core`
 - Before completion: `scripts/harness/check.sh`
 
 ## Notes for LLM Agents

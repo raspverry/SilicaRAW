@@ -349,6 +349,18 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - `python3 scripts/harness/check-md-links.py`
   - `scripts/harness/check.sh`
 
+### Task 12.6: Product RAW Support Mapping
+
+- **Location:** `crates/silica-decode`, `crates/silica-core`, `docs/wiki/topics/raw-decoding.md`
+- **Description:** Map fixture-backed Core Image probe evidence into metadata-only product RAW decode plans without showing RAW pixels.
+- **Dependencies:** Task 12.5
+- **Acceptance Criteria:**
+  - Successful macOS probe results for fixture classes A-D can return `Supported` with backend, dimensions, orientation metadata, and source hash evidence.
+  - Arbitrary path-based RAW candidates remain blocked unless probe evidence is supplied.
+  - Failed, unsupported, class E, or unknown fixture classes return explicit blocked states.
+  - No UI RAW display, export expansion, cache generation, broad camera support claim, color correctness claim, original mutation, or LibRaw dependency is added.
+- **Validation:** `cargo test -p silica-decode -p silica-core`, `scripts/harness/check.sh`
+
 ## Phase 13: Color Pipeline Proof
 
 **Goal:** Prove the Core Image/ColorSync-compatible path before expanding export and preview claims.

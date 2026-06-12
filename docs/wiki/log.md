@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | Product RAW support mapping added
+
+- Completed Task 12.6 with an evidence-driven product RAW support mapping API.
+- The path-only RAW plan remains conservative; only successful A-D Core Image probe evidence can return metadata-only `Supported`.
+- No RAW pixels, export expansion, cache generation, broad support claim, original mutation, or LibRaw dependency was added.
+
 ## [2026-06-12] phase-12 | RAW fixture probe evidence recorded
 
 - Completed local Task 12.5.2 through Task 12.5.4 for raw.pixls.us candidates A-D.

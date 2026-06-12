@@ -239,6 +239,80 @@ pub fn plan_product_raw_decode(source_path: impl AsRef<str>) -> ProductRawDecode
     }
 }
 
+pub fn plan_product_raw_decode_from_probe(
+    fixture_class: impl AsRef<str>,
+    probe: &RawProbeResult,
+) -> ProductRawDecodePlan {
+    let fixture_class = fixture_class.as_ref().trim();
+
+    if !is_core_image_supported_fixture_class(fixture_class) {
+        return ProductRawDecodePlan {
+            source_path: probe.source_path.clone(),
+            backend: RawProbeBackend::CoreImageRaw,
+            status: ProductRawDecodeStatus::BlockedPendingEvidence,
+            width: None,
+            height: None,
+            orientation: None,
+            message: "Product RAW decode remains blocked because this fixture class is not marked Core Image supported.".to_string(),
+        };
+    }
+
+    if probe.status != RawProbeStatus::Success {
+        return ProductRawDecodePlan {
+            source_path: probe.source_path.clone(),
+            backend: RawProbeBackend::CoreImageRaw,
+            status: match probe.status {
+                RawProbeStatus::Unsupported => ProductRawDecodeStatus::BlockedUnsupportedClass,
+                _ => ProductRawDecodeStatus::BlockedCoreImageFailed,
+            },
+            width: probe.width,
+            height: probe.height,
+            orientation: probe.orientation,
+            message: "Product RAW decode is blocked because the Core Image probe did not succeed."
+                .to_string(),
+        };
+    }
+
+    if probe.platform != RawProbePlatform::Macos || probe.source_sha256.is_none() {
+        return ProductRawDecodePlan {
+            source_path: probe.source_path.clone(),
+            backend: RawProbeBackend::CoreImageRaw,
+            status: ProductRawDecodeStatus::BlockedCoreImageFailed,
+            width: probe.width,
+            height: probe.height,
+            orientation: probe.orientation,
+            message: "Product RAW decode is blocked because the probe evidence is incomplete."
+                .to_string(),
+        };
+    }
+
+    if probe.width.is_none() || probe.height.is_none() {
+        return ProductRawDecodePlan {
+            source_path: probe.source_path.clone(),
+            backend: RawProbeBackend::CoreImageRaw,
+            status: ProductRawDecodeStatus::BlockedCoreImageFailed,
+            width: probe.width,
+            height: probe.height,
+            orientation: probe.orientation,
+            message: "Product RAW decode is blocked because the Core Image probe did not report dimensions.".to_string(),
+        };
+    }
+
+    ProductRawDecodePlan {
+        source_path: probe.source_path.clone(),
+        backend: RawProbeBackend::CoreImageRaw,
+        status: ProductRawDecodeStatus::Supported,
+        width: probe.width,
+        height: probe.height,
+        orientation: probe.orientation,
+        message: "Product RAW decode is supported for this fixture-backed Core Image class as a metadata-only plan.".to_string(),
+    }
+}
+
+fn is_core_image_supported_fixture_class(fixture_class: &str) -> bool {
+    matches!(fixture_class, "A" | "B" | "C" | "D")
+}
+
 /// Build the local alpha preview decode plan for a catalog photo path.
 pub fn plan_preview_decode(source_path: impl AsRef<str>, unsupported: bool) -> PreviewDecodePlan {
     let source_path = source_path.as_ref().to_string();
@@ -495,6 +569,74 @@ mod tests {
     }
 
     #[test]
+    fn product_raw_decode_plan_supports_successful_fixture_probe() {
+        let probe = successful_raw_probe("/tmp/sample.cr3", Some(6960), Some(4640));
+        let plan = super::plan_product_raw_decode_from_probe("B", &probe);
+
+        assert_eq!(plan.source_path, "/tmp/sample.cr3");
+        assert_eq!(plan.backend, super::RawProbeBackend::CoreImageRaw);
+        assert_eq!(plan.status, super::ProductRawDecodeStatus::Supported);
+        assert_eq!(plan.width, Some(6960));
+        assert_eq!(plan.height, Some(4640));
+        assert_eq!(plan.orientation, None);
+    }
+
+    #[test]
+    fn product_raw_decode_plan_keeps_unproven_fixture_classes_blocked() {
+        let probe = successful_raw_probe("/tmp/sample.raw", Some(1200), Some(800));
+        let plan = super::plan_product_raw_decode_from_probe("E", &probe);
+
+        assert_eq!(
+            plan.status,
+            super::ProductRawDecodeStatus::BlockedPendingEvidence
+        );
+        assert_eq!(plan.width, None);
+        assert_eq!(plan.height, None);
+    }
+
+    #[test]
+    fn product_raw_decode_plan_blocks_failed_fixture_probe() {
+        let mut probe = successful_raw_probe("/tmp/sample.raf", Some(6240), Some(4160));
+        probe.status = super::RawProbeStatus::Failed;
+        probe.error_category = Some(super::RawProbeErrorCategory::CoreImageOpenFailed);
+        probe.message = "Core Image failed.".to_string();
+
+        let plan = super::plan_product_raw_decode_from_probe("C", &probe);
+
+        assert_eq!(
+            plan.status,
+            super::ProductRawDecodeStatus::BlockedCoreImageFailed
+        );
+        assert_eq!(plan.width, Some(6240));
+        assert_eq!(plan.height, Some(4160));
+    }
+
+    #[test]
+    fn product_raw_decode_plan_blocks_success_without_dimensions() {
+        let probe = successful_raw_probe("/tmp/sample.dng", None, Some(3024));
+        let plan = super::plan_product_raw_decode_from_probe("D", &probe);
+
+        assert_eq!(
+            plan.status,
+            super::ProductRawDecodeStatus::BlockedCoreImageFailed
+        );
+        assert_eq!(plan.width, None);
+        assert_eq!(plan.height, Some(3024));
+    }
+
+    #[test]
+    fn product_raw_decode_plan_blocks_incomplete_probe_evidence() {
+        let mut probe = successful_raw_probe("/tmp/sample.cr2", Some(5184), Some(3456));
+        probe.source_sha256 = None;
+        let plan = super::plan_product_raw_decode_from_probe("A", &probe);
+
+        assert_eq!(
+            plan.status,
+            super::ProductRawDecodeStatus::BlockedCoreImageFailed
+        );
+    }
+
+    #[test]
     fn product_raw_decode_plan_blocks_non_raw_candidates_as_unsupported_class() {
         let plan = super::plan_product_raw_decode("/tmp/sample.txt");
 
@@ -505,5 +647,27 @@ mod tests {
         assert_eq!(plan.width, None);
         assert_eq!(plan.height, None);
         assert_eq!(plan.orientation, None);
+    }
+
+    fn successful_raw_probe(
+        source_path: &str,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> super::RawProbeResult {
+        super::RawProbeResult {
+            backend: super::RawProbeBackend::CoreImageRaw,
+            platform: super::RawProbePlatform::Macos,
+            macos_version: Some("26.4".to_string()),
+            source_path: source_path.to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            original_file_size: Some(1024),
+            original_modified_at: Some("2026-06-12T00:00:00Z".to_string()),
+            status: super::RawProbeStatus::Success,
+            width,
+            height,
+            orientation: None,
+            error_category: None,
+            message: "Core Image opened the RAW source.".to_string(),
+        }
     }
 }

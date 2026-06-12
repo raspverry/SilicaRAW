@@ -198,12 +198,13 @@ Current behavior:
 ```txt
 RAW candidate -> BlockedPendingEvidence
 non-RAW candidate -> BlockedUnsupportedClass
-Supported -> pending a follow-up product API mapping task for fixture-proven classes A-D
+successful probe evidence for fixture classes A-D -> Supported metadata-only plan
+class E, unknown class, failed probe, or missing dimensions -> blocked state
 ```
 
 The API returns backend, status, optional dimensions, optional orientation, and a UI-suitable message. It does not return decoded pixels and does not trigger rendering, cache writes, export, or original-file mutation.
 
-The next product API task may map fixture-proven classes A-D to `Supported` metadata-only plans. It must still avoid UI pixels, export behavior, cache writes, broad camera claims, and original mutation.
+The path-only `plan_product_raw_decode` stays conservative and does not infer support from file extension alone. The evidence-driven `plan_product_raw_decode_from_probe` maps only fixture-backed Core Image probe results to metadata-only product plans.
 
 ## Links
 
