@@ -282,7 +282,7 @@
                   <button type="button" disabled title="Next navigation is deferred for the local alpha.">Next</button>
                 </div>
               </div>
-              <div class="sr-loupe-viewer" id="loupeViewer" data-preview-status="blocked">
+              <div class="sr-loupe-viewer" id="loupeViewer" data-preview-status="blocked" data-native-viewer-host="reserved" data-native-viewer-surface="loupe" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
                 <div class="sr-loupe-art" aria-hidden="true"></div>
                 <div class="sr-loupe-status">
                   <strong id="loupePreviewStatus">No Preview</strong>
@@ -307,7 +307,7 @@
                 <button type="button">Split</button>
               </div>
             </div>
-            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false">
+            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false" data-native-viewer-host="reserved" data-native-viewer-surface="develop" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
               <div class="sr-develop-art sr-thumb-art-a" id="developPreviewArt" aria-hidden="true"></div>
               <div class="sr-develop-status">
                 <strong id="developPreviewStatus">No Preview</strong>
@@ -664,6 +664,81 @@
       const pageThumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
       const developObjectUrls = new Map();
+      const nativeViewerHosts = {
+        loupe: loupeViewer,
+        develop: developPreviewSurface,
+      };
+
+      function roundedGeometryValue(value) {
+        return Math.round(Number(value || 0) * 100) / 100;
+      }
+
+      function unavailableViewerHostGeometry(surface, reason) {
+        const scaleFactor = window.devicePixelRatio || 1;
+        return {
+          available: false,
+          surface,
+          state: "web-fallback",
+          reason,
+          controls: "external",
+          logicalRect: { x: 0, y: 0, width: 0, height: 0 },
+          scaleFactor,
+          drawableSize: { width: 0, height: 0 },
+        };
+      }
+
+      function viewerHostGeometry(element) {
+        if (!element) {
+          return unavailableViewerHostGeometry("none", "missing-host");
+        }
+        const surface = element.dataset.nativeViewerSurface || "unknown";
+        if (element.dataset.nativeViewerHost !== "reserved") {
+          return unavailableViewerHostGeometry(surface, "not-reserved-host");
+        }
+        const rect = element.getBoundingClientRect();
+        const width = roundedGeometryValue(rect.width);
+        const height = roundedGeometryValue(rect.height);
+        const scaleFactor = window.devicePixelRatio || 1;
+        const available = element.isConnected && width > 0 && height > 0;
+
+        return {
+          available,
+          surface,
+          state: element.dataset.nativeViewerState || "web-fallback",
+          reason: available ? "" : "empty-host-rect",
+          controls: element.dataset.nativeViewerControls || "external",
+          logicalRect: {
+            x: roundedGeometryValue(rect.left),
+            y: roundedGeometryValue(rect.top),
+            width,
+            height,
+          },
+          scaleFactor,
+          drawableSize: {
+            width: Math.round(width * scaleFactor),
+            height: Math.round(height * scaleFactor),
+          },
+        };
+      }
+
+      function currentNativeViewerHostGeometry() {
+        if (appFrame.dataset.activeMode === "develop") {
+          return viewerHostGeometry(developPreviewSurface);
+        }
+        if (!loupeSurface.hidden) {
+          return viewerHostGeometry(loupeViewer);
+        }
+        return unavailableViewerHostGeometry("none", "no-active-viewer");
+      }
+
+      window.SilicaRAWViewerHost = Object.freeze({
+        enabled: false,
+        surfaces: Object.freeze(["loupe", "develop"]),
+        currentGeometry: currentNativeViewerHostGeometry,
+        geometryFor(surface) {
+          return viewerHostGeometry(nativeViewerHosts[surface]);
+        },
+      });
 
       function setStatus(message) {
         statusOutput.value = message;

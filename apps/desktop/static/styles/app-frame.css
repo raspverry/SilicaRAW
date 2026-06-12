@@ -1318,6 +1318,12 @@ progress::-webkit-progress-value {
   background: var(--sr-bg-primary);
 }
 
+.sr-loupe-viewer[data-native-viewer-host="reserved"],
+.sr-develop-preview[data-native-viewer-host="reserved"] {
+  contain: layout paint;
+  isolation: isolate;
+}
+
 .sr-loupe-art {
   position: absolute;
   inset: var(--sr-space-lg);

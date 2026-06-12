@@ -1796,6 +1796,9 @@ mod tests {
         assert!(contract.product_module);
         assert!(!contract.uses_spike_module);
         assert!(!contract.installs_in_default_build);
+        assert_eq!(contract.reserved_surfaces, ["loupe", "develop"]);
+        assert!(contract.consumes_web_host_geometry);
+        assert!(contract.controls_must_be_external);
     }
 
     #[test]

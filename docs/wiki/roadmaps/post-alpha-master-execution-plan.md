@@ -36,8 +36,8 @@ As of 2026-06-12:
 - Phase 12 RAW proof is complete for fixture-backed Core Image support mapping.
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
 - Phase 14 is active.
-- Task 14.0 through Task 14.2 are complete.
-- Next task: [14.3 Reserved Viewer Layout Handshake](../tasks/14.3-reserved-viewer-layout-handshake.md).
+- Task 14.0 through Task 14.3 are complete.
+- Next task: [14.4 Resize Retina Lifecycle Proof](../tasks/14.4-resize-retina-lifecycle-proof.md).
 
 ## Wave Map
 
@@ -367,7 +367,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 14.3 from the existing task card.
+1. Execute Task 14.4 from the existing task card.
 2. Continue through Task 14.8 without creating another Phase 14 plan.
 3. After Phase 14 completes, create Phase 15 task cards from the Phase 15 split in this master plan.
 4. Execute Phase 15 cards in order.

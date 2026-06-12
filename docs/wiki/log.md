@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Reserved viewer layout handshake added
+
+- Completed Task 14.3 with reserved native viewer host markers for Loupe and Develop surfaces plus an inert feature-off geometry reporting API.
+- Extended the static UI harness to require exact reserved hosts, external controls, and native viewer geometry functions.
+- Kept AppKit view installation, Metal rendering, texture cache, shader passes, RAW pixels, and native input ownership out of scope.
+
 ## [2026-06-12] phase-14 | Native viewer feature gate added
 
 - Completed Task 14.2 with a non-default `native-metal-viewer` feature and macOS-only `native_metal_viewer` product module shell.

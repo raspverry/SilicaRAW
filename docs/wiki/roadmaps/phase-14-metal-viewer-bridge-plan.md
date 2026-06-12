@@ -26,7 +26,8 @@ As of 2026-06-12:
 - Task 14.0 design gate is complete.
 - Task 14.1 bridge contract is complete.
 - Task 14.2 feature-gated product module shell is complete.
-- No reserved layout handshake, lifecycle proof, texture lifecycle, or viewer QA checklist exists yet.
+- Task 14.3 reserved viewer layout handshake is complete.
+- No lifecycle proof, texture lifecycle, or viewer QA checklist exists yet.
 
 ## Goal
 
@@ -88,14 +89,14 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.3: Reserved Viewer Layout Handshake
 
 - **Card:** [14.3 Reserved Viewer Layout Handshake](../tasks/14.3-reserved-viewer-layout-handshake.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** The web shell exposes a stable viewer host rectangle and the native bridge consumes that geometry without overlapping panels or controls.
 - **Validation:** static UI contract, viewer layout smoke, `cargo test -p silica-desktop --features native-metal-viewer`
 
 ### Task 14.4: Resize, Retina, and Lifecycle Proof
 
 - **Card:** [14.4 Resize Retina Lifecycle Proof](../tasks/14.4-resize-retina-lifecycle-proof.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** Product viewer module records resize, drawable size, backing scale, install/uninstall lifecycle, and render timing evidence.
 - **Validation:** `cargo test -p silica-desktop --features native-metal-viewer`, manual macOS runbook evidence
 

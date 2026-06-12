@@ -13,6 +13,9 @@ pub struct NativeMetalViewerModuleContract {
     pub product_module: bool,
     pub uses_spike_module: bool,
     pub installs_in_default_build: bool,
+    pub reserved_surfaces: [&'static str; 2],
+    pub consumes_web_host_geometry: bool,
+    pub controls_must_be_external: bool,
 }
 
 /// Returns the current product viewer module contract.
@@ -24,5 +27,8 @@ pub fn module_contract() -> NativeMetalViewerModuleContract {
         product_module: true,
         uses_spike_module: false,
         installs_in_default_build: false,
+        reserved_surfaces: ["loupe", "develop"],
+        consumes_web_host_geometry: true,
+        controls_must_be_external: true,
     }
 }

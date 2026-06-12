@@ -18,19 +18,32 @@ class StaticUiParser(HTMLParser):
         self.ids = {}
         self.styles = 0
         self.mode_buttons = {}
+        self.native_viewer_hosts = {}
+        self.native_viewer_descendant_ids = {}
+        self._element_stack = []
         self._current_button_mode = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        current_native_host = next(
+            (entry["native_host_id"] for entry in reversed(self._element_stack) if entry["native_host_id"]),
+            None,
+        )
         if tag == "style":
             self.styles += 1
         if tag == "link" and attrs.get("rel") == "stylesheet":
             self.links.append(attrs.get("href", ""))
         if "id" in attrs:
             self.ids[attrs["id"]] = attrs
+            if current_native_host:
+                self.native_viewer_descendant_ids[attrs["id"]] = current_native_host
+        native_host_id = attrs.get("id") if attrs.get("data-native-viewer-host") == "reserved" else None
+        if native_host_id:
+            self.native_viewer_hosts[native_host_id] = attrs
         if tag == "button" and "data-mode" in attrs:
             self._current_button_mode = attrs["data-mode"]
             self.mode_buttons[attrs["data-mode"]] = {"attrs": attrs, "text": ""}
+        self._element_stack.append({"tag": tag, "native_host_id": native_host_id})
 
     def handle_data(self, data):
         if self._current_button_mode:
@@ -39,6 +52,10 @@ class StaticUiParser(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "button":
             self._current_button_mode = None
+        for index in range(len(self._element_stack) - 1, -1, -1):
+            if self._element_stack[index]["tag"] == tag:
+                del self._element_stack[index:]
+                break
 
 
 def require(condition, message, failures):
@@ -272,6 +289,69 @@ def main():
     require(contrast_slider.get("min") == "-100", "#developContrastSlider min must match edit graph contrast", failures)
     require(contrast_slider.get("max") == "100", "#developContrastSlider max must match edit graph contrast", failures)
     require(contrast_slider.get("step") == "1", "#developContrastSlider step must support integer contrast edits", failures)
+
+    expected_native_hosts = {
+        "loupeViewer": "loupe",
+        "developPreviewSurface": "develop",
+    }
+    require(
+        set(parser.native_viewer_hosts) == set(expected_native_hosts),
+        "reserved native viewer hosts must be exactly Loupe and Develop viewer surfaces",
+        failures,
+    )
+    for host_id, surface in expected_native_hosts.items():
+        host_attrs = parser.native_viewer_hosts.get(host_id, {})
+        require(
+            host_attrs.get("data-native-viewer-surface") == surface,
+            f"#{host_id} must report native viewer surface {surface}",
+            failures,
+        )
+        require(
+            host_attrs.get("data-native-viewer-state") == "web-fallback",
+            f"#{host_id} must default to web-fallback while native viewer is feature-gated",
+            failures,
+        )
+        require(
+            host_attrs.get("data-native-viewer-controls") == "external",
+            f"#{host_id} must declare controls outside the reserved native viewer host",
+            failures,
+        )
+
+    interactive_viewer_controls = {
+        "closeLoupe",
+        "loupeFitMode",
+        "developExposureSlider",
+        "developExposureValue",
+        "developExposureReset",
+        "developContrastSlider",
+        "developContrastValue",
+        "developContrastReset",
+        "developCommitEdit",
+        "developRevertEdit",
+        "openExportDialog",
+        "exportDialog",
+    }
+    for control_id in interactive_viewer_controls:
+        require(
+            control_id not in parser.native_viewer_descendant_ids,
+            f"#{control_id} must remain outside reserved native viewer hosts",
+            failures,
+        )
+    require(
+        "function viewerHostGeometry" in source,
+        "index.html must expose viewerHostGeometry for native bridge geometry reporting",
+        failures,
+    )
+    require(
+        "function currentNativeViewerHostGeometry" in source,
+        "index.html must expose currentNativeViewerHostGeometry",
+        failures,
+    )
+    require(
+        "window.SilicaRAWViewerHost" in source,
+        "index.html must expose inert feature-off native viewer host API",
+        failures,
+    )
 
     require(
         parser.ids.get("developExposureValue", {}).get("type") == "number",
