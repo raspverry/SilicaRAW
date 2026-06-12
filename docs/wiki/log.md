@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Local color fixture manifest added
+
+- Completed Task 13.2 locally with ignored synthetic Color Class F fixtures and `.tmp/legal-color-fixtures/color-fixtures.json`.
+- Recorded hashes for sRGB, Display P3, and untagged JPEG fixtures.
+- Kept fixture media and manifest out of git; profile probing remains Task 13.3 and Task 13.4.
+
 ## [2026-06-12] phase-13 | Color fixture source review added
 
 - Completed Task 13.1 source review for local-only synthetic Color Class F fixtures.

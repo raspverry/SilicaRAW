@@ -46,9 +46,9 @@ sha256: 0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0
 
 These hashes identify the local profile files used for local fixture generation. They are not a redistribution license.
 
-## Planned Generation Policy
+## Local Generation Evidence
 
-Task 13.2 may generate ignored local fixtures with macOS system tools such as `sips`:
+Task 13.2 generated ignored local fixtures with project synthetic pixels and local macOS profile tools:
 
 ```txt
 sRGB fixture -> embed local sRGB ICC profile
@@ -56,7 +56,21 @@ Display P3 fixture -> match/embed local Display P3 ICC profile
 untagged fixture -> remove color-management properties
 ```
 
-The exact commands, generated file hashes, and local fixture manifest belong to Task 13.2.
+Local manifest path:
+
+```txt
+.tmp/legal-color-fixtures/color-fixtures.json
+```
+
+Generated fixture hashes:
+
+```txt
+srgb_jpeg: ba7fed85d6fdd5d2dbf8376fdb4030e2206a541e58efa2c69ec5ba494152b6fe
+display_p3_jpeg: 84855ac721fbc8062ef543f5fe95df843e6e4a211be2eac2869e3456c55e1ebb
+untagged_jpeg: aff808a1c3625a5de3e249c80c3cb9d7e9ae53d92f6bd95158aa4a0f384a23e9
+```
+
+The generated files remain ignored by git.
 
 ## Rejected Alternatives
 

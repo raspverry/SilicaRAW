@@ -41,7 +41,16 @@ display_p3_jpeg -> synthetic pixels + local macOS Display P3 ICC, local-only
 untagged_jpeg -> synthetic pixels + removed color-management properties, local-only
 ```
 
-No committed color-management fixture corpus exists yet. Task 13.2 must generate or place the accepted fixtures under an ignored local path and record hashes in a local manifest.
+No committed color-management fixture corpus exists yet. Task 13.2 generated an ignored local corpus and manifest:
+
+```txt
+manifest: .tmp/legal-color-fixtures/color-fixtures.json
+srgb_jpeg sha256: ba7fed85d6fdd5d2dbf8376fdb4030e2206a541e58efa2c69ec5ba494152b6fe
+display_p3_jpeg sha256: 84855ac721fbc8062ef543f5fe95df843e6e4a211be2eac2869e3456c55e1ebb
+untagged_jpeg sha256: aff808a1c3625a5de3e249c80c3cb9d7e9ae53d92f6bd95158aa4a0f384a23e9
+```
+
+This local corpus proves only that legal local fixture files and hashes exist. It does not prove profile parsing, transforms, export ICC embedding, or color correctness.
 
 ## Task 10.1 Color Class F Contract
 
@@ -74,8 +83,8 @@ Current planned order:
 ```txt
 13.0 design gate
 13.1 source review [complete]
-13.2 ignored local fixtures and manifest [next]
-13.3 feature-gated color probe
+13.2 ignored local fixtures and manifest [complete locally]
+13.3 feature-gated color probe [next]
 13.4 probe harness
 13.5 support matrix
 13.6 ICC export proof

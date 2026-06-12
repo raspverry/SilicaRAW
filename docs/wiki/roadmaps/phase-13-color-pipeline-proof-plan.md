@@ -27,7 +27,8 @@ As of 2026-06-12:
 - No color probe, ICC proof, tolerance result, manual visual review, or color correctness claim exists yet.
 - Task 13.0 design gate is complete.
 - Task 13.1 color fixture source review is complete with a local-only synthetic fixture source.
-- Task 13.2 local color fixture corpus and manifest is next.
+- Task 13.2 local color fixture corpus and manifest is complete locally.
+- Task 13.3 feature-gated color profile probe is next.
 
 ## Goal
 
@@ -69,14 +70,14 @@ Create fixture-backed evidence for:
 ### Task 13.2: Local Color Fixture Corpus and Manifest
 
 - **Card:** [13.2 Local Color Fixture Corpus and Manifest](../tasks/13.2-color-fixture-local-manifest.md)
-- **Status:** next
+- **Status:** complete locally
 - **Output:** Ignored local Class F fixture files and a local fixture manifest compatible with `schemas/fixture_manifest.schema.json`.
 - **Validation:** `git status --short` shows no fixture media staged.
 
 ### Task 13.3: Feature-Gated Color Profile Probe
 
 - **Card:** [13.3 Feature-Gated Color Profile Probe](../tasks/13.3-feature-gated-color-profile-probe.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** `silica-render` exposes a non-default `color-probe` path that records profile and transform metadata without changing normal product behavior.
 - **Validation:** `cargo test -p silica-render --features color-probe`
 
