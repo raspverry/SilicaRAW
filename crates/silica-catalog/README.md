@@ -23,4 +23,6 @@ Phase 4.4 adds the local alpha photo flags contract:
 - picked and rejected state
 - optional color label normalization
 
+Task 16.2 moves the local alpha schema contract to version 6 and adds the ordered edit history checkpoint index contract for undo/history work.
+
 `silica-storage` owns SQLite execution and migration application. `silica-catalog` owns the domain-facing contract that later library create/open, import, culling, and query code should reference.

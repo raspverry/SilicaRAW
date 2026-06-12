@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Edit history persistence added
+
+- Completed Task 16.2 with catalog schema version 6 and ordered edit history checkpoint columns.
+- Persisted one `silica.action` edit checkpoint per committed exposure/contrast edit, including schema-valid before/after edit graphs.
+- Added tests for reopen persistence, draft no-history behavior, and migration idempotence.
+
 ## [2026-06-12] phase-16 | Action semantics contract recorded
 
 - Completed Task 16.1 with `silica.action` payload version 1 semantics.

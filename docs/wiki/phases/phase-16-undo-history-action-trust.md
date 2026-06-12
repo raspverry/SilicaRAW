@@ -28,7 +28,7 @@ Phase 16 is a trust gate, not UI breadth. It defines and implements undoable sta
 | --- | --- | --- |
 | 16.0 | Phase 16 Design Gate | Complete: action classes, schema boundary, transaction policy, sidecar policy |
 | 16.1 | Undo, History, and Action Semantics Contract | Complete: undoable vs logged-only vs irreversible classes documented |
-| 16.2 | Edit History Persistence | Validated checkpoints survive reopen; draft updates write no history |
+| 16.2 | Edit History Persistence | Complete: validated checkpoints survive reopen; draft updates write no history |
 | 16.3 | Undo/Redo Core Commands | Undo/redo run as catalog transactions and never delete exports/originals |
 | 16.4 | Develop History Panel Contract | UI lists real checkpoints only; no fake/demo rows |
 | 16.5 | Append-Only Action Log | Core-only action log API for sensitive actions and future permissions |
@@ -55,6 +55,8 @@ Task 16.0 locks the Phase 16 trust boundary in [Action Trust](../topics/action-t
 - sidecar status after history commits must not claim stale sidecars are clean.
 
 Task 16.1 adds the action semantics contract in the same topic: `silica.action` payload version 1, per-photo checkpoint units, redo invalidation after new undoable checkpoints, explicit disabled undo/redo states, and draft-preview no-history behavior.
+
+Task 16.2 implements the first durable edit checkpoints: catalog schema version 6, ordered per-photo `edit_history` rows, schema-valid before/after edit graph payloads, and tests proving draft preview updates still write no history rows.
 
 ## Validation Strategy
 

@@ -128,6 +128,12 @@ pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
 /// Cache record type used for disposable Loupe preview images.
 pub const PREVIEW_CACHE_TYPE: &str = "preview";
 
+/// Stable action payload schema marker for undo/history records.
+pub const ACTION_SCHEMA: &str = "silica.action";
+
+/// Stable action payload version for Phase 16 history records.
+pub const ACTION_VERSION: i64 = 1;
+
 /// Task 11.7.2 policy: no metadata scan runs during library open or session restore.
 pub const METADATA_BACKFILL_ON_OPEN_OR_RESTORE: bool = false;
 /// Existing imports remain unknown until import-time extraction or explicit scoped backfill.
@@ -594,6 +600,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 5,
         name: "photo_metadata_query_indexes",
         sql: PHOTO_METADATA_QUERY_INDEXES_SQL,
+    },
+    Migration {
+        version: 6,
+        name: "edit_history_checkpoint_columns",
+        sql: EDIT_HISTORY_CHECKPOINT_COLUMNS_SQL,
     },
 ];
 
@@ -2605,26 +2616,66 @@ pub fn commit_edit_graph(
     silica_edit::validate_edit_graph(&graph)?;
 
     let library = open_local_library(library_root_path)?;
+    let before_graph =
+        load_active_edit_graph_or_default(&library.root_path, &graph.source.photo_id)?;
     let mut connection = open_catalog(&library.catalog_path)?;
     let photo_id = graph.source.photo_id.clone();
-    let edit_state_id = stable_catalog_id("edit-state", &photo_id);
+    let edit_state_id = unique_catalog_id("edit-state");
+    let edit_history_id = stable_catalog_id("edit-history", &edit_state_id);
     let edit_graph_json = serde_json::to_string(&graph)?;
+    let action_json = serde_json::to_string(&serde_json::json!({
+        "schema": ACTION_SCHEMA,
+        "version": ACTION_VERSION,
+        "class": "undoable",
+        "kind": "edit_commit",
+        "photo_id": photo_id,
+        "label": "Exposure / contrast",
+        "before": {
+            "edit_graph": before_graph,
+        },
+        "after": {
+            "edit_graph": graph,
+        },
+        "created_by": "core",
+    }))?;
 
     let transaction = connection.transaction()?;
+    let sequence: i64 = transaction.query_row(
+        "SELECT COALESCE(MAX(sequence), 0) + 1 FROM edit_history WHERE photo_id = ?1",
+        params![photo_id],
+        |row| row.get(0),
+    )?;
     transaction.execute(
-        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1 AND id <> ?2",
-        params![photo_id, edit_state_id],
+        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1",
+        params![photo_id],
     )?;
     transaction.execute(
         r#"
         INSERT INTO edit_states(id, photo_id, active, edit_graph_json, updated_at)
         VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP)
-        ON CONFLICT(id) DO UPDATE SET
-          active = 1,
-          edit_graph_json = excluded.edit_graph_json,
-          updated_at = CURRENT_TIMESTAMP
         "#,
         params![edit_state_id, photo_id, edit_graph_json],
+    )?;
+    transaction.execute(
+        r#"
+        INSERT INTO edit_history(
+          id,
+          photo_id,
+          edit_state_id,
+          action_json,
+          sequence,
+          action_class,
+          action_kind
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, 'undoable', 'edit_commit')
+        "#,
+        params![
+            edit_history_id,
+            photo_id,
+            edit_state_id,
+            action_json,
+            sequence
+        ],
     )?;
     transaction.execute(
         r#"
@@ -3399,6 +3450,14 @@ fn stable_catalog_id(prefix: &str, value: &str) -> String {
     format!("{prefix}-{hash:016x}")
 }
 
+fn unique_catalog_id(prefix: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    stable_catalog_id(prefix, &format!("{prefix}\n{nanos}"))
+}
+
 fn bool_to_sql(value: bool) -> i64 {
     if value {
         1
@@ -3730,6 +3789,20 @@ ALTER TABLE photo_metadata
 const PHOTO_METADATA_QUERY_INDEXES_SQL: &str = r#"
 CREATE INDEX IF NOT EXISTS idx_photo_metadata_dimensions_photo_id
   ON photo_metadata(width, height, photo_id);
+"#;
+
+const EDIT_HISTORY_CHECKPOINT_COLUMNS_SQL: &str = r#"
+ALTER TABLE edit_history
+  ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE edit_history
+  ADD COLUMN action_class TEXT NOT NULL DEFAULT 'undoable';
+
+ALTER TABLE edit_history
+  ADD COLUMN action_kind TEXT NOT NULL DEFAULT 'edit_commit';
+
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_sequence
+  ON edit_history(photo_id, sequence);
 "#;
 
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
@@ -4200,6 +4273,31 @@ mod tests {
             CURRENT_SCHEMA_VERSION
         );
         assert!(catalog_object_exists(&connection, "idx_photos_library_id").expect("index lookup"));
+        assert!(
+            catalog_object_exists(&connection, "idx_edit_history_photo_sequence")
+                .expect("history sequence index lookup")
+        );
+        let history_columns: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT name FROM pragma_table_info('edit_history')")
+                .expect("prepare history column query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query history columns")
+                .map(|row| row.expect("history column"))
+                .collect()
+        };
+        for column in ["sequence", "action_class", "action_kind"] {
+            assert!(
+                history_columns.contains(&column.to_string()),
+                "missing edit_history column {column}"
+            );
+        }
+        run_migrations(&mut connection).expect("re-run migrations idempotently");
+        assert_eq!(
+            current_schema_version(&connection).expect("version after rerun"),
+            CURRENT_SCHEMA_VERSION
+        );
     }
 
     #[test]
@@ -6264,6 +6362,7 @@ mod tests {
             )
             .expect("photo id");
         assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
         drop(connection);
 
         let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
@@ -6278,6 +6377,11 @@ mod tests {
             0,
             "draft slider update must not write edit_states"
         );
+        assert_eq!(
+            count_edit_history(&connection),
+            0,
+            "draft slider update must not write edit_history"
+        );
         drop(connection);
 
         commit_edit_graph(&library.root_path, edited).expect("commit edit graph");
@@ -6291,6 +6395,63 @@ mod tests {
 
         let connection = open_catalog(&reopened.catalog_path).expect("open reopened catalog");
         assert_eq!(count_edit_states(&connection), 1);
+        assert_eq!(count_edit_history(&connection), 1);
+        let action_json: String = connection
+            .query_row(
+                "SELECT action_json FROM edit_history WHERE photo_id = ?1 AND sequence = 1",
+                params![photo_id],
+                |row| row.get(0),
+            )
+            .expect("history action json");
+        let action: serde_json::Value =
+            serde_json::from_str(&action_json).expect("parse history action json");
+        assert_eq!(action["schema"], "silica.action");
+        assert_eq!(action["version"], 1);
+        assert_eq!(action["class"], "undoable");
+        assert_eq!(action["kind"], "edit_commit");
+        assert_eq!(action["photo_id"], photo_id);
+
+        let before_graph: silica_edit::EditGraph =
+            serde_json::from_value(action["before"]["edit_graph"].clone())
+                .expect("before edit graph");
+        silica_edit::validate_edit_graph(&before_graph).expect("before graph validates");
+        assert_eq!(before_graph.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(before_graph.basic.contrast.as_f64(), Some(0.0));
+
+        let after_graph: silica_edit::EditGraph =
+            serde_json::from_value(action["after"]["edit_graph"].clone())
+                .expect("after edit graph");
+        silica_edit::validate_edit_graph(&after_graph).expect("after graph validates");
+        assert_eq!(after_graph.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(after_graph.basic.contrast.as_f64(), Some(-8.0));
+        drop(connection);
+
+        let second_edit = silica_edit::apply_exposure_contrast(&persisted, 1.0, 3.0, "unix:4")
+            .expect("apply second edit");
+        commit_edit_graph(&reopened.root_path, second_edit).expect("commit second edit graph");
+
+        let connection = open_catalog(&reopened.catalog_path).expect("open catalog after second");
+        assert_eq!(count_edit_states(&connection), 2);
+        assert_eq!(count_edit_history(&connection), 2);
+        let active_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM edit_states WHERE photo_id = ?1 AND active = 1",
+                params![photo_id],
+                |row| row.get(0),
+            )
+            .expect("count active states");
+        assert_eq!(active_count, 1);
+        let sequences: Vec<i64> = {
+            let mut statement = connection
+                .prepare("SELECT sequence FROM edit_history WHERE photo_id = ?1 ORDER BY sequence")
+                .expect("prepare history sequence query");
+            statement
+                .query_map(params![photo_id], |row| row.get::<_, i64>(0))
+                .expect("query history sequences")
+                .map(|row| row.expect("history sequence"))
+                .collect()
+        };
+        assert_eq!(sequences, vec![1, 2]);
 
         remove_library_root(&workspace);
     }
@@ -6402,5 +6563,11 @@ mod tests {
         connection
             .query_row("SELECT COUNT(*) FROM edit_states", [], |row| row.get(0))
             .expect("count edit states")
+    }
+
+    fn count_edit_history(connection: &Connection) -> i64 {
+        connection
+            .query_row("SELECT COUNT(*) FROM edit_history", [], |row| row.get(0))
+            .expect("count edit history")
     }
 }

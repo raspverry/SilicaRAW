@@ -148,6 +148,18 @@ created_by: core
 
 Undoable `before` and `after` values must be catalog state snapshots. They must not rely on export files, cache bytes, sidecar files, original files, or live decoder output to restore state.
 
+Task 16.2 storage status:
+
+```txt
+catalog schema version -> 6
+edit_history.sequence -> per-photo checkpoint order
+edit_history.action_class -> undoable for edit checkpoints
+edit_history.action_kind -> edit_commit for exposure/contrast commits
+idx_edit_history_photo_sequence -> ordered per-photo history lookup
+```
+
+Committed exposure/contrast edits write one active `edit_states` row and one `edit_history` row in the same transaction. The history `action_json` stores schema-valid before/after edit graphs. Slider drafts still write no `edit_states` or `edit_history` rows.
+
 ## Migration Policy
 
 ```txt
