@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | Core Image support matrix recorded
+
+- Completed Task 12.3 with every RAW fixture class marked `blocked_pending_evidence`.
+- No legal RAW fixture manifest is available, so no fixture class graduated to Core Image-supported.
+- LibRaw remains deferred because no fixture-backed Core Image gap has been recorded.
+
 ## [2026-06-12] phase-12 | RAW fixture probe harness added
 
 - Added Task 12.2.1 RAW fixture probe report types, manifest loader, ignored fixture test, and manual harness command.

@@ -139,6 +139,20 @@ SILICARAW_RAW_FIXTURE_MANIFEST=/absolute/path/to/local/raw-fixtures.json scripts
 
 Do not fabricate RAW samples or use user photos without a reviewed legal fixture manifest.
 
+## Phase 12 Core Image Support Matrix
+
+No legal RAW fixture probe evidence is available yet. The matrix records blocked status for each RAW fixture class without inferring support from file extensions.
+
+| Fixture class | Fixture role | Fixture id | Format | Backend | Probe status | Dimensions | Orientation | Product status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A | Ordinary Core Image candidate RAW | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
+| B | High-risk or edge-case RAW | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
+| C | Fuji RAF candidate | pending_legal_fixture | raf | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
+| D | Apple ProRAW DNG candidate | pending_legal_fixture | dng | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
+| E | RAW-like file expected to stay unsupported or blocked | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
+
+LibRaw remains deferred. No fixture-backed Core Image gap has been recorded, and no decoder dependency should be added from this matrix.
+
 ## Links
 
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)

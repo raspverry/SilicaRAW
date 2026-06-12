@@ -545,7 +545,7 @@ git commit -m "test(decode): add raw fixture probe harness"
 - Modify: `docs/wiki/tasks/12.3-core-image-support-matrix.md`
 - Modify: `docs/wiki/log.md`
 
-- [ ] **Step 1: Add support matrix section**
+- [x] **Step 1: Add support matrix section**
 
 Add this table shape to `docs/wiki/topics/raw-decoding.md`:
 
@@ -559,7 +559,7 @@ Add this table shape to `docs/wiki/topics/raw-decoding.md`:
 
 Replace `example` rows with actual Task 12.2 evidence. If no legal fixture evidence exists, use a blocked row that says `blocked_pending_evidence`.
 
-- [ ] **Step 2: Record LibRaw gate**
+- [x] **Step 2: Record LibRaw gate**
 
 If Core Image covers the legal fixture set, add:
 
@@ -569,7 +569,7 @@ LibRaw remains deferred. No fixture-backed Core Image gap has been recorded.
 
 If Core Image fails a required fixture class, create ADR 0009 before adding any dependency.
 
-- [ ] **Step 3: Validate docs and dependency guard**
+- [x] **Step 3: Validate docs and dependency guard**
 
 Run:
 
@@ -580,7 +580,7 @@ python3 scripts/harness/check-cargo-deps.py
 
 Expected: both pass.
 
-- [ ] **Step 4: Commit Task 12.3**
+- [x] **Step 4: Commit Task 12.3**
 
 Run:
 

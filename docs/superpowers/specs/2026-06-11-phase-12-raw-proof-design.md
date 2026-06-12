@@ -287,6 +287,7 @@ The product API must not:
   - Product status is explicit.
   - File extensions alone do not establish support.
 - **Validation:** `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-12 as a blocked-pending-evidence matrix. No legal fixture manifest is available, so no fixture class is supported and no Core Image gap exists to justify LibRaw.
 
 ### Task 12.3.2: LibRaw Gate Decision
 
@@ -297,6 +298,7 @@ The product API must not:
   - If Core Image coverage is enough, LibRaw remains deferred.
   - If Core Image has a concrete gap, dependency and distribution impact are documented before any dependency is added.
 - **Validation:** `python3 scripts/harness/check-cargo-deps.py`
+- **Status:** Completed on 2026-06-12. LibRaw remains deferred because there is no fixture-backed Core Image gap or dependency/distribution decision.
 
 ### Task 12.4.1: Product RAW Decode API Types
 
