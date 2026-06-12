@@ -417,6 +417,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Replace the Spike 001 proof with a product viewer bridge boundary.
 
+**Planning Status:** Phase 14 now has a dedicated [Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md), [brief](../phases/phase-14-product-metal-viewer-bridge.md), and task cards.
+
 ### Task 14.1: AppKit/Metal Viewer Bridge Contract
 
 - **Location:** `docs/wiki/topics/metal-rendering.md`, `apps/desktop/src-tauri`

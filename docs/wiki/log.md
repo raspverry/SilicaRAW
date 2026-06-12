@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Product Metal viewer bridge plan added
+
+- Added the Phase 14 Product Metal Viewer Bridge plan, phase brief, and task cards 14.0 through 14.8.
+- Split Path B product viewer work into atomic gates for bridge contract, feature-gated module shell, reserved layout, lifecycle, input, render request, texture lifecycle, and QA.
+- Kept RAW pixels, exposure/contrast Metal rendering, shader breadth, and color correctness out of Phase 14.
+
 ## [2026-06-12] phase-13 | Explicit export color options added
 
 - Completed Task 13.8 with sRGB as the default JPEG export path and Display P3 as an explicit ICC-backed option.

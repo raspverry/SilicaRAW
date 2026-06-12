@@ -22,9 +22,18 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 13 is complete. The next planned product area is Phase 14: Product Metal Viewer Bridge.
+Phase 13 is complete. The current planned product area is Phase 14: Product Metal Viewer Bridge.
 
-Before Phase 14 implementation, create a dedicated Phase 14 plan, brief, and atomic task cards from the [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md).
+For Phase 14 work, read:
+
+- [Phase 14 Product Metal Viewer Bridge Plan](../roadmaps/phase-14-metal-viewer-bridge-plan.md)
+- [Phase 14 Brief](../phases/phase-14-product-metal-viewer-bridge.md)
+- The matching task card under [Task Cards](../tasks/index.md)
+- [Metal Rendering](../topics/metal-rendering.md)
+- [Spike 001 Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
+- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
+- [Metal Render Pipeline Specification](../../08_Metal_Render_Pipeline_Specification.md)
+- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
 For Phase 13 historical color-proof context, read:
 

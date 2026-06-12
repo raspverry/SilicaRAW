@@ -28,7 +28,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ### LLM Routing
 
 - [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
-- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including the Phase 13 design gate.
+- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including the Phase 14 design gate.
 
 ### Overview
 
@@ -40,13 +40,15 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
 - [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
-- [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): current color proof execution plan and fixture evidence gate.
+- [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): completed color proof execution plan and fixture evidence gate.
+- [Phase 14 Product Metal Viewer Bridge Plan](roadmaps/phase-14-metal-viewer-bridge-plan.md): current native viewer bridge plan and Path B evidence gate.
 
 ### Phase Briefs
 
 - [Phase 11 Summary](phases/phase-11-summary.md): completed session, grid, metadata, and import foundation context.
 - [Phase 12 RAW Proof Brief](phases/phase-12-raw-proof.md): completed RAW proof scope and task order.
-- [Phase 13 Color Pipeline Proof Brief](phases/phase-13-color-pipeline-proof.md): current color proof scope and task order.
+- [Phase 13 Color Pipeline Proof Brief](phases/phase-13-color-pipeline-proof.md): completed color proof scope and task order.
+- [Phase 14 Product Metal Viewer Bridge Brief](phases/phase-14-product-metal-viewer-bridge.md): current native viewer bridge scope and task order.
 
 ### Decisions
 

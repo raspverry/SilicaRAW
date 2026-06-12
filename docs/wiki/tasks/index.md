@@ -34,6 +34,18 @@ Task cards are small, LLM-readable pages for the next atomic work items. Use the
 - [13.7: Color Metadata Contract](13.7-color-metadata-contract.md)
 - [13.8: Explicit Export Color Options](13.8-explicit-export-color-options.md)
 
+## Phase 14
+
+- [14.0: Phase 14 Design Gate](14.0-phase-14-design-gate.md)
+- [14.1: AppKit/Metal Viewer Bridge Contract](14.1-appkit-metal-viewer-bridge-contract.md)
+- [14.2: Native Viewer Feature Gate and Module Shell](14.2-native-viewer-feature-gate.md)
+- [14.3: Reserved Viewer Layout Handshake](14.3-reserved-viewer-layout-handshake.md)
+- [14.4: Resize, Retina, and Lifecycle Proof](14.4-resize-retina-lifecycle-proof.md)
+- [14.5: Viewer Input Ownership Proof](14.5-viewer-input-ownership-proof.md)
+- [14.6: Render Request Boundary](14.6-render-request-boundary.md)
+- [14.7: Disposable Texture Lifecycle Boundary](14.7-disposable-texture-lifecycle-boundary.md)
+- [14.8: Viewer QA Harness and Checklist](14.8-viewer-qa-harness.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.
