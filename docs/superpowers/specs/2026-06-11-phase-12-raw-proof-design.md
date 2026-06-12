@@ -322,6 +322,7 @@ The product API must not:
   - Preview readiness behavior remains stable until later UI work.
   - Original-file safety checks remain present.
 - **Validation:** `scripts/harness/check.sh`
+- **Status:** Completed on 2026-06-12. Added a core wrapper test for the blocked product RAW decode contract and verified the full harness. UI RAW pixels remain unwired and original-file safety tests remain present.
 
 ## Validation Strategy
 

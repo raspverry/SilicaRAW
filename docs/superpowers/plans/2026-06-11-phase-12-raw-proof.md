@@ -528,7 +528,7 @@ Expected: pass only with a legal local fixture manifest. If no legal fixtures ex
 
 Current result on 2026-06-12: blocked pending a legal local RAW fixture manifest. `SILICARAW_RAW_FIXTURE_MANIFEST` is unset, and the repository only contains `.tmp` blocked placeholder fixtures that must not be used as RAW proof evidence.
 
-- [ ] **Step 5: Commit Task 12.2.1**
+- [x] **Step 5: Commit Task 12.2.1**
 
 Run:
 
