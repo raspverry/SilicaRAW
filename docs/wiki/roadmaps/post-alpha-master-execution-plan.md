@@ -46,7 +46,8 @@ As of 2026-06-12:
 - Task 15.5 RAW-derived JPEG sRGB export is complete.
 - Task 15.6 RAW export manual color QA is complete.
 - Phase 15 is complete.
-- Next task: [16.0 Phase 16 Design Gate](../tasks/16.0-phase-16-design-gate.md).
+- Task 16.0 Phase 16 design gate is complete.
+- Next task: [16.1 Undo, History, and Action Semantics Contract](../tasks/16.1-undo-history-action-semantics-contract.md).
 
 ## Wave Map
 
@@ -146,6 +147,7 @@ Treat Phase 16 as a hard trust gate before more Develop breadth.
 
 Required split:
 
+- 16.0: Design gate for action classes, schema boundary, transaction policy, and sidecar policy.
 - 16.1: Undo, history, and action semantics contract.
 - 16.2: Edit history persistence with migration and idempotence tests.
 - 16.3: Undo/redo core commands as catalog transactions.
@@ -376,7 +378,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 16.0 from the existing task card.
+1. Execute Task 16.1 from the existing task card.
 2. Continue through Phase 16 in order.
 
 ## Links

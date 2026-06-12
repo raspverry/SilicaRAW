@@ -34,6 +34,7 @@ For Phase 16 planning or implementation, read:
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)
+- [Action Trust](../topics/action-trust.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 

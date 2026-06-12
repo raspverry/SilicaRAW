@@ -77,6 +77,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [UI Visual and Responsive QA](topics/ui-visual-responsive-qa.md)
 - [Product Alpha Runtime Completion](topics/product-alpha-runtime-completion.md)
 - [Edit Graph](topics/edit-graph.md)
+- [Action Trust](topics/action-trust.md)
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)
 

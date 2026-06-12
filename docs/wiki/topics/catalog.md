@@ -27,6 +27,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 10.5.2 adds checkpointed backup artifacts under `backups/` containing `catalog.db`, `sidecars/`, and a manifest only.
 - Task 10.5.3 adds staged restore from backup artifacts with rollback copies for existing target libraries.
 - Task 11.5.2 adds catalog schema version 3 for paged-query support: normalized `photos.file_type` values and query indexes for accepted sort/filter fields.
+- Task 16.0 records the [Action Trust](action-trust.md) taxonomy before undo/history runtime work: edit commits and flag changes are undoable catalog transactions, while export, cache clear, sidecar write, and import-by-reference behavior stay outside Develop undo.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -146,7 +147,8 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - Applied catalog rebuild or restore from sidecars.
 - Sidecar conflict handling and conflict UI.
 - Full edit history and undo/redo persistence.
-- Cache clear safety.
+- Product undo/redo commands and history panel data.
+- Cache clear undo behavior beyond the Phase 16 action-trust policy.
 - Full paged grid UI states and pagination controls.
 - Broad catalog UI screens beyond the local alpha workflow.
 - Plugin or MCP catalog access.
@@ -157,6 +159,7 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [Data Safety](data-safety.md)
+- [Action Trust](action-trust.md)
 - [Backup and Restore](backup-restore.md)
 - [`silica-catalog` README](../../../crates/silica-catalog/README.md)
 - [`silica-storage` README](../../../crates/silica-storage/README.md)

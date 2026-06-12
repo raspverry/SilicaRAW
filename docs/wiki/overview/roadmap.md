@@ -78,7 +78,7 @@ The current implementation order starts with:
 - Task 15.5, RAW-derived JPEG sRGB export, is complete.
 - Task 15.6, RAW export manual color QA, is complete.
 - Phase 15 is complete.
-- Phase 16 task cards now exist. Next roadmap step is Task 16.0, Phase 16 design gate.
+- Phase 16 task cards now exist. Task 16.0 design gate is complete; next roadmap step is Task 16.1, undo/history/action semantics contract.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

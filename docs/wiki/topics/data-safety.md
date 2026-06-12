@@ -31,6 +31,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 14.7 records the native viewer disposable texture lifecycle boundary: viewer texture identity is rebuildable runtime state and cleanup on photo change, drawable resize, library close, or app close does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
 - Task 15.2 adds fixture-backed RAW preview artifacts as disposable cache files under library `previews/`; source/output canonical matches, stale source hashes, and preview cache path escapes are rejected before trust claims are made.
 - Task 15.5 adds RAW-derived JPEG sRGB export through a full-resolution source artifact under `render-cache/raw-export-sources/`; final export rejects original overwrite, records source/output/ICC hashes, records original hash unchanged evidence, and does not depend on viewer texture cache.
+- Task 16.0 records the [Action Trust](action-trust.md) boundary: undo/redo covers catalog state only, exports and cache bytes are not deleted or reconstructed by undo, sidecar writes are explicit, and original-file mutation remains blocked.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -52,6 +53,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Native viewer texture lifecycle safety. Task 14.7 covers disposable viewer texture identity and cleanup without catalog writes, sidecar writes, original write destinations, or persistent GPU cache state.
 - RAW preview artifact safety. Task 15.2 covers canonical source/output overwrite rejection, stale probe hash rejection, library `previews/` cache bounding, `..` escape rejection, unsupported-class no-write behavior, and original hash preservation for legal local RAW fixture classes.
 - RAW-derived export safety. Task 15.5 covers canonical RAW source/output overwrite rejection, full-resolution export source artifact separation from preview cache, source/output/ICC hash recording, no preview cache dependency, unsupported-class no-write behavior, and original hash preservation for legal local RAW fixture classes.
+- Action trust safety. Task 16.0 covers undoable vs logged-only vs non-reversible vs blocked action classes before runtime undo/history changes.
 
 ## Links
 
@@ -61,6 +63,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - [Agent Rules](../../../codex/AGENT_RULES.md)
 - [Spike 004: SQLite Catalog Persistence](../../spikes/004-sqlite-persistence.md)
 - [Catalog](catalog.md)
+- [Action Trust](action-trust.md)
 - [Backup and Restore](backup-restore.md)
 
 ## Notes for LLM Agents

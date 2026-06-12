@@ -96,6 +96,43 @@ profile_metadata_source
 
 These fields are export evidence. They do not prove visual color correctness.
 
+## Undo, History, and Action Trust
+
+Task 16.0 defines action trust before runtime undo/history changes.
+
+Schema ownership:
+
+```txt
+edit graph JSON shape -> schemas/edit_graph.schema.json and silica-edit
+catalog action tables -> silica-catalog contract and silica-storage migrations
+product mutation policy -> silica-core typed commands
+desktop UI -> presentation only, no raw SQL or schema ownership
+```
+
+Action class rules:
+
+```txt
+- Committed edit graph changes and photo flag changes are undoable catalog transactions.
+- Redo replays only previously undone undoable catalog actions.
+- Export creation, sidecar write, import by reference, backup creation, and restore attempt records are logged-only.
+- Cache clear is non-reversible; cache bytes are disposable and must not be reconstructed by undo.
+- Original photo mutation, original overwrite export paths, sidecar path escape, and direct extension DB writes are blocked.
+```
+
+Existing tables used by Phase 16:
+
+```txt
+edit_states
+edit_history
+photo_flags
+exports
+sidecar_status
+cache_records
+action_log
+```
+
+Task 16.0 does not change schemas or migrations. Task 16.1 owns the typed action semantics contract before persistence and command implementation.
+
 ## Migration Policy
 
 ```txt

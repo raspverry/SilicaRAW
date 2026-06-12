@@ -26,7 +26,7 @@ Phase 16 is a trust gate, not UI breadth. It defines and implements undoable sta
 
 | Task | Name | Gate |
 | --- | --- | --- |
-| 16.0 | Phase 16 Design Gate | Action classes, schema boundary, transaction policy, sidecar policy |
+| 16.0 | Phase 16 Design Gate | Complete: action classes, schema boundary, transaction policy, sidecar policy |
 | 16.1 | Undo, History, and Action Semantics Contract | Undoable vs logged-only vs irreversible classes documented |
 | 16.2 | Edit History Persistence | Validated checkpoints survive reopen; draft updates write no history |
 | 16.3 | Undo/Redo Core Commands | Undo/redo run as catalog transactions and never delete exports/originals |
@@ -43,6 +43,16 @@ Phase 16 is a trust gate, not UI breadth. It defines and implements undoable sta
 - No export-file deletion through undo.
 - No original-file mutation.
 - No fake history rows or static demo history UI.
+
+## Design Gate Result
+
+Task 16.0 locks the Phase 16 trust boundary in [Action Trust](../topics/action-trust.md):
+
+- edit graph commits and photo flag changes are undoable catalog transactions;
+- export, sidecar write, import by reference, backup, and restore attempt records are logged-only;
+- cache clear is non-reversible and must not be reconstructed by undo;
+- originals, original-overwrite export paths, sidecar path escapes, and direct extension writes are blocked;
+- sidecar status after history commits must not claim stale sidecars are clean.
 
 ## Validation Strategy
 

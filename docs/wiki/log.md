@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Action trust design gate recorded
+
+- Completed Task 16.0 with an Action Trust topic for undoable, redoable, logged-only, non-reversible, and blocked action classes.
+- Linked action trust from catalog, data-safety, edit-graph, schema reference, and LLM routing.
+- Kept the task docs-only: no code, migrations, runtime behavior, dependencies, or broad fallback systems added.
+
 ## [2026-06-12] phase-16 | Undo history action trust task cards added
 
 - Added the Phase 16 Undo History Action Trust brief and task cards 16.0 through 16.6.
