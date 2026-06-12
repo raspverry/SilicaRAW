@@ -143,6 +143,7 @@ impl ViewerPreviewViewport {
 pub enum ViewerPreviewPixelFormat {
     Bgra8Unorm,
     Rgba16Float,
+    JpegSrgb8,
 }
 
 /// Input identity for a viewer preview request.
@@ -238,6 +239,7 @@ fn viewer_pixel_format_from_decoded(
         silica_decode::DecodedImagePixelFormat::Rgba16Float => {
             ViewerPreviewPixelFormat::Rgba16Float
         }
+        silica_decode::DecodedImagePixelFormat::JpegSrgb8 => ViewerPreviewPixelFormat::JpegSrgb8,
     }
 }
 
@@ -961,6 +963,36 @@ mod tests {
                 assert_eq!(working_space, "linear_display_p3");
             }
             other => panic!("expected decoded image artifact input, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn viewer_input_from_jpeg_srgb_handoff_marks_artifact_format() {
+        let handoff = silica_decode::DecodedImageHandoff {
+            source_path: "/tmp/sample.cr2".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            decoder_backend: silica_decode::DecodedImageDecoderBackend::CoreImageRaw,
+            status: silica_decode::DecodedImageHandoffStatus::Ready,
+            width: Some(2048),
+            height: Some(1365),
+            orientation: None,
+            input_profile: "core_image_raw".to_string(),
+            working_space: "srgb".to_string(),
+            cache_identity: Some(silica_decode::DecodedImageCacheIdentity {
+                cache_key: "raw-preview:test".to_string(),
+                disposable: true,
+            }),
+            pixel_format: Some(silica_decode::DecodedImagePixelFormat::JpegSrgb8),
+            message: "Core Image emitted a bounded JPEG sRGB preview artifact.".to_string(),
+        };
+
+        let input = super::ViewerPreviewInput::from_decoded_handoff(&handoff);
+
+        match input {
+            super::ViewerPreviewInput::DecodedImageArtifact { pixel_format, .. } => {
+                assert_eq!(pixel_format, super::ViewerPreviewPixelFormat::JpegSrgb8);
+            }
+            other => panic!("expected decoded JPEG artifact input, got {other:?}"),
         }
     }
 

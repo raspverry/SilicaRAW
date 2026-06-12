@@ -470,6 +470,7 @@ pub enum LibraryStorageError {
     NotDirectory(PathBuf),
     InvalidPath(PathBuf),
     InvalidSidecarPhotoId(String),
+    CacheValidation(String),
     SidecarValidation(String),
     BackupValidation(String),
 }
@@ -497,6 +498,9 @@ impl fmt::Display for LibraryStorageError {
             Self::InvalidSidecarPhotoId(photo_id) => {
                 write!(formatter, "invalid sidecar photo id: {photo_id:?}")
             }
+            Self::CacheValidation(message) => {
+                write!(formatter, "cache validation error: {message}")
+            }
             Self::SidecarValidation(message) => {
                 write!(formatter, "sidecar validation error: {message}")
             }
@@ -521,6 +525,7 @@ impl Error for LibraryStorageError {
             | Self::NotDirectory(_)
             | Self::InvalidPath(_)
             | Self::InvalidSidecarPhotoId(_)
+            | Self::CacheValidation(_)
             | Self::SidecarValidation(_)
             | Self::BackupValidation(_) => None,
         }
@@ -1301,6 +1306,7 @@ fn record_photo_cache(
     }
 
     let library = open_existing_library_for_read(library_root_path)?;
+    validate_cache_path(&library.root_path, cache_type, path.as_ref())?;
     let connection = open_catalog(&library.catalog_path)?;
     let cache_id = stable_catalog_id(cache_id_namespace, photo_id);
     let cache_key = cache_key.as_ref().to_string();
@@ -1338,6 +1344,42 @@ fn record_photo_cache(
         path,
         byte_size,
     })
+}
+
+fn validate_cache_path(
+    library_root_path: &Path,
+    cache_type: &str,
+    path: &Path,
+) -> Result<(), LibraryStorageError> {
+    let expected_directory = match cache_type {
+        THUMBNAIL_CACHE_TYPE => Some("thumbnails"),
+        PREVIEW_CACHE_TYPE => Some("previews"),
+        _ => None,
+    };
+    let Some(expected_directory) = expected_directory else {
+        return Ok(());
+    };
+    let expected_root = library_root_path.join(expected_directory);
+    let expected_root = std::fs::canonicalize(&expected_root).map_err(|error| {
+        LibraryStorageError::CacheValidation(format!(
+            "{cache_type} cache root must resolve before recording cache metadata: {} ({error})",
+            expected_root.display()
+        ))
+    })?;
+    let resolved_path = std::fs::canonicalize(path).map_err(|error| {
+        LibraryStorageError::CacheValidation(format!(
+            "{cache_type} cache path must resolve before recording cache metadata: {} ({error})",
+            path.display()
+        ))
+    })?;
+    if resolved_path.starts_with(&expected_root) {
+        return Ok(());
+    }
+
+    Err(LibraryStorageError::CacheValidation(format!(
+        "{cache_type} cache path must stay under disposable {expected_directory}/ cache directory: {}",
+        path.display()
+    )))
 }
 
 /// Persist culling and label flags for a photo in the catalog.
@@ -5895,6 +5937,84 @@ mod tests {
             )
             .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rejects_preview_cache_records_outside_disposable_preview_directory() {
+        let workspace = unique_library_root("preview-cache-outside-root");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let outside_path = workspace.join("outside-preview.jpg");
+        std::fs::write(&outside_path, b"preview bytes").expect("write outside preview");
+
+        let error = record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &outside_path,
+            13,
+        )
+        .expect_err("preview cache path outside previews/ must be rejected");
+
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("previews")
+        ));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rejects_preview_cache_records_that_escape_preview_directory() {
+        let workspace = unique_library_root("preview-cache-parent-escape");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let escaped_path = library
+            .root_path
+            .join("previews")
+            .join("..")
+            .join("escaped-preview.jpg");
+        std::fs::write(
+            library.root_path.join("escaped-preview.jpg"),
+            b"preview bytes",
+        )
+        .expect("write escaped preview");
+
+        let error = record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &escaped_path,
+            13,
+        )
+        .expect_err("preview cache path cannot escape previews/");
+
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("previews")
+        ));
 
         remove_library_root(&workspace);
     }

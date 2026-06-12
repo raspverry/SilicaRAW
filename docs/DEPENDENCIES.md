@@ -242,15 +242,15 @@ Verification source: `cargo info objc2-foundation@0.3.2 --verbose`; repository l
 ```txt
 Name: objc2-core-graphics
 Version: 0.3.2
-Purpose: CoreGraphics framework linkage for Metal device creation during Spike 001.
+Purpose: CoreGraphics framework linkage for Metal device creation during Spike 001 and feature-gated RAW preview artifact scaling/color-space selection in Task 15.2.
 License: Zlib OR Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/madsmtm/objc2
 Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature; crates/silica-decode behind the `core-image-raw-probe` feature.
-Why needed: `objc2-metal` documents that `MTLCreateSystemDefaultDevice` requires CoreGraphics linkage.
+Why needed: `objc2-metal` documents that `MTLCreateSystemDefaultDevice` requires CoreGraphics linkage; `silica-decode` uses the `CGAffineTransform` and `CGColorSpace` features behind `core-image-raw-probe` for bounded Core Image JPEG sRGB preview artifacts.
 Alternatives considered: Manual `#[link(name = "CoreGraphics", kind = "framework")]` declaration.
-Risk notes: Linkage helper only for the spike; keep feature-gated.
+Risk notes: Linkage and RAW preview helper only while the relevant non-default feature is enabled; keep feature-gated.
 Binary size impact: No default app impact while the feature is disabled. CoreGraphics is a macOS system framework.
-Security notes: No image capture or display enumeration behavior is added by this use.
+Security notes: No image capture or display enumeration behavior is added by this use. The RAW preview path reads fixture-backed local files and writes disposable preview artifacts only.
 Verification source: `cargo info objc2-core-graphics@0.3.2 --verbose`; `objc2-metal` crate note for `MTLCreateSystemDefaultDevice`.
 ```
 
@@ -394,15 +394,15 @@ Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase
 ```txt
 Name: objc2-core-image
 Version: 0.3.2
-Purpose: Feature-gated Core Image RAW probe bindings for Task 12.1.
+Purpose: Feature-gated Core Image RAW probe bindings for Task 12.1 and bounded RAW preview artifact writing for Task 15.2.
 License: Zlib OR Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/madsmtm/objc2
 Used by: crates/silica-decode behind the `core-image-raw-probe` feature.
-Why needed: Access Core Image RAW probe APIs without adding LibRaw.
+Why needed: Access Core Image RAW probe and JPEG representation APIs without adding LibRaw.
 Alternatives considered: raw Objective-C FFI, Swift shim, LibRaw, no probe.
-Risk notes: Non-default macOS proof only; no product RAW pixels. Enables `objc2-image-io` transitively for Core Image URL/image source support.
+Risk notes: Non-default macOS path only; fixture-backed preview artifacts remain evidence-limited and do not imply broad RAW support. Enables `objc2-image-io` transitively for Core Image URL/image source support.
 Binary size impact: No default build impact while feature is disabled. Feature builds link Core Image, already present on macOS.
-Security notes: Reads local fixture paths only; must not mutate originals.
+Security notes: Reads local fixture paths only, verifies source hash evidence before writing, and must not mutate originals.
 Verification source: `cargo info objc2-core-image@0.3.2 --verbose`.
 ```
 
@@ -434,7 +434,7 @@ Risk notes: Supported formats depend on Apple. Less low-level control.
 Binary size impact: platform framework
 Security notes: Decode failures must be non-fatal.
 Verification source: Apple Developer documentation.
-Status after Spike 002: selected as first implementation target. Task 12.1 adds a non-default `core-image-raw-probe` binding path for proof work only; product RAW pixels remain out of scope.
+Status after Spike 002: selected as first implementation target. Task 12.1 adds a non-default `core-image-raw-probe` binding path for proof work, and Task 15.2 uses the same gated path for bounded JPEG sRGB RAW preview artifacts. Broad RAW support, final color correctness, and full-resolution RAW export remain out of scope.
 ```
 
 ### RAW Decode — LibRaw

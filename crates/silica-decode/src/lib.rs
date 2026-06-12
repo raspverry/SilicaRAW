@@ -3,7 +3,9 @@
 //! Spike 002 records the decoder path gate. This crate still does not decode RAW
 //! files or link decoder backends.
 
-use std::path::Path;
+use std::error::Error;
+use std::fmt;
+use std::path::{Path, PathBuf};
 
 mod core_image_raw_probe;
 mod raw_probe_fixture;
@@ -247,6 +249,7 @@ impl DecodedImageCacheIdentity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecodedImagePixelFormat {
     Rgba16Float,
+    JpegSrgb8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -268,6 +271,145 @@ pub struct DecodedImageHandoff {
 impl DecodedImageHandoff {
     pub fn contains_image_pixels(&self) -> bool {
         false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawPreviewArtifactRequest {
+    pub fixture_class: String,
+    pub probe: RawProbeResult,
+    pub cache_key: String,
+    pub output_path: PathBuf,
+    pub max_edge: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawPreviewArtifactResult {
+    pub handoff: DecodedImageHandoff,
+    pub artifact_path: Option<PathBuf>,
+    pub bytes_written: Option<u64>,
+    pub original_hash_unchanged: Option<bool>,
+}
+
+#[derive(Debug)]
+pub enum RawPreviewArtifactError {
+    OutputMatchesSource(PathBuf),
+    SourceHashMismatch { expected: String, actual: String },
+    InvalidRequest(String),
+    CoreImageUnavailable(String),
+    CoreImageWrite(String),
+    Io(std::io::Error),
+}
+
+impl fmt::Display for RawPreviewArtifactError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OutputMatchesSource(path) => {
+                write!(
+                    formatter,
+                    "RAW preview artifact output matches source: {}",
+                    path.display()
+                )
+            }
+            Self::SourceHashMismatch { expected, actual } => write!(
+                formatter,
+                "RAW preview artifact source hash mismatch: expected {expected}, actual {actual}"
+            ),
+            Self::InvalidRequest(message) => {
+                write!(formatter, "invalid RAW preview request: {message}")
+            }
+            Self::CoreImageUnavailable(message) => {
+                write!(formatter, "Core Image unavailable: {message}")
+            }
+            Self::CoreImageWrite(message) => {
+                write!(formatter, "Core Image RAW preview write failed: {message}")
+            }
+            Self::Io(error) => write!(formatter, "RAW preview artifact filesystem error: {error}"),
+        }
+    }
+}
+
+impl Error for RawPreviewArtifactError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::OutputMatchesSource(_)
+            | Self::SourceHashMismatch { .. }
+            | Self::InvalidRequest(_)
+            | Self::CoreImageUnavailable(_)
+            | Self::CoreImageWrite(_) => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for RawPreviewArtifactError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+pub fn write_raw_preview_artifact(
+    request: RawPreviewArtifactRequest,
+) -> Result<RawPreviewArtifactResult, RawPreviewArtifactError> {
+    let source_path = PathBuf::from(&request.probe.source_path);
+    if paths_refer_to_same_file(&source_path, &request.output_path) {
+        return Err(RawPreviewArtifactError::OutputMatchesSource(
+            request.output_path,
+        ));
+    }
+    if request.max_edge == 0 {
+        return Err(RawPreviewArtifactError::InvalidRequest(
+            "max_edge must be greater than zero".to_string(),
+        ));
+    }
+    let mut handoff = plan_decoded_image_handoff_from_raw_probe(
+        &request.fixture_class,
+        &request.probe,
+        request.cache_key,
+    );
+    if handoff.status != DecodedImageHandoffStatus::Ready {
+        return Ok(RawPreviewArtifactResult {
+            handoff,
+            artifact_path: None,
+            bytes_written: None,
+            original_hash_unchanged: None,
+        });
+    }
+    if let (Some(width), Some(height)) = (request.probe.width, request.probe.height) {
+        let (bounded_width, bounded_height) =
+            bounded_preview_dimensions(width, height, request.max_edge);
+        handoff.width = Some(bounded_width);
+        handoff.height = Some(bounded_height);
+    }
+    handoff.input_profile = "core_image_raw".to_string();
+    handoff.working_space = "srgb".to_string();
+    handoff.pixel_format = Some(DecodedImagePixelFormat::JpegSrgb8);
+
+    let write_result = core_image_raw_probe::write_core_image_raw_preview_artifact(
+        &request.probe,
+        &request.output_path,
+        request.max_edge,
+    )?;
+
+    Ok(RawPreviewArtifactResult {
+        handoff,
+        artifact_path: Some(write_result.output_path),
+        bytes_written: Some(write_result.bytes_written),
+        original_hash_unchanged: Some(write_result.original_hash_unchanged),
+    })
+}
+
+fn paths_refer_to_same_file(source_path: &Path, output_path: &Path) -> bool {
+    if source_path == output_path {
+        return true;
+    }
+
+    match (
+        std::fs::canonicalize(source_path),
+        std::fs::canonicalize(output_path),
+    ) {
+        (Ok(source_path), Ok(output_path)) => source_path == output_path,
+        _ => false,
     }
 }
 
@@ -418,6 +560,18 @@ fn decoded_handoff_status(status: ProductRawDecodeStatus) -> DecodedImageHandoff
             DecodedImageHandoffStatus::BlockedUnsupportedClass
         }
     }
+}
+
+fn bounded_preview_dimensions(width: u32, height: u32, max_edge: u32) -> (u32, u32) {
+    let longest_edge = width.max(height);
+    if longest_edge <= max_edge {
+        return (width, height);
+    }
+
+    let scale = max_edge as f64 / longest_edge as f64;
+    let bounded_width = ((width as f64 * scale).round() as u32).max(1);
+    let bounded_height = ((height as f64 * scale).round() as u32).max(1);
+    (bounded_width, bounded_height)
 }
 
 fn is_core_image_supported_fixture_class(fixture_class: &str) -> bool {
@@ -588,7 +742,6 @@ mod tests {
         assert_eq!(result.height, None);
     }
 
-    #[cfg(feature = "core-image-raw-probe")]
     fn unique_temp_probe_path(label: &str) -> std::path::PathBuf {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -736,6 +889,171 @@ mod tests {
         assert_eq!(handoff.cache_identity, None);
         assert_eq!(handoff.pixel_format, None);
         assert!(!handoff.contains_image_pixels());
+    }
+
+    #[test]
+    fn raw_preview_artifact_refuses_to_write_over_original_source() {
+        let probe = successful_raw_probe("/tmp/sample.cr2", Some(5184), Some(3456));
+
+        let error = super::write_raw_preview_artifact(super::RawPreviewArtifactRequest {
+            fixture_class: "A".to_string(),
+            probe,
+            cache_key: "raw-preview:test".to_string(),
+            output_path: std::path::PathBuf::from("/tmp/sample.cr2"),
+            max_edge: 2048,
+        })
+        .expect_err("preview artifact must not overwrite source");
+
+        assert!(matches!(
+            error,
+            super::RawPreviewArtifactError::OutputMatchesSource(_)
+        ));
+    }
+
+    #[test]
+    fn raw_preview_artifact_refuses_canonical_source_output_match() {
+        let source_path = unique_temp_probe_path("raw-preview-source.cr2");
+        std::fs::write(&source_path, b"raw placeholder").expect("write source");
+        let output_path = unique_temp_probe_path("raw-preview-source-link.cr2");
+        std::os::unix::fs::symlink(&source_path, &output_path).expect("create source symlink");
+        let probe = successful_raw_probe(&source_path.display().to_string(), Some(1200), Some(800));
+
+        let error = super::write_raw_preview_artifact(super::RawPreviewArtifactRequest {
+            fixture_class: "A".to_string(),
+            probe,
+            cache_key: "raw-preview:test".to_string(),
+            output_path: output_path.clone(),
+            max_edge: 2048,
+        })
+        .expect_err("canonical source/output match must be rejected");
+
+        assert!(matches!(
+            error,
+            super::RawPreviewArtifactError::OutputMatchesSource(_)
+        ));
+        let _ = std::fs::remove_file(source_path);
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn raw_preview_artifact_keeps_unproven_classes_blocked() {
+        let probe = successful_raw_probe("/tmp/sample.raw", Some(1200), Some(800));
+
+        let result = super::write_raw_preview_artifact(super::RawPreviewArtifactRequest {
+            fixture_class: "E".to_string(),
+            probe,
+            cache_key: "raw-preview:test".to_string(),
+            output_path: std::path::PathBuf::from("/tmp/preview.jpg"),
+            max_edge: 2048,
+        })
+        .expect("blocked handoff should be reviewable");
+
+        assert_eq!(
+            result.handoff.status,
+            super::DecodedImageHandoffStatus::BlockedPendingEvidence
+        );
+        assert_eq!(result.artifact_path, None);
+        assert_eq!(result.bytes_written, None);
+        assert_eq!(result.original_hash_unchanged, None);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[test]
+    #[ignore]
+    fn writes_raw_preview_artifact_from_fixture_manifest_without_mutating_originals() {
+        let manifest = std::env::var("SILICARAW_RAW_FIXTURE_MANIFEST")
+            .expect("SILICARAW_RAW_FIXTURE_MANIFEST must point to a legal RAW fixture manifest");
+        let report =
+            super::probe_raw_fixture_manifest(manifest).expect("probe legal RAW fixture manifest");
+        let required = report
+            .results
+            .iter()
+            .find(|result| result.fixture_class == "A")
+            .expect("Class A fixture evidence");
+        let higher_risk = report
+            .results
+            .iter()
+            .find(|result| matches!(result.fixture_class.as_str(), "C" | "D"))
+            .expect("Class C or D fixture evidence");
+        let output_root = unique_temp_probe_path("raw-preview-artifacts");
+        std::fs::create_dir_all(&output_root).expect("create output root");
+
+        for fixture in [required, higher_risk] {
+            let output_path = output_root.join(format!("{}.jpg", fixture.fixture_id));
+            let expected_cache_key = format!("raw-preview:{}", fixture.fixture_id);
+            let result = super::write_raw_preview_artifact(super::RawPreviewArtifactRequest {
+                fixture_class: fixture.fixture_class.clone(),
+                probe: fixture.probe.clone(),
+                cache_key: expected_cache_key.clone(),
+                output_path: output_path.clone(),
+                max_edge: 2048,
+            })
+            .expect("write RAW preview artifact");
+
+            assert_eq!(
+                result.handoff.status,
+                super::DecodedImageHandoffStatus::Ready
+            );
+            assert_eq!(result.artifact_path.as_deref(), Some(output_path.as_path()));
+            assert_eq!(
+                result
+                    .handoff
+                    .cache_identity
+                    .as_ref()
+                    .map(|identity| identity.cache_key.as_str()),
+                Some(expected_cache_key.as_str())
+            );
+            assert_eq!(
+                result.handoff.pixel_format,
+                Some(super::DecodedImagePixelFormat::JpegSrgb8)
+            );
+            assert_eq!(result.handoff.working_space, "srgb");
+            assert!(result.handoff.width.unwrap_or_default() <= 2048);
+            assert!(result.handoff.height.unwrap_or_default() <= 2048);
+            assert!(result.bytes_written.unwrap_or_default() > 0);
+            assert_eq!(result.original_hash_unchanged, Some(true));
+            assert!(output_path.starts_with(&output_root));
+            assert_ne!(
+                output_path,
+                std::path::PathBuf::from(&fixture.probe.source_path)
+            );
+            assert!(output_path.is_file());
+            let _ = std::fs::remove_file(output_path);
+        }
+        let _ = std::fs::remove_dir_all(output_root);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[test]
+    #[ignore]
+    fn raw_preview_artifact_rejects_stale_probe_hash_before_writing() {
+        let manifest = std::env::var("SILICARAW_RAW_FIXTURE_MANIFEST")
+            .expect("SILICARAW_RAW_FIXTURE_MANIFEST must point to a legal RAW fixture manifest");
+        let report =
+            super::probe_raw_fixture_manifest(manifest).expect("probe legal RAW fixture manifest");
+        let fixture = report
+            .results
+            .iter()
+            .find(|result| result.fixture_class == "A")
+            .expect("Class A fixture evidence");
+        let mut stale_probe = fixture.probe.clone();
+        stale_probe.source_sha256 = Some("stale-fixture-hash".to_string());
+        let output_path = unique_temp_probe_path("stale-raw-preview.jpg");
+
+        let error = super::write_raw_preview_artifact(super::RawPreviewArtifactRequest {
+            fixture_class: fixture.fixture_class.clone(),
+            probe: stale_probe,
+            cache_key: "raw-preview:stale".to_string(),
+            output_path: output_path.clone(),
+            max_edge: 2048,
+        })
+        .expect_err("stale probe evidence must be rejected before writing");
+
+        assert!(matches!(
+            error,
+            super::RawPreviewArtifactError::SourceHashMismatch { .. }
+        ));
+        assert!(!output_path.exists());
     }
 
     #[test]

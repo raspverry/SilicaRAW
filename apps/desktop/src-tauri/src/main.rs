@@ -1734,6 +1734,7 @@ fn preview_status_text(status: silica_core::PhotoPreviewStatus) -> &'static str 
 fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
     match error {
         silica_core::CoreError::Storage(_) => "storage",
+        silica_core::CoreError::Decode(_) => "decode",
         silica_core::CoreError::EditGraph(_) => "editGraph",
         silica_core::CoreError::Export(_) => "export",
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
@@ -1810,6 +1811,16 @@ fn main() {
 mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn desktop_core_error_kind_maps_decode_errors() {
+        let error =
+            silica_core::CoreError::Decode(silica_core::RawPreviewArtifactError::InvalidRequest(
+                "invalid RAW preview request".to_string(),
+            ));
+
+        assert_eq!(super::core_error_kind(&error), "decode");
+    }
 
     #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
     #[test]

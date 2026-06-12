@@ -29,6 +29,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 10.5.2 adds checkpointed backup boundary creation for `catalog.db`, `sidecars/`, and `backup-manifest.json` under `backups/` while excluding originals, caches, export outputs, logs, and nested backups.
 - Task 10.5.3 adds staged restore from backup artifacts with existing-target rollback copies, restored catalog/sidecar preservation, newer-schema rejection before target mutation, and original-file safety tests.
 - Task 14.7 records the native viewer disposable texture lifecycle boundary: viewer texture identity is rebuildable runtime state and cleanup on photo change, drawable resize, library close, or app close does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
+- Task 15.2 adds fixture-backed RAW preview artifacts as disposable cache files under library `previews/`; source/output canonical matches, stale source hashes, and preview cache path escapes are rejected before trust claims are made.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -48,6 +49,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Restore boundary safety. Task 10.5.3 covers restore into empty targets, rollback-protected restore into existing targets, restored edit/flag/sidecar/export/migration state, newer-schema rejection before target mutation, and original-file preservation.
 - Cache clear safety. Phase 6.2 simulates the currently scoped cache safety surface by deleting disposable library cache directories because no product cache-clear command exists yet.
 - Native viewer texture lifecycle safety. Task 14.7 covers disposable viewer texture identity and cleanup without catalog writes, sidecar writes, original write destinations, or persistent GPU cache state.
+- RAW preview artifact safety. Task 15.2 covers canonical source/output overwrite rejection, stale probe hash rejection, library `previews/` cache bounding, `..` escape rejection, unsupported-class no-write behavior, and original hash preservation for legal local RAW fixture classes.
 
 ## Links
 

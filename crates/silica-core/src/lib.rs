@@ -13,6 +13,7 @@ use std::time::UNIX_EPOCH;
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-core";
 
+pub use silica_decode::RawPreviewArtifactError;
 pub use silica_storage::CatalogRebuildDryRunAction;
 pub use silica_storage::CatalogRebuildDryRunEntry;
 pub use silica_storage::CatalogRebuildDryRunIssue;
@@ -74,6 +75,16 @@ impl DecodedImageViewerHandoffPlan {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct RawPreviewArtifactSession {
+    pub handoff: DecodedImageViewerHandoffPlan,
+    pub output_path: PathBuf,
+    pub artifact_path: Option<PathBuf>,
+    pub cache_record: Option<silica_storage::CacheRecord>,
+    pub bytes_written: Option<u64>,
+    pub original_hash_unchanged: Option<bool>,
+}
+
 pub fn plan_decoded_image_viewer_handoff(
     fixture_class: impl AsRef<str>,
     probe: &silica_decode::RawProbeResult,
@@ -87,6 +98,53 @@ pub fn plan_decoded_image_viewer_handoff(
         decoded,
         viewer_input,
     }
+}
+
+pub fn write_raw_preview_artifact_for_probe(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+    fixture_class: impl AsRef<str>,
+    probe: &silica_decode::RawProbeResult,
+) -> Result<RawPreviewArtifactSession, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let photo_id = photo_id.as_ref();
+    let output_path = raw_preview_artifact_output_path(library_root_path, photo_id);
+    let cache_key = raw_preview_artifact_cache_key(photo_id, probe);
+    let result =
+        silica_decode::write_raw_preview_artifact(silica_decode::RawPreviewArtifactRequest {
+            fixture_class: fixture_class.as_ref().to_string(),
+            probe: probe.clone(),
+            cache_key: cache_key.clone(),
+            output_path: output_path.clone(),
+            max_edge: LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE,
+        })?;
+    let viewer_input = silica_render::ViewerPreviewInput::from_decoded_handoff(&result.handoff);
+    let handoff = DecodedImageViewerHandoffPlan {
+        decoded: result.handoff,
+        viewer_input,
+    };
+    let cache_record = match (&result.artifact_path, result.bytes_written) {
+        (Some(path), Some(bytes_written)) => {
+            let byte_size = i64::try_from(bytes_written).unwrap_or(i64::MAX);
+            Some(silica_storage::record_preview_cache(
+                library_root_path,
+                photo_id,
+                cache_key,
+                path,
+                byte_size,
+            )?)
+        }
+        _ => None,
+    };
+
+    Ok(RawPreviewArtifactSession {
+        handoff,
+        output_path,
+        artifact_path: result.artifact_path,
+        cache_record,
+        bytes_written: result.bytes_written,
+        original_hash_unchanged: result.original_hash_unchanged,
+    })
 }
 
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
@@ -482,6 +540,7 @@ impl LibraryCacheClearSession {
 #[derive(Debug)]
 pub enum CoreError {
     Storage(silica_storage::LibraryStorageError),
+    Decode(silica_decode::RawPreviewArtifactError),
     EditGraph(silica_edit::EditGraphValidationError),
     Export(silica_export::ExportError),
     ExportBlocked(String),
@@ -492,6 +551,7 @@ impl fmt::Display for CoreError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Storage(error) => write!(formatter, "{error}"),
+            Self::Decode(error) => write!(formatter, "{error}"),
             Self::EditGraph(error) => write!(formatter, "{error}"),
             Self::Export(error) => write!(formatter, "{error}"),
             Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
@@ -504,6 +564,7 @@ impl Error for CoreError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Storage(error) => Some(error),
+            Self::Decode(error) => Some(error),
             Self::EditGraph(error) => Some(error),
             Self::Export(error) => Some(error),
             Self::ExportBlocked(_) => None,
@@ -515,6 +576,12 @@ impl Error for CoreError {
 impl From<silica_storage::LibraryStorageError> for CoreError {
     fn from(error: silica_storage::LibraryStorageError) -> Self {
         Self::Storage(error)
+    }
+}
+
+impl From<silica_decode::RawPreviewArtifactError> for CoreError {
+    fn from(error: silica_decode::RawPreviewArtifactError) -> Self {
+        Self::Decode(error)
     }
 }
 
@@ -1947,6 +2014,25 @@ fn preview_cache_key(photo_id: &str, source_path: &Path) -> String {
     )
 }
 
+fn raw_preview_artifact_output_path(library_root_path: &Path, photo_id: &str) -> PathBuf {
+    library_root_path
+        .join("previews")
+        .join(format!("raw-{photo_id}.jpg"))
+}
+
+fn raw_preview_artifact_cache_key(photo_id: &str, probe: &silica_decode::RawProbeResult) -> String {
+    let backend = match probe.backend {
+        silica_decode::RawProbeBackend::CoreImageRaw => "core-image-raw",
+    };
+    let source_sha = probe.source_sha256.as_deref().unwrap_or("missing-sha256");
+    format!(
+        "raw-preview:v1:{photo_id}:{backend}:{source_sha}:{}:{}x{}",
+        LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE,
+        probe.width.unwrap_or(0),
+        probe.height.unwrap_or(0)
+    )
+}
+
 fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> PhotoPreviewStatus {
     match status {
         silica_render::PreviewRenderStatus::Ready => PhotoPreviewStatus::Ready,
@@ -2080,6 +2166,85 @@ mod tests {
             }
             other => panic!("expected decoded image artifact input, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn raw_preview_artifact_path_stays_under_library_previews() {
+        let library_root = PathBuf::from("/tmp/SilicaRAW Library");
+        let output_path = raw_preview_artifact_output_path(&library_root, "photo-1");
+
+        assert_eq!(
+            output_path,
+            library_root.join("previews").join("raw-photo-1.jpg")
+        );
+        assert!(output_path.starts_with(library_root.join("previews")));
+    }
+
+    #[test]
+    fn raw_preview_artifact_cache_key_uses_source_hash_and_decode_settings() {
+        let probe = silica_decode::RawProbeResult {
+            backend: silica_decode::RawProbeBackend::CoreImageRaw,
+            platform: silica_decode::RawProbePlatform::Macos,
+            macos_version: Some("26.4".to_string()),
+            source_path: "/tmp/sample.cr2".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            original_file_size: Some(1024),
+            original_modified_at: Some("2026-06-12T00:00:00Z".to_string()),
+            status: silica_decode::RawProbeStatus::Success,
+            width: Some(5184),
+            height: Some(3456),
+            orientation: None,
+            error_category: None,
+            message: "Core Image opened the RAW source.".to_string(),
+        };
+
+        let cache_key = raw_preview_artifact_cache_key("photo-1", &probe);
+
+        assert!(cache_key.contains("raw-preview:v1:photo-1"));
+        assert!(cache_key.contains("fixture-hash"));
+        assert!(cache_key.contains("core-image-raw"));
+        assert!(cache_key.contains("2048"));
+    }
+
+    #[test]
+    fn raw_preview_artifact_wrapper_keeps_blocked_classes_reviewable_without_cache_write() {
+        let workspace = unique_library_root("raw-preview-wrapper-blocked");
+        let library_root = workspace.join("SilicaRAW Library");
+        let created = create_library(&library_root).expect("create library through core");
+        let source_path = workspace.join("sample.cr2");
+        std::fs::write(&source_path, b"raw placeholder").expect("write raw placeholder");
+        let probe = silica_decode::RawProbeResult {
+            backend: silica_decode::RawProbeBackend::CoreImageRaw,
+            platform: silica_decode::RawProbePlatform::Macos,
+            macos_version: Some("26.4".to_string()),
+            source_path: source_path.display().to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            original_file_size: Some(1024),
+            original_modified_at: Some("2026-06-12T00:00:00Z".to_string()),
+            status: silica_decode::RawProbeStatus::Success,
+            width: Some(1200),
+            height: Some(800),
+            orientation: None,
+            error_category: None,
+            message: "Core Image opened the RAW source.".to_string(),
+        };
+
+        let session =
+            write_raw_preview_artifact_for_probe(&created.root_path, "photo-1", "E", &probe)
+                .expect("blocked class remains reviewable");
+
+        assert_eq!(
+            session.handoff.decoded.status,
+            silica_decode::DecodedImageHandoffStatus::BlockedPendingEvidence
+        );
+        assert_eq!(session.artifact_path, None);
+        assert_eq!(session.cache_record, None);
+        assert!(session
+            .output_path
+            .starts_with(created.root_path.join("previews")));
+        assert!(!session.output_path.exists());
+
+        remove_library_root(&workspace);
     }
 
     #[test]

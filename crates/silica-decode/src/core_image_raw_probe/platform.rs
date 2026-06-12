@@ -5,9 +5,11 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    RawProbeBackend, RawProbeErrorCategory, RawProbePlatform, RawProbeRequest, RawProbeResult,
-    RawProbeStatus,
+    RawPreviewArtifactError, RawProbeBackend, RawProbeErrorCategory, RawProbePlatform,
+    RawProbeRequest, RawProbeResult, RawProbeStatus,
 };
+
+use super::CoreImageRawPreviewArtifact;
 
 pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
     let source_path = request.source_path.clone();
@@ -210,6 +212,112 @@ fn probe_core_image_dimensions(path: &Path) -> Result<(u32, u32), (RawProbeError
                 .to_string(),
         )),
     }
+}
+
+pub fn write_core_image_raw_preview_artifact(
+    probe: &RawProbeResult,
+    output_path: &Path,
+    max_edge: u32,
+) -> Result<CoreImageRawPreviewArtifact, RawPreviewArtifactError> {
+    let source_path = PathBuf::from(&probe.source_path);
+    let before_hash = sha256_file(&source_path)?;
+    if let Some(expected_hash) = probe.source_sha256.as_deref() {
+        if !expected_hash.eq_ignore_ascii_case(&before_hash) {
+            return Err(RawPreviewArtifactError::SourceHashMismatch {
+                expected: expected_hash.to_string(),
+                actual: before_hash,
+            });
+        }
+    }
+
+    write_core_image_jpeg(&source_path, output_path, max_edge)?;
+
+    let after_hash = sha256_file(&source_path)?;
+    let bytes_written = fs::metadata(output_path)?.len();
+
+    Ok(CoreImageRawPreviewArtifact {
+        output_path: output_path.to_path_buf(),
+        bytes_written,
+        original_hash_unchanged: before_hash == after_hash,
+    })
+}
+
+fn write_core_image_jpeg(
+    source_path: &Path,
+    output_path: &Path,
+    max_edge: u32,
+) -> Result<(), RawPreviewArtifactError> {
+    use objc2::runtime::AnyObject;
+    use objc2_core_graphics::{kCGColorSpaceSRGB, CGAffineTransformMakeScale, CGColorSpace};
+    use objc2_core_image::{CIContext, CIImage, CIImageRepresentationOption};
+    use objc2_foundation::NSDictionary;
+
+    let source_url = file_url(source_path)?;
+    let output_url = file_url(output_path)?;
+    let Some(parent) = output_path.parent() else {
+        return Err(RawPreviewArtifactError::InvalidRequest(
+            "RAW preview output path must have a parent directory.".to_string(),
+        ));
+    };
+    fs::create_dir_all(parent)?;
+
+    let Some(image) = (unsafe { CIImage::imageWithContentsOfURL(&source_url) }) else {
+        return Err(RawPreviewArtifactError::CoreImageWrite(
+            "Core Image could not open RAW source for preview artifact.".to_string(),
+        ));
+    };
+    let extent = unsafe { image.extent() };
+    let max_dimension = extent.size.width.max(extent.size.height) as f64;
+    if !max_dimension.is_finite() || max_dimension <= 0.0 {
+        return Err(RawPreviewArtifactError::CoreImageWrite(
+            "Core Image opened the RAW source but reported invalid dimensions.".to_string(),
+        ));
+    }
+
+    let scale = (max_edge as f64 / max_dimension).min(1.0);
+    let image = if scale < 1.0 {
+        let transform = CGAffineTransformMakeScale(scale, scale);
+        unsafe { image.imageByApplyingTransform_highQualityDownsample(transform, true) }
+    } else {
+        image
+    };
+
+    let Some(color_space) = CGColorSpace::with_name(Some(unsafe { kCGColorSpaceSRGB })) else {
+        return Err(RawPreviewArtifactError::CoreImageWrite(
+            "Core Graphics could not create an sRGB color space.".to_string(),
+        ));
+    };
+    let options = NSDictionary::<CIImageRepresentationOption, AnyObject>::new();
+    let context = unsafe { CIContext::context() };
+
+    unsafe {
+        context
+            .writeJPEGRepresentationOfImage_toURL_colorSpace_options_error(
+                &image,
+                &output_url,
+                &color_space,
+                &options,
+            )
+            .map_err(|error| {
+                RawPreviewArtifactError::CoreImageWrite(format!(
+                    "Core Image JPEG representation failed: {error:?}"
+                ))
+            })
+    }
+}
+
+fn file_url(
+    path: &Path,
+) -> Result<objc2::rc::Retained<objc2_foundation::NSURL>, RawPreviewArtifactError> {
+    let Some(path) = path.to_str() else {
+        return Err(RawPreviewArtifactError::InvalidRequest(format!(
+            "path is not valid UTF-8 for NSURL creation: {}",
+            path.display()
+        )));
+    };
+
+    let ns_path = objc2_foundation::NSString::from_str(path);
+    Ok(objc2_foundation::NSURL::fileURLWithPath(&ns_path))
 }
 
 fn dimension_to_u32(value: f64) -> Option<u32> {

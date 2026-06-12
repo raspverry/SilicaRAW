@@ -19,6 +19,7 @@ RAW decoding is one of SilicaRAW's highest-risk technical areas. Spike 002 selec
 - LibRaw remains a deferred fallback until legal fixtures prove a camera-support gap.
 - Phase 5.1 adds preview decode readiness routing, not RAW pixels.
 - Phase 12.1 adds a feature-gated Core Image RAW probe contract and macOS metadata path, not product RAW pixels.
+- Task 15.2 adds a narrow feature-gated Core Image RAW preview artifact writer for fixture-backed classes A-D only.
 - Full decoder-dependent features remain blocked until real fixture-backed decoding exists.
 
 ## Blocked Work
@@ -234,6 +235,23 @@ blocked unsupported class
 ```
 
 The handoff records source path, source SHA-256, decoder backend, dimensions, orientation, input profile, working space, disposable cache identity, pixel format, and a UI-suitable message. It intentionally carries no image bytes and does not create cache files. RAW class E and unknown RAW classes remain blocked without cache identity or pixel format.
+
+## Phase 15.2 RAW Preview Artifact
+
+`silica-decode` now exposes `write_raw_preview_artifact` for the Phase 15 vertical slice. On macOS `core-image-raw-probe` feature builds, it can write bounded JPEG sRGB preview artifacts for fixture-backed Core Image RAW classes A-D.
+
+Task 15.2 behavior:
+
+```txt
+supported fixture class A-D + successful probe + matching source SHA -> bounded JPEG sRGB preview artifact
+class E or unknown fixture class -> blocked, no artifact path, no bytes written
+stale source SHA -> rejected before artifact write
+source/output canonical match -> rejected
+```
+
+The product wrapper in `silica-core` constructs RAW preview artifact paths under the library `previews/` directory and records cache metadata only after successful artifact creation. `silica-storage` rejects preview cache records outside the disposable preview directory, including `..` escapes.
+
+This does not claim broad RAW camera support, final color correctness, full-resolution RAW export, or Metal display. Task 15.3 owns native viewer display of the preview artifact.
 
 ## Links
 

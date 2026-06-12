@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | RAW preview artifact path added
+
+- Completed Task 15.2 with fixture-backed Core Image RAW preview artifact writing behind `core-image-raw-probe`.
+- Added bounded JPEG sRGB preview artifact identity, stale source SHA rejection, canonical source/output overwrite rejection, and original hash preservation checks.
+- Added product cache path bounding under library `previews/` with cache escape rejection, while keeping RAW class E, broad RAW support, full-resolution export, and Metal display out of scope.
+
 ## [2026-06-12] phase-15 | Decoded image handoff contract added
 
 - Completed Task 15.1 with typed decode, render, and core handoff contracts.
