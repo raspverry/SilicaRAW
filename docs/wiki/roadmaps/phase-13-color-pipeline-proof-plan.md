@@ -30,7 +30,8 @@ As of 2026-06-12:
 - Task 13.2 local color fixture corpus and manifest is complete locally.
 - Task 13.3 feature-gated color profile probe is complete.
 - Task 13.4 color probe harness is complete.
-- Task 13.5 color support matrix is next.
+- Task 13.5 color support matrix is complete.
+- Task 13.6 ICC export proof is next.
 
 ## Goal
 
@@ -93,14 +94,14 @@ Create fixture-backed evidence for:
 ### Task 13.5: Color Support Matrix
 
 - **Card:** [13.5 Color Support Matrix](../tasks/13.5-color-support-matrix.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** [Color Management](../topics/color-management.md) records fixture-backed states for sRGB, Display P3, and untagged raster classes.
 - **Validation:** `python3 scripts/harness/check-md-links.py`, `python3 scripts/harness/check-cargo-deps.py`
 
 ### Task 13.6: ICC Export Proof
 
 - **Card:** [13.6 ICC Export Proof](../tasks/13.6-icc-export-proof.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** Exported sRGB and Display P3 JPEGs have fixture-backed ICC embedding evidence and original-preservation evidence.
 - **Validation:** color export tests and manual color QA checklist.
 

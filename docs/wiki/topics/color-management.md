@@ -20,7 +20,8 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Export should default to sRGB with ICC embedding and support Display P3 when explicitly selected.
 - Decoder-specific color assumptions must be documented.
 - Phase 5.1 records display-profile-aware preview readiness but does not prove color correctness.
-- Tagged color fixtures are still missing, so sRGB and Display P3 behavior is not yet proven.
+- Committed tagged color fixtures are still missing.
+- Local ignored Class F fixtures now have profile-probe evidence for sRGB, Display P3, and untagged JPEG handling.
 - Phase 13 now has an execution plan, brief, and task cards for fixture-backed color proof.
 
 ## Blocked Work
@@ -50,7 +51,7 @@ display_p3_jpeg sha256: 84855ac721fbc8062ef543f5fe95df843e6e4a211be2eac2869e3456
 untagged_jpeg sha256: aff808a1c3625a5de3e249c80c3cb9d7e9ae53d92f6bd95158aa4a0f384a23e9
 ```
 
-This local corpus proves only that legal local fixture files and hashes exist. It does not prove profile parsing, transforms, export ICC embedding, or color correctness.
+This local corpus and the Task 13.4 harness now prove local profile-probe handling for the three Class F subclasses. They do not prove ColorSync transform output, export ICC embedding, or color correctness.
 
 ## Task 10.1 Color Class F Contract
 
@@ -86,7 +87,7 @@ Current planned order:
 13.2 ignored local fixtures and manifest [complete locally]
 13.3 feature-gated color probe [complete]
 13.4 probe harness [complete]
-13.5 support matrix
+13.5 support matrix [complete]
 13.6 ICC export proof
 13.7 schema-safe color metadata
 13.8 explicit export color options
@@ -99,6 +100,25 @@ Task 13.3 added a non-default `color-probe` feature in `silica-render`. It recor
 Task 13.4 added `scripts/harness/check-color-probe-fixtures.py` and a feature-gated `silica-render` `color_probe_report` example. With `SILICARAW_COLOR_FIXTURE_MANIFEST` pointed at the ignored local manifest, the harness records profile probe status, input profile, working space, output profile, transform path, source hash, file size, modified time, and original hash preservation.
 
 The local Task 13.4 run passed for sRGB, Display P3, and untagged Class F fixtures. This is profile-probe evidence only; color correctness, export ICC embedding, and transform output remain blocked.
+
+## Phase 13.5 Color Probe Support Matrix
+
+The matrix records local ignored fixture evidence from Task 13.4. It is not a broad product color claim.
+
+| Fixture subclass | Fixture id | Input profile | Embedded ICC | Working space | Output profile | Transform path | Probe status | Original hash | Product state | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `srgb_jpeg` | `silicaraw_synthetic_srgb_jpeg` | `srgb` | true | `linear_display_p3` | `srgb` | `embedded_icc_to_linear_display_p3_to_srgb` | success | unchanged | `profile_probe_supported` | Task 13.4 local ignored manifest probe on macOS |
+| `display_p3_jpeg` | `silicaraw_synthetic_display_p3_jpeg` | `display_p3` | true | `linear_display_p3` | `srgb` | `embedded_icc_to_linear_display_p3_to_srgb` | success | unchanged | `profile_probe_supported` | Task 13.4 local ignored manifest probe on macOS |
+| `untagged_jpeg` | `silicaraw_synthetic_untagged_jpeg` | `none` | false | `linear_display_p3` | `srgb` | `assume_srgb_to_linear_display_p3_to_srgb` | success | unchanged | `assume_srgb_profile_probe_supported` | Task 13.4 local ignored manifest probe on macOS |
+
+Blocked states remain explicit:
+
+| Area | State | Reason |
+| --- | --- | --- |
+| Color correctness | `blocked_pending_tolerance_and_visual_review` | No approved pixel or perceptual comparison and no manual visual QA record. |
+| Export ICC embedding | `blocked_pending_task_13_6` | Probe evidence does not write or inspect exported JPEG ICC data. |
+| Display P3 export option | `blocked_pending_task_13_8` | The product option stays blocked until ICC export proof and UI/API wiring exist. |
+| Committed fixture corpus | `blocked_pending_redistribution_review` | Local macOS profile-derived fixture files remain ignored by git. |
 
 ## Color-Dependent Tags
 

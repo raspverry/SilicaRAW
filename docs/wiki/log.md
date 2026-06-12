@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Color support matrix added
+
+- Completed Task 13.5 with a fixture-backed color probe support matrix.
+- Recorded sRGB, Display P3, and untagged JPEG probe status, profile state, working/output profile, transform path, original hash state, and evidence source.
+- Kept color correctness, export ICC embedding, Display P3 export options, and committed fixture media blocked pending later proof tasks.
+
 ## [2026-06-12] phase-13 | Color probe harness added
 
 - Completed Task 13.4 with a manifest-driven local color probe harness.
