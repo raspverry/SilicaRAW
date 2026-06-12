@@ -22,6 +22,7 @@ These notes are not adopted wholesale. Each source page separates useful inspira
 - [karpathy/autoresearch](karpathy-autoresearch.md)
 - [huggingface/ml-intern](huggingface-ml-intern.md)
 - [raw.pixls.us Source Review](raw-pixls-us.md)
+- [Synthetic Local Color Fixture Source Review](color-fixtures-synthetic-local.md)
 
 ## Notes for LLM Agents
 

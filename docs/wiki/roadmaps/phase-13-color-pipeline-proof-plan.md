@@ -26,7 +26,8 @@ As of 2026-06-12:
 - No legal local Color Class F fixture corpus has been selected yet.
 - No color probe, ICC proof, tolerance result, manual visual review, or color correctness claim exists yet.
 - Task 13.0 design gate is complete.
-- Task 13.1 color fixture source review is next.
+- Task 13.1 color fixture source review is complete with a local-only synthetic fixture source.
+- Task 13.2 local color fixture corpus and manifest is next.
 
 ## Goal
 
@@ -61,14 +62,14 @@ Create fixture-backed evidence for:
 ### Task 13.1: Color Fixture Source Review
 
 - **Card:** [13.1 Color Fixture Source Review](../tasks/13.1-color-fixture-source-review.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** Legal source review for one tagged sRGB JPEG, one tagged Display P3 JPEG, and one untagged JPEG.
 - **Validation:** Manual source review recorded in wiki docs; fixture media remains uncommitted unless commit permission is explicitly proven.
 
 ### Task 13.2: Local Color Fixture Corpus and Manifest
 
 - **Card:** [13.2 Local Color Fixture Corpus and Manifest](../tasks/13.2-color-fixture-local-manifest.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** Ignored local Class F fixture files and a local fixture manifest compatible with `schemas/fixture_manifest.schema.json`.
 - **Validation:** `git status --short` shows no fixture media staged.
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Color fixture source review added
+
+- Completed Task 13.1 source review for local-only synthetic Color Class F fixtures.
+- Accepted generated local fixtures for sRGB, Display P3, and untagged JPEG subclasses.
+- Kept fixture media and Apple system-profile-derived outputs blocked from git until redistribution permission is reviewed.
+
 ## [2026-06-12] phase-13 | Color proof plan added
 
 - Added Phase 13 color pipeline proof plan, phase brief, and task cards 13.0 through 13.8.

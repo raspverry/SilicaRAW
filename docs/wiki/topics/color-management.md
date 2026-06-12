@@ -33,15 +33,15 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 
 ## Fixture Status
 
-Class F tagged raster fixtures are missing:
+Class F tagged raster fixture source review is complete for local-only synthetic fixtures:
 
 ```txt
-sRGB JPEG
-Display P3 HEIC/JPEG
-untagged JPEG
+srgb_jpeg -> synthetic pixels + local macOS sRGB ICC, local-only
+display_p3_jpeg -> synthetic pixels + local macOS Display P3 ICC, local-only
+untagged_jpeg -> synthetic pixels + removed color-management properties, local-only
 ```
 
-The repository currently contains app icons and UI mockup PNGs, not color-management fixtures.
+No committed color-management fixture corpus exists yet. Task 13.2 must generate or place the accepted fixtures under an ignored local path and record hashes in a local manifest.
 
 ## Task 10.1 Color Class F Contract
 
@@ -73,8 +73,8 @@ Current planned order:
 
 ```txt
 13.0 design gate
-13.1 source review
-13.2 ignored local fixtures and manifest
+13.1 source review [complete]
+13.2 ignored local fixtures and manifest [next]
 13.3 feature-gated color probe
 13.4 probe harness
 13.5 support matrix
@@ -99,6 +99,7 @@ RAW Camera Profiles: decoder-dependent color-dependent
 
 - [Spike 003 Report](../../spikes/003-color-managed-preview-export.md)
 - [Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md)
+- [Synthetic Local Color Fixture Source Review](../sources/color-fixtures-synthetic-local.md)
 - [Color Management Specification](../../09_Color_Management_Specification.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
