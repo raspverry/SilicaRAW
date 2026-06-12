@@ -264,4 +264,63 @@ mod tests {
             super::PreviewDecodeStatus::BlockedByMissingRawFixtureProbe
         );
     }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[test]
+    fn core_image_raw_probe_reports_missing_files_on_macos_feature() {
+        let path = unique_temp_probe_path("missing.dng");
+        let _ = std::fs::remove_file(&path);
+
+        let result =
+            super::probe_core_image_raw(super::RawProbeRequest::new(path.to_string_lossy()));
+
+        assert_eq!(result.platform, super::RawProbePlatform::Macos);
+        assert_eq!(result.status, super::RawProbeStatus::Failed);
+        assert_eq!(
+            result.error_category,
+            Some(super::RawProbeErrorCategory::MissingFile)
+        );
+        assert_eq!(result.source_sha256, None);
+        assert_eq!(result.original_file_size, None);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[test]
+    fn core_image_raw_probe_records_hash_mismatch_before_core_image_open() {
+        let path = unique_temp_probe_path("hash-mismatch.dng");
+        std::fs::write(&path, b"not a raw file\n").expect("write probe fixture");
+        let before = std::fs::read(&path).expect("read probe fixture before probe");
+
+        let result = super::probe_core_image_raw(super::RawProbeRequest {
+            source_path: path.to_string_lossy().to_string(),
+            expected_sha256: Some("00000000000000000000000000000000".to_string()),
+        });
+
+        let after = std::fs::read(&path).expect("read probe fixture after probe");
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(before, after);
+        assert_eq!(result.platform, super::RawProbePlatform::Macos);
+        assert_eq!(result.status, super::RawProbeStatus::Failed);
+        assert_eq!(
+            result.error_category,
+            Some(super::RawProbeErrorCategory::SourceHashMismatch)
+        );
+        assert_eq!(
+            result.source_sha256.as_deref(),
+            Some("8f48f233d3b6daa5e4735c8b695ec2754d9bffa3876e9ef5f541eef7b5e6c9fc")
+        );
+        assert_eq!(result.original_file_size, Some(15));
+        assert_eq!(result.width, None);
+        assert_eq!(result.height, None);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    fn unique_temp_probe_path(label: &str) -> std::path::PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("silicaraw-core-image-raw-probe-{nonce}-{label}"))
+    }
 }

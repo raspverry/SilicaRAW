@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | Core Image RAW probe backend added
+
+- Completed Task 12.1.3 macOS Core Image probe backend.
+- The non-default probe records source metadata, SHA-256, explicit errors, and Core Image dimensions when available.
+- Product RAW pixels, fixture-backed support claims, LibRaw, and UI RAW display remain out of scope.
+
 ## [2026-06-12] wiki | Phase 12 design gate task card added
 
 - Added Task 12.0 as a wiki task card so Phase 12 routing starts at the design gate.

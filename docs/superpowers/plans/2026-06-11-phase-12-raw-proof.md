@@ -359,7 +359,7 @@ git commit -m "feat(decode): add raw probe contract"
 **Files:**
 - Modify: `crates/silica-decode/src/core_image_raw_probe.rs`
 
-- [ ] **Step 1: Add macOS feature cfg split**
+- [x] **Step 1: Add macOS feature cfg split**
 
 Refactor `core_image_raw_probe.rs` into:
 
@@ -392,7 +392,7 @@ pub fn probe_core_image_raw(request: crate::RawProbeRequest) -> crate::RawProbeR
 
 Create `crates/silica-decode/src/core_image_raw_probe/platform.rs` for the macOS implementation.
 
-- [ ] **Step 2: Implement file metadata and hash preservation first**
+- [x] **Step 2: Implement file metadata and hash preservation first**
 
 Before Core Image calls, implement:
 
@@ -423,7 +423,7 @@ fn sha256_file(path: &std::path::Path) -> Result<String, std::io::Error> {
 
 Do not reuse the existing FNV-style test hash helpers for fixture evidence; they are not SHA-256.
 
-- [ ] **Step 3: Implement Core Image metadata probe**
+- [x] **Step 3: Implement Core Image metadata probe**
 
 Use `CIImage` or `CIRAWFilter` through `objc2-core-image` to open the file URL and read extent/dimensions where available. Map failures to:
 
@@ -436,7 +436,7 @@ RawProbeErrorCategory::Unknown
 
 No decoded pixel buffer should be returned.
 
-- [ ] **Step 4: Run macOS feature tests**
+- [x] **Step 4: Run macOS feature tests**
 
 Run:
 
@@ -446,7 +446,7 @@ cargo test -p silica-decode --features core-image-raw-probe
 
 Expected: probe contract tests pass. If no real fixture is present, tests should cover missing/unavailable paths only.
 
-- [ ] **Step 5: Commit Task 12.1.3**
+- [x] **Step 5: Commit Task 12.1.3**
 
 Run:
 

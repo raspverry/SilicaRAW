@@ -2,7 +2,7 @@
 title: RAW Decoding
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/20_v1_1_Architecture_Patch.md
 ---
 
@@ -18,6 +18,7 @@ RAW decoding is one of SilicaRAW's highest-risk technical areas. Spike 002 selec
 - Spike 002 selected Core Image RAW primary.
 - LibRaw remains a deferred fallback until legal fixtures prove a camera-support gap.
 - Phase 5.1 adds preview decode readiness routing, not RAW pixels.
+- Phase 12.1 adds a feature-gated Core Image RAW probe contract and macOS metadata path, not product RAW pixels.
 - Full decoder-dependent features remain blocked until real fixture-backed decoding exists.
 
 ## Blocked Work
@@ -81,6 +82,41 @@ RAW candidate -> Core Image RAW blocked until fixture-backed probe
 ```
 
 This preserves the Spike 002 decision without pretending RAW decoding exists.
+
+## Phase 12.1 Core Image RAW Probe Contract
+
+`silica-decode` now exposes a proof-only Core Image RAW probe behind the non-default `core-image-raw-probe` feature.
+
+The probe result records:
+
+```txt
+backend
+platform
+macos_version
+source_path
+source_sha256
+original_file_size
+original_modified_at
+status
+width
+height
+orientation
+error_category
+message
+```
+
+On macOS feature builds, the probe:
+
+- reads the source file by path
+- records file size and modified time before Core Image work
+- computes SHA-256 for fixture evidence
+- checks expected SHA-256 when supplied
+- opens the source with Core Image and records image dimensions when available
+- returns explicit failure categories for missing files, permission failures, source hash mismatch, Core Image open failure, missing metadata, invalid fixtures, and unknown errors
+
+Default builds still return an unavailable probe result and do not compile the Core Image path.
+
+Phase 12.1 does not prove RAW support. Support claims remain blocked until Task 12.2 fixture probe evidence and Task 12.3 support-matrix decisions exist.
 
 ## Links
 

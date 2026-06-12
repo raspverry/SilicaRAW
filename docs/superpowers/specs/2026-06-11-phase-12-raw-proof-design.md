@@ -252,6 +252,7 @@ The product API must not:
   - Probe does not mutate source files.
   - Normal preview readiness behavior remains unchanged.
 - **Validation:** `cargo test -p silica-decode --features core-image-raw-probe`
+- **Status:** Completed on 2026-06-12. Added the feature-gated macOS Core Image probe path with file metadata capture, SHA-256 verification, Core Image extent probing, and explicit failure categories. Legal fixture evidence and product RAW support remain blocked for Task 12.2 and Task 12.3.
 
 ### Task 12.2.1: RAW Probe Result Harness
 
