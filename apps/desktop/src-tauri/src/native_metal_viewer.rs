@@ -638,6 +638,7 @@ pub fn input_smoke_evidence() -> Result<String, NativeViewerLifecycleError> {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct NativeViewerRenderBridge {
     scheduler: silica_render::ViewerPreviewRenderScheduler,
+    texture_lifecycle: silica_render::ViewerTextureLifecycle,
     catalog_write_requested: bool,
 }
 
@@ -647,8 +648,16 @@ impl NativeViewerRenderBridge {
         request: silica_render::ViewerPreviewRenderRequest,
     ) -> silica_render::ViewerPreviewScheduleResult {
         debug_assert!(!request.writes_catalog_state());
+        let texture_identity = silica_render::ViewerTextureIdentity::from_preview_request(&request);
         self.catalog_write_requested = false;
-        self.scheduler.schedule(request)
+        let result = self.scheduler.schedule(request);
+        if let Some(texture_identity) = texture_identity {
+            self.texture_lifecycle.bind_texture(texture_identity);
+        } else {
+            self.texture_lifecycle
+                .release(silica_render::ViewerTextureReleaseReason::PhotoChanged);
+        }
+        result
     }
 
     pub fn latest_request_id(&self) -> Option<silica_render::ViewerPreviewRenderRequestId> {
@@ -661,6 +670,10 @@ impl NativeViewerRenderBridge {
 
     pub fn catalog_write_requested(&self) -> bool {
         self.catalog_write_requested
+    }
+
+    pub fn current_texture(&self) -> Option<&silica_render::ViewerTextureIdentity> {
+        self.texture_lifecycle.current_texture()
     }
 }
 
@@ -679,12 +692,16 @@ pub fn render_request_smoke_evidence() -> String {
         "photo-11",
         "/tmp/source.raw",
         silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
-        silica_render::ViewerPreviewInput::future_texture(
-            "decode-cache/photo-11/request-12",
-            4032,
-            3024,
-            silica_render::ViewerPreviewPixelFormat::Bgra8Unorm,
-        ),
+        silica_render::ViewerPreviewInput::DecodedImageArtifact {
+            cache_key: "raw-preview:v1:photo-11/request-12".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            width_px: 2048,
+            height_px: 1365,
+            pixel_format: silica_render::ViewerPreviewPixelFormat::JpegSrgb8,
+            decoder_backend: "core_image_raw".to_string(),
+            input_profile: "core_image_raw".to_string(),
+            working_space: "srgb".to_string(),
+        },
         2,
     );
     let mut bridge = NativeViewerRenderBridge::default();
@@ -701,19 +718,24 @@ pub fn render_request_smoke_evidence() -> String {
         .replaced_request_id
         .map(|request_id| request_id.0)
         .unwrap_or_default();
-    let future_texture_identity = matches!(
+    let decoded_artifact_texture_identity = matches!(
         latest_request.input,
-        silica_render::ViewerPreviewInput::FutureTexture { .. }
+        silica_render::ViewerPreviewInput::DecodedImageArtifact { .. }
     );
+    let current_texture_key = bridge
+        .current_texture()
+        .map(|identity| identity.texture_key.as_str())
+        .unwrap_or("none");
 
     format!(
-        "latest_request={} replaced_request={} latest_wins={} catalog_write_requested={} contains_image_pixels={} future_texture_identity={}",
+        "latest_request={} replaced_request={} latest_wins={} catalog_write_requested={} contains_image_pixels={} decoded_artifact_texture_identity={} current_texture_key={}",
         latest_request_id.0,
         replaced_request_id,
         latest_wins,
         bridge.catalog_write_requested(),
         latest_request.contains_image_pixels(),
-        future_texture_identity
+        decoded_artifact_texture_identity,
+        current_texture_key
     )
 }
 
@@ -1061,6 +1083,113 @@ mod tests {
     }
 
     #[test]
+    fn render_bridge_binds_decoded_artifact_texture_identity_latest_wins() {
+        let first = silica_render::ViewerPreviewRenderRequest::new(
+            silica_render::ViewerPreviewRenderRequestId(31),
+            "photo-31",
+            "/tmp/sample.cr2",
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewInput::DecodedImageArtifact {
+                cache_key: "raw-preview:v1:photo-31:first".to_string(),
+                source_sha256: Some("fixture-hash".to_string()),
+                width_px: 2048,
+                height_px: 1365,
+                pixel_format: silica_render::ViewerPreviewPixelFormat::JpegSrgb8,
+                decoder_backend: "core_image_raw".to_string(),
+                input_profile: "core_image_raw".to_string(),
+                working_space: "srgb".to_string(),
+            },
+            1,
+        );
+        let second = silica_render::ViewerPreviewRenderRequest::new(
+            silica_render::ViewerPreviewRenderRequestId(32),
+            "photo-31",
+            "/tmp/sample.cr2",
+            silica_render::ViewerPreviewViewport::new(1200, 675, 2.0),
+            silica_render::ViewerPreviewInput::DecodedImageArtifact {
+                cache_key: "raw-preview:v1:photo-31:second".to_string(),
+                source_sha256: Some("fixture-hash".to_string()),
+                width_px: 2048,
+                height_px: 1365,
+                pixel_format: silica_render::ViewerPreviewPixelFormat::JpegSrgb8,
+                decoder_backend: "core_image_raw".to_string(),
+                input_profile: "core_image_raw".to_string(),
+                working_space: "srgb".to_string(),
+            },
+            2,
+        );
+        let mut bridge = NativeViewerRenderBridge::default();
+
+        let _ = bridge.schedule_render_request(first);
+        let second_result = bridge.schedule_render_request(second);
+
+        assert_eq!(
+            second_result.replaced_request_id,
+            Some(silica_render::ViewerPreviewRenderRequestId(31))
+        );
+        assert_eq!(
+            bridge.latest_request_id(),
+            Some(silica_render::ViewerPreviewRenderRequestId(32))
+        );
+        let texture = bridge
+            .current_texture()
+            .expect("decoded artifact should bind current texture identity");
+        assert_eq!(
+            texture.request_id,
+            silica_render::ViewerPreviewRenderRequestId(32)
+        );
+        assert_eq!(texture.texture_key, "raw-preview:v1:photo-31:second");
+        assert_eq!(
+            texture.drawable_size,
+            silica_render::ViewerTextureDrawableSize::new(2400, 1350)
+        );
+        assert!(!bridge.catalog_write_requested());
+    }
+
+    #[test]
+    fn render_bridge_clears_texture_identity_for_blocked_preview_request() {
+        let ready = silica_render::ViewerPreviewRenderRequest::new(
+            silica_render::ViewerPreviewRenderRequestId(41),
+            "photo-41",
+            "/tmp/sample.cr2",
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewInput::DecodedImageArtifact {
+                cache_key: "raw-preview:v1:photo-41".to_string(),
+                source_sha256: Some("fixture-hash".to_string()),
+                width_px: 2048,
+                height_px: 1365,
+                pixel_format: silica_render::ViewerPreviewPixelFormat::JpegSrgb8,
+                decoder_backend: "core_image_raw".to_string(),
+                input_profile: "core_image_raw".to_string(),
+                working_space: "srgb".to_string(),
+            },
+            1,
+        );
+        let blocked = silica_render::ViewerPreviewRenderRequest::new(
+            silica_render::ViewerPreviewRenderRequestId(42),
+            "photo-42",
+            "/tmp/blocked.raw",
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewInput::no_pixels_yet(
+                silica_render::PreviewRenderStatus::BlockedByDecode,
+            ),
+            1,
+        );
+        let mut bridge = NativeViewerRenderBridge::default();
+
+        bridge.schedule_render_request(ready);
+        assert!(bridge.current_texture().is_some());
+        bridge.schedule_render_request(blocked);
+
+        assert_eq!(
+            bridge.latest_request_id(),
+            Some(silica_render::ViewerPreviewRenderRequestId(42))
+        );
+        assert_eq!(bridge.current_texture(), None);
+        assert!(!bridge.catalog_write_requested());
+    }
+
+    #[test]
     fn render_request_smoke_evidence_is_reviewable() {
         let evidence = super::render_request_smoke_evidence();
         println!("[SilicaRAW Native Viewer] {evidence}");
@@ -1070,7 +1199,8 @@ mod tests {
         assert!(evidence.contains("latest_wins=true"));
         assert!(evidence.contains("catalog_write_requested=false"));
         assert!(evidence.contains("contains_image_pixels=false"));
-        assert!(evidence.contains("future_texture_identity=true"));
+        assert!(evidence.contains("decoded_artifact_texture_identity=true"));
+        assert!(evidence.contains("current_texture_key=raw-preview:v1:photo-11/request-12"));
     }
 
     #[test]

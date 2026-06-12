@@ -41,7 +41,8 @@ As of 2026-06-12:
 - Task 15.0 evidence gate is complete.
 - Task 15.1 decoded image handoff contract is complete.
 - Task 15.2 RAW decode to preview artifact is complete.
-- Next task: [15.3 Metal Preview Display](../tasks/15.3-metal-preview-display.md).
+- Task 15.3 Metal preview display is complete.
+- Next task: [15.4 Exposure/Contrast Metal Draft Path](../tasks/15.4-exposure-contrast-metal-draft-path.md).
 
 ## Wave Map
 
@@ -371,7 +372,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 15.3 from the existing task card.
+1. Execute Task 15.4 from the existing task card.
 2. Continue through Task 15.6 in order.
 3. After Phase 15 completes, create only the missing next-phase task cards from this master plan, then implement them atomically.
 

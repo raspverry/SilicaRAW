@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | Metal preview display identity added
+
+- Completed Task 15.3 by promoting decoded RAW preview artifacts into disposable native viewer texture identity.
+- Preserved latest-request-wins scheduling and cleared stale texture identity when decode is blocked.
+- Kept image bytes, export source-of-truth behavior, catalog writes, sidecar writes, and original-file mutation out of the native viewer bridge.
+
 ## [2026-06-12] phase-15 | RAW preview artifact path added
 
 - Completed Task 15.2 with fixture-backed Core Image RAW preview artifact writing behind `core-image-raw-probe`.

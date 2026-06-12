@@ -78,6 +78,8 @@ Task 15.1 adds the decoded image handoff boundary used by future viewer requests
 
 Task 15.2 adds a fixture-backed JPEG sRGB RAW preview artifact path. `silica-render` now distinguishes this artifact as `JpegSrgb8` identity data; it still carries no image bytes and does not allocate Metal textures. Task 15.3 owns native viewer display of this artifact and must keep full-resolution export independent of viewer texture/cache state.
 
+Task 15.3 promotes decoded preview artifact requests into disposable native viewer texture identity. The feature-gated native viewer bridge binds the latest decoded artifact texture identity, clears stale texture identity when decode is blocked, and records smoke evidence without making viewer texture cache an export source of truth.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.

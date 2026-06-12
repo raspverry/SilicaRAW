@@ -136,6 +136,20 @@ impl ViewerPreviewViewport {
             backing_scale_factor,
         }
     }
+
+    pub fn drawable_size(&self) -> ViewerTextureDrawableSize {
+        ViewerTextureDrawableSize::new(
+            scaled_dimension(self.width_px, self.backing_scale_factor),
+            scaled_dimension(self.height_px, self.backing_scale_factor),
+        )
+    }
+}
+
+fn scaled_dimension(value: u32, scale: f64) -> u32 {
+    if !scale.is_finite() || scale <= 0.0 {
+        return value.max(1);
+    }
+    ((value as f64 * scale).round() as u32).max(1)
 }
 
 /// Future Metal texture pixel format identity. No pixel bytes are carried here.
@@ -356,6 +370,20 @@ impl ViewerTextureIdentity {
             texture_key: texture_key.into(),
             drawable_size,
         }
+    }
+
+    pub fn from_preview_request(request: &ViewerPreviewRenderRequest) -> Option<Self> {
+        let texture_key = match &request.input {
+            ViewerPreviewInput::DecodedImageArtifact { cache_key, .. } => cache_key.clone(),
+            ViewerPreviewInput::FutureTexture { texture_key, .. } => texture_key.clone(),
+            ViewerPreviewInput::NoPixelsYet { .. } => return None,
+        };
+
+        Some(Self::new(
+            request.request_id,
+            texture_key,
+            request.viewport.drawable_size(),
+        ))
     }
 }
 
@@ -1127,6 +1155,39 @@ mod tests {
             lifecycle.last_release_reason(),
             Some(super::ViewerTextureReleaseReason::AppClosed)
         );
+    }
+
+    #[test]
+    fn decoded_preview_artifact_can_become_disposable_texture_identity() {
+        let request = super::ViewerPreviewRenderRequest::new(
+            super::ViewerPreviewRenderRequestId(31),
+            "photo-31",
+            "/tmp/sample.cr2",
+            super::ViewerPreviewViewport::new(1200, 675, 1.5),
+            super::ViewerPreviewInput::DecodedImageArtifact {
+                cache_key: "raw-preview:v1:photo-31".to_string(),
+                source_sha256: Some("fixture-hash".to_string()),
+                width_px: 2048,
+                height_px: 1365,
+                pixel_format: super::ViewerPreviewPixelFormat::JpegSrgb8,
+                decoder_backend: "core_image_raw".to_string(),
+                input_profile: "core_image_raw".to_string(),
+                working_space: "srgb".to_string(),
+            },
+            3,
+        );
+
+        let identity = super::ViewerTextureIdentity::from_preview_request(&request)
+            .expect("decoded artifact should produce texture identity");
+
+        assert_eq!(identity.request_id, super::ViewerPreviewRenderRequestId(31));
+        assert_eq!(identity.texture_key, "raw-preview:v1:photo-31");
+        assert_eq!(
+            identity.drawable_size,
+            super::ViewerTextureDrawableSize::new(1800, 1013)
+        );
+        assert!(!request.writes_catalog_state());
+        assert!(!request.contains_image_pixels());
     }
 
     #[cfg(all(feature = "color-probe", target_os = "macos"))]
