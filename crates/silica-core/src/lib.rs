@@ -476,6 +476,10 @@ pub struct PhotoEditPreviewSession {
     pub white_balance: silica_edit::WhiteBalance,
     pub temperature: f64,
     pub tint: f64,
+    pub highlights: f64,
+    pub shadows: f64,
+    pub whites: f64,
+    pub blacks: f64,
     pub message: String,
 }
 
@@ -483,7 +487,7 @@ impl PhotoEditPreviewSession {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
         format!(
-            "Photo: {}\nPreview: {:?}\nSource: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nMessage: {}",
+            "Photo: {}\nPreview: {:?}\nSource: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nHighlights: {}\nShadows: {}\nWhites: {}\nBlacks: {}\nMessage: {}",
             self.photo_id,
             self.status,
             self.source_path,
@@ -492,6 +496,10 @@ impl PhotoEditPreviewSession {
             self.white_balance,
             self.temperature,
             self.tint,
+            self.highlights,
+            self.shadows,
+            self.whites,
+            self.blacks,
             self.message
         )
     }
@@ -506,6 +514,10 @@ pub struct PhotoEditCommit {
     pub white_balance: silica_edit::WhiteBalance,
     pub temperature: f64,
     pub tint: f64,
+    pub highlights: f64,
+    pub shadows: f64,
+    pub whites: f64,
+    pub blacks: f64,
     pub persisted: bool,
     pub message: String,
 }
@@ -514,13 +526,17 @@ impl PhotoEditCommit {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
         format!(
-            "Photo: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nPersisted: {}\nMessage: {}",
+            "Photo: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nHighlights: {}\nShadows: {}\nWhites: {}\nBlacks: {}\nPersisted: {}\nMessage: {}",
             self.photo_id,
             self.exposure,
             self.contrast,
             self.white_balance,
             self.temperature,
             self.tint,
+            self.highlights,
+            self.shadows,
+            self.whites,
+            self.blacks,
             self.persisted,
             self.message
         )
@@ -536,6 +552,10 @@ pub struct PhotoEditState {
     pub white_balance: silica_edit::WhiteBalance,
     pub temperature: f64,
     pub tint: f64,
+    pub highlights: f64,
+    pub shadows: f64,
+    pub whites: f64,
+    pub blacks: f64,
     pub persisted: bool,
     pub message: String,
 }
@@ -544,13 +564,17 @@ impl PhotoEditState {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
         format!(
-            "Photo: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nPersisted: {}\nMessage: {}",
+            "Photo: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nHighlights: {}\nShadows: {}\nWhites: {}\nBlacks: {}\nPersisted: {}\nMessage: {}",
             self.photo_id,
             self.exposure,
             self.contrast,
             self.white_balance,
             self.temperature,
             self.tint,
+            self.highlights,
+            self.shadows,
+            self.whites,
+            self.blacks,
             self.persisted,
             self.message
         )
@@ -1375,6 +1399,7 @@ pub fn preview_exposure_contrast_edit(
         edited.basic.contrast.as_f64().unwrap_or(contrast),
     );
     request.white_balance = render_white_balance_from_graph(&graph);
+    request.tone_recovery = render_tone_recovery_from_graph(&graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1393,6 +1418,7 @@ pub fn preview_exposure_contrast_edit(
             request.exposure,
             request.contrast,
             export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
         )?
     } else {
         None
@@ -1408,6 +1434,10 @@ pub fn preview_exposure_contrast_edit(
         white_balance: graph.basic.white_balance,
         temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
         tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
         message,
     }))
 }
@@ -1446,6 +1476,8 @@ pub fn preview_white_balance_edit(
         contrast,
         render_white_balance_from_graph(&edited),
     );
+    let mut request = request;
+    request.tone_recovery = render_tone_recovery_from_graph(&graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1464,6 +1496,7 @@ pub fn preview_white_balance_edit(
             request.exposure,
             request.contrast,
             export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
         )?
     } else {
         None
@@ -1479,6 +1512,87 @@ pub fn preview_white_balance_edit(
         white_balance: edited.basic.white_balance,
         temperature: edited.basic.temperature.as_f64().unwrap_or(temperature),
         tint: edited.basic.tint.as_f64().unwrap_or(tint),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
+        message,
+    }))
+}
+
+/// Build a draft tone-recovery preview request without writing the catalog.
+pub fn preview_tone_recovery_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_tone_recovery(
+        &graph,
+        highlights,
+        shadows,
+        whites,
+        blacks,
+        current_timestamp_string(),
+    )?;
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let request = silica_render::plan_tone_recovery_preview(
+        render_plan,
+        graph.basic.exposure.as_f64().unwrap_or(0.0),
+        graph.basic.contrast.as_f64().unwrap_or(0.0),
+        render_white_balance_from_graph(&graph),
+        render_tone_recovery_from_graph(&edited),
+    );
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+            export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
+        )?
+    } else {
+        None
+    };
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        develop_preview_bytes,
+        status,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: edited.basic.highlights.as_f64().unwrap_or(highlights),
+        shadows: edited.basic.shadows.as_f64().unwrap_or(shadows),
+        whites: edited.basic.whites.as_f64().unwrap_or(whites),
+        blacks: edited.basic.blacks.as_f64().unwrap_or(blacks),
         message,
     }))
 }
@@ -1511,6 +1625,10 @@ pub fn commit_exposure_contrast_edit(
         white_balance: persisted.basic.white_balance,
         temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
         tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         persisted: true,
         message: "Exposure/contrast edit persisted on commit.".to_string(),
     }))
@@ -1546,8 +1664,53 @@ pub fn commit_white_balance_edit(
         white_balance: persisted.basic.white_balance,
         temperature: persisted.basic.temperature.as_f64().unwrap_or(temperature),
         tint: persisted.basic.tint.as_f64().unwrap_or(tint),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         persisted: true,
         message: "White balance edit persisted on commit.".to_string(),
+    }))
+}
+
+/// Persist a tone-recovery edit on commit/release.
+pub fn commit_tone_recovery_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_tone_recovery(
+        &graph,
+        highlights,
+        shadows,
+        whites,
+        blacks,
+        current_timestamp_string(),
+    )?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id,
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(highlights),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(shadows),
+        whites: persisted.basic.whites.as_f64().unwrap_or(whites),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(blacks),
+        persisted: true,
+        message: "Tone recovery edit persisted on commit.".to_string(),
     }))
 }
 
@@ -1565,6 +1728,10 @@ pub fn get_photo_edit_state(
             white_balance: graph.basic.white_balance,
             temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
             tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+            highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+            shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+            whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+            blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
             persisted: true,
             message: "Restored committed edit state.".to_string(),
         }));
@@ -1583,6 +1750,10 @@ pub fn get_photo_edit_state(
         white_balance: graph.basic.white_balance,
         temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
         tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
         persisted: false,
         message: "Default clean edit state loaded.".to_string(),
     }))
@@ -1627,12 +1798,13 @@ pub fn export_photo_jpeg(
         };
     let exposure = graph.basic.exposure.as_f64().unwrap_or(0.0);
     let contrast = graph.basic.contrast.as_f64().unwrap_or(0.0);
-    let render_request = silica_render::plan_jpeg_srgb_export_with_white_balance(
+    let render_request = silica_render::plan_jpeg_srgb_export_with_tone_recovery(
         render_plan.source_path.clone(),
         output_path.display().to_string(),
         exposure,
         contrast,
         render_white_balance_from_graph(&graph),
+        render_tone_recovery_from_graph(&graph),
         LOCAL_ALPHA_JPEG_QUALITY,
     );
 
@@ -1643,6 +1815,7 @@ pub fn export_photo_jpeg(
             exposure: render_request.exposure,
             contrast: render_request.contrast,
             white_balance: export_white_balance_from_render(render_request.white_balance),
+            tone_recovery: export_tone_recovery_from_render(render_request.tone_recovery),
             quality: render_request.quality,
             color_profile: export_color_profile_to_export(color_profile),
         })?;
@@ -1661,6 +1834,10 @@ pub fn export_photo_jpeg(
         "white_balance": white_balance_render_mode_string(render_request.white_balance.mode),
         "temperature": render_request.white_balance.temperature,
         "tint": render_request.white_balance.tint,
+        "highlights": render_request.tone_recovery.highlights,
+        "shadows": render_request.tone_recovery.shadows,
+        "whites": render_request.tone_recovery.whites,
+        "blacks": render_request.tone_recovery.blacks,
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
@@ -1751,12 +1928,13 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             output_path: source_artifact_path,
         },
     )?;
-    let render_request = silica_render::plan_raw_derived_jpeg_srgb_export_with_white_balance(
+    let render_request = silica_render::plan_raw_derived_jpeg_srgb_export_with_tone_recovery(
         source_artifact.artifact_path.display().to_string(),
         output_path.display().to_string(),
         exposure,
         contrast,
         render_white_balance_from_graph(&graph),
+        render_tone_recovery_from_graph(&graph),
         LOCAL_ALPHA_JPEG_QUALITY,
     );
     let export_result =
@@ -1766,6 +1944,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             exposure: render_request.exposure,
             contrast: render_request.contrast,
             white_balance: export_white_balance_from_render(render_request.white_balance),
+            tone_recovery: export_tone_recovery_from_render(render_request.tone_recovery),
             quality: render_request.quality,
             color_profile: silica_export::ExportColorProfile::Srgb,
         })?;
@@ -1786,6 +1965,10 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         "white_balance": white_balance_render_mode_string(render_request.white_balance.mode),
         "temperature": render_request.white_balance.temperature,
         "tint": render_request.white_balance.tint,
+        "highlights": render_request.tone_recovery.highlights,
+        "shadows": render_request.tone_recovery.shadows,
+        "whites": render_request.tone_recovery.whites,
+        "blacks": render_request.tone_recovery.blacks,
         "source_path": source_artifact.source_path.clone(),
         "source_sha256": source_artifact.source_sha256.clone(),
         "raw_source_path": source_artifact.source_path.clone(),
@@ -1949,6 +2132,7 @@ fn write_jpeg_develop_preview_bytes(
     exposure: f64,
     contrast: f64,
     white_balance: silica_export::WhiteBalanceAdjustment,
+    tone_recovery: silica_export::ToneRecoveryAdjustment,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
     if !is_jpeg_path(&source_path) || !source_path.is_file() {
@@ -1969,6 +2153,7 @@ fn write_jpeg_develop_preview_bytes(
             exposure,
             contrast,
             white_balance,
+            tone_recovery,
         }) {
             Ok(result) => result,
             Err(silica_export::ExportError::Image(_)) => return Ok(None),
@@ -2636,6 +2821,28 @@ fn export_white_balance_from_render(
         mode: export_white_balance_mode(white_balance.mode),
         temperature: white_balance.temperature,
         tint: white_balance.tint,
+    }
+}
+
+fn render_tone_recovery_from_graph(
+    graph: &silica_edit::EditGraph,
+) -> silica_render::ToneRecoveryRenderAdjustment {
+    silica_render::ToneRecoveryRenderAdjustment {
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
+    }
+}
+
+fn export_tone_recovery_from_render(
+    tone_recovery: silica_render::ToneRecoveryRenderAdjustment,
+) -> silica_export::ToneRecoveryAdjustment {
+    silica_export::ToneRecoveryAdjustment {
+        highlights: tone_recovery.highlights,
+        shadows: tone_recovery.shadows,
+        whites: tone_recovery.whites,
+        blacks: tone_recovery.blacks,
     }
 }
 
@@ -4358,6 +4565,83 @@ mod tests {
         assert_eq!(settings["white_balance"], "custom");
         assert_eq!(settings["temperature"], 6500.0);
         assert_eq!(settings["tint"], 20.0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn previews_commits_and_exports_tone_recovery_through_core() {
+        let workspace = unique_library_root("core-tone-recovery");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let preview =
+            preview_tone_recovery_edit(&created.root_path, &photo_id, -35.0, 42.0, 10.0, -12.0)
+                .expect("preview tone recovery")
+                .expect("preview result");
+
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(preview.highlights, -35.0);
+        assert_eq!(preview.shadows, 42.0);
+        assert_eq!(preview.whites, 10.0);
+        assert_eq!(preview.blacks, -12.0);
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after preview")
+                .is_none(),
+            "tone recovery preview must not write edit state"
+        );
+
+        let committed =
+            commit_tone_recovery_edit(&created.root_path, &photo_id, -35.0, 42.0, 10.0, -12.0)
+                .expect("commit tone recovery")
+                .expect("commit result");
+        assert_eq!(committed.highlights, -35.0);
+        assert_eq!(committed.shadows, 42.0);
+        assert_eq!(committed.whites, 10.0);
+        assert_eq!(committed.blacks, -12.0);
+        assert!(committed.persisted);
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 1);
+        assert_eq!(history.items[0].label, "Tone recovery");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+        assert!(exported.bytes_written > 0);
+
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["highlights"], -35.0);
+        assert_eq!(settings["shadows"], 42.0);
+        assert_eq!(settings["whites"], 10.0);
+        assert_eq!(settings["blacks"], -12.0);
 
         remove_library_root(&workspace);
     }

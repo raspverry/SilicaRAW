@@ -29,3 +29,5 @@ Task 16.5 adds thin append/read wrappers for the action log and records sensitiv
 Task 16.6 adds a thin `get_photo_sidecar_status` wrapper. History-changing Core calls rely on storage to mark clean sidecars as `catalog_newer` without hidden sidecar file writes.
 
 Task 17.2.1 adds white-balance-family preview and commit APIs. Core validates the edit graph, keeps draft previews non-persistent, commits one undoable history checkpoint, and passes the committed white-balance state into JPEG export settings.
+
+Task 17.2.2 adds tone recovery preview and commit APIs for highlights, shadows, whites, and blacks under the same draft/commit/export boundary.

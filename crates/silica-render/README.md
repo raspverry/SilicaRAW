@@ -11,3 +11,5 @@ Phase 5.3 adds a render request contract for draft exposure/contrast preview upd
 Phase 13.3 adds a non-default `color-probe` feature that reads JPEG marker/profile metadata for fixture proof and records source hashes. This is probe evidence only; it does not render pixels or apply transforms.
 
 Task 17.2.1 carries white-balance-family values through preview/export request planning. It still does not create a Metal viewer, shader, Core Image context, ColorSync transform, ICC embedding, or render pixels.
+
+Task 17.2.2 carries tone recovery values through preview/export request planning under the same boundary. Pixel adjustment remains owned by `silica-export` for supported JPEG/JPG paths.

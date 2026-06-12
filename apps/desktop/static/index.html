@@ -427,6 +427,46 @@
               <button id="developTintReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-adjustment-slider" data-adjustment="highlights">
+            <div class="sr-adjustment-header">
+              <label for="developHighlightsSlider">Highlights</label>
+              <input id="developHighlightsValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Highlights value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developHighlightsSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Highlights">
+              <button id="developHighlightsReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="shadows">
+            <div class="sr-adjustment-header">
+              <label for="developShadowsSlider">Shadows</label>
+              <input id="developShadowsValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Shadows value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developShadowsSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Shadows">
+              <button id="developShadowsReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="whites">
+            <div class="sr-adjustment-header">
+              <label for="developWhitesSlider">Whites</label>
+              <input id="developWhitesValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Whites value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developWhitesSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Whites">
+              <button id="developWhitesReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="blacks">
+            <div class="sr-adjustment-header">
+              <label for="developBlacksSlider">Blacks</label>
+              <input id="developBlacksValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Blacks value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developBlacksSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Blacks">
+              <button id="developBlacksReset" type="button">Reset</button>
+            </div>
+          </div>
           <div class="sr-develop-commit-row">
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
@@ -649,6 +689,18 @@
       const developTintSlider = document.querySelector("#developTintSlider");
       const developTintValue = document.querySelector("#developTintValue");
       const developTintReset = document.querySelector("#developTintReset");
+      const developHighlightsSlider = document.querySelector("#developHighlightsSlider");
+      const developHighlightsValue = document.querySelector("#developHighlightsValue");
+      const developHighlightsReset = document.querySelector("#developHighlightsReset");
+      const developShadowsSlider = document.querySelector("#developShadowsSlider");
+      const developShadowsValue = document.querySelector("#developShadowsValue");
+      const developShadowsReset = document.querySelector("#developShadowsReset");
+      const developWhitesSlider = document.querySelector("#developWhitesSlider");
+      const developWhitesValue = document.querySelector("#developWhitesValue");
+      const developWhitesReset = document.querySelector("#developWhitesReset");
+      const developBlacksSlider = document.querySelector("#developBlacksSlider");
+      const developBlacksValue = document.querySelector("#developBlacksValue");
+      const developBlacksReset = document.querySelector("#developBlacksReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developHistoryPanel = document.querySelector("#developHistoryPanel");
@@ -1604,6 +1656,10 @@
         return String(Math.round(clamp(value, -150, 150)));
       }
 
+      function formatSignedHundred(value) {
+        return String(Math.round(clamp(value, -100, 100)));
+      }
+
       function normalizeWhiteBalance(value) {
         const supported = new Set(["as_shot", "auto", "daylight", "cloudy", "shade", "tungsten", "fluorescent", "flash", "custom"]);
         return supported.has(value) ? value : "as_shot";
@@ -1678,11 +1734,19 @@
             draftWhiteBalance: "as_shot",
             draftTemperature: 5200,
             draftTint: 0,
+            draftHighlights: 0,
+            draftShadows: 0,
+            draftWhites: 0,
+            draftBlacks: 0,
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
             committedTemperature: 5200,
             committedTint: 0,
+            committedHighlights: 0,
+            committedShadows: 0,
+            committedWhites: 0,
+            committedBlacks: 0,
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -1704,6 +1768,14 @@
         developTemperatureValue.value = formatTemperature(state.draftTemperature);
         developTintSlider.value = formatTint(state.draftTint);
         developTintValue.value = formatTint(state.draftTint);
+        developHighlightsSlider.value = formatSignedHundred(state.draftHighlights);
+        developHighlightsValue.value = formatSignedHundred(state.draftHighlights);
+        developShadowsSlider.value = formatSignedHundred(state.draftShadows);
+        developShadowsValue.value = formatSignedHundred(state.draftShadows);
+        developWhitesSlider.value = formatSignedHundred(state.draftWhites);
+        developWhitesValue.value = formatSignedHundred(state.draftWhites);
+        developBlacksSlider.value = formatSignedHundred(state.draftBlacks);
+        developBlacksValue.value = formatSignedHundred(state.draftBlacks);
       }
 
       function updateDevelopDirtyState(state) {
@@ -1715,6 +1787,10 @@
             || normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
             || Number(state.draftTemperature) !== Number(state.committedTemperature)
             || Number(state.draftTint) !== Number(state.committedTint)
+            || Number(state.draftHighlights) !== Number(state.committedHighlights)
+            || Number(state.draftShadows) !== Number(state.committedShadows)
+            || Number(state.draftWhites) !== Number(state.committedWhites)
+            || Number(state.draftBlacks) !== Number(state.committedBlacks)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -1733,11 +1809,19 @@
         state.committedWhiteBalance = normalizeWhiteBalance(editState?.whiteBalance);
         state.committedTemperature = editStateNumber(editState?.temperature, 5200);
         state.committedTint = editStateNumber(editState?.tint, 0);
+        state.committedHighlights = editStateNumber(editState?.highlights, 0);
+        state.committedShadows = editStateNumber(editState?.shadows, 0);
+        state.committedWhites = editStateNumber(editState?.whites, 0);
+        state.committedBlacks = editStateNumber(editState?.blacks, 0);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
         state.draftTemperature = state.committedTemperature;
         state.draftTint = state.committedTint;
+        state.draftHighlights = state.committedHighlights;
+        state.draftShadows = state.committedShadows;
+        state.draftWhites = state.committedWhites;
+        state.draftBlacks = state.committedBlacks;
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -2005,7 +2089,7 @@
         if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.developPreviewBytes.length}`;
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.developPreviewBytes.length}`;
         if (developObjectUrls.has(cacheKey)) {
           return developObjectUrls.get(cacheKey);
         }
@@ -2576,7 +2660,7 @@
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}.`;
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}.`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
         }
@@ -2621,6 +2705,18 @@
           developTintSlider,
           developTintValue,
           developTintReset,
+          developHighlightsSlider,
+          developHighlightsValue,
+          developHighlightsReset,
+          developShadowsSlider,
+          developShadowsValue,
+          developShadowsReset,
+          developWhitesSlider,
+          developWhitesValue,
+          developWhitesReset,
+          developBlacksSlider,
+          developBlacksValue,
+          developBlacksReset,
           developCommitEdit,
           developRevertEdit,
         ].forEach((control) => {
@@ -2632,11 +2728,19 @@
           draftWhiteBalance: "as_shot",
           draftTemperature: 5200,
           draftTint: 0,
+          draftHighlights: 0,
+          draftShadows: 0,
+          draftWhites: 0,
+          draftBlacks: 0,
           committedExposure: 0,
           committedContrast: 0,
           committedWhiteBalance: "as_shot",
           committedTemperature: 5200,
           committedTint: 0,
+          committedHighlights: 0,
+          committedShadows: 0,
+          committedWhites: 0,
+          committedBlacks: 0,
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -2683,6 +2787,10 @@
             whiteBalance: response.data.whiteBalance,
             temperature: response.data.temperature,
             tint: response.data.tint,
+            highlights: response.data.highlights,
+            shadows: response.data.shadows,
+            whites: response.data.whites,
+            blacks: response.data.blacks,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -2725,7 +2833,16 @@
               temperature: state.draftTemperature,
               tint: state.draftTint,
             })
-            : await invoke("preview_exposure_contrast_edit", {
+            : family === "toneRecovery"
+              ? await invoke("preview_tone_recovery_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                highlights: state.draftHighlights,
+                shadows: state.draftShadows,
+                whites: state.draftWhites,
+                blacks: state.draftBlacks,
+              })
+              : await invoke("preview_exposure_contrast_edit", {
               libraryPath: activeLibraryPath,
               photoId: photo.photoId,
               exposure: state.draftExposure,
@@ -2754,6 +2871,10 @@
             whiteBalance: response.data.whiteBalance,
             temperature: response.data.temperature,
             tint: response.data.tint,
+            highlights: response.data.highlights,
+            shadows: response.data.shadows,
+            whites: response.data.whites,
+            blacks: response.data.blacks,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -2775,8 +2896,18 @@
         const whiteBalanceDirty = normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
           || Number(state.draftTemperature) !== Number(state.committedTemperature)
           || Number(state.draftTint) !== Number(state.committedTint);
+        const toneRecoveryDirty = Number(state.draftHighlights) !== Number(state.committedHighlights)
+          || Number(state.draftShadows) !== Number(state.committedShadows)
+          || Number(state.draftWhites) !== Number(state.committedWhites)
+          || Number(state.draftBlacks) !== Number(state.committedBlacks);
         const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
           || Number(state.draftContrast) !== Number(state.committedContrast);
+
+        if (!whiteBalanceDirty && !toneRecoveryDirty && !exposureContrastDirty) {
+          updateDevelopDirtyState(state);
+          setStatus("No Develop draft changes to commit.");
+          return;
+        }
 
         if (!activeLibraryPath || !invoke) {
           state.committedExposure = state.draftExposure;
@@ -2784,6 +2915,10 @@
           state.committedWhiteBalance = normalizeWhiteBalance(state.draftWhiteBalance);
           state.committedTemperature = state.draftTemperature;
           state.committedTint = state.draftTint;
+          state.committedHighlights = state.draftHighlights;
+          state.committedShadows = state.draftShadows;
+          state.committedWhites = state.draftWhites;
+          state.committedBlacks = state.draftBlacks;
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -2801,6 +2936,15 @@
               temperature: state.draftTemperature,
               tint: state.draftTint,
             })
+            : toneRecoveryDirty
+              ? await invoke("commit_tone_recovery_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                highlights: state.draftHighlights,
+                shadows: state.draftShadows,
+                whites: state.draftWhites,
+                blacks: state.draftBlacks,
+              })
             : await invoke("commit_exposure_contrast_edit", {
               libraryPath: activeLibraryPath,
               photoId: photo.photoId,
@@ -2820,10 +2964,19 @@
           state.committedWhiteBalance = normalizeWhiteBalance(response.data.whiteBalance);
           state.committedTemperature = editStateNumber(response.data.temperature, state.draftTemperature);
           state.committedTint = editStateNumber(response.data.tint, state.draftTint);
+          state.committedHighlights = editStateNumber(response.data.highlights, state.draftHighlights);
+          state.committedShadows = editStateNumber(response.data.shadows, state.draftShadows);
+          state.committedWhites = editStateNumber(response.data.whites, state.draftWhites);
+          state.committedBlacks = editStateNumber(response.data.blacks, state.draftBlacks);
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
             state.draftTemperature = state.committedTemperature;
             state.draftTint = state.committedTint;
+          } else if (toneRecoveryDirty) {
+            state.draftHighlights = state.committedHighlights;
+            state.draftShadows = state.committedShadows;
+            state.draftWhites = state.committedWhites;
+            state.draftBlacks = state.committedBlacks;
           } else {
             state.draftExposure = state.committedExposure;
             state.draftContrast = state.committedContrast;
@@ -2833,8 +2986,19 @@
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
           await loadDevelopHistory();
-          setStatus(whiteBalanceDirty && exposureContrastDirty
-            ? `${responseMessage(response)} Exposure/contrast draft remains uncommitted.`
+          const remainingFamilies = [];
+          if (whiteBalanceDirty && (toneRecoveryDirty || exposureContrastDirty)) {
+            if (toneRecoveryDirty) {
+              remainingFamilies.push("tone recovery");
+            }
+            if (exposureContrastDirty) {
+              remainingFamilies.push("exposure/contrast");
+            }
+          } else if (toneRecoveryDirty && exposureContrastDirty) {
+            remainingFamilies.push("exposure/contrast");
+          }
+          setStatus(remainingFamilies.length
+            ? `${responseMessage(response)} ${remainingFamilies.join(" and ")} draft remains uncommitted.`
             : responseMessage(response));
         } catch (error) {
           setStatus(responseErrorMessage(error, "Develop edit commit failed."));
@@ -2854,6 +3018,10 @@
         state.draftWhiteBalance = state.committedWhiteBalance;
         state.draftTemperature = state.committedTemperature;
         state.draftTint = state.committedTint;
+        state.draftHighlights = state.committedHighlights;
+        state.draftShadows = state.committedShadows;
+        state.draftWhites = state.committedWhites;
+        state.draftBlacks = state.committedBlacks;
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -2880,6 +3048,18 @@
         } else if (kind === "tint") {
           state.draftTint = Number(formatTint(value));
           previewDevelopEdit("whiteBalance");
+        } else if (kind === "highlights") {
+          state.draftHighlights = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "shadows") {
+          state.draftShadows = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "whites") {
+          state.draftWhites = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "blacks") {
+          state.draftBlacks = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
         }
       }
 
@@ -2918,7 +3098,15 @@
             ? state.draftTemperature
             : kind === "tint"
               ? state.draftTint
-              : state.draftContrast;
+              : kind === "highlights"
+                ? state.draftHighlights
+                : kind === "shadows"
+                  ? state.draftShadows
+                  : kind === "whites"
+                    ? state.draftWhites
+                    : kind === "blacks"
+                      ? state.draftBlacks
+                      : state.draftContrast;
         updateDevelopAdjustment(kind, current + direction * step);
       }
 
@@ -3238,6 +3426,18 @@
           developTintSlider,
           developTintValue,
           developTintReset,
+          developHighlightsSlider,
+          developHighlightsValue,
+          developHighlightsReset,
+          developShadowsSlider,
+          developShadowsValue,
+          developShadowsReset,
+          developWhitesSlider,
+          developWhitesValue,
+          developWhitesReset,
+          developBlacksSlider,
+          developBlacksValue,
+          developBlacksReset,
           developCommitEdit,
           developRevertEdit,
         ].forEach((control) => {
@@ -3427,6 +3627,46 @@
       developTintValue.addEventListener("dblclick", () => resetDevelopAdjustment("tint"));
       developTemperatureReset.addEventListener("click", () => resetDevelopAdjustment("temperature"));
       developTintReset.addEventListener("click", () => resetDevelopAdjustment("tint"));
+      developHighlightsSlider.addEventListener("input", () => updateDevelopAdjustment("highlights", developHighlightsSlider.value));
+      developHighlightsSlider.addEventListener("dblclick", () => resetDevelopAdjustment("highlights"));
+      developHighlightsSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("highlights", event));
+      developHighlightsValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developHighlightsValue.value)) {
+          updateDevelopAdjustment("highlights", developHighlightsValue.value);
+        }
+      });
+      developHighlightsValue.addEventListener("dblclick", () => resetDevelopAdjustment("highlights"));
+      developHighlightsReset.addEventListener("click", () => resetDevelopAdjustment("highlights"));
+      developShadowsSlider.addEventListener("input", () => updateDevelopAdjustment("shadows", developShadowsSlider.value));
+      developShadowsSlider.addEventListener("dblclick", () => resetDevelopAdjustment("shadows"));
+      developShadowsSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("shadows", event));
+      developShadowsValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developShadowsValue.value)) {
+          updateDevelopAdjustment("shadows", developShadowsValue.value);
+        }
+      });
+      developShadowsValue.addEventListener("dblclick", () => resetDevelopAdjustment("shadows"));
+      developShadowsReset.addEventListener("click", () => resetDevelopAdjustment("shadows"));
+      developWhitesSlider.addEventListener("input", () => updateDevelopAdjustment("whites", developWhitesSlider.value));
+      developWhitesSlider.addEventListener("dblclick", () => resetDevelopAdjustment("whites"));
+      developWhitesSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("whites", event));
+      developWhitesValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developWhitesValue.value)) {
+          updateDevelopAdjustment("whites", developWhitesValue.value);
+        }
+      });
+      developWhitesValue.addEventListener("dblclick", () => resetDevelopAdjustment("whites"));
+      developWhitesReset.addEventListener("click", () => resetDevelopAdjustment("whites"));
+      developBlacksSlider.addEventListener("input", () => updateDevelopAdjustment("blacks", developBlacksSlider.value));
+      developBlacksSlider.addEventListener("dblclick", () => resetDevelopAdjustment("blacks"));
+      developBlacksSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("blacks", event));
+      developBlacksValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developBlacksValue.value)) {
+          updateDevelopAdjustment("blacks", developBlacksValue.value);
+        }
+      });
+      developBlacksValue.addEventListener("dblclick", () => resetDevelopAdjustment("blacks"));
+      developBlacksReset.addEventListener("click", () => resetDevelopAdjustment("blacks"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       openExportDialogButton.addEventListener("click", openExportDialog);

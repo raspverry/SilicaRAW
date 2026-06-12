@@ -160,6 +160,10 @@ enum DesktopCommandData {
         white_balance: &'static str,
         temperature: f64,
         tint: f64,
+        highlights: f64,
+        shadows: f64,
+        whites: f64,
+        blacks: f64,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -170,6 +174,10 @@ enum DesktopCommandData {
         white_balance: &'static str,
         temperature: f64,
         tint: f64,
+        highlights: f64,
+        shadows: f64,
+        whites: f64,
+        blacks: f64,
         persisted: bool,
         message: String,
     },
@@ -180,6 +188,10 @@ enum DesktopCommandData {
         white_balance: &'static str,
         temperature: f64,
         tint: f64,
+        highlights: f64,
+        shadows: f64,
+        whites: f64,
+        blacks: f64,
         persisted: bool,
         message: String,
     },
@@ -1113,6 +1125,10 @@ fn preview_exposure_contrast_edit(
                 white_balance: white_balance_text(preview.white_balance),
                 temperature: preview.temperature,
                 tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1172,6 +1188,61 @@ fn preview_white_balance_edit(
                 white_balance: white_balance_text(preview.white_balance),
                 temperature: preview.temperature,
                 tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_tone_recovery_edit(
+    library_path: String,
+    photo_id: String,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_tone_recovery_edit";
+    match silica_core::preview_tone_recovery_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        highlights,
+        shadows,
+        whites,
+        blacks,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1213,6 +1284,10 @@ fn commit_exposure_contrast_edit(
                 white_balance: white_balance_text(commit.white_balance),
                 temperature: commit.temperature,
                 tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1270,6 +1345,59 @@ fn commit_white_balance_edit(
                 white_balance: white_balance_text(commit.white_balance),
                 temperature: commit.temperature,
                 tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_tone_recovery_edit(
+    library_path: String,
+    photo_id: String,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_tone_recovery_edit";
+    match silica_core::commit_tone_recovery_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        highlights,
+        shadows,
+        whites,
+        blacks,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1301,6 +1429,10 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 white_balance: white_balance_text(state.white_balance),
                 temperature: state.temperature,
                 tint: state.tint,
+                highlights: state.highlights,
+                shadows: state.shadows,
+                whites: state.whites,
+                blacks: state.blacks,
                 persisted: state.persisted,
                 message: state.message,
             },
@@ -2117,8 +2249,10 @@ fn main() {
             open_photo_preview,
             preview_exposure_contrast_edit,
             preview_white_balance_edit,
+            preview_tone_recovery_edit,
             commit_exposure_contrast_edit,
             commit_white_balance_edit,
+            commit_tone_recovery_edit,
             get_photo_edit_state,
             undo_last_history_action,
             redo_last_history_action,
@@ -3113,6 +3247,81 @@ mod tests {
                 assert_eq!(*white_balance, "custom");
                 assert_eq!(*temperature, 6500.0);
                 assert_eq!(*tint, 20.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_preview_and_commit_tone_recovery_edit() {
+        let workspace = unique_library_root("desktop-tone-recovery-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_tone_recovery_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            -35.0,
+            42.0,
+            10.0,
+            -12.0,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                highlights,
+                shadows,
+                whites,
+                blacks,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*highlights, -35.0);
+                assert_eq!(*shadows, 42.0);
+                assert_eq!(*whites, 10.0);
+                assert_eq!(*blacks, -12.0);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_tone_recovery_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            -35.0,
+            42.0,
+            10.0,
+            -12.0,
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                highlights,
+                shadows,
+                whites,
+                blacks,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*highlights, -35.0);
+                assert_eq!(*shadows, 42.0);
+                assert_eq!(*whites, 10.0);
+                assert_eq!(*blacks, -12.0);
                 assert!(*persisted);
             }
             other => panic!("unexpected response data: {other:?}"),

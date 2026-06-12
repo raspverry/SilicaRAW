@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-17 | Tone recovery preview commit export parity added
+
+- Completed Task 17.2.2 with tone recovery preview, commit, history, and export parity for supported local JPEG/JPG paths.
+- Recorded highlights, shadows, whites, and blacks in export settings for raster and RAW-derived export routes without broad RAW or color-correctness claims.
+- Added desktop command/static Develop controls and routed Phase 17 execution to Task 17.2.3.
+
 ## [2026-06-13] phase-17 | White balance preview commit export parity added
 
 - Completed Task 17.2.1 with white-balance-family preview, commit, history, and export parity for supported local JPEG/JPG paths.

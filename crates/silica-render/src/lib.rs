@@ -102,6 +102,7 @@ pub struct ExposureContrastPreviewRequest {
     pub exposure: f64,
     pub contrast: f64,
     pub white_balance: WhiteBalanceRenderAdjustment,
+    pub tone_recovery: ToneRecoveryRenderAdjustment,
     pub message: String,
 }
 
@@ -115,6 +116,7 @@ pub struct JpegSrgbExportRenderRequest {
     pub exposure: f64,
     pub contrast: f64,
     pub white_balance: WhiteBalanceRenderAdjustment,
+    pub tone_recovery: ToneRecoveryRenderAdjustment,
     pub quality: u8,
     pub message: String,
 }
@@ -147,6 +149,26 @@ impl WhiteBalanceRenderAdjustment {
             mode: WhiteBalanceRenderMode::AsShot,
             temperature: 5200.0,
             tint: 0.0,
+        }
+    }
+}
+
+/// Tone recovery values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ToneRecoveryRenderAdjustment {
+    pub highlights: f64,
+    pub shadows: f64,
+    pub whites: f64,
+    pub blacks: f64,
+}
+
+impl ToneRecoveryRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            highlights: 0.0,
+            shadows: 0.0,
+            whites: 0.0,
+            blacks: 0.0,
         }
     }
 }
@@ -858,8 +880,29 @@ pub fn plan_white_balance_preview(
     contrast: f64,
     white_balance: WhiteBalanceRenderAdjustment,
 ) -> ExposureContrastPreviewRequest {
+    let mut request = plan_tone_recovery_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        ToneRecoveryRenderAdjustment::neutral(),
+    );
+    if request.status == PreviewRenderStatus::Ready {
+        request.message = "White balance preview request is ready.".to_string();
+    }
+    request
+}
+
+/// Build a render request for a draft tone-recovery preview update.
+pub fn plan_tone_recovery_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
     let message = match preview_plan.status {
-        PreviewRenderStatus::Ready => "White balance preview request is ready.".to_string(),
+        PreviewRenderStatus::Ready => "Tone recovery preview request is ready.".to_string(),
         PreviewRenderStatus::BlockedByDecode | PreviewRenderStatus::Unsupported => {
             preview_plan.message.clone()
         }
@@ -872,6 +915,7 @@ pub fn plan_white_balance_preview(
         exposure,
         contrast,
         white_balance,
+        tone_recovery,
         message,
     }
 }
@@ -903,6 +947,27 @@ pub fn plan_jpeg_srgb_export_with_white_balance(
     white_balance: WhiteBalanceRenderAdjustment,
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
+    plan_jpeg_srgb_export_with_tone_recovery(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        ToneRecoveryRenderAdjustment::neutral(),
+        quality,
+    )
+}
+
+/// Build a render-side request for exporting an edited raster source with tone recovery.
+pub fn plan_jpeg_srgb_export_with_tone_recovery(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
         source_kind: ExportRenderSourceKind::RasterSource,
         source_path: source_path.into(),
@@ -911,6 +976,7 @@ pub fn plan_jpeg_srgb_export_with_white_balance(
         exposure,
         contrast,
         white_balance,
+        tone_recovery,
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
@@ -943,6 +1009,27 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_white_balance(
     white_balance: WhiteBalanceRenderAdjustment,
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
+    plan_raw_derived_jpeg_srgb_export_with_tone_recovery(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        ToneRecoveryRenderAdjustment::neutral(),
+        quality,
+    )
+}
+
+/// Build a render-side request for exporting a RAW-derived source artifact with tone recovery.
+pub fn plan_raw_derived_jpeg_srgb_export_with_tone_recovery(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
         source_kind: ExportRenderSourceKind::RawFullResolutionArtifact,
         source_path: source_path.into(),
@@ -951,6 +1038,7 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_white_balance(
         exposure,
         contrast,
         white_balance,
+        tone_recovery,
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
@@ -1088,6 +1176,44 @@ mod tests {
         assert_eq!(export.exposure, 0.25);
         assert_eq!(export.contrast, -3.0);
         assert!(!export.uses_viewer_texture_cache_as_source());
+    }
+
+    #[test]
+    fn plans_tone_recovery_preview_and_export_requests() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let tone_recovery = super::ToneRecoveryRenderAdjustment {
+            highlights: -35.0,
+            shadows: 42.0,
+            whites: 10.0,
+            blacks: -12.0,
+        };
+
+        let preview = super::plan_tone_recovery_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            tone_recovery,
+        );
+        let export = super::plan_jpeg_srgb_export_with_tone_recovery(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            tone_recovery,
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.tone_recovery, tone_recovery);
+        assert!(preview.message.contains("Tone recovery"));
+        assert_eq!(export.tone_recovery, tone_recovery);
+        assert_eq!(export.exposure, 0.25);
+        assert_eq!(export.contrast, -3.0);
     }
 
     #[test]
