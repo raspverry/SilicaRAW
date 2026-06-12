@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | Vertical slice evidence gate completed
+
+- Completed Task 15.0 with [Phase 15 Vertical Slice Evidence Gate](../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md).
+- Rechecked local ignored RAW classes A-D through the Core Image RAW probe harness and Color Class F through the color profile probe harness.
+- Allowed Phase 15 to proceed to Task 15.1 while keeping RAW class E, broad RAW support, visual color correctness, committed fixture media, and original-file mutation blocked.
+
 ## [2026-06-12] phase-15 | RAW color Metal vertical slice task cards added
 
 - Added the Phase 15 RAW Color Metal Vertical Slice brief and task cards 15.0 through 15.6.

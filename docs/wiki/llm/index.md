@@ -22,7 +22,7 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 14 is complete. The current planned product area is Phase 15: RAW, Color, and Metal Vertical Slice.
+Phase 14 and Task 15.0 are complete. The current planned product area is Phase 15: RAW, Color, and Metal Vertical Slice.
 
 For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
 
@@ -30,6 +30,7 @@ For Phase 15 work, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
+- [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md)
 - The matching task card under [Task Cards](../tasks/index.md)
 - [RAW Decoding](../topics/raw-decoding.md)
 - [Color Management](../topics/color-management.md)

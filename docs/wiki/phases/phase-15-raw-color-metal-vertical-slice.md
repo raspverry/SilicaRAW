@@ -87,9 +87,11 @@ When a task changes edit graph fields or persisted catalog/export state, also re
 
 If fixture evidence is unavailable, Phase 15 implementation must stop at the evidence gate rather than creating fake product support.
 
+Task 15.0 completed the evidence gate on 2026-06-12. The allowed scope is recorded in [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md): RAW classes A-D are fixture-backed local Core Image proof inputs, RAW class E remains blocked, and Color Class F is required for ICC/profile regression only.
+
 ## Validation Strategy
 
-- Task 15.0: evidence gate docs and fixture manifest routing.
+- Task 15.0: evidence gate docs and fixture manifest routing. Completed on 2026-06-12.
 - Task 15.1: `cargo test -p silica-decode -p silica-render -p silica-core`.
 - Task 15.2: fixture-backed RAW preview artifact tests and original hash checks.
 - Task 15.3: feature-gated desktop/native viewer tests.

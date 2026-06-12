@@ -38,7 +38,8 @@ As of 2026-06-12:
 - Phase 14 is complete.
 - Task 14.0 through Task 14.8 are complete.
 - Phase 15 task cards exist.
-- Next task: [15.0 Vertical Slice Evidence Gate](../tasks/15.0-vertical-slice-evidence-gate.md).
+- Task 15.0 evidence gate is complete.
+- Next task: [15.1 Decoded Image Handoff Contract](../tasks/15.1-decoded-image-handoff-contract.md).
 
 ## Wave Map
 
@@ -368,7 +369,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 15.0 from the existing task card.
+1. Execute Task 15.1 from the existing task card.
 2. Continue through Task 15.6 in order.
 3. After Phase 15 completes, create only the missing next-phase task cards from this master plan, then implement them atomically.
 

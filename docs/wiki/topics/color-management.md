@@ -169,6 +169,18 @@ The UI/API distinction is deliberate. Omitted color profile means default sRGB. 
 
 This task does not prove visual color correctness; it only connects the already-proven ICC embedding path to product controls.
 
+## Phase 15 Entry Gate
+
+Task 15.0 rechecked local ignored Color Class F profile-probe evidence and requires all three Class F subclasses for Phase 15 ICC/profile regression:
+
+```txt
+srgb_jpeg -> profile probe success, embedded ICC, original hash unchanged
+display_p3_jpeg -> profile probe success, embedded ICC, original hash unchanged
+untagged_jpeg -> profile probe success, assume_srgb path, original hash unchanged
+```
+
+This gate does not prove visual color correctness, transform-output appearance, camera profile behavior, or parity with Preview.app, Photos, Lightroom, Capture One, or camera vendor renderers.
+
 ## Color-Dependent Tags
 
 ```txt
@@ -184,6 +196,7 @@ RAW Camera Profiles: decoder-dependent color-dependent
 - [Spike 003 Report](../../spikes/003-color-managed-preview-export.md)
 - [Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md)
 - [Synthetic Local Color Fixture Source Review](../sources/color-fixtures-synthetic-local.md)
+- [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md)
 - [Color Management Specification](../../09_Color_Management_Specification.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)

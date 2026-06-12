@@ -72,6 +72,8 @@ Task 14.7 added disposable texture lifecycle identity and cleanup boundaries. Te
 
 Task 14.8 adds [Native Viewer QA Checklist](../../../checklists/NATIVE_VIEWER_QA.md) and a lightweight default harness check that verifies QA routing and reserved-layout evidence without requiring feature-gated native viewer execution in default CI.
 
+Task 15.0 confirms that Phase 15 may proceed only as a fixture-limited RAW/color/Metal vertical slice. The native viewer bridge remains bounded by the Phase 14 contracts: disposable texture state, latest-request-wins rendering, reserved viewer geometry, and no catalog, sidecar, original, export, or persistent GPU cache writes.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.

@@ -206,9 +206,26 @@ The API returns backend, status, optional dimensions, optional orientation, and 
 
 The path-only `plan_product_raw_decode` stays conservative and does not infer support from file extension alone. The evidence-driven `plan_product_raw_decode_from_probe` maps only fixture-backed Core Image probe results to metadata-only product plans.
 
+## Phase 15 Entry Gate
+
+Task 15.0 rechecked the local ignored RAW fixture manifest and allows Phase 15 implementation to use only fixture-backed RAW classes A-D.
+
+Allowed Phase 15 RAW scope:
+
+```txt
+Class A CR2 -> required minimum fixture-backed path
+Class B CR3 -> optional edge-case fixture-backed path
+Class C RAF -> recommended higher-risk fixture-backed path
+Class D DNG -> recommended higher-risk fixture-backed path
+Class E and unknown RAW classes -> blocked
+```
+
+This gate does not claim broad RAW camera support, RAW support from file extensions, product RAW pixel display, RAW-derived export correctness, final color correctness, camera profile behavior, lens correction, or LibRaw coverage.
+
 ## Links
 
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)
+- [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md)
 - [Phase 12 Task Cards](../tasks/index.md)
 - [Spike 002 Report](../../spikes/002-raw-decoder.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)

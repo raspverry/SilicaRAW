@@ -70,7 +70,8 @@ The current implementation order starts with:
 - Phase 12 RAW proof and Phase 13 color proof are complete.
 - Phase 14 product Metal viewer bridge proof is complete.
 - Phase 15 task cards now route the RAW/color/Metal vertical slice.
-- Next roadmap step is Task 15.0, the vertical slice evidence gate.
+- Task 15.0, the vertical slice evidence gate, is complete.
+- Next roadmap step is Task 15.1, the decoded image handoff contract.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
