@@ -1896,6 +1896,7 @@ fn export_format_string(format: silica_export::ExportImageFormat) -> &'static st
 fn export_color_profile_string(profile: silica_export::ExportColorProfile) -> &'static str {
     match profile {
         silica_export::ExportColorProfile::Srgb => "srgb",
+        silica_export::ExportColorProfile::DisplayP3 => "display_p3",
     }
 }
 

@@ -2907,6 +2907,7 @@ name = "silica-export"
 version = "0.1.0"
 dependencies = [
  "image",
+ "sha2",
 ]
 
 [[package]]

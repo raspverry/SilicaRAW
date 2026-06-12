@@ -8,7 +8,11 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+
+use image::ImageEncoder;
+use sha2::{Digest, Sha256};
 
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-export";
@@ -23,6 +27,7 @@ pub enum ExportImageFormat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportColorProfile {
     Srgb,
+    DisplayP3,
 }
 
 /// Request to export an already-rendered raster source as JPEG sRGB.
@@ -35,13 +40,38 @@ pub struct JpegSrgbExportRequest {
     pub quality: u8,
 }
 
-/// Result returned after a JPEG sRGB export is written.
+/// Request to export an already-rendered raster source as JPEG with an explicit color profile.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JpegColorExportRequest {
+    pub source_path: PathBuf,
+    pub output_path: PathBuf,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub quality: u8,
+    pub color_profile: ExportColorProfile,
+}
+
+/// Result returned after a JPEG export is written.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JpegSrgbExportResult {
+pub struct JpegExportResult {
     pub output_path: PathBuf,
     pub format: ExportImageFormat,
     pub color_profile: ExportColorProfile,
     pub bytes_written: u64,
+    pub output_sha256: String,
+    pub icc_profile_embedded: bool,
+    pub icc_profile_sha256: String,
+}
+
+/// Backwards-compatible result name for the local alpha sRGB export path.
+pub type JpegSrgbExportResult = JpegExportResult;
+
+/// ICC inspection result for exported JPEG proof work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegIccProfileInspection {
+    pub embedded: bool,
+    pub color_profile: Option<ExportColorProfile>,
+    pub icc_profile_sha256: Option<String>,
 }
 
 /// Request to create a disposable JPEG thumbnail for a raster source.
@@ -88,6 +118,12 @@ pub enum ExportError {
     InvalidThumbnailEdge(u32),
     NonFiniteAdjustment,
     SameSourceAndOutput(PathBuf),
+    IccProfileUnavailable {
+        profile: ExportColorProfile,
+        path: PathBuf,
+        message: String,
+    },
+    InvalidJpegIccProfile(PathBuf),
 }
 
 impl fmt::Display for ExportError {
@@ -120,6 +156,25 @@ impl fmt::Display for ExportError {
                     path.display()
                 )
             }
+            Self::IccProfileUnavailable {
+                profile,
+                path,
+                message,
+            } => {
+                write!(
+                    formatter,
+                    "{} ICC profile is unavailable at {}: {message}",
+                    export_color_profile_label(*profile),
+                    path.display()
+                )
+            }
+            Self::InvalidJpegIccProfile(path) => {
+                write!(
+                    formatter,
+                    "jpeg ICC profile could not be inspected: {}",
+                    path.display()
+                )
+            }
         }
     }
 }
@@ -132,7 +187,9 @@ impl Error for ExportError {
             Self::InvalidQuality(_)
             | Self::InvalidThumbnailEdge(_)
             | Self::NonFiniteAdjustment
-            | Self::SameSourceAndOutput(_) => None,
+            | Self::SameSourceAndOutput(_)
+            | Self::IccProfileUnavailable { .. }
+            | Self::InvalidJpegIccProfile(_) => None,
         }
     }
 }
@@ -153,6 +210,20 @@ impl From<image::ImageError> for ExportError {
 pub fn export_jpeg_srgb(
     request: JpegSrgbExportRequest,
 ) -> Result<JpegSrgbExportResult, ExportError> {
+    export_jpeg_with_color_profile(JpegColorExportRequest {
+        source_path: request.source_path,
+        output_path: request.output_path,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        quality: request.quality,
+        color_profile: ExportColorProfile::Srgb,
+    })
+}
+
+/// Export an already-rendered raster source as a separate JPEG with an explicit ICC profile.
+pub fn export_jpeg_with_color_profile(
+    request: JpegColorExportRequest,
+) -> Result<JpegExportResult, ExportError> {
     if paths_match(&request.source_path, &request.output_path)? {
         return Err(ExportError::SameSourceAndOutput(request.output_path));
     }
@@ -163,6 +234,7 @@ pub fn export_jpeg_srgb(
         return Err(ExportError::NonFiniteAdjustment);
     }
 
+    let icc_profile = export_icc_profile(request.color_profile)?;
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
         .decode()?;
@@ -172,6 +244,9 @@ pub fn export_jpeg_srgb(
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut output, request.quality);
+    encoder
+        .set_icc_profile(icc_profile)
+        .map_err(image::ImageError::Unsupported)?;
     encoder.encode(
         rgb.as_raw(),
         rgb.width(),
@@ -180,11 +255,47 @@ pub fn export_jpeg_srgb(
     )?;
     drop(output);
 
-    Ok(JpegSrgbExportResult {
+    let output_sha256 = sha256_file(&request.output_path)?;
+    let inspection = inspect_jpeg_icc_profile(&request.output_path)?;
+    if inspection.color_profile != Some(request.color_profile) {
+        return Err(ExportError::InvalidJpegIccProfile(request.output_path));
+    }
+    let icc_profile_sha256 = inspection
+        .icc_profile_sha256
+        .ok_or_else(|| ExportError::InvalidJpegIccProfile(request.output_path.clone()))?;
+
+    Ok(JpegExportResult {
         bytes_written: fs::metadata(&request.output_path)?.len(),
         output_path: request.output_path,
         format: ExportImageFormat::Jpeg,
-        color_profile: ExportColorProfile::Srgb,
+        color_profile: request.color_profile,
+        output_sha256,
+        icc_profile_embedded: inspection.embedded,
+        icc_profile_sha256,
+    })
+}
+
+/// Inspect the first embedded ICC profile in a JPEG file.
+pub fn inspect_jpeg_icc_profile(
+    path: impl AsRef<Path>,
+) -> Result<JpegIccProfileInspection, ExportError> {
+    let path = path.as_ref();
+    let bytes = fs::read(path)?;
+    let profile = first_icc_profile(&bytes)
+        .map_err(|_| ExportError::InvalidJpegIccProfile(path.to_path_buf()))?;
+    let Some(profile) = profile else {
+        return Ok(JpegIccProfileInspection {
+            embedded: false,
+            color_profile: None,
+            icc_profile_sha256: None,
+        });
+    };
+
+    let icc_profile_sha256 = sha256_hex(&profile);
+    Ok(JpegIccProfileInspection {
+        embedded: true,
+        color_profile: classify_icc_profile(&profile),
+        icc_profile_sha256: Some(icc_profile_sha256),
     })
 }
 
@@ -301,6 +412,108 @@ fn apply_exposure_contrast(image: &mut image::RgbImage, exposure: f64, contrast:
     }
 }
 
+fn export_icc_profile(profile: ExportColorProfile) -> Result<Vec<u8>, ExportError> {
+    let path = export_icc_profile_path(profile);
+    fs::read(&path).map_err(|error| ExportError::IccProfileUnavailable {
+        profile,
+        path,
+        message: error.to_string(),
+    })
+}
+
+fn export_icc_profile_path(profile: ExportColorProfile) -> PathBuf {
+    match profile {
+        ExportColorProfile::Srgb => {
+            PathBuf::from("/System/Library/ColorSync/Profiles/sRGB Profile.icc")
+        }
+        ExportColorProfile::DisplayP3 => {
+            PathBuf::from("/System/Library/ColorSync/Profiles/Display P3.icc")
+        }
+    }
+}
+
+fn first_icc_profile(bytes: &[u8]) -> Result<Option<Vec<u8>>, ()> {
+    if bytes.len() < 2 || bytes[0..2] != [0xff, 0xd8] {
+        return Err(());
+    }
+
+    let mut index = 2;
+    while index + 4 <= bytes.len() {
+        if bytes[index] != 0xff {
+            return Err(());
+        }
+
+        let marker = bytes[index + 1];
+        if marker == 0xd9 || marker == 0xda {
+            return Ok(None);
+        }
+
+        let length = u16::from_be_bytes([bytes[index + 2], bytes[index + 3]]) as usize;
+        if length < 2 || index + 2 + length > bytes.len() {
+            return Err(());
+        }
+
+        let marker_payload = &bytes[index + 4..index + 2 + length];
+        if marker == 0xe2
+            && marker_payload.starts_with(b"ICC_PROFILE\0")
+            && marker_payload.len() >= 14
+        {
+            return Ok(Some(marker_payload[14..].to_vec()));
+        }
+
+        index += 2 + length;
+    }
+
+    Ok(None)
+}
+
+fn classify_icc_profile(profile: &[u8]) -> Option<ExportColorProfile> {
+    match sha256_hex(profile).as_str() {
+        "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e" => {
+            Some(ExportColorProfile::Srgb)
+        }
+        "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0" => {
+            Some(ExportColorProfile::DisplayP3)
+        }
+        _ if profile
+            .windows(b"sRGB".len())
+            .any(|window| window.eq_ignore_ascii_case(b"sRGB")) =>
+        {
+            Some(ExportColorProfile::Srgb)
+        }
+        _ => None,
+    }
+}
+
+fn sha256_file(path: &Path) -> Result<String, io::Error> {
+    let mut file = File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+fn export_color_profile_label(profile: ExportColorProfile) -> &'static str {
+    match profile {
+        ExportColorProfile::Srgb => "sRGB",
+        ExportColorProfile::DisplayP3 => "Display P3",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
@@ -334,9 +547,25 @@ mod tests {
         assert_eq!(result.format, super::ExportImageFormat::Jpeg);
         assert_eq!(result.color_profile, super::ExportColorProfile::Srgb);
         assert!(result.bytes_written > 0);
+        assert!(result.icc_profile_embedded);
+        assert_eq!(
+            result.output_sha256,
+            super::sha256_file(&result.output_path).expect("hash exported jpeg")
+        );
         assert_eq!(
             std::fs::read(&source_path).expect("read original after"),
             original_before
+        );
+        let inspection =
+            super::inspect_jpeg_icc_profile(&result.output_path).expect("inspect exported ICC");
+        assert!(inspection.embedded);
+        assert_eq!(
+            inspection.color_profile,
+            Some(super::ExportColorProfile::Srgb)
+        );
+        assert_eq!(
+            inspection.icc_profile_sha256.as_deref(),
+            Some(result.icc_profile_sha256.as_str())
         );
 
         let exported = image::ImageReader::open(&result.output_path)
@@ -347,6 +576,54 @@ mod tests {
             .expect("decode exported jpeg");
         assert_eq!(exported.width(), 2);
         assert_eq!(exported.height(), 2);
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn exports_display_p3_jpeg_only_when_explicitly_requested() {
+        let root = unique_export_root("display-p3");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("display-p3.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: output_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            quality: 90,
+            color_profile: super::ExportColorProfile::DisplayP3,
+        })
+        .expect("export display p3 jpeg");
+
+        assert_eq!(result.output_path, output_path);
+        assert_eq!(result.format, super::ExportImageFormat::Jpeg);
+        assert_eq!(result.color_profile, super::ExportColorProfile::DisplayP3);
+        assert!(result.icc_profile_embedded);
+        assert_eq!(
+            result.output_sha256,
+            super::sha256_file(&result.output_path).expect("hash exported jpeg")
+        );
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        let inspection =
+            super::inspect_jpeg_icc_profile(&result.output_path).expect("inspect exported ICC");
+        assert!(inspection.embedded);
+        assert_eq!(
+            inspection.color_profile,
+            Some(super::ExportColorProfile::DisplayP3)
+        );
+        assert_eq!(
+            inspection.icc_profile_sha256.as_deref(),
+            Some(result.icc_profile_sha256.as_str())
+        );
 
         remove_export_root(&root);
     }

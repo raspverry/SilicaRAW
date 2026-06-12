@@ -23,15 +23,17 @@ As of 2026-06-12:
 - Export policy is sRGB by default with ICC embedding and Display P3 only when explicitly selected.
 - Class F fixture expectations exist in the fixture manifest schema and example.
 - The golden image tolerance policy exists as a policy baseline.
-- No legal local Color Class F fixture corpus has been selected yet.
-- No color probe, ICC proof, tolerance result, manual visual review, or color correctness claim exists yet.
+- A legal local Color Class F fixture corpus has been selected and kept ignored by git.
+- Profile probe evidence and ICC export proof exist.
+- No tolerance result, executed manual visual review, or color correctness claim exists yet.
 - Task 13.0 design gate is complete.
 - Task 13.1 color fixture source review is complete with a local-only synthetic fixture source.
 - Task 13.2 local color fixture corpus and manifest is complete locally.
 - Task 13.3 feature-gated color profile probe is complete.
 - Task 13.4 color probe harness is complete.
 - Task 13.5 color support matrix is complete.
-- Task 13.6 ICC export proof is next.
+- Task 13.6 ICC export proof is complete.
+- Task 13.7 color metadata contract is next.
 
 ## Goal
 
@@ -101,14 +103,14 @@ Create fixture-backed evidence for:
 ### Task 13.6: ICC Export Proof
 
 - **Card:** [13.6 ICC Export Proof](../tasks/13.6-icc-export-proof.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** Exported sRGB and Display P3 JPEGs have fixture-backed ICC embedding evidence and original-preservation evidence.
 - **Validation:** color export tests and manual color QA checklist.
 
 ### Task 13.7: Color Metadata Contract
 
 - **Card:** [13.7 Color Metadata Contract](../tasks/13.7-color-metadata-contract.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** Existing edit graph/profile fields carry color metadata without inventing hidden schema fields.
 - **Validation:** `cargo test -p silica-edit -p silica-render -p silica-export`
 

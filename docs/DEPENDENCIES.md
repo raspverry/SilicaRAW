@@ -106,16 +106,16 @@ Verification source: local workspace Cargo metadata and Phase 5.3 edit flow test
 ```txt
 Name: silica-export
 Version: workspace
-Purpose: Local alpha JPEG sRGB export boundary.
+Purpose: Local alpha JPEG export boundary with sRGB default and explicit Display P3 ICC proof path.
 License: project internal
 Repository/Homepage: this repository
 Used by: crates/silica-core
-Why needed: Phase 5.4 keeps JPEG file writing and export-specific validation out of Core, Render, and Storage while still allowing Core to orchestrate the local alpha workflow.
+Why needed: Phase 5.4 keeps JPEG file writing and export-specific validation out of Core, Render, and Storage while still allowing Core to orchestrate the local alpha workflow. Task 13.6 keeps ICC embedding and output/profile hash proof inside the export boundary.
 Alternatives considered: direct JPEG encoding in `silica-core`, postponing export until UI screens, placeholder output files.
-Risk notes: This crate handles already-rendered raster inputs only. It does not implement RAW decoding, a Metal renderer, ICC fixture validation, or broad fallback export paths.
+Risk notes: This crate handles already-rendered raster inputs only. It does not implement RAW decoding, a Metal renderer, visual color correctness, or broad fallback export paths.
 Binary size impact: Internal workspace code only; external image codec impact is tracked under `image`.
 Security notes: Reject exporting over the original source path and treat image inputs as untrusted files.
-Verification source: local workspace Cargo metadata and Phase 5.4 `silica-export` tests.
+Verification source: local workspace Cargo metadata, Phase 5.4 `silica-export` tests, and Task 13.6 ICC export tests.
 ```
 
 ### Tauri Runtime
@@ -377,16 +377,16 @@ Verification source: `cargo info serde_json@1.0.150` during Phase 12.2 and serde
 ```txt
 Name: image
 Version: 0.25.6
-Purpose: JPEG decode/encode for the local alpha JPEG sRGB export path, JPEG thumbnail, Loupe preview, Develop preview cache generation, import-time JPEG dimension inspection, and JPEG fixture inspection in integration tests.
+Purpose: JPEG decode/encode for the local alpha JPEG export path, ICC embedding, JPEG thumbnail, Loupe preview, Develop preview cache generation, import-time JPEG dimension inspection, and JPEG fixture inspection in integration tests.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/image-rs/image
 Used by: crates/silica-export at runtime; crates/silica-core and apps/desktop/src-tauri as dev-dependencies for JPEG test fixture generation and inspection.
-Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer. Tasks 5.6.4, 5.6.5, and 5.6.6 reuse the same JPEG-only runtime image path to create disposable grid thumbnails, Loupe previews, and adjusted Develop previews for JPEG/JPG originals. Task 11.7.3 reuses `image::image_dimensions` to persist JPEG/JPG width and height during import without adding an EXIF parser.
+Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer. Tasks 5.6.4, 5.6.5, and 5.6.6 reuse the same JPEG-only runtime image path to create disposable grid thumbnails, Loupe previews, and adjusted Develop previews for JPEG/JPG originals. Task 11.7.3 reuses `image::image_dimensions` to persist JPEG/JPG width and height during import without adding an EXIF parser. Task 13.6 uses `ImageEncoder::set_icc_profile` for export ICC proof.
 Alternatives considered: placeholder export bytes, direct `zune-jpeg` use, Core Image export bridge, postponing export until UI implementation.
-Risk notes: Pinned exactly to 0.25.6 because it declares Rust 1.70 compatibility while the workspace targets Rust 1.80. Default features are disabled and only the `jpeg` feature is enabled. This does not prove final ICC/color correctness.
+Risk notes: Pinned exactly to 0.25.6 because it declares Rust 1.70 compatibility while the workspace targets Rust 1.80. Default features are disabled and only the `jpeg` feature is enabled. ICC embedding proof does not prove visual color correctness.
 Binary size impact: Adds the JPEG-only subset of `image` and its transitive codec support; measure final `.app` and `.dmg` during packaging QA.
 Security notes: Treat decoded image files as untrusted. Export path protection is enforced before writing so original source files are not overwritten.
-Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, Task 5.4 export tests, Task 5.6.4 thumbnail cache tests, Task 5.6.5 Loupe preview cache tests, Task 5.6.6 Develop preview tests, and Task 11.7.3 metadata import tests.
+Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, Task 5.4 export tests, Task 5.6.4 thumbnail cache tests, Task 5.6.5 Loupe preview cache tests, Task 5.6.6 Develop preview tests, Task 11.7.3 metadata import tests, and Task 13.6 ICC export tests.
 ```
 
 ### RAW Decode — Core Image
@@ -409,16 +409,16 @@ Verification source: `cargo info objc2-core-image@0.3.2 --verbose`.
 ```txt
 Name: sha2
 Version: 0.10.9
-Purpose: Compute SHA-256 source hashes for feature-gated RAW and color fixture probe evidence.
+Purpose: Compute SHA-256 source/output/profile hashes for feature-gated RAW, color fixture probe, and ICC export evidence.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/RustCrypto/hashes
-Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature.
-Why needed: Task 12.2 RAW evidence and Task 13.3 color profile evidence must verify source hashes and original-file preservation.
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature; crates/silica-export for Task 13.6 ICC export proof.
+Why needed: Task 12.2 RAW evidence, Task 13.3 color profile evidence, and Task 13.6 ICC export proof must verify source/output/profile hashes and original-file preservation.
 Alternatives considered: Python-only hash verification, existing partial FNV-style test hash, platform-specific hashing APIs.
-Risk notes: Non-default probe features only; do not use partial hashes for fixture evidence.
-Binary size impact: No default build impact while feature is disabled. Pure Rust hashing code is linked only into feature builds.
-Security notes: Reads local fixture files only and does not mutate originals.
-Verification source: `cargo info sha2@0.10.9`; Task 13.3 color-probe tests.
+Risk notes: Do not use partial hashes for fixture or export evidence.
+Binary size impact: Pure Rust hashing code is linked into the local alpha export crate and feature-gated proof builds.
+Security notes: Reads local fixture/export files only and does not mutate originals.
+Verification source: `cargo info sha2@0.10.9`; Task 13.3 color-probe tests; Task 13.6 export ICC tests.
 ```
 
 ```txt

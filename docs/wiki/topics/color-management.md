@@ -27,7 +27,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 ## Blocked Work
 
 - Fixture-backed color correctness claims.
-- ICC embedding proof.
+- Manual visual review records.
 - Camera profile behavior.
 - Fixture-backed golden image baseline.
 - Broad user-facing color claims.
@@ -93,7 +93,7 @@ Current planned order:
 13.8 explicit export color options
 ```
 
-Until those tasks produce evidence, color correctness and Display P3 export claims remain blocked.
+Until those tasks produce evidence, color correctness and user-facing Display P3 export claims remain blocked.
 
 Task 13.3 added a non-default `color-probe` feature in `silica-render`. It records JPEG profile metadata and source hashes for fixture proof only. It does not apply a ColorSync transform, write ICC profiles, render pixels, or prove color correctness.
 
@@ -116,9 +116,24 @@ Blocked states remain explicit:
 | Area | State | Reason |
 | --- | --- | --- |
 | Color correctness | `blocked_pending_tolerance_and_visual_review` | No approved pixel or perceptual comparison and no manual visual QA record. |
-| Export ICC embedding | `blocked_pending_task_13_6` | Probe evidence does not write or inspect exported JPEG ICC data. |
-| Display P3 export option | `blocked_pending_task_13_8` | The product option stays blocked until ICC export proof and UI/API wiring exist. |
+| Transform output appearance | `blocked_pending_tolerance_and_visual_review` | ICC/profile inspection does not prove rendered pixel correctness. |
+| Display P3 user-facing option | `blocked_pending_task_13_8` | The UI/API option stays blocked until explicit product wiring exists. |
 | Committed fixture corpus | `blocked_pending_redistribution_review` | Local macOS profile-derived fixture files remain ignored by git. |
+
+## Phase 13.6 ICC Export Proof
+
+Task 13.6 proves JPEG ICC embedding by file/profile inspection. It does not prove visual color correctness.
+
+| Export target | Entry point | Embedded ICC | ICC SHA-256 | Output hash | Original hash | Product state | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `srgb` | `export_jpeg_srgb` | true | `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e` | recorded in `JpegExportResult.output_sha256` | unchanged in tests | `default_export_icc_supported` | `cargo test -p silica-export -p silica-render` |
+| `display_p3` | `export_jpeg_with_color_profile(... DisplayP3)` | true | `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0` | recorded in `JpegExportResult.output_sha256` | unchanged in tests | `explicit_api_proof_only` | `cargo test -p silica-export -p silica-render` |
+
+Manual visual review is ready but not executed:
+
+- [Color Export Manual QA Checklist](../../../checklists/COLOR_EXPORT_MANUAL_QA.md)
+
+User-facing Display P3 export remains blocked until Task 13.8 wires an explicit product option.
 
 ## Color-Dependent Tags
 

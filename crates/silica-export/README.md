@@ -2,7 +2,6 @@
 
 Export coordination boundary for SilicaRAW.
 
-This crate will eventually own export job coordination, output format decisions, metadata handling, color-managed export integration, and batch export behavior.
+This crate owns the local alpha JPEG export path, disposable JPEG thumbnails, and disposable Develop JPEG previews.
 
-Task 0101 only creates the crate boundary. No export implementation is present yet.
-
+Task 13.6 adds ICC embedding proof for JPEG export. sRGB remains the default export target. Display P3 is available only through an explicit export request and is not yet wired to a user-facing option.

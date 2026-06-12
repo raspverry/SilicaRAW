@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | ICC export proof added
+
+- Completed Task 13.6 with JPEG ICC embedding and inspection for default sRGB export and explicit Display P3 export API proof.
+- Recorded output SHA-256, ICC profile SHA-256, embedded ICC state, output profile, separate output path behavior, and original-preservation coverage.
+- Added the manual Preview.app or Photos QA checklist while keeping color correctness and user-facing Display P3 export blocked.
+
 ## [2026-06-12] phase-13 | Color support matrix added
 
 - Completed Task 13.5 with a fixture-backed color probe support matrix.
