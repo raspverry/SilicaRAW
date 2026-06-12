@@ -185,6 +185,12 @@ JPEG sRGB export path -> embedded sRGB ICC and recorded ICC/profile/hash evidenc
 
 The export record stores source SHA-256, output SHA-256, ICC embedded state, ICC profile SHA-256, decoder backend, input profile, working space, and `profile_metadata_source`. This proves ICC/profile evidence for the fixture-backed RAW export path. It still does not prove broad visual color correctness.
 
+## Phase 15.6 RAW Export Manual QA
+
+[Phase 15 RAW Export Manual Color QA](../../../checklists/PHASE_15_RAW_EXPORT_MANUAL_QA.md) records one Preview.app review of a fixture-backed RAW-derived JPEG sRGB export.
+
+The review passed the evidence-limited gate for Preview.app opening, embedded sRGB ICC evidence, source/output hash recording, and original source hash preservation. Broad visual color correctness remains blocked.
+
 ## Phase 15 Entry Gate
 
 Task 15.0 rechecked local ignored Color Class F profile-probe evidence and requires all three Class F subclasses for Phase 15 ICC/profile regression:

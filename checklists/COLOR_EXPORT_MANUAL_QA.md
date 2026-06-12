@@ -1,6 +1,6 @@
 # Color Export Manual QA Checklist
 
-Status: ready for Task 13.6 manual review
+Status: Task 15.6 RAW export review recorded
 Updated: 2026-06-12
 
 ## Purpose
@@ -46,6 +46,6 @@ pass/fail:
 
 ## Current State
 
-No manual visual review result has been recorded yet.
+Task 15.6 records one fixture-backed RAW-derived JPEG sRGB review in [Phase 15 RAW Export Manual Color QA](PHASE_15_RAW_EXPORT_MANUAL_QA.md).
 
-Color correctness claims remain blocked until this checklist is executed with approved tolerance evidence.
+Color correctness claims remain blocked until broader review and approved tolerance evidence exist.

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | RAW export manual color QA recorded
+
+- Completed Task 15.6 with a Preview.app manual QA record for one Class A fixture-backed RAW-derived JPEG sRGB export.
+- Recorded local ignored QA artifact paths, source/output/ICC hashes, macOS/display context, and known limitations.
+- Marked Phase 15 complete while keeping broad RAW support and broad visual color correctness claims blocked.
+
 ## [2026-06-12] phase-15 | RAW-derived JPEG sRGB export added
 
 - Completed Task 15.5 with a fixture-gated full-resolution RAW export source artifact path under `render-cache/raw-export-sources/`.

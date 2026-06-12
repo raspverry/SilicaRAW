@@ -97,8 +97,10 @@ Task 15.0 completed the evidence gate on 2026-06-12. The allowed scope is record
 - Task 15.3: feature-gated desktop/native viewer tests. Completed on 2026-06-12.
 - Task 15.4: no-draft-write tests and edit graph commit tests. Completed on 2026-06-12.
 - Task 15.5: export inspection, ICC evidence, output/source hash checks, full-resolution RAW export source artifact proof. Completed on 2026-06-12.
-- Task 15.6: manual Preview.app or Photos QA record.
+- Task 15.6: manual Preview.app or Photos QA record. Completed on 2026-06-12.
 - Before completion: `scripts/harness/check.sh`.
+
+Phase 15 is complete as of 2026-06-12. Remaining broad RAW support, broad color correctness, broader camera classes, and public release claims remain blocked by the stop gates below and later roadmap phases.
 
 ## Stop Gates
 

@@ -76,7 +76,8 @@ The current implementation order starts with:
 - Task 15.3, Metal preview display, is complete.
 - Task 15.4, exposure/contrast Metal draft path, is complete.
 - Task 15.5, RAW-derived JPEG sRGB export, is complete.
-- Next roadmap step is Task 15.6, RAW export manual color QA.
+- Task 15.6, RAW export manual color QA, is complete.
+- Phase 15 is complete. Next roadmap action is to create Phase 16 task cards from the master execution plan.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

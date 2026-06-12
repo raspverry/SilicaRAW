@@ -44,7 +44,9 @@ As of 2026-06-12:
 - Task 15.3 Metal preview display is complete.
 - Task 15.4 Exposure/contrast Metal draft path is complete.
 - Task 15.5 RAW-derived JPEG sRGB export is complete.
-- Next task: [15.6 RAW Export Manual Color QA](../tasks/15.6-raw-export-manual-color-qa.md).
+- Task 15.6 RAW export manual color QA is complete.
+- Phase 15 is complete.
+- Next action: create missing Phase 16 task cards from this master plan before Phase 16 implementation.
 
 ## Wave Map
 
@@ -374,8 +376,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 15.6 from the existing task card.
-2. After Phase 15 completes, create only the missing next-phase task cards from this master plan, then implement them atomically.
+1. Create Phase 16 task cards from the Phase 16 split in this master plan.
+2. Start Task 16.1 only after those cards exist.
 
 ## Links
 

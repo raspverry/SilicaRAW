@@ -22,23 +22,28 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 14 through Task 15.5 are complete. The current planned product area is Phase 15: RAW, Color, and Metal Vertical Slice.
+Phase 14 and Phase 15 are complete. The current planned product area is Phase 16: Undo, History, and Action Trust.
 
 For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
 
-For Phase 15 work, read:
+For Phase 16 planning or implementation, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
+- The Phase 16 task card after it is created
+- [Catalog](../topics/catalog.md)
+- [Data Safety](../topics/data-safety.md)
+- [Edit Graph](../topics/edit-graph.md)
+- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
+- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
+
+For Phase 15 historical RAW/color/Metal context, read:
+
 - [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
 - [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md)
-- The matching task card under [Task Cards](../tasks/index.md)
+- [Phase 15 RAW Export Manual Color QA](../../../checklists/PHASE_15_RAW_EXPORT_MANUAL_QA.md)
 - [RAW Decoding](../topics/raw-decoding.md)
 - [Color Management](../topics/color-management.md)
 - [Metal Rendering](../topics/metal-rendering.md)
-- [Data Safety](../topics/data-safety.md)
-- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
-- [Metal Render Pipeline Specification](../../08_Metal_Render_Pipeline_Specification.md)
-- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
 For Phase 14 historical native viewer bridge context, read:
 

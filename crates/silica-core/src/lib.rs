@@ -3932,6 +3932,31 @@ mod tests {
         assert!(artifact_path.contains("render-cache/raw-export-sources"));
         assert!(!artifact_path.contains("/previews/"));
 
+        if let Ok(qa_dir) = std::env::var("SILICARAW_RAW_EXPORT_QA_DIR") {
+            let qa_dir = PathBuf::from(qa_dir);
+            std::fs::create_dir_all(&qa_dir).expect("create RAW export QA directory");
+            let qa_output = qa_dir.join(format!("{}-adjusted-srgb.jpg", fixture.fixture_id));
+            std::fs::copy(&adjusted.output_path, &qa_output).expect("copy adjusted QA export");
+            let qa_evidence = serde_json::json!({
+                "task": "15.6",
+                "fixture_id": fixture.fixture_id,
+                "fixture_class": fixture.fixture_class,
+                "source_path": fixture.probe.source_path,
+                "source_sha256": fixture.probe.source_sha256,
+                "output_path": qa_output.display().to_string(),
+                "output_sha256": adjusted.output_sha256,
+                "icc_profile_embedded": adjusted.icc_profile_embedded,
+                "icc_profile_sha256": adjusted.icc_profile_sha256,
+                "decoder_backend": adjusted.decoder_backend,
+                "input_profile": adjusted.input_profile,
+                "working_space": adjusted.working_space,
+                "export_settings": settings,
+            })
+            .to_string();
+            std::fs::write(qa_dir.join("raw-export-qa-evidence.json"), qa_evidence)
+                .expect("write RAW export QA evidence");
+        }
+
         remove_library_root(&workspace);
     }
 
