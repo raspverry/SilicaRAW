@@ -496,6 +496,32 @@ pub struct PhotoHistoryItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewActionLogEntry {
+    pub actor_type: String,
+    pub actor_id: Option<String>,
+    pub action_type: String,
+    pub subject_type: Option<String>,
+    pub subject_id: Option<String>,
+    pub side_effect_category: String,
+    pub evidence_ref: Option<String>,
+    pub payload_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionLogEntry {
+    pub id: String,
+    pub actor_type: String,
+    pub actor_id: Option<String>,
+    pub action_type: String,
+    pub subject_type: Option<String>,
+    pub subject_id: Option<String>,
+    pub side_effect_category: String,
+    pub evidence_ref: Option<String>,
+    pub payload_json: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct HistoryActionRow {
     id: String,
     action_kind: String,
@@ -520,6 +546,7 @@ pub enum LibraryStorageError {
     SidecarValidation(String),
     BackupValidation(String),
     HistoryValidation(String),
+    ActionLogValidation(String),
 }
 
 impl fmt::Display for LibraryStorageError {
@@ -557,6 +584,9 @@ impl fmt::Display for LibraryStorageError {
             Self::HistoryValidation(message) => {
                 write!(formatter, "history validation error: {message}")
             }
+            Self::ActionLogValidation(message) => {
+                write!(formatter, "action log validation error: {message}")
+            }
         }
     }
 }
@@ -578,7 +608,8 @@ impl Error for LibraryStorageError {
             | Self::CacheValidation(_)
             | Self::SidecarValidation(_)
             | Self::BackupValidation(_)
-            | Self::HistoryValidation(_) => None,
+            | Self::HistoryValidation(_)
+            | Self::ActionLogValidation(_) => None,
         }
     }
 }
@@ -655,6 +686,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 7,
         name: "edit_history_state_columns",
         sql: EDIT_HISTORY_STATE_COLUMNS_SQL,
+    },
+    Migration {
+        version: 8,
+        name: "action_log_side_effect_columns",
+        sql: ACTION_LOG_SIDE_EFFECT_COLUMNS_SQL,
     },
 ];
 
@@ -2868,6 +2904,76 @@ pub fn list_photo_history(
     })
 }
 
+pub fn append_action_log_entry(
+    library_root_path: impl AsRef<Path>,
+    entry: NewActionLogEntry,
+) -> Result<ActionLogEntry, LibraryStorageError> {
+    validate_new_action_log_entry(&entry)?;
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let id = action_log_id(&entry);
+    connection.execute(
+        r#"
+        INSERT INTO action_log(
+          id,
+          actor_type,
+          actor_id,
+          action_type,
+          subject_type,
+          subject_id,
+          payload_json,
+          side_effect_category,
+          evidence_ref
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        "#,
+        params![
+            id,
+            entry.actor_type,
+            entry.actor_id,
+            entry.action_type,
+            entry.subject_type,
+            entry.subject_id,
+            entry.payload_json,
+            entry.side_effect_category,
+            entry.evidence_ref,
+        ],
+    )?;
+    action_log_entry_by_id(&connection, &id)
+}
+
+pub fn list_action_log_entries(
+    library_root_path: impl AsRef<Path>,
+    limit: u16,
+) -> Result<Vec<ActionLogEntry>, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let limit = i64::from(limit.clamp(1, 500));
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+          id,
+          actor_type,
+          actor_id,
+          action_type,
+          subject_type,
+          subject_id,
+          side_effect_category,
+          evidence_ref,
+          payload_json,
+          created_at
+        FROM action_log
+        ORDER BY rowid DESC
+        LIMIT ?1
+        "#,
+    )?;
+    let entries = statement
+        .query_map(params![limit], action_log_entry_from_row)?
+        .map(|row| row.map_err(LibraryStorageError::from))
+        .collect();
+    entries
+}
+
 fn apply_history_action(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
@@ -3724,6 +3830,97 @@ fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRec
     })
 }
 
+fn action_log_entry_by_id(
+    connection: &Connection,
+    id: &str,
+) -> Result<ActionLogEntry, LibraryStorageError> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+              id,
+              actor_type,
+              actor_id,
+              action_type,
+              subject_type,
+              subject_id,
+              side_effect_category,
+              evidence_ref,
+              payload_json,
+              created_at
+            FROM action_log
+            WHERE id = ?1
+            "#,
+            params![id],
+            action_log_entry_from_row,
+        )
+        .map_err(LibraryStorageError::from)
+}
+
+fn action_log_entry_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActionLogEntry> {
+    Ok(ActionLogEntry {
+        id: row.get(0)?,
+        actor_type: row.get(1)?,
+        actor_id: row.get(2)?,
+        action_type: row.get(3)?,
+        subject_type: row.get(4)?,
+        subject_id: row.get(5)?,
+        side_effect_category: row.get(6)?,
+        evidence_ref: row.get(7)?,
+        payload_json: row.get(8)?,
+        created_at: row.get(9)?,
+    })
+}
+
+fn validate_new_action_log_entry(entry: &NewActionLogEntry) -> Result<(), LibraryStorageError> {
+    if entry.actor_type.trim().is_empty() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "actor_type is required".to_string(),
+        ));
+    }
+    if entry.action_type.trim().is_empty() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "action_type is required".to_string(),
+        ));
+    }
+    if entry.side_effect_category.trim().is_empty() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "side_effect_category is required".to_string(),
+        ));
+    }
+    if entry.action_type == "original_mutation" || entry.side_effect_category == "original_mutation"
+    {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "original mutation action logging is blocked".to_string(),
+        ));
+    }
+    let payload: serde_json::Value = serde_json::from_str(&entry.payload_json)?;
+    if !payload.is_object() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "payload_json must be a JSON object".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn action_log_id(entry: &NewActionLogEntry) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    stable_catalog_id(
+        "action-log",
+        &format!(
+            "{}\n{}\n{}\n{}\n{}",
+            entry.actor_type,
+            entry.action_type,
+            entry.subject_id.as_deref().unwrap_or(""),
+            entry.evidence_ref.as_deref().unwrap_or(""),
+            nanos
+        ),
+    )
+}
+
 fn path_to_string(path: &Path) -> Result<String, LibraryStorageError> {
     path.to_str()
         .map(ToOwned::to_owned)
@@ -4299,6 +4496,20 @@ CREATE INDEX IF NOT EXISTS idx_edit_history_photo_state_sequence
   ON edit_history(photo_id, history_state, sequence);
 "#;
 
+const ACTION_LOG_SIDE_EFFECT_COLUMNS_SQL: &str = r#"
+ALTER TABLE action_log
+  ADD COLUMN side_effect_category TEXT NOT NULL DEFAULT 'unspecified';
+
+ALTER TABLE action_log
+  ADD COLUMN evidence_ref TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_action_log_action_type_created_at
+  ON action_log(action_type, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_subject
+  ON action_log(subject_type, subject_id);
+"#;
+
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
 SELECT COUNT(*)
 FROM photos
@@ -4791,6 +5002,28 @@ mod tests {
                 "missing edit_history column {column}"
             );
         }
+        let action_log_columns: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT name FROM pragma_table_info('action_log')")
+                .expect("prepare action log column query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query action log columns")
+                .map(|row| row.expect("action log column"))
+                .collect()
+        };
+        for column in ["side_effect_category", "evidence_ref"] {
+            assert!(
+                action_log_columns.contains(&column.to_string()),
+                "missing action_log column {column}"
+            );
+        }
+        assert!(
+            catalog_object_exists(&connection, "idx_action_log_action_type_created_at")
+                .expect("action log action index lookup")
+        );
+        assert!(catalog_object_exists(&connection, "idx_action_log_subject")
+            .expect("action log subject index lookup"));
         run_migrations(&mut connection).expect("re-run migrations idempotently");
         assert_eq!(
             current_schema_version(&connection).expect("version after rerun"),
@@ -7218,6 +7451,79 @@ mod tests {
         assert_eq!(history.items[1].history_state, "applied");
         assert!(history.items[1].can_undo);
         assert!(!history.items[1].can_redo);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn appends_action_log_entries_without_replacing_prior_rows() {
+        let workspace = unique_library_root("action-log");
+        let library_root = workspace.join("SilicaRAW Library");
+        let library = create_local_library(&library_root).expect("create library");
+
+        let first = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "core".to_string(),
+                actor_id: Some("local-alpha".to_string()),
+                action_type: "export".to_string(),
+                subject_type: Some("photo".to_string()),
+                subject_id: Some("photo-1".to_string()),
+                side_effect_category: "file_write".to_string(),
+                evidence_ref: Some("export-1".to_string()),
+                payload_json: "{\"ok\":true}".to_string(),
+            },
+        )
+        .expect("append first action");
+        let second = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "core".to_string(),
+                actor_id: Some("local-alpha".to_string()),
+                action_type: "cache_clear".to_string(),
+                subject_type: Some("library".to_string()),
+                subject_id: Some(library.root_path.display().to_string()),
+                side_effect_category: "cache_delete".to_string(),
+                evidence_ref: Some("cache-clear".to_string()),
+                payload_json: "{\"removedCacheRecords\":0}".to_string(),
+            },
+        )
+        .expect("append second action");
+
+        assert_ne!(first.id, second.id);
+        let entries = list_action_log_entries(&library.root_path, 20).expect("list action log");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].action_type, "cache_clear");
+        assert_eq!(entries[0].side_effect_category, "cache_delete");
+        assert_eq!(entries[0].evidence_ref.as_deref(), Some("cache-clear"));
+        assert_eq!(entries[1].action_type, "export");
+        assert_eq!(entries[1].side_effect_category, "file_write");
+        assert_eq!(entries[1].evidence_ref.as_deref(), Some("export-1"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn action_log_rejects_original_mutation_claims() {
+        let workspace = unique_library_root("action-log-original-mutation");
+        let library_root = workspace.join("SilicaRAW Library");
+        let library = create_local_library(&library_root).expect("create library");
+
+        let error = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "core".to_string(),
+                actor_id: Some("local-alpha".to_string()),
+                action_type: "original_mutation".to_string(),
+                subject_type: Some("original".to_string()),
+                subject_id: Some("/tmp/original.jpg".to_string()),
+                side_effect_category: "original_mutation".to_string(),
+                evidence_ref: None,
+                payload_json: "{}".to_string(),
+            },
+        )
+        .expect_err("original mutation action log must be blocked");
+        assert!(error.to_string().contains("original mutation"));
 
         remove_library_root(&workspace);
     }

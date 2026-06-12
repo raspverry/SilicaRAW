@@ -30,7 +30,7 @@ For Phase 16 planning or implementation, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Phase 16 Brief](../phases/phase-16-undo-history-action-trust.md)
-- [Task 16.5 Append-Only Action Log](../tasks/16.5-append-only-action-log.md)
+- [Task 16.6 Sidecar Sync Status After History Commits](../tasks/16.6-sidecar-sync-status-after-history.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)

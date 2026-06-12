@@ -224,6 +224,12 @@ CREATE INDEX IF NOT EXISTS idx_action_log_actor
 
 CREATE INDEX IF NOT EXISTS idx_action_log_created_at
   ON action_log(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_action_type_created_at
+  ON action_log(action_type, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_subject
+  ON action_log(subject_type, subject_id);
 ```
 
 ## Index Rules

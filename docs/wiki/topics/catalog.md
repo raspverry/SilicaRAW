@@ -32,12 +32,13 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.2 adds catalog schema version 6 for edit history checkpoints: `edit_history.sequence`, `edit_history.action_class`, `edit_history.action_kind`, and `idx_edit_history_photo_sequence`.
 - Task 16.3 adds catalog schema version 7 for undo/redo state: `edit_history.history_state` and `idx_edit_history_photo_state_sequence`.
 - Task 16.4 adds the read-only photo history panel query over `edit_history` and exposes only applied/undone real checkpoints to the Develop UI.
+- Task 16.5 adds catalog schema version 8 for append-only action log evidence: `action_log.side_effect_category`, `action_log.evidence_ref`, `idx_action_log_action_type_created_at`, and `idx_action_log_subject`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
 ## Implemented Foundation
 
-- Current alpha schema version: `7`.
+- Current alpha schema version: `8`.
 - Migration table: `schema_migrations`.
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
@@ -46,6 +47,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Migration 5 adds `idx_photo_metadata_dimensions_photo_id` for the accepted `has_dimensions` metadata filter.
 - Migration 6 adds edit history checkpoint columns and the `idx_edit_history_photo_sequence` index.
 - Migration 7 adds `edit_history.history_state` and `idx_edit_history_photo_state_sequence` for undo/redo lookup.
+- Migration 8 adds action log side-effect/evidence columns plus lookup indexes for action type/time and subject.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
@@ -60,6 +62,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Exposure/contrast commit/release writes the active edit graph to `edit_states`.
 - Exposure/contrast commit/release also writes one `edit_history` checkpoint with a `silica.action` payload containing schema-valid before/after edit graphs. Draft preview updates still write no history rows.
 - Undo/redo commands restore edit checkpoints and culling flags through catalog transactions, mark history rows applied/undone/invalidated, and never delete export outputs.
+- Sensitive local actions append action log rows through Core and storage APIs. Current logged actions cover import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear.
 - Sidecar write/read validates sidecar and nested edit graph JSON, mirrors rating/picked/rejected/color-label state only, writes under library `sidecars/`, and updates `sidecar_status` after successful writes.
 - Sidecar rebuild dry-run scans `sidecars/` in deterministic order, resolves portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults, and reports malformed sidecars, schema issues, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts without applying changes.
 - Backup creation checkpoints WAL state before copying `catalog.db`, copies `sidecars/`, writes `backup-manifest.json`, and excludes originals, disposable caches, export outputs, logs, and nested backups.

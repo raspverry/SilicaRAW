@@ -620,6 +620,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Original file mutation remains forbidden.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
 
+**Status:** Completed on 2026-06-12. Catalog schema version 8 adds action log side-effect/evidence fields plus lookup indexes. Storage/core expose append/read APIs, and Core records import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear as evidence-only log rows without adding extension runtime behavior.
+
 ### Task 16.6: Sidecar Sync Status After History Commits
 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `schemas/sidecar.schema.json`, `docs/wiki/topics/catalog.md`

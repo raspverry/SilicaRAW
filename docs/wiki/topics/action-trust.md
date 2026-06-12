@@ -135,6 +135,8 @@ Task 16.3 implements the first runtime form of this contract for edit commits an
 
 Task 16.4 exposes this state to the Develop history panel without adding a second mutation path. The panel lists only runtime `edit_history` checkpoints for the selected photo, hides invalidated redo rows, and enables selection only for the next valid undo or redo row. Row selection calls the same core undo/redo commands; it does not jump directly to arbitrary catalog states.
 
+Task 16.5 adds the append-only action log runtime surface for sensitive local actions. Core and storage expose append/read APIs that require actor, action type, subject, timestamp, side-effect category, evidence reference, and JSON object payload context. Current Core flows log import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear. The log is evidence only: it does not make logged-only actions undoable and it does not allow plugins, MCP, MLX, or UI code to write raw SQLite rows.
+
 ## Schema Boundary
 
 Existing catalog tables already reserve the first Phase 16 surfaces:
@@ -147,7 +149,7 @@ Existing catalog tables already reserve the first Phase 16 surfaces:
 - `cache_records`: disposable cache metadata.
 - `action_log`: append-only evidence for sensitive actions and future extension permissions.
 
-Task 16.0 does not change migrations. Task 16.1 owns the typed action semantics contract before runtime behavior. Task 16.2 adds ordered edit history checkpoints. Task 16.3 adds transaction-safe undo/redo state via `history_state`. Task 16.4 adds a read-only history panel query over existing state and does not require a new migration. If a later task needs queryable columns that are not present, it must add them through `silica-storage` migrations and update `docs/DEPENDENCIES.md` only if dependencies change.
+Task 16.0 does not change migrations. Task 16.1 owns the typed action semantics contract before runtime behavior. Task 16.2 adds ordered edit history checkpoints. Task 16.3 adds transaction-safe undo/redo state via `history_state`. Task 16.4 adds a read-only history panel query over existing state and does not require a new migration. Task 16.5 adds schema version 8 for `action_log.side_effect_category`, `action_log.evidence_ref`, `idx_action_log_action_type_created_at`, and `idx_action_log_subject`. If a later task needs queryable columns that are not present, it must add them through `silica-storage` migrations and update `docs/DEPENDENCIES.md` only if dependencies change.
 
 ## Sidecar Status After History
 

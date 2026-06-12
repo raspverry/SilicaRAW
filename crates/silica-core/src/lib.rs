@@ -15,6 +15,7 @@ pub const CRATE_NAME: &str = "silica-core";
 
 pub use silica_decode::RawFullResolutionExportSourceError;
 pub use silica_decode::RawPreviewArtifactError;
+pub use silica_storage::ActionLogEntry;
 pub use silica_storage::CatalogRebuildDryRunAction;
 pub use silica_storage::CatalogRebuildDryRunEntry;
 pub use silica_storage::CatalogRebuildDryRunIssue;
@@ -33,6 +34,7 @@ pub use silica_storage::LibraryQueryOrderField;
 pub use silica_storage::LibraryQueryPage;
 pub use silica_storage::LibraryQueryRequest;
 pub use silica_storage::LibraryQuerySort;
+pub use silica_storage::NewActionLogEntry;
 pub use silica_storage::PhotoFlags;
 pub use silica_storage::PhotoHistoryItem;
 pub use silica_storage::PhotoHistoryPanel;
@@ -1003,6 +1005,49 @@ pub fn open_library(root_path: impl AsRef<Path>) -> Result<LibrarySession, CoreE
         .map_err(CoreError::from)
 }
 
+/// Append a validated action-log row through the core command boundary.
+pub fn append_action_log_entry(
+    library_root_path: impl AsRef<Path>,
+    entry: NewActionLogEntry,
+) -> Result<ActionLogEntry, CoreError> {
+    silica_storage::append_action_log_entry(library_root_path, entry).map_err(CoreError::from)
+}
+
+/// Read recent action-log rows through the core command boundary.
+pub fn list_action_log_entries(
+    library_root_path: impl AsRef<Path>,
+    limit: u16,
+) -> Result<Vec<ActionLogEntry>, CoreError> {
+    silica_storage::list_action_log_entries(library_root_path, limit).map_err(CoreError::from)
+}
+
+fn append_core_action_log(
+    library_root_path: &Path,
+    action_type: &str,
+    subject_type: Option<&str>,
+    subject_id: Option<String>,
+    side_effect_category: &str,
+    evidence_ref: Option<String>,
+    payload: serde_json::Value,
+) -> Result<ActionLogEntry, CoreError> {
+    let payload_json = serde_json::to_string(&payload).map_err(|error| {
+        CoreError::AppSession(format!("action log payload serialization failed: {error}"))
+    })?;
+    append_action_log_entry(
+        library_root_path,
+        NewActionLogEntry {
+            actor_type: "core".to_string(),
+            actor_id: Some("local-alpha".to_string()),
+            action_type: action_type.to_string(),
+            subject_type: subject_type.map(str::to_string),
+            subject_id,
+            side_effect_category: side_effect_category.to_string(),
+            evidence_ref,
+            payload_json,
+        },
+    )
+}
+
 /// Scan a folder by reference through the core command boundary.
 pub fn import_folder(
     library_root_path: impl AsRef<Path>,
@@ -1022,9 +1067,24 @@ pub fn import_folder_with_options(
     options: FolderImportOptions,
 ) -> Result<silica_storage::FolderImportSummary, CoreError> {
     let library_root_path = library_root_path.as_ref().to_path_buf();
+    let folder_path = folder_path.as_ref().to_path_buf();
     let summary =
-        silica_storage::import_folder_with_options(&library_root_path, folder_path, options)?;
+        silica_storage::import_folder_with_options(&library_root_path, &folder_path, options)?;
     persist_imported_photo_metadata(&library_root_path, &summary)?;
+    append_core_action_log(
+        &library_root_path,
+        "import_reference",
+        Some("folder"),
+        Some(summary.folder_path.display().to_string()),
+        "catalog_reference",
+        Some(summary.folder_path.display().to_string()),
+        serde_json::json!({
+            "scanned_files": summary.scanned_files,
+            "supported_files": summary.supported_files,
+            "unsupported_files": summary.unsupported_files,
+            "recursive": options.recursive,
+        }),
+    )?;
     Ok(summary)
 }
 
@@ -1182,8 +1242,24 @@ pub fn write_photo_sidecar(
     photo_id: &str,
     app_version: &str,
 ) -> Result<Option<SidecarWriteResult>, CoreError> {
-    match silica_storage::write_photo_sidecar(library_root_path, photo_id, app_version) {
-        Ok(result) => Ok(Some(result)),
+    let library_root_path = library_root_path.as_ref().to_path_buf();
+    match silica_storage::write_photo_sidecar(&library_root_path, photo_id, app_version) {
+        Ok(result) => {
+            append_core_action_log(
+                &library_root_path,
+                "sidecar_write",
+                Some("photo"),
+                Some(result.photo_id.clone()),
+                "sidecar_write",
+                Some(result.sidecar_relative_path.clone()),
+                serde_json::json!({
+                    "sidecar_relative_path": result.sidecar_relative_path.clone(),
+                    "bytes_written": result.bytes_written,
+                    "app_version": app_version,
+                }),
+            )?;
+            Ok(Some(result))
+        }
         Err(silica_storage::LibraryStorageError::MissingPhoto(_)) => Ok(None),
         Err(error) => Err(CoreError::from(error)),
     }
@@ -1418,7 +1494,7 @@ pub fn export_photo_jpeg(
     let source_sha256 = export_result.source_sha256.clone();
     let output_sha256 = export_result.output_sha256.clone();
     let icc_profile_sha256 = export_result.icc_profile_sha256.clone();
-    let settings_json = serde_json::json!({
+    let settings_value = serde_json::json!({
         "format": format,
         "color_profile": exported_color_profile,
         "quality": render_request.quality,
@@ -1431,13 +1507,23 @@ pub fn export_photo_jpeg(
         "icc_profile_embedded": export_result.icc_profile_embedded,
         "icc_profile_sha256": icc_profile_sha256.clone(),
         "profile_metadata_source": "silica-export",
-    })
-    .to_string();
+    });
+    let settings_json = settings_value.to_string();
     let export_record = silica_storage::record_export(
         library_root_path,
         &photo_id,
         &export_result.output_path,
         settings_json,
+    )?;
+    let export_record_id = export_record.id;
+    append_core_action_log(
+        library_root_path,
+        "export",
+        Some("photo"),
+        Some(photo_id.clone()),
+        "file_write",
+        Some(export_record_id.clone()),
+        settings_value,
     )?;
 
     Ok(Some(PhotoExportSession {
@@ -1454,7 +1540,7 @@ pub fn export_photo_jpeg(
         decoder_backend: None,
         input_profile: None,
         working_space: None,
-        export_record_id: export_record.id,
+        export_record_id,
         message: export_color_profile_message(color_profile).to_string(),
     }))
 }
@@ -1528,7 +1614,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
     let decoder_backend = source_artifact.decoder_backend.as_str().to_string();
     let input_profile = source_artifact.input_profile.clone();
     let working_space = source_artifact.working_space.clone();
-    let settings_json = serde_json::json!({
+    let settings_value = serde_json::json!({
         "format": format,
         "color_profile": exported_color_profile,
         "quality": render_request.quality,
@@ -1552,13 +1638,23 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         "working_space": working_space.clone(),
         "export_source_kind": "raw_full_resolution_artifact",
         "viewer_texture_cache_source": render_request.uses_viewer_texture_cache_as_source(),
-    })
-    .to_string();
+    });
+    let settings_json = settings_value.to_string();
     let export_record = silica_storage::record_export(
         library_root_path,
         &candidate.photo_id,
         &export_result.output_path,
         settings_json,
+    )?;
+    let export_record_id = export_record.id;
+    append_core_action_log(
+        library_root_path,
+        "export",
+        Some("photo"),
+        Some(candidate.photo_id.clone()),
+        "file_write",
+        Some(export_record_id.clone()),
+        settings_value,
     )?;
 
     Ok(Some(PhotoExportSession {
@@ -1575,7 +1671,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         decoder_backend: Some(decoder_backend),
         input_profile: Some(input_profile),
         working_space: Some(working_space),
-        export_record_id: export_record.id,
+        export_record_id,
         message: "RAW-derived JPEG sRGB export completed.".to_string(),
     }))
 }
@@ -1584,7 +1680,21 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
 pub fn clear_library_cache(
     library_root_path: impl AsRef<Path>,
 ) -> Result<LibraryCacheClearSession, CoreError> {
-    let summary = silica_storage::clear_disposable_cache(library_root_path)?;
+    let library_root_path = library_root_path.as_ref().to_path_buf();
+    let summary = silica_storage::clear_disposable_cache(&library_root_path)?;
+    append_core_action_log(
+        &library_root_path,
+        "cache_clear",
+        Some("library"),
+        Some(library_root_path.display().to_string()),
+        "cache_delete",
+        Some("disposable-cache".to_string()),
+        serde_json::json!({
+            "cleared_directories": summary.cleared_directories.clone(),
+            "recreated_directories": summary.recreated_directories.clone(),
+            "removed_cache_records": summary.removed_cache_records,
+        }),
+    )?;
     Ok(LibraryCacheClearSession {
         cleared_directories: summary.cleared_directories,
         recreated_directories: summary.recreated_directories,
@@ -3894,6 +4004,60 @@ mod tests {
             )
             .expect("exported flag");
         assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn sensitive_core_actions_append_action_log_entries() {
+        let workspace = unique_library_root("core-action-log");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        write_photo_sidecar(&created.root_path, &photo_id, "test")
+            .expect("write sidecar")
+            .expect("sidecar result");
+        export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+        clear_library_cache(&created.root_path).expect("clear cache");
+
+        let entries = list_action_log_entries(&created.root_path, 20).expect("list action log");
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "import_reference"
+                && entry.side_effect_category == "catalog_reference"));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "sidecar_write"
+                && entry.side_effect_category == "sidecar_write"
+                && entry.subject_id.as_deref() == Some(photo_id.as_str())));
+        assert!(entries.iter().any(|entry| entry.action_type == "export"
+            && entry.side_effect_category == "file_write"
+            && entry.subject_id.as_deref() == Some(photo_id.as_str())));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "cache_clear"
+                && entry.side_effect_category == "cache_delete"));
 
         remove_library_root(&workspace);
     }

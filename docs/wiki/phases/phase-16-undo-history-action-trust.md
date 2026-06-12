@@ -62,6 +62,8 @@ Task 16.3 implements storage/core/desktop undo and redo commands for edit checkp
 
 Task 16.4 implements the first real Develop history panel contract. Storage/core expose photo history checkpoints from `edit_history`; desktop exposes `get_photo_history`; the static UI renders an empty list until runtime data arrives, and checkpoint row actions use only the documented undo/redo commands.
 
+Task 16.5 implements the append-only action log groundwork. Catalog schema version 8 adds side-effect and evidence fields to `action_log`; storage and Core expose append/read APIs; Core logs import by reference, sidecar writes, JPEG exports, RAW-derived exports, and disposable cache clear without adding plugin, MCP, MLX, or permission UI runtime.
+
 ## Validation Strategy
 
 - Task 16.0 and 16.1: docs/static checks and schema boundary review.

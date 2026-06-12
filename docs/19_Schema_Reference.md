@@ -182,6 +182,18 @@ selectable row -> latest applied row for undo or earliest undone row for redo on
 
 The Develop history panel is presentation only. It must not own raw SQL, schema shape, or arbitrary checkpoint jumps. Selecting a row calls the same core undo/redo command path used by toolbar/buttons.
 
+Task 16.5 action log status:
+
+```txt
+catalog schema version -> 8
+action_log.side_effect_category -> required side-effect class
+action_log.evidence_ref -> optional durable evidence pointer
+idx_action_log_action_type_created_at -> action timeline lookup
+idx_action_log_subject -> target lookup
+```
+
+Core now exposes append/read action-log APIs and records local alpha sensitive actions for import by reference, sidecar write, JPEG export, RAW-derived export, and disposable cache clear. The action log is append-only through Core-facing APIs; it is not an undo stack and must not be used to authorize direct plugin/MCP database writes.
+
 ## Migration Policy
 
 ```txt

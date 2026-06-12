@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Append-only action log added
+
+- Completed Task 16.5 with schema version 8 action log side-effect/evidence fields and lookup indexes.
+- Added storage/core append/read APIs and Core logging for import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear.
+- Kept plugins, MCP, MLX, permission UI, raw SQLite extension writes, and original mutation claims out of scope.
+
 ## [2026-06-12] phase-16 | Develop history panel contract added
 
 - Completed Task 16.4 with storage/core history listing, desktop `get_photo_history`, and a Develop history panel backed only by runtime checkpoints.

@@ -10,7 +10,7 @@ use std::fmt;
 pub const CRATE_NAME: &str = "silica-catalog";
 
 /// Current local alpha catalog schema version.
-pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 7;
+pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 8;
 
 /// Migration bookkeeping table required in every catalog database.
 pub const SCHEMA_MIGRATIONS_TABLE: &str = "schema_migrations";
@@ -67,6 +67,8 @@ pub const ALPHA_CATALOG_REQUIRED_INDEXES: &[&str] = &[
     "idx_exports_photo_id",
     "idx_action_log_actor",
     "idx_action_log_created_at",
+    "idx_action_log_action_type_created_at",
+    "idx_action_log_subject",
 ];
 
 /// Domain-facing catalog schema contract for local alpha storage work.
@@ -457,7 +459,7 @@ mod tests {
 
     #[test]
     fn records_phase_4_1_catalog_schema_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 7);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 8);
         assert_eq!(ALPHA_CATALOG_SCHEMA.migration_table, "schema_migrations");
         assert_eq!(
             ALPHA_CATALOG_SCHEMA.required_tables,
@@ -486,6 +488,12 @@ mod tests {
         assert!(ALPHA_CATALOG_SCHEMA
             .required_indexes
             .contains(&"idx_action_log_created_at"));
+        assert!(ALPHA_CATALOG_SCHEMA
+            .required_indexes
+            .contains(&"idx_action_log_action_type_created_at"));
+        assert!(ALPHA_CATALOG_SCHEMA
+            .required_indexes
+            .contains(&"idx_action_log_subject"));
         assert!(ALPHA_CATALOG_SCHEMA
             .required_indexes
             .contains(&"idx_edit_history_photo_sequence"));
@@ -586,7 +594,7 @@ mod tests {
 
     #[test]
     fn records_paged_query_index_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 7);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 8);
         for index_name in [
             "idx_photos_library_imported_id",
             "idx_photos_library_file_name_path_id",

@@ -23,3 +23,5 @@ Task 10.3 adds thin sidecar workflow wrappers for explicit sidecar write/read. C
 Task 10.4 adds a thin sidecar rebuild dry-run wrapper. Core exposes the report to command-facing callers without duplicating precedence, conflict, or schema handling.
 
 Task 16.4 adds a thin `list_photo_history` wrapper for the Develop history panel. Core keeps UI callers on the same undo/history boundary and does not expose raw SQLite or arbitrary checkpoint mutation.
+
+Task 16.5 adds thin append/read wrappers for the action log and records sensitive local Core actions: import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear. Core keeps this as evidence, not undo behavior, and does not expose plugin/MCP raw database writes.
