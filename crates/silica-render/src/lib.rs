@@ -103,6 +103,7 @@ pub struct ExposureContrastPreviewRequest {
     pub contrast: f64,
     pub white_balance: WhiteBalanceRenderAdjustment,
     pub tone_recovery: ToneRecoveryRenderAdjustment,
+    pub color_presence: ColorPresenceRenderAdjustment,
     pub message: String,
 }
 
@@ -117,6 +118,7 @@ pub struct JpegSrgbExportRenderRequest {
     pub contrast: f64,
     pub white_balance: WhiteBalanceRenderAdjustment,
     pub tone_recovery: ToneRecoveryRenderAdjustment,
+    pub color_presence: ColorPresenceRenderAdjustment,
     pub quality: u8,
     pub message: String,
 }
@@ -169,6 +171,22 @@ impl ToneRecoveryRenderAdjustment {
             shadows: 0.0,
             whites: 0.0,
             blacks: 0.0,
+        }
+    }
+}
+
+/// Color presence values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColorPresenceRenderAdjustment {
+    pub vibrance: f64,
+    pub saturation: f64,
+}
+
+impl ColorPresenceRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            vibrance: 0.0,
+            saturation: 0.0,
         }
     }
 }
@@ -901,8 +919,31 @@ pub fn plan_tone_recovery_preview(
     white_balance: WhiteBalanceRenderAdjustment,
     tone_recovery: ToneRecoveryRenderAdjustment,
 ) -> ExposureContrastPreviewRequest {
+    let mut request = plan_color_presence_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        ColorPresenceRenderAdjustment::neutral(),
+    );
+    if request.status == PreviewRenderStatus::Ready {
+        request.message = "Tone recovery preview request is ready.".to_string();
+    }
+    request
+}
+
+/// Build a render request for a draft color-presence preview update.
+pub fn plan_color_presence_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
     let message = match preview_plan.status {
-        PreviewRenderStatus::Ready => "Tone recovery preview request is ready.".to_string(),
+        PreviewRenderStatus::Ready => "Color presence preview request is ready.".to_string(),
         PreviewRenderStatus::BlockedByDecode | PreviewRenderStatus::Unsupported => {
             preview_plan.message.clone()
         }
@@ -916,6 +957,7 @@ pub fn plan_tone_recovery_preview(
         contrast,
         white_balance,
         tone_recovery,
+        color_presence,
         message,
     }
 }
@@ -968,6 +1010,29 @@ pub fn plan_jpeg_srgb_export_with_tone_recovery(
     tone_recovery: ToneRecoveryRenderAdjustment,
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
+    plan_jpeg_srgb_export_with_color_presence(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        ColorPresenceRenderAdjustment::neutral(),
+        quality,
+    )
+}
+
+/// Build a render-side request for exporting an edited raster source with color presence.
+pub fn plan_jpeg_srgb_export_with_color_presence(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
         source_kind: ExportRenderSourceKind::RasterSource,
         source_path: source_path.into(),
@@ -977,6 +1042,7 @@ pub fn plan_jpeg_srgb_export_with_tone_recovery(
         contrast,
         white_balance,
         tone_recovery,
+        color_presence,
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
@@ -1030,6 +1096,29 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_tone_recovery(
     tone_recovery: ToneRecoveryRenderAdjustment,
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
+    plan_raw_derived_jpeg_srgb_export_with_color_presence(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        ColorPresenceRenderAdjustment::neutral(),
+        quality,
+    )
+}
+
+/// Build a render-side request for exporting a RAW-derived source artifact with color presence.
+pub fn plan_raw_derived_jpeg_srgb_export_with_color_presence(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
         source_kind: ExportRenderSourceKind::RawFullResolutionArtifact,
         source_path: source_path.into(),
@@ -1039,6 +1128,7 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_tone_recovery(
         contrast,
         white_balance,
         tone_recovery,
+        color_presence,
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
@@ -1212,6 +1302,44 @@ mod tests {
         assert_eq!(preview.tone_recovery, tone_recovery);
         assert!(preview.message.contains("Tone recovery"));
         assert_eq!(export.tone_recovery, tone_recovery);
+        assert_eq!(export.exposure, 0.25);
+        assert_eq!(export.contrast, -3.0);
+    }
+
+    #[test]
+    fn plans_color_presence_preview_and_export_requests() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let color_presence = super::ColorPresenceRenderAdjustment {
+            vibrance: 24.0,
+            saturation: -8.5,
+        };
+
+        let preview = super::plan_color_presence_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            color_presence,
+        );
+        let export = super::plan_jpeg_srgb_export_with_color_presence(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            color_presence,
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.color_presence, color_presence);
+        assert!(preview.message.contains("Color presence"));
+        assert_eq!(export.color_presence, color_presence);
         assert_eq!(export.exposure, 0.25);
         assert_eq!(export.contrast, -3.0);
     }

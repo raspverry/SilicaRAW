@@ -39,6 +39,7 @@ pub struct JpegSrgbExportRequest {
     pub contrast: f64,
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
     pub quality: u8,
 }
 
@@ -51,6 +52,7 @@ pub struct JpegColorExportRequest {
     pub contrast: f64,
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
 }
@@ -107,6 +109,22 @@ impl ToneRecoveryAdjustment {
     }
 }
 
+/// Color presence values applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColorPresenceAdjustment {
+    pub vibrance: f64,
+    pub saturation: f64,
+}
+
+impl ColorPresenceAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            vibrance: 0.0,
+            saturation: 0.0,
+        }
+    }
+}
+
 /// Result returned after a JPEG export is written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JpegExportResult {
@@ -151,6 +169,7 @@ pub struct JpegDevelopPreviewRequest {
     pub contrast: f64,
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
 }
 
 /// Result returned after a JPEG thumbnail is written.
@@ -276,6 +295,7 @@ pub fn export_jpeg_srgb(
         contrast: request.contrast,
         white_balance: request.white_balance,
         tone_recovery: request.tone_recovery,
+        color_presence: request.color_presence,
         quality: request.quality,
         color_profile: ExportColorProfile::Srgb,
     })
@@ -296,6 +316,7 @@ pub fn export_jpeg_with_color_profile(
         request.contrast,
         request.white_balance,
         request.tone_recovery,
+        request.color_presence,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
@@ -309,6 +330,7 @@ pub fn export_jpeg_with_color_profile(
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
     apply_white_balance(&mut rgb, request.white_balance);
     apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_color_presence(&mut rgb, request.color_presence);
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -432,6 +454,7 @@ pub fn write_jpeg_develop_preview(
         request.contrast,
         request.white_balance,
         request.tone_recovery,
+        request.color_presence,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
@@ -445,6 +468,7 @@ pub fn write_jpeg_develop_preview(
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
     apply_white_balance(&mut rgb, request.white_balance);
     apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_color_presence(&mut rgb, request.color_presence);
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -529,11 +553,32 @@ fn apply_tone_recovery(image: &mut image::RgbImage, tone_recovery: ToneRecoveryA
     }
 }
 
+fn apply_color_presence(image: &mut image::RgbImage, color_presence: ColorPresenceAdjustment) {
+    let vibrance = (color_presence.vibrance / 100.0).clamp(-1.0, 1.0) as f32;
+    let saturation = (color_presence.saturation / 100.0).clamp(-1.0, 1.0) as f32;
+
+    for pixel in image.pixels_mut() {
+        let red = f32::from(pixel.0[0]) / 255.0;
+        let green = f32::from(pixel.0[1]) / 255.0;
+        let blue = f32::from(pixel.0[2]) / 255.0;
+        let luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+        let max_channel = red.max(green).max(blue);
+        let min_channel = red.min(green).min(blue);
+        let chroma = max_channel - min_channel;
+        let factor = (1.0 + saturation * 0.55 + vibrance * 0.45 * (1.0 - chroma)).clamp(0.0, 2.0);
+
+        pixel.0[0] = ((luma + (red - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+        pixel.0[1] = ((luma + (green - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+        pixel.0[2] = ((luma + (blue - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+    }
+}
+
 fn adjustments_are_finite(
     exposure: f64,
     contrast: f64,
     white_balance: WhiteBalanceAdjustment,
     tone_recovery: ToneRecoveryAdjustment,
+    color_presence: ColorPresenceAdjustment,
 ) -> bool {
     exposure.is_finite()
         && contrast.is_finite()
@@ -543,6 +588,8 @@ fn adjustments_are_finite(
         && tone_recovery.shadows.is_finite()
         && tone_recovery.whites.is_finite()
         && tone_recovery.blacks.is_finite()
+        && color_presence.vibrance.is_finite()
+        && color_presence.saturation.is_finite()
 }
 
 fn export_icc_profile(profile: ExportColorProfile) -> Result<Vec<u8>, ExportError> {
@@ -674,6 +721,7 @@ mod tests {
             contrast: -8.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -736,6 +784,7 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::DisplayP3,
         })
@@ -783,6 +832,7 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -848,6 +898,7 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -859,6 +910,7 @@ mod tests {
             contrast: 20.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write adjusted preview");
 
@@ -902,6 +954,7 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -913,6 +966,7 @@ mod tests {
             contrast: 0.0,
             white_balance,
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write white balance preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -924,6 +978,7 @@ mod tests {
             color_profile: super::ExportColorProfile::Srgb,
             white_balance,
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("export white balance jpeg");
 
@@ -969,6 +1024,7 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -980,6 +1036,7 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery,
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write tone recovery preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -989,10 +1046,79 @@ mod tests {
             contrast: 0.0,
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery,
+            color_presence: super::ColorPresenceAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
         .expect("export tone recovery jpeg");
+
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_color_presence_adjusted_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("color-presence");
+        let source_path = root.join("source.jpg");
+        let neutral_preview_path = root.join("previews").join("neutral.jpg");
+        let adjusted_preview_path = root.join("previews").join("adjusted.jpg");
+        let adjusted_export_path = root.join("export").join("adjusted.jpg");
+        std::fs::create_dir_all(adjusted_export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(neutral_preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let color_presence = super::ColorPresenceAdjustment {
+            vibrance: 24.0,
+            saturation: -8.5,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence,
+        })
+        .expect("write color presence preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence,
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect("export color presence jpeg");
 
         assert_ne!(
             std::fs::read(neutral.output_path).expect("read neutral preview"),

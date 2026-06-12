@@ -9,3 +9,5 @@ Task 13.6 adds ICC embedding proof for JPEG export. sRGB remains the default exp
 Task 17.2.1 applies the same deterministic local white-balance adjustment to supported JPEG/JPG Develop previews and JPEG exports. This keeps preview/export parity for the committed edit graph; it is not a fixture-backed color-correctness claim.
 
 Task 17.2.2 applies the same deterministic local tone recovery adjustment to supported JPEG/JPG Develop previews and JPEG exports. This keeps highlights, shadows, whites, and blacks aligned with the committed edit graph without broad RAW or color-correctness claims.
+
+Task 17.2.3 applies the same deterministic local color presence adjustment to supported JPEG/JPG Develop previews and JPEG exports. This keeps vibrance and saturation aligned with the committed edit graph without broad RAW or color-correctness claims.

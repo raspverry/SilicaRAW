@@ -467,6 +467,26 @@
               <button id="developBlacksReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-adjustment-slider" data-adjustment="vibrance">
+            <div class="sr-adjustment-header">
+              <label for="developVibranceSlider">Vibrance</label>
+              <input id="developVibranceValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Vibrance value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developVibranceSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Vibrance">
+              <button id="developVibranceReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="saturation">
+            <div class="sr-adjustment-header">
+              <label for="developSaturationSlider">Saturation</label>
+              <input id="developSaturationValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Saturation value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developSaturationSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Saturation">
+              <button id="developSaturationReset" type="button">Reset</button>
+            </div>
+          </div>
           <div class="sr-develop-commit-row">
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
@@ -701,6 +721,12 @@
       const developBlacksSlider = document.querySelector("#developBlacksSlider");
       const developBlacksValue = document.querySelector("#developBlacksValue");
       const developBlacksReset = document.querySelector("#developBlacksReset");
+      const developVibranceSlider = document.querySelector("#developVibranceSlider");
+      const developVibranceValue = document.querySelector("#developVibranceValue");
+      const developVibranceReset = document.querySelector("#developVibranceReset");
+      const developSaturationSlider = document.querySelector("#developSaturationSlider");
+      const developSaturationValue = document.querySelector("#developSaturationValue");
+      const developSaturationReset = document.querySelector("#developSaturationReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developHistoryPanel = document.querySelector("#developHistoryPanel");
@@ -1738,6 +1764,8 @@
             draftShadows: 0,
             draftWhites: 0,
             draftBlacks: 0,
+            draftVibrance: 0,
+            draftSaturation: 0,
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
@@ -1747,6 +1775,8 @@
             committedShadows: 0,
             committedWhites: 0,
             committedBlacks: 0,
+            committedVibrance: 0,
+            committedSaturation: 0,
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -1776,6 +1806,10 @@
         developWhitesValue.value = formatSignedHundred(state.draftWhites);
         developBlacksSlider.value = formatSignedHundred(state.draftBlacks);
         developBlacksValue.value = formatSignedHundred(state.draftBlacks);
+        developVibranceSlider.value = formatSignedHundred(state.draftVibrance);
+        developVibranceValue.value = formatSignedHundred(state.draftVibrance);
+        developSaturationSlider.value = formatSignedHundred(state.draftSaturation);
+        developSaturationValue.value = formatSignedHundred(state.draftSaturation);
       }
 
       function updateDevelopDirtyState(state) {
@@ -1791,6 +1825,8 @@
             || Number(state.draftShadows) !== Number(state.committedShadows)
             || Number(state.draftWhites) !== Number(state.committedWhites)
             || Number(state.draftBlacks) !== Number(state.committedBlacks)
+            || Number(state.draftVibrance) !== Number(state.committedVibrance)
+            || Number(state.draftSaturation) !== Number(state.committedSaturation)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -1813,6 +1849,8 @@
         state.committedShadows = editStateNumber(editState?.shadows, 0);
         state.committedWhites = editStateNumber(editState?.whites, 0);
         state.committedBlacks = editStateNumber(editState?.blacks, 0);
+        state.committedVibrance = editStateNumber(editState?.vibrance, 0);
+        state.committedSaturation = editStateNumber(editState?.saturation, 0);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -1822,6 +1860,8 @@
         state.draftShadows = state.committedShadows;
         state.draftWhites = state.committedWhites;
         state.draftBlacks = state.committedBlacks;
+        state.draftVibrance = state.committedVibrance;
+        state.draftSaturation = state.committedSaturation;
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -2089,7 +2129,7 @@
         if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.developPreviewBytes.length}`;
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.vibrance ?? ""}:${preview.saturation ?? ""}:${preview.developPreviewBytes.length}`;
         if (developObjectUrls.has(cacheKey)) {
           return developObjectUrls.get(cacheKey);
         }
@@ -2660,7 +2700,7 @@
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}.`;
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}.`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
         }
@@ -2717,6 +2757,12 @@
           developBlacksSlider,
           developBlacksValue,
           developBlacksReset,
+          developVibranceSlider,
+          developVibranceValue,
+          developVibranceReset,
+          developSaturationSlider,
+          developSaturationValue,
+          developSaturationReset,
           developCommitEdit,
           developRevertEdit,
         ].forEach((control) => {
@@ -2732,6 +2778,8 @@
           draftShadows: 0,
           draftWhites: 0,
           draftBlacks: 0,
+          draftVibrance: 0,
+          draftSaturation: 0,
           committedExposure: 0,
           committedContrast: 0,
           committedWhiteBalance: "as_shot",
@@ -2741,6 +2789,8 @@
           committedShadows: 0,
           committedWhites: 0,
           committedBlacks: 0,
+          committedVibrance: 0,
+          committedSaturation: 0,
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -2791,6 +2841,8 @@
             shadows: response.data.shadows,
             whites: response.data.whites,
             blacks: response.data.blacks,
+            vibrance: response.data.vibrance,
+            saturation: response.data.saturation,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -2842,6 +2894,13 @@
                 whites: state.draftWhites,
                 blacks: state.draftBlacks,
               })
+              : family === "colorPresence"
+                ? await invoke("preview_color_presence_edit", {
+                  libraryPath: activeLibraryPath,
+                  photoId: photo.photoId,
+                  vibrance: state.draftVibrance,
+                  saturation: state.draftSaturation,
+                })
               : await invoke("preview_exposure_contrast_edit", {
               libraryPath: activeLibraryPath,
               photoId: photo.photoId,
@@ -2875,6 +2934,8 @@
             shadows: response.data.shadows,
             whites: response.data.whites,
             blacks: response.data.blacks,
+            vibrance: response.data.vibrance,
+            saturation: response.data.saturation,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -2900,10 +2961,12 @@
           || Number(state.draftShadows) !== Number(state.committedShadows)
           || Number(state.draftWhites) !== Number(state.committedWhites)
           || Number(state.draftBlacks) !== Number(state.committedBlacks);
+        const colorPresenceDirty = Number(state.draftVibrance) !== Number(state.committedVibrance)
+          || Number(state.draftSaturation) !== Number(state.committedSaturation);
         const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
           || Number(state.draftContrast) !== Number(state.committedContrast);
 
-        if (!whiteBalanceDirty && !toneRecoveryDirty && !exposureContrastDirty) {
+        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !exposureContrastDirty) {
           updateDevelopDirtyState(state);
           setStatus("No Develop draft changes to commit.");
           return;
@@ -2919,6 +2982,8 @@
           state.committedShadows = state.draftShadows;
           state.committedWhites = state.draftWhites;
           state.committedBlacks = state.draftBlacks;
+          state.committedVibrance = state.draftVibrance;
+          state.committedSaturation = state.draftSaturation;
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -2945,6 +3010,13 @@
                 whites: state.draftWhites,
                 blacks: state.draftBlacks,
               })
+            : colorPresenceDirty
+              ? await invoke("commit_color_presence_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                vibrance: state.draftVibrance,
+                saturation: state.draftSaturation,
+              })
             : await invoke("commit_exposure_contrast_edit", {
               libraryPath: activeLibraryPath,
               photoId: photo.photoId,
@@ -2968,6 +3040,8 @@
           state.committedShadows = editStateNumber(response.data.shadows, state.draftShadows);
           state.committedWhites = editStateNumber(response.data.whites, state.draftWhites);
           state.committedBlacks = editStateNumber(response.data.blacks, state.draftBlacks);
+          state.committedVibrance = editStateNumber(response.data.vibrance, state.draftVibrance);
+          state.committedSaturation = editStateNumber(response.data.saturation, state.draftSaturation);
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
             state.draftTemperature = state.committedTemperature;
@@ -2977,6 +3051,9 @@
             state.draftShadows = state.committedShadows;
             state.draftWhites = state.committedWhites;
             state.draftBlacks = state.committedBlacks;
+          } else if (colorPresenceDirty) {
+            state.draftVibrance = state.committedVibrance;
+            state.draftSaturation = state.committedSaturation;
           } else {
             state.draftExposure = state.committedExposure;
             state.draftContrast = state.committedContrast;
@@ -2987,14 +3064,24 @@
           updateDevelopDirtyState(state);
           await loadDevelopHistory();
           const remainingFamilies = [];
-          if (whiteBalanceDirty && (toneRecoveryDirty || exposureContrastDirty)) {
+          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || exposureContrastDirty)) {
             if (toneRecoveryDirty) {
               remainingFamilies.push("tone recovery");
+            }
+            if (colorPresenceDirty) {
+              remainingFamilies.push("color presence");
             }
             if (exposureContrastDirty) {
               remainingFamilies.push("exposure/contrast");
             }
-          } else if (toneRecoveryDirty && exposureContrastDirty) {
+          } else if (toneRecoveryDirty && (colorPresenceDirty || exposureContrastDirty)) {
+            if (colorPresenceDirty) {
+              remainingFamilies.push("color presence");
+            }
+            if (exposureContrastDirty) {
+              remainingFamilies.push("exposure/contrast");
+            }
+          } else if (colorPresenceDirty && exposureContrastDirty) {
             remainingFamilies.push("exposure/contrast");
           }
           setStatus(remainingFamilies.length
@@ -3022,6 +3109,8 @@
         state.draftShadows = state.committedShadows;
         state.draftWhites = state.committedWhites;
         state.draftBlacks = state.committedBlacks;
+        state.draftVibrance = state.committedVibrance;
+        state.draftSaturation = state.committedSaturation;
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -3060,6 +3149,12 @@
         } else if (kind === "blacks") {
           state.draftBlacks = Number(formatSignedHundred(value));
           previewDevelopEdit("toneRecovery");
+        } else if (kind === "vibrance") {
+          state.draftVibrance = Number(formatSignedHundred(value));
+          previewDevelopEdit("colorPresence");
+        } else if (kind === "saturation") {
+          state.draftSaturation = Number(formatSignedHundred(value));
+          previewDevelopEdit("colorPresence");
         }
       }
 
@@ -3106,6 +3201,10 @@
                     ? state.draftWhites
                     : kind === "blacks"
                       ? state.draftBlacks
+                      : kind === "vibrance"
+                        ? state.draftVibrance
+                        : kind === "saturation"
+                          ? state.draftSaturation
                       : state.draftContrast;
         updateDevelopAdjustment(kind, current + direction * step);
       }
@@ -3438,6 +3537,12 @@
           developBlacksSlider,
           developBlacksValue,
           developBlacksReset,
+          developVibranceSlider,
+          developVibranceValue,
+          developVibranceReset,
+          developSaturationSlider,
+          developSaturationValue,
+          developSaturationReset,
           developCommitEdit,
           developRevertEdit,
         ].forEach((control) => {
@@ -3667,6 +3772,26 @@
       });
       developBlacksValue.addEventListener("dblclick", () => resetDevelopAdjustment("blacks"));
       developBlacksReset.addEventListener("click", () => resetDevelopAdjustment("blacks"));
+      developVibranceSlider.addEventListener("input", () => updateDevelopAdjustment("vibrance", developVibranceSlider.value));
+      developVibranceSlider.addEventListener("dblclick", () => resetDevelopAdjustment("vibrance"));
+      developVibranceSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("vibrance", event));
+      developVibranceValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developVibranceValue.value)) {
+          updateDevelopAdjustment("vibrance", developVibranceValue.value);
+        }
+      });
+      developVibranceValue.addEventListener("dblclick", () => resetDevelopAdjustment("vibrance"));
+      developVibranceReset.addEventListener("click", () => resetDevelopAdjustment("vibrance"));
+      developSaturationSlider.addEventListener("input", () => updateDevelopAdjustment("saturation", developSaturationSlider.value));
+      developSaturationSlider.addEventListener("dblclick", () => resetDevelopAdjustment("saturation"));
+      developSaturationSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("saturation", event));
+      developSaturationValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developSaturationValue.value)) {
+          updateDevelopAdjustment("saturation", developSaturationValue.value);
+        }
+      });
+      developSaturationValue.addEventListener("dblclick", () => resetDevelopAdjustment("saturation"));
+      developSaturationReset.addEventListener("click", () => resetDevelopAdjustment("saturation"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       openExportDialogButton.addEventListener("click", openExportDialog);
