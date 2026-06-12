@@ -147,6 +147,50 @@ pub fn write_raw_preview_artifact_for_probe(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn plan_exposure_contrast_metal_draft(
+    photo_id: impl Into<String>,
+    source_path: impl Into<String>,
+    viewer_input: silica_render::ViewerPreviewInput,
+    viewport: silica_render::ViewerPreviewViewport,
+    request_id: silica_render::ViewerPreviewRenderRequestId,
+    edit_graph_revision: u64,
+    exposure: f64,
+    contrast: f64,
+) -> Result<silica_render::ViewerPreviewRenderRequest, CoreError> {
+    let photo_id = photo_id.into();
+    let source_path = source_path.into();
+    let graph = silica_edit::default_edit_graph(
+        silica_edit::EditGraphSource {
+            photo_id: photo_id.clone(),
+            path: source_path.clone(),
+            file_size: 0,
+            modified_at: None,
+            partial_hash: None,
+            full_hash: None,
+        },
+        current_timestamp_string(),
+    );
+    let edited = silica_edit::apply_exposure_contrast(
+        &graph,
+        exposure,
+        contrast,
+        current_timestamp_string(),
+    )?;
+    let exposure = edited.basic.exposure.as_f64().unwrap_or(exposure);
+    let contrast = edited.basic.contrast.as_f64().unwrap_or(contrast);
+
+    Ok(silica_render::ViewerPreviewRenderRequest::new(
+        request_id,
+        photo_id,
+        source_path,
+        viewport,
+        viewer_input,
+        edit_graph_revision,
+    )
+    .with_exposure_contrast_draft(exposure, contrast))
+}
+
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
 const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
@@ -2245,6 +2289,71 @@ mod tests {
         assert!(!session.output_path.exists());
 
         remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metal_draft_preview_request_validates_exposure_contrast_without_state_writes() {
+        let viewer_input = silica_render::ViewerPreviewInput::DecodedImageArtifact {
+            cache_key: "raw-preview:v1:photo-1".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            width_px: 2048,
+            height_px: 1365,
+            pixel_format: silica_render::ViewerPreviewPixelFormat::JpegSrgb8,
+            decoder_backend: "core_image_raw".to_string(),
+            input_profile: "core_image_raw".to_string(),
+            working_space: "srgb".to_string(),
+        };
+
+        let request = plan_exposure_contrast_metal_draft(
+            "photo-1",
+            "/tmp/sample.cr2",
+            viewer_input,
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewRenderRequestId(51),
+            3,
+            0.5,
+            -8.0,
+        )
+        .expect("valid metal draft request");
+
+        assert_eq!(request.photo_id, "photo-1");
+        assert_eq!(
+            request.exposure_contrast_draft,
+            Some(silica_render::ViewerExposureContrastDraft {
+                exposure: 0.5,
+                contrast: -8.0
+            })
+        );
+        assert!(!request.writes_catalog_state());
+        assert!(!request.contains_image_pixels());
+    }
+
+    #[test]
+    fn metal_draft_preview_request_rejects_invalid_edit_values() {
+        let viewer_input = silica_render::ViewerPreviewInput::DecodedImageArtifact {
+            cache_key: "raw-preview:v1:photo-1".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            width_px: 2048,
+            height_px: 1365,
+            pixel_format: silica_render::ViewerPreviewPixelFormat::JpegSrgb8,
+            decoder_backend: "core_image_raw".to_string(),
+            input_profile: "core_image_raw".to_string(),
+            working_space: "srgb".to_string(),
+        };
+
+        let error = plan_exposure_contrast_metal_draft(
+            "photo-1",
+            "/tmp/sample.cr2",
+            viewer_input,
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewRenderRequestId(52),
+            3,
+            8.0,
+            0.0,
+        )
+        .expect_err("invalid exposure must fail edit graph validation");
+
+        assert!(matches!(error, CoreError::EditGraph(_)));
     }
 
     #[test]

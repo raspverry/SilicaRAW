@@ -703,7 +703,8 @@ pub fn render_request_smoke_evidence() -> String {
             working_space: "srgb".to_string(),
         },
         2,
-    );
+    )
+    .with_exposure_contrast_draft(0.5, -8.0);
     let mut bridge = NativeViewerRenderBridge::default();
     let _first_result = bridge.schedule_render_request(first);
     let second_result = bridge.schedule_render_request(second);
@@ -726,16 +727,21 @@ pub fn render_request_smoke_evidence() -> String {
         .current_texture()
         .map(|identity| identity.texture_key.as_str())
         .unwrap_or("none");
+    let draft = latest_request.exposure_contrast_draft;
+    let draft_exposure = draft.map(|draft| draft.exposure).unwrap_or(0.0);
+    let draft_contrast = draft.map(|draft| draft.contrast).unwrap_or(0.0);
 
     format!(
-        "latest_request={} replaced_request={} latest_wins={} catalog_write_requested={} contains_image_pixels={} decoded_artifact_texture_identity={} current_texture_key={}",
+        "latest_request={} replaced_request={} latest_wins={} catalog_write_requested={} contains_image_pixels={} decoded_artifact_texture_identity={} current_texture_key={} draft_exposure={} draft_contrast={}",
         latest_request_id.0,
         replaced_request_id,
         latest_wins,
         bridge.catalog_write_requested(),
         latest_request.contains_image_pixels(),
         decoded_artifact_texture_identity,
-        current_texture_key
+        current_texture_key,
+        draft_exposure,
+        draft_contrast
     )
 }
 
@@ -1201,6 +1207,8 @@ mod tests {
         assert!(evidence.contains("contains_image_pixels=false"));
         assert!(evidence.contains("decoded_artifact_texture_identity=true"));
         assert!(evidence.contains("current_texture_key=raw-preview:v1:photo-11/request-12"));
+        assert!(evidence.contains("draft_exposure=0.5"));
+        assert!(evidence.contains("draft_contrast=-8"));
     }
 
     #[test]

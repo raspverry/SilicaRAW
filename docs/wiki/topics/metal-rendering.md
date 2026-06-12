@@ -80,6 +80,8 @@ Task 15.2 adds a fixture-backed JPEG sRGB RAW preview artifact path. `silica-ren
 
 Task 15.3 promotes decoded preview artifact requests into disposable native viewer texture identity. The feature-gated native viewer bridge binds the latest decoded artifact texture identity, clears stale texture identity when decode is blocked, and records smoke evidence without making viewer texture cache an export source of truth.
 
+Task 15.4 adds exposure/contrast draft payloads to the same viewer preview request boundary. Draft slider ticks remain render-request data, latest request wins, and catalog/edit history writes remain limited to the existing Core commit path.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.

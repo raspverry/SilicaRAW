@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | Exposure contrast Metal draft path added
+
+- Completed Task 15.4 by carrying exposure/contrast draft values on viewer preview render requests.
+- Added Core-side edit graph validation for Metal draft requests without catalog/history writes.
+- Kept commit as the only validated edit graph persistence path and preserved preview/export separation.
+
 ## [2026-06-12] phase-15 | Metal preview display identity added
 
 - Completed Task 15.3 by promoting decoded RAW preview artifacts into disposable native viewer texture identity.

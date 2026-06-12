@@ -60,4 +60,4 @@ Default edit graphs use `input_profile = "unknown"` and `decoder_backend = null`
 
 Do not invent an alternate edit graph. Do not place experimental top-level fields beside schema-owned fields; use `extensions`.
 
-Phase 5.3 adds the first exposure/contrast graph update path and commit boundary. Phase 13.7 adds the color metadata contract for schema-owned `profile` fields. Pixel edit application, full render integration, sidecar persistence, product UI controls, RAW decoding, Metal viewer work, MLX, MCP, and plugin behavior remain separate explicit tasks.
+Phase 5.3 adds the first exposure/contrast graph update path and commit boundary. Phase 13.7 adds the color metadata contract for schema-owned `profile` fields. Task 15.4 validates exposure/contrast Metal draft requests through the edit graph validator while keeping slider drafts out of catalog history; commit remains the only path that writes the validated edit graph. Pixel edit application, full render integration, sidecar persistence, product UI controls, broad RAW decoding, MLX, MCP, and plugin behavior remain separate explicit tasks.

@@ -257,6 +257,13 @@ fn viewer_pixel_format_from_decoded(
     }
 }
 
+/// Draft adjustment payload for interactive exposure/contrast preview requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ViewerExposureContrastDraft {
+    pub exposure: f64,
+    pub contrast: f64,
+}
+
 /// Typed render request boundary between `silica-render` and the native viewer.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewerPreviewRenderRequest {
@@ -266,6 +273,7 @@ pub struct ViewerPreviewRenderRequest {
     pub viewport: ViewerPreviewViewport,
     pub input: ViewerPreviewInput,
     pub edit_graph_revision: u64,
+    pub exposure_contrast_draft: Option<ViewerExposureContrastDraft>,
 }
 
 impl ViewerPreviewRenderRequest {
@@ -284,7 +292,13 @@ impl ViewerPreviewRenderRequest {
             viewport,
             input,
             edit_graph_revision,
+            exposure_contrast_draft: None,
         }
+    }
+
+    pub fn with_exposure_contrast_draft(mut self, exposure: f64, contrast: f64) -> Self {
+        self.exposure_contrast_draft = Some(ViewerExposureContrastDraft { exposure, contrast });
+        self
     }
 
     pub fn writes_catalog_state(&self) -> bool {
@@ -1186,6 +1200,39 @@ mod tests {
             identity.drawable_size,
             super::ViewerTextureDrawableSize::new(1800, 1013)
         );
+        assert!(!request.writes_catalog_state());
+        assert!(!request.contains_image_pixels());
+    }
+
+    #[test]
+    fn viewer_preview_request_carries_exposure_contrast_draft_without_state_writes() {
+        let request = super::ViewerPreviewRenderRequest::new(
+            super::ViewerPreviewRenderRequestId(51),
+            "photo-51",
+            "/tmp/sample.cr2",
+            super::ViewerPreviewViewport::new(1200, 675, 1.5),
+            super::ViewerPreviewInput::DecodedImageArtifact {
+                cache_key: "raw-preview:v1:photo-51".to_string(),
+                source_sha256: Some("fixture-hash".to_string()),
+                width_px: 2048,
+                height_px: 1365,
+                pixel_format: super::ViewerPreviewPixelFormat::JpegSrgb8,
+                decoder_backend: "core_image_raw".to_string(),
+                input_profile: "core_image_raw".to_string(),
+                working_space: "srgb".to_string(),
+            },
+            7,
+        )
+        .with_exposure_contrast_draft(0.5, -8.0);
+
+        assert_eq!(
+            request.exposure_contrast_draft,
+            Some(super::ViewerExposureContrastDraft {
+                exposure: 0.5,
+                contrast: -8.0
+            })
+        );
+        assert_eq!(request.edit_graph_revision, 7);
         assert!(!request.writes_catalog_state());
         assert!(!request.contains_image_pixels());
     }
