@@ -54,8 +54,8 @@ As of 2026-06-13:
 - Task 16.5 Append-Only Action Log is complete.
 - Task 16.6 Sidecar Sync Status After History Commits is complete.
 - Phase 16 is complete.
-- Tasks 17.1.1 through 17.2.3 are complete.
-- Next task: [17.3 Real Histogram Cache and Display](../tasks/17.3-real-histogram-cache-display.md).
+- Tasks 17.1.1 through 17.3 are complete.
+- Next task: [17.4 Reset Before After Basic Presets](../tasks/17.4-reset-before-after-basic-presets.md).
 
 ## Wave Map
 
@@ -386,7 +386,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 17.3 from the existing task card.
+1. Execute Task 17.4 from the existing task card.
 2. Continue through Phase 17 in order.
 
 ## Links

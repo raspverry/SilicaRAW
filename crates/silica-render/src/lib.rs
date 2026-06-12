@@ -191,6 +191,37 @@ impl ColorPresenceRenderAdjustment {
     }
 }
 
+/// Histogram data for a real RGB pixel buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RgbHistogram {
+    pub red: Vec<u32>,
+    pub green: Vec<u32>,
+    pub blue: Vec<u32>,
+    pub luminance: Vec<u32>,
+    pub pixel_count: u64,
+}
+
+/// Histogram computation error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HistogramError {
+    RgbByteLengthNotMultipleOfThree { byte_len: usize },
+}
+
+impl std::fmt::Display for HistogramError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RgbByteLengthNotMultipleOfThree { byte_len } => {
+                write!(
+                    formatter,
+                    "RGB byte length must be divisible by 3: {byte_len}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for HistogramError {}
+
 /// Source class for export rendering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportRenderSourceKind {
@@ -873,6 +904,41 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+/// Compute 8-bit RGB and luminance histograms from real RGB pixels.
+pub fn compute_rgb_histogram(rgb_bytes: &[u8]) -> Result<RgbHistogram, HistogramError> {
+    if rgb_bytes.len() % 3 != 0 {
+        return Err(HistogramError::RgbByteLengthNotMultipleOfThree {
+            byte_len: rgb_bytes.len(),
+        });
+    }
+
+    let mut histogram = RgbHistogram {
+        red: vec![0; 256],
+        green: vec![0; 256],
+        blue: vec![0; 256],
+        luminance: vec![0; 256],
+        pixel_count: (rgb_bytes.len() / 3) as u64,
+    };
+
+    for pixel in rgb_bytes.chunks_exact(3) {
+        let red = pixel[0] as usize;
+        let green = pixel[1] as usize;
+        let blue = pixel[2] as usize;
+        let luminance = (f32::from(pixel[0]) * 0.2126
+            + f32::from(pixel[1]) * 0.7152
+            + f32::from(pixel[2]) * 0.0722)
+            .round()
+            .clamp(0.0, 255.0) as usize;
+
+        histogram.red[red] += 1;
+        histogram.green[green] += 1;
+        histogram.blue[blue] += 1;
+        histogram.luminance[luminance] += 1;
+    }
+
+    Ok(histogram)
+}
+
 /// Build a render request for a draft exposure/contrast preview update.
 pub fn plan_exposure_contrast_preview(
     preview_plan: PreviewRenderPlan,
@@ -1164,6 +1230,25 @@ mod tests {
             super::ColorFixtureStatus::MissingTaggedRasterFixtures
         );
         assert_eq!(super::COLOR_BLOCKING_TAG, "color-blocking");
+    }
+
+    #[test]
+    fn computes_rgb_histogram_from_real_pixels() {
+        let histogram = super::compute_rgb_histogram(&[
+            0, 0, 0, //
+            255, 128, 64,
+        ])
+        .expect("compute histogram");
+
+        assert_eq!(histogram.pixel_count, 2);
+        assert_eq!(histogram.red[0], 1);
+        assert_eq!(histogram.red[255], 1);
+        assert_eq!(histogram.green[0], 1);
+        assert_eq!(histogram.green[128], 1);
+        assert_eq!(histogram.blue[0], 1);
+        assert_eq!(histogram.blue[64], 1);
+        assert_eq!(histogram.luminance[0], 1);
+        assert_eq!(histogram.luminance[150], 1);
     }
 
     #[test]

@@ -345,7 +345,10 @@
 
       <aside class="sr-inspector" id="rightInspector" aria-label="Right inspector">
         <section class="sr-inspector-section">
-          <div class="sr-histogram" aria-label="Histogram placeholder"></div>
+          <div class="sr-histogram" id="photoHistogram" data-histogram-state="empty" aria-label="Photo histogram">
+            <div class="sr-histogram-bars" id="photoHistogramBars" aria-hidden="true"></div>
+            <output class="sr-histogram-status" id="photoHistogramStatus" aria-live="polite">No histogram</output>
+          </div>
         </section>
         <section class="sr-inspector-section" data-mode-panel="library">
           <div class="sr-panel-heading">Quick Review</div>
@@ -689,6 +692,9 @@
       const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
       const clearCullingFlagsButton = document.querySelector("#clearCullingFlags");
       const cullingStatus = document.querySelector("#cullingStatus");
+      const photoHistogram = document.querySelector("#photoHistogram");
+      const photoHistogramBars = document.querySelector("#photoHistogramBars");
+      const photoHistogramStatus = document.querySelector("#photoHistogramStatus");
       const selectionSummary = document.querySelector("#selectionSummary");
       const primarySelectedPhotoName = document.querySelector("#primarySelectedPhotoName");
       const multiSelectionCount = document.querySelector("#multiSelectionCount");
@@ -2519,6 +2525,7 @@
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         updateCullingControls(selected);
         syncDevelopSelection();
+        void loadPhotoHistogram();
         syncExportDialog();
         if (!loupeSurface.hidden) {
           previewSelectedPhoto();
@@ -2529,6 +2536,69 @@
         }
         if (options.persist !== false) {
           void recordActiveSessionState();
+        }
+      }
+
+      function renderPhotoHistogram(histogram) {
+        const status = histogram?.status || "No Histogram";
+        photoHistogram.dataset.histogramState = status === "Ready" ? "ready" : "blocked";
+        photoHistogramStatus.value = histogram?.message || "No histogram";
+        photoHistogramBars.replaceChildren();
+
+        const luminance = Array.isArray(histogram?.luminance) ? histogram.luminance : [];
+        if (status !== "Ready" || luminance.length === 0) {
+          return;
+        }
+
+        const bucketCount = 32;
+        const buckets = Array.from({ length: bucketCount }, () => 0);
+        luminance.forEach((value, index) => {
+          const bucket = Math.min(bucketCount - 1, Math.floor(index / (256 / bucketCount)));
+          buckets[bucket] += Number(value) || 0;
+        });
+        const maxBucket = Math.max(1, ...buckets);
+        buckets.forEach((value) => {
+          const bar = document.createElement("span");
+          bar.className = "sr-histogram-bar";
+          bar.style.height = `${Math.max(2, Math.round((value / maxBucket) * 100))}%`;
+          photoHistogramBars.append(bar);
+        });
+      }
+
+      async function loadPhotoHistogram() {
+        const photo = selectedPhoto();
+        if (!photo) {
+          renderPhotoHistogram({ status: "No Histogram", message: "No photo selected." });
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          renderPhotoHistogram({
+            status: "Unavailable",
+            message: "Desktop runtime is required to load real histogram data.",
+          });
+          return;
+        }
+        try {
+          const response = await invoke("get_photo_histogram", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+          });
+          if (commandFailed(response)) {
+            renderPhotoHistogram({
+              status: "Blocked",
+              message: responseErrorMessage(response, "Histogram unavailable."),
+            });
+            return;
+          }
+          renderPhotoHistogram(response.data || {
+            status: "No Histogram",
+            message: "Histogram unavailable for the selected photo.",
+          });
+        } catch (error) {
+          renderPhotoHistogram({
+            status: "Blocked",
+            message: responseErrorMessage(error, "Histogram unavailable."),
+          });
         }
       }
 
@@ -3063,6 +3133,7 @@
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
           await loadDevelopHistory();
+          await loadPhotoHistogram();
           const remainingFamilies = [];
           if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || exposureContrastDirty)) {
             if (toneRecoveryDirty) {
@@ -3483,6 +3554,7 @@
           syncDevelopSelection();
           readPersistedDevelopState(selectedPhoto()).then(() => previewDevelopEdit());
           void loadDevelopHistory();
+          void loadPhotoHistogram();
         }
         if (mode === "export") {
           openExportDialog();

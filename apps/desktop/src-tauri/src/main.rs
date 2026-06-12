@@ -217,6 +217,19 @@ enum DesktopCommandData {
         status: String,
         message: String,
     },
+    Histogram {
+        photo_id: String,
+        source_path: String,
+        status: &'static str,
+        red: Vec<u32>,
+        green: Vec<u32>,
+        blue: Vec<u32>,
+        luminance: Vec<u32>,
+        pixel_count: u64,
+        cache_key: String,
+        cache_path: String,
+        message: String,
+    },
     Export {
         photo_id: String,
         source_path: String,
@@ -262,6 +275,7 @@ impl DesktopCommandData {
             Self::EditState { .. } => "editState",
             Self::HistoryCommand { .. } => "historyCommand",
             Self::HistoryPanel { .. } => "historyPanel",
+            Self::Histogram { .. } => "histogram",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
         }
@@ -1567,6 +1581,40 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
 }
 
 #[tauri::command]
+fn get_photo_histogram(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_histogram";
+    match silica_core::get_photo_histogram(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(histogram)) => DesktopCommandResponse::ok(
+            command,
+            histogram.message.clone(),
+            DesktopCommandData::Histogram {
+                photo_id: histogram.photo_id,
+                source_path: histogram.source_path,
+                status: histogram_status_text(histogram.status),
+                red: histogram.red,
+                green: histogram.green,
+                blue: histogram.blue,
+                luminance: histogram.luminance,
+                pixel_count: histogram.pixel_count,
+                cache_key: histogram.cache_key,
+                cache_path: histogram.cache_path,
+                message: histogram.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn undo_last_history_action(library_path: String, photo_id: String) -> DesktopCommandResponse {
     let command = "undo_last_history_action";
     match silica_core::undo_last_history_action(PathBuf::from(&library_path), &photo_id) {
@@ -2297,6 +2345,15 @@ fn preview_status_text(status: silica_core::PhotoPreviewStatus) -> &'static str 
     }
 }
 
+fn histogram_status_text(status: silica_core::PhotoHistogramStatus) -> &'static str {
+    match status {
+        silica_core::PhotoHistogramStatus::Ready => "Ready",
+        silica_core::PhotoHistogramStatus::BlockedByDecode => "BlockedByDecode",
+        silica_core::PhotoHistogramStatus::Unsupported => "Unsupported",
+        silica_core::PhotoHistogramStatus::Missing => "Missing",
+    }
+}
+
 fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
     match error {
         silica_core::CoreError::Storage(_) => "storage",
@@ -2372,6 +2429,7 @@ fn main() {
             commit_tone_recovery_edit,
             commit_color_presence_edit,
             get_photo_edit_state,
+            get_photo_histogram,
             undo_last_history_action,
             redo_last_history_action,
             get_photo_history,
@@ -3504,6 +3562,48 @@ mod tests {
                 assert_eq!(*vibrance, 24.0);
                 assert_eq!(*saturation, -8.5);
                 assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_returns_histogram_contract() {
+        let workspace = unique_library_root("desktop-histogram-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let histogram =
+            super::get_photo_histogram(library_root.display().to_string(), photo_id.clone());
+        assert!(histogram.ok);
+        match response_data(&histogram) {
+            super::DesktopCommandData::Histogram {
+                status,
+                red,
+                green,
+                blue,
+                luminance,
+                pixel_count,
+                cache_path,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*pixel_count, 4);
+                assert_eq!(red.len(), 256);
+                assert_eq!(green.len(), 256);
+                assert_eq!(blue.len(), 256);
+                assert_eq!(luminance.len(), 256);
+                assert!(cache_path.contains("render-cache"));
             }
             other => panic!("unexpected response data: {other:?}"),
         }

@@ -33,3 +33,5 @@ Task 17.2.1 adds white-balance-family preview and commit APIs. Core validates th
 Task 17.2.2 adds tone recovery preview and commit APIs for highlights, shadows, whites, and blacks under the same draft/commit/export boundary.
 
 Task 17.2.3 adds color presence preview and commit APIs for vibrance and saturation under the same draft/commit/export boundary.
+
+Task 17.3 adds `get_photo_histogram` for the current committed JPEG/JPG Develop state. Core records histogram JSON only as disposable render cache and returns explicit ready, missing, blocked, or unsupported states.

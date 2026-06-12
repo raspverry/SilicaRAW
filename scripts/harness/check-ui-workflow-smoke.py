@@ -31,6 +31,7 @@ ALLOWED_COMMANDS = {
     "commit_tone_recovery_edit",
     "commit_color_presence_edit",
     "get_photo_edit_state",
+    "get_photo_histogram",
     "get_photo_history",
     "undo_last_history_action",
     "redo_last_history_action",
@@ -164,9 +165,13 @@ WORKFLOW_STEPS = [
             "developHistoryList",
             "developUndoHistory",
             "developRedoHistory",
+            "photoHistogram",
+            "photoHistogramBars",
+            "photoHistogramStatus",
         ],
         "commands": [
             "get_photo_edit_state",
+            "get_photo_histogram",
             "get_photo_history",
             "undo_last_history_action",
             "redo_last_history_action",
@@ -400,6 +405,14 @@ def main():
         "sr-develop-image",
     ]:
         require(marker in source, f"real develop preview marker missing: {marker}", failures)
+    for marker in [
+        "get_photo_histogram",
+        "renderPhotoHistogram",
+        "loadPhotoHistogram",
+        "sr-histogram-bar",
+        "data-histogram-state",
+    ]:
+        require(marker in source, f"real histogram marker missing: {marker}", failures)
     for marker in [
         "renderExportPreviewImage",
         "sr-export-preview-image",

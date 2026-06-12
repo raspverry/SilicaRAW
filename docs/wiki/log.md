@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-17 | Real histogram cache display added
+
+- Completed Task 17.3 with real RGB/luminance histogram data for supported local JPEG/JPG committed Develop state.
+- Stored histogram JSON only under disposable `render-cache/` and kept missing, blocked, and unsupported states explicit.
+- Replaced the static fake histogram placeholder with command-backed luminance bars and routed Phase 17 execution to Task 17.4.
+
 ## [2026-06-13] phase-17 | Color presence preview commit export parity added
 
 - Completed Task 17.2.3 with color presence preview, commit, history, and export parity for supported local JPEG/JPG paths.

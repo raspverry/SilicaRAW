@@ -127,6 +127,8 @@ pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
 pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
 /// Cache record type used for disposable Loupe preview images.
 pub const PREVIEW_CACHE_TYPE: &str = "preview";
+/// Cache record type used for disposable Develop histogram data.
+pub const HISTOGRAM_CACHE_TYPE: &str = "histogram";
 
 /// Stable action payload schema marker for undo/history records.
 pub const ACTION_SCHEMA: &str = "silica.action";
@@ -1360,6 +1362,25 @@ pub fn record_preview_cache(
     )
 }
 
+/// Record disposable histogram cache data for a catalog photo.
+pub fn record_histogram_cache(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    cache_key: impl AsRef<str>,
+    path: impl AsRef<Path>,
+    byte_size: i64,
+) -> Result<CacheRecord, LibraryStorageError> {
+    record_photo_cache(
+        library_root_path,
+        "cache-histogram",
+        photo_id,
+        HISTOGRAM_CACHE_TYPE,
+        cache_key,
+        path,
+        byte_size,
+    )
+}
+
 /// Read a disposable cache record for one catalog photo and cache type.
 pub fn get_photo_cache_record(
     library_root_path: impl AsRef<Path>,
@@ -1488,6 +1509,7 @@ fn validate_cache_path(
     let expected_directory = match cache_type {
         THUMBNAIL_CACHE_TYPE => Some("thumbnails"),
         PREVIEW_CACHE_TYPE => Some("previews"),
+        HISTOGRAM_CACHE_TYPE => Some("render-cache"),
         _ => None,
     };
     let Some(expected_directory) = expected_directory else {
@@ -7043,6 +7065,62 @@ mod tests {
             )
             .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn records_histogram_cache_under_render_cache_only() {
+        let workspace = unique_library_root("histogram-cache");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let histogram_path = library
+            .root_path
+            .join("render-cache")
+            .join("sample-histogram.json");
+        std::fs::write(&histogram_path, br#"{"pixel_count":2}"#).expect("write histogram");
+
+        let record = record_histogram_cache(
+            &library.root_path,
+            &photo_id,
+            "histogram-key",
+            &histogram_path,
+            17,
+        )
+        .expect("record histogram cache");
+        assert_eq!(record.cache_type, HISTOGRAM_CACHE_TYPE);
+
+        let cached = get_photo_cache_record(&library.root_path, &photo_id, HISTOGRAM_CACHE_TYPE)
+            .expect("read histogram cache")
+            .expect("histogram cache row");
+        assert_eq!(cached.path, histogram_path.display().to_string());
+        assert_eq!(cached.cache_key, "histogram-key");
+        assert_eq!(cached.byte_size, 17);
+
+        let outside_path = workspace.join("outside-histogram.json");
+        std::fs::write(&outside_path, br#"{"pixel_count":2}"#).expect("write outside histogram");
+        let error = record_histogram_cache(
+            &library.root_path,
+            &photo_id,
+            "histogram-key",
+            &outside_path,
+            17,
+        )
+        .expect_err("histogram cache path outside render-cache/ must be rejected");
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("render-cache")
+        ));
 
         remove_library_root(&workspace);
     }

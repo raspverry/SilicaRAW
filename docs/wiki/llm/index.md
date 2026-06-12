@@ -31,7 +31,7 @@ For Phase 17 planning or implementation, read:
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-17-develop-p0-expansion)
 - [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md)
-- [Task 17.3 Real Histogram Cache and Display](../tasks/17.3-real-histogram-cache-display.md)
+- [Task 17.4 Reset Before After Basic Presets](../tasks/17.4-reset-before-after-basic-presets.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)

@@ -28,6 +28,8 @@ Task 16.5 adds schema version 8 plus append-only action log APIs. `append_action
 
 Task 16.6 adds `get_photo_sidecar_status` and marks clean sidecar status as `catalog_newer` after edit commits, flag commits, undo, and redo. It preserves `conflict` and `sidecar_newer` and does not rewrite sidecar files.
 
+Task 17.3 adds `record_histogram_cache` for disposable histogram JSON under `render-cache/` only. Cache clear removes histogram records with the other disposable cache rows.
+
 Task 10.3 adds explicit sidecar write/read APIs. Sidecars are written only under `sidecars/` inside the library root, validate the sidecar and nested edit graph payloads, mirror rating/picked/rejected/color-label state only, update `sidecar_status` after successful writes, and do not mutate original referenced files.
 
 Task 10.4 adds `dry_run_catalog_rebuild_from_sidecars`. It scans library-local sidecars in deterministic order, reports resolved portable flag state and non-fatal issues, uses `sidecar.flags` before `edit_graph.metadata` before defaults, and does not mutate catalog tables or original referenced files.

@@ -635,6 +635,31 @@ impl PhotoExportSession {
     }
 }
 
+/// Histogram readiness for the current supported preview state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoHistogramStatus {
+    Ready,
+    BlockedByDecode,
+    Unsupported,
+    Missing,
+}
+
+/// Histogram data returned for the current committed Develop state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoHistogramSession {
+    pub photo_id: String,
+    pub source_path: String,
+    pub status: PhotoHistogramStatus,
+    pub red: Vec<u32>,
+    pub green: Vec<u32>,
+    pub blue: Vec<u32>,
+    pub luminance: Vec<u32>,
+    pub pixel_count: u64,
+    pub cache_key: String,
+    pub cache_path: String,
+    pub message: String,
+}
+
 /// Summary returned when disposable library caches are cleared.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibraryCacheClearSession {
@@ -1378,6 +1403,139 @@ pub fn open_photo_preview(
         preview_bytes,
         status,
         message: render_plan.message,
+    }))
+}
+
+/// Build and cache histogram data for the current committed Develop state.
+pub fn get_photo_histogram(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoHistogramSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let candidate = match silica_storage::get_photo_preview_candidate(library_root_path, photo_id)?
+    {
+        Some(candidate) => candidate,
+        None => return Ok(None),
+    };
+    let source_path = PathBuf::from(&candidate.path);
+    let empty_bins = || vec![0; 256];
+
+    if candidate.unsupported {
+        return Ok(Some(PhotoHistogramSession {
+            photo_id: candidate.photo_id,
+            source_path: candidate.path,
+            status: PhotoHistogramStatus::Unsupported,
+            red: empty_bins(),
+            green: empty_bins(),
+            blue: empty_bins(),
+            luminance: empty_bins(),
+            pixel_count: 0,
+            cache_key: String::new(),
+            cache_path: String::new(),
+            message: "Histogram unavailable for unsupported files.".to_string(),
+        }));
+    }
+    if !source_path.is_file() {
+        return Ok(Some(PhotoHistogramSession {
+            photo_id: candidate.photo_id,
+            source_path: candidate.path,
+            status: PhotoHistogramStatus::Missing,
+            red: empty_bins(),
+            green: empty_bins(),
+            blue: empty_bins(),
+            luminance: empty_bins(),
+            pixel_count: 0,
+            cache_key: String::new(),
+            cache_path: String::new(),
+            message: "Histogram unavailable because the referenced source file is missing."
+                .to_string(),
+        }));
+    }
+    if !is_jpeg_path(&source_path) {
+        return Ok(Some(PhotoHistogramSession {
+            photo_id: candidate.photo_id,
+            source_path: candidate.path,
+            status: PhotoHistogramStatus::BlockedByDecode,
+            red: empty_bins(),
+            green: empty_bins(),
+            blue: empty_bins(),
+            luminance: empty_bins(),
+            pixel_count: 0,
+            cache_key: String::new(),
+            cache_path: String::new(),
+            message: "Histogram blocked until RAW decode provides preview pixels.".to_string(),
+        }));
+    }
+
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let histogram =
+        silica_export::compute_jpeg_develop_histogram(silica_export::JpegHistogramRequest {
+            source_path: source_path.clone(),
+            exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
+            contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
+            white_balance: export_white_balance_from_render(render_white_balance_from_graph(
+                &graph,
+            )),
+            tone_recovery: export_tone_recovery_from_render(render_tone_recovery_from_graph(
+                &graph,
+            )),
+            color_presence: export_color_presence_from_render(render_color_presence_from_graph(
+                &graph,
+            )),
+        })?;
+    let pixel_count = histogram.pixel_count;
+    let red = histogram.red;
+    let green = histogram.green;
+    let blue = histogram.blue;
+    let luminance = histogram.luminance;
+    let cache_key = histogram_cache_key(photo_id, &source_path, &graph);
+    let render_cache_root = library_root_path.join("render-cache");
+    std::fs::create_dir_all(&render_cache_root)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)?;
+    let cache_path = render_cache_root.join(format!("histogram-{photo_id}.json"));
+    let cache_value = serde_json::json!({
+        "schema": "silica.histogram",
+        "version": 1,
+        "photo_id": photo_id,
+        "source_path": source_path.display().to_string(),
+        "cache_key": cache_key,
+        "pixel_count": pixel_count,
+        "red": &red,
+        "green": &green,
+        "blue": &blue,
+        "luminance": &luminance,
+    });
+    let cache_bytes = serde_json::to_vec(&cache_value)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)?;
+    std::fs::write(&cache_path, &cache_bytes)
+        .map_err(silica_storage::LibraryStorageError::from)
+        .map_err(CoreError::from)?;
+    silica_storage::record_histogram_cache(
+        library_root_path,
+        photo_id,
+        cache_key.clone(),
+        &cache_path,
+        cache_bytes.len() as i64,
+    )?;
+
+    Ok(Some(PhotoHistogramSession {
+        photo_id: candidate.photo_id,
+        source_path: source_path.display().to_string(),
+        status: PhotoHistogramStatus::Ready,
+        red,
+        green,
+        blue,
+        luminance,
+        pixel_count,
+        cache_key,
+        cache_path: cache_path.display().to_string(),
+        message: "Histogram ready from current committed Develop state.".to_string(),
     }))
 }
 
@@ -2855,6 +3013,38 @@ fn preview_cache_key(photo_id: &str, source_path: &Path) -> String {
         modified,
         LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE,
         LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY
+    )
+}
+
+fn histogram_cache_key(
+    photo_id: &str,
+    source_path: &Path,
+    graph: &silica_edit::EditGraph,
+) -> String {
+    let metadata = std::fs::metadata(source_path).ok();
+    let file_size = metadata.as_ref().map(std::fs::Metadata::len).unwrap_or(0);
+    let modified = metadata
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "histogram:v1:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+        photo_id,
+        source_path.display(),
+        file_size,
+        modified,
+        graph.basic.exposure.as_f64().unwrap_or(0.0),
+        graph.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance_render_mode_string(render_white_balance_from_graph(graph).mode),
+        graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        graph.basic.tint.as_f64().unwrap_or(0.0),
+        graph.basic.highlights.as_f64().unwrap_or(0.0),
+        graph.basic.shadows.as_f64().unwrap_or(0.0),
+        graph.basic.whites.as_f64().unwrap_or(0.0),
+        graph.basic.blacks.as_f64().unwrap_or(0.0),
+        graph.basic.vibrance.as_f64().unwrap_or(0.0),
+        graph.basic.saturation.as_f64().unwrap_or(0.0)
     )
 }
 
@@ -4351,6 +4541,57 @@ mod tests {
             )
             .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn computes_and_caches_histogram_without_mutating_original() {
+        let workspace = unique_library_root("core-histogram-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        commit_color_presence_edit(&created.root_path, &photo_id, 24.0, -8.5)
+            .expect("commit color presence")
+            .expect("commit result");
+        let histogram = get_photo_histogram(&created.root_path, &photo_id)
+            .expect("get histogram")
+            .expect("histogram result");
+
+        assert_eq!(histogram.status, PhotoHistogramStatus::Ready);
+        assert_eq!(histogram.pixel_count, 4);
+        assert_eq!(histogram.red.len(), 256);
+        assert_eq!(histogram.green.len(), 256);
+        assert_eq!(histogram.blue.len(), 256);
+        assert_eq!(histogram.luminance.len(), 256);
+        assert!(histogram.cache_path.contains("render-cache"));
+        assert_original_hash(&jpeg_file, &original_hash, "histogram generation");
+
+        let cached = silica_storage::get_photo_cache_record(
+            &created.root_path,
+            &photo_id,
+            silica_storage::HISTOGRAM_CACHE_TYPE,
+        )
+        .expect("read histogram cache")
+        .expect("histogram cache row");
+        assert_eq!(cached.path, histogram.cache_path);
 
         remove_library_root(&workspace);
     }

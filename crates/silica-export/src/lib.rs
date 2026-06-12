@@ -172,6 +172,17 @@ pub struct JpegDevelopPreviewRequest {
     pub color_presence: ColorPresenceAdjustment,
 }
 
+/// Request to compute Develop histogram data from a supported JPEG source.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JpegHistogramRequest {
+    pub source_path: PathBuf,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
+    pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
+}
+
 /// Result returned after a JPEG thumbnail is written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JpegThumbnailResult {
@@ -485,6 +496,36 @@ pub fn write_jpeg_develop_preview(
         bytes_written: fs::metadata(&request.output_path)?.len(),
         output_path: request.output_path,
         format: ExportImageFormat::Jpeg,
+    })
+}
+
+/// Compute real histogram data from the same local JPEG adjustment path used for Develop preview.
+pub fn compute_jpeg_develop_histogram(
+    request: JpegHistogramRequest,
+) -> Result<silica_render::RgbHistogram, ExportError> {
+    if !adjustments_are_finite(
+        request.exposure,
+        request.contrast,
+        request.white_balance,
+        request.tone_recovery,
+        request.color_presence,
+    ) {
+        return Err(ExportError::NonFiniteAdjustment);
+    }
+
+    let decoded = image::ImageReader::open(&request.source_path)?
+        .with_guessed_format()?
+        .decode()?;
+    let mut rgb = decoded.to_rgb8();
+    apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
+    apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_color_presence(&mut rgb, request.color_presence);
+    silica_render::compute_rgb_histogram(rgb.as_raw()).map_err(|error| {
+        ExportError::Image(image::ImageError::IoError(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            error.to_string(),
+        )))
     })
 }
 
@@ -1125,6 +1166,40 @@ mod tests {
             std::fs::read(adjusted.output_path).expect("read adjusted preview")
         );
         assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn computes_adjusted_jpeg_histogram_without_mutating_original() {
+        let root = unique_export_root("histogram");
+        let source_path = root.join("source.jpg");
+        std::fs::create_dir_all(&root).expect("create histogram root");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let histogram = super::compute_jpeg_develop_histogram(super::JpegHistogramRequest {
+            source_path: source_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment {
+                vibrance: 24.0,
+                saturation: -8.5,
+            },
+        })
+        .expect("compute histogram");
+
+        assert_eq!(histogram.pixel_count, 4);
+        assert_eq!(histogram.red.len(), 256);
+        assert_eq!(histogram.green.len(), 256);
+        assert_eq!(histogram.blue.len(), 256);
+        assert_eq!(histogram.luminance.len(), 256);
         assert_eq!(
             std::fs::read(&source_path).expect("read original after"),
             original_before

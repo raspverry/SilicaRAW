@@ -24,6 +24,10 @@ This page remains the record for the static Phase 5.5 pass. It is not the final 
 
 Task 5.6.12 is now the Phase 6 readiness visual gate. The Phase 5.5 notes below remain historical context only.
 
+## Phase 17 Histogram Note
+
+Task 17.3 replaces the inspector's fake histogram placeholder with command-backed luminance bars from real histogram data. The histogram surface must keep the existing inspector footprint, avoid text overlap at the checked desktop widths, and show explicit blocked or unavailable text when real data is not available.
+
 ## Final Phase 5.6.12 Refresh
 
 Final QA command:

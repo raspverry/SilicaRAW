@@ -1929,46 +1929,43 @@ progress::-webkit-progress-value {
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background: var(--sr-bg-secondary);
+  padding: var(--sr-space-sm) var(--sr-space-md);
 }
 
-.sr-histogram::before,
-.sr-histogram::after {
-  content: "";
+.sr-histogram-bars {
   position: absolute;
   right: var(--sr-space-md);
   left: var(--sr-space-md);
-}
-
-.sr-histogram::before {
   top: var(--sr-space-md);
-  bottom: var(--sr-space-sm);
-  background:
-    linear-gradient(90deg, var(--sr-overlay-danger-soft), var(--sr-overlay-success-soft), var(--sr-overlay-info-soft)),
-    var(--sr-surface-active);
-  clip-path: polygon(
-    0 90%,
-    5% 84%,
-    11% 74%,
-    17% 77%,
-    24% 58%,
-    31% 62%,
-    39% 44%,
-    48% 50%,
-    56% 27%,
-    64% 37%,
-    72% 21%,
-    80% 34%,
-    87% 12%,
-    94% 66%,
-    100% 88%,
-    100% 100%,
-    0 100%
-  );
+  bottom: calc(var(--sr-space-lg) + var(--sr-space-sm));
+  display: grid;
+  grid-template-columns: repeat(32, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+  border-bottom: 1px solid var(--sr-border-default);
 }
 
-.sr-histogram::after {
-  bottom: var(--sr-space-sm);
-  border-top: 1px solid var(--sr-border-default);
+.sr-histogram-bar {
+  display: block;
+  min-height: 2px;
+  background: linear-gradient(180deg, var(--sr-overlay-info-soft), var(--sr-accent-system));
+  border-radius: 2px 2px 0 0;
+}
+
+.sr-histogram-status {
+  position: absolute;
+  right: var(--sr-space-md);
+  bottom: var(--sr-space-xs);
+  left: var(--sr-space-md);
+  overflow: hidden;
+  color: var(--sr-text-secondary);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-histogram[data-histogram-state="blocked"] .sr-histogram-bars {
+  opacity: 0.2;
 }
 
 .sr-inspector-section {

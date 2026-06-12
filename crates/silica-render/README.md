@@ -15,3 +15,5 @@ Task 17.2.1 carries white-balance-family values through preview/export request p
 Task 17.2.2 carries tone recovery values through preview/export request planning under the same boundary. Pixel adjustment remains owned by `silica-export` for supported JPEG/JPG paths.
 
 Task 17.2.3 carries color presence values through preview/export request planning under the same boundary.
+
+Task 17.3 computes 256-bin RGB and luminance histograms from real RGB pixel buffers. It does not decode files or own cache persistence.
