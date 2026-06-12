@@ -54,7 +54,8 @@ As of 2026-06-12:
 - Task 16.5 Append-Only Action Log is complete.
 - Task 16.6 Sidecar Sync Status After History Commits is complete.
 - Phase 16 is complete.
-- Next step: create Phase 17 task cards from this master plan and the post-alpha product roadmap, then execute Task 17.1 Basic Edit Graph Mutators.
+- Phase 17 task cards now exist.
+- Next task: [17.1.1 White Balance Temperature Tint Mutators](../tasks/17.1.1-white-balance-temperature-tint-mutators.md).
 
 ## Wave Map
 
@@ -385,8 +386,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Create Phase 17 task cards from this master plan and [Post-Alpha Product Roadmap](post-alpha-product-roadmap.md).
-2. Execute Task 17.1 Basic Edit Graph Mutators first.
+1. Execute Task 17.1.1 from the existing task card.
+2. Continue through Phase 17 in order.
 
 ## Links
 

@@ -68,6 +68,18 @@ For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](.
 - [16.5: Append-Only Action Log](16.5-append-only-action-log.md)
 - [16.6: Sidecar Sync Status After History Commits](16.6-sidecar-sync-status-after-history.md)
 
+## Phase 17
+
+- [17.1.1: White Balance, Temperature, and Tint Mutators](17.1.1-white-balance-temperature-tint-mutators.md)
+- [17.1.2: Tone Recovery Mutators](17.1.2-tone-recovery-mutators.md)
+- [17.1.3: Color Presence Mutators](17.1.3-color-presence-mutators.md)
+- [17.2.1: White Balance Preview, Commit, and Export Parity](17.2.1-white-balance-preview-commit-export-parity.md)
+- [17.2.2: Tone Recovery Preview, Commit, and Export Parity](17.2.2-tone-recovery-preview-commit-export-parity.md)
+- [17.2.3: Color Presence Preview, Commit, and Export Parity](17.2.3-color-presence-preview-commit-export-parity.md)
+- [17.3: Real Histogram Cache and Display](17.3-real-histogram-cache-display.md)
+- [17.4: Reset, Before/After, and Basic Presets](17.4-reset-before-after-basic-presets.md)
+- [17.5: Develop P0 Visual QA](17.5-develop-p0-visual-qa.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.

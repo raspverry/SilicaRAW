@@ -53,6 +53,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Phase 14 Product Metal Viewer Bridge Brief](phases/phase-14-product-metal-viewer-bridge.md): completed native viewer bridge scope and task order.
 - [Phase 15 RAW Color Metal Vertical Slice Brief](phases/phase-15-raw-color-metal-vertical-slice.md): completed RAW/color/Metal vertical slice scope and task order.
 - [Phase 16 Undo History Action Trust Brief](phases/phase-16-undo-history-action-trust.md): completed undo, history, and action trust scope and task order.
+- [Phase 17 Develop P0 Expansion Brief](phases/phase-17-develop-p0-expansion.md): current Develop P0 control family scope and task order.
 
 ### Decisions
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-17 | Develop P0 task cards added
+
+- Added the Phase 17 Develop P0 Expansion brief.
+- Split Phase 17 into atomic control-family task cards for mutators, preview/commit/export parity, histogram, reset/before-after/presets, and visual QA.
+- Routed the LLM index and master execution plan to Task 17.1.1.
+
 ## [2026-06-12] phase-16 | Sidecar history status added
 
 - Completed Task 16.6 with storage/core sidecar status read APIs.
