@@ -5,11 +5,11 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    RawPreviewArtifactError, RawProbeBackend, RawProbeErrorCategory, RawProbePlatform,
-    RawProbeRequest, RawProbeResult, RawProbeStatus,
+    RawFullResolutionExportSourceError, RawPreviewArtifactError, RawProbeBackend,
+    RawProbeErrorCategory, RawProbePlatform, RawProbeRequest, RawProbeResult, RawProbeStatus,
 };
 
-use super::CoreImageRawPreviewArtifact;
+use super::{CoreImageRawFullResolutionExportSource, CoreImageRawPreviewArtifact};
 
 pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
     let source_path = request.source_path.clone();
@@ -230,7 +230,7 @@ pub fn write_core_image_raw_preview_artifact(
         }
     }
 
-    write_core_image_jpeg(&source_path, output_path, max_edge)?;
+    write_core_image_jpeg(&source_path, output_path, Some(max_edge))?;
 
     let after_hash = sha256_file(&source_path)?;
     let bytes_written = fs::metadata(output_path)?.len();
@@ -242,10 +242,40 @@ pub fn write_core_image_raw_preview_artifact(
     })
 }
 
+pub fn write_core_image_raw_full_resolution_export_source(
+    probe: &RawProbeResult,
+    output_path: &Path,
+) -> Result<CoreImageRawFullResolutionExportSource, RawFullResolutionExportSourceError> {
+    let source_path = PathBuf::from(&probe.source_path);
+    let before_hash = sha256_file(&source_path)?;
+    if let Some(expected_hash) = probe.source_sha256.as_deref() {
+        if !expected_hash.eq_ignore_ascii_case(&before_hash) {
+            return Err(RawFullResolutionExportSourceError::SourceHashMismatch {
+                expected: expected_hash.to_string(),
+                actual: before_hash,
+            });
+        }
+    }
+
+    write_core_image_jpeg(&source_path, output_path, None)?;
+
+    let after_hash = sha256_file(&source_path)?;
+    let artifact_sha256 = sha256_file(output_path)?;
+    let bytes_written = fs::metadata(output_path)?.len();
+
+    Ok(CoreImageRawFullResolutionExportSource {
+        output_path: output_path.to_path_buf(),
+        bytes_written,
+        source_sha256: before_hash.clone(),
+        artifact_sha256,
+        original_hash_unchanged: before_hash == after_hash,
+    })
+}
+
 fn write_core_image_jpeg(
     source_path: &Path,
     output_path: &Path,
-    max_edge: u32,
+    max_edge: Option<u32>,
 ) -> Result<(), RawPreviewArtifactError> {
     use objc2::runtime::AnyObject;
     use objc2_core_graphics::{kCGColorSpaceSRGB, CGAffineTransformMakeScale, CGColorSpace};
@@ -274,7 +304,9 @@ fn write_core_image_jpeg(
         ));
     }
 
-    let scale = (max_edge as f64 / max_dimension).min(1.0);
+    let scale = max_edge
+        .map(|max_edge| (max_edge as f64 / max_dimension).min(1.0))
+        .unwrap_or(1.0);
     let image = if scale < 1.0 {
         let transform = CGAffineTransformMakeScale(scale, scale);
         unsafe { image.imageByApplyingTransform_highQualityDownsample(transform, true) }

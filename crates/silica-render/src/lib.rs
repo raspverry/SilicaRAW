@@ -107,6 +107,7 @@ pub struct ExposureContrastPreviewRequest {
 /// Render-side export request for the local alpha JPEG sRGB path.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JpegSrgbExportRenderRequest {
+    pub source_kind: ExportRenderSourceKind,
     pub source_path: String,
     pub output_path: String,
     pub color_behavior: ExportColorBehavior,
@@ -114,6 +115,19 @@ pub struct JpegSrgbExportRenderRequest {
     pub contrast: f64,
     pub quality: u8,
     pub message: String,
+}
+
+/// Source class for export rendering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportRenderSourceKind {
+    RasterSource,
+    RawFullResolutionArtifact,
+}
+
+impl JpegSrgbExportRenderRequest {
+    pub fn uses_viewer_texture_cache_as_source(&self) -> bool {
+        false
+    }
 }
 
 /// Stable identity for one viewer preview render request.
@@ -819,6 +833,7 @@ pub fn plan_jpeg_srgb_export(
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
+        source_kind: ExportRenderSourceKind::RasterSource,
         source_path: source_path.into(),
         output_path: output_path.into(),
         color_behavior: SPIKE_003_COLOR_GATE.export,
@@ -826,6 +841,26 @@ pub fn plan_jpeg_srgb_export(
         contrast,
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
+    }
+}
+
+/// Build a render-side request for exporting a full-resolution RAW-derived source artifact.
+pub fn plan_raw_derived_jpeg_srgb_export(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    JpegSrgbExportRenderRequest {
+        source_kind: ExportRenderSourceKind::RawFullResolutionArtifact,
+        source_path: source_path.into(),
+        output_path: output_path.into(),
+        color_behavior: SPIKE_003_COLOR_GATE.export,
+        exposure,
+        contrast,
+        quality,
+        message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
 }
 
@@ -915,6 +950,10 @@ mod tests {
             super::plan_jpeg_srgb_export("/tmp/original.jpg", "/tmp/exported.jpg", 0.5, -8.0, 90);
 
         assert_eq!(request.source_path, "/tmp/original.jpg");
+        assert_eq!(
+            request.source_kind,
+            super::ExportRenderSourceKind::RasterSource
+        );
         assert_eq!(request.output_path, "/tmp/exported.jpg");
         assert_eq!(request.exposure, 0.5);
         assert_eq!(request.contrast, -8.0);
@@ -924,6 +963,28 @@ mod tests {
             super::ExportColorBehavior::SrgbDefaultDisplayP3Supported
         );
         assert!(request.message.contains("JPEG sRGB export"));
+    }
+
+    #[test]
+    fn plans_raw_derived_jpeg_srgb_export_from_full_resolution_artifact_not_viewer_cache() {
+        let request = super::plan_raw_derived_jpeg_srgb_export(
+            "/tmp/silicaraw-library/exports/raw-derived/photo-7-source.jpg",
+            "/tmp/exported-photo-7.jpg",
+            0.5,
+            -8.0,
+            90,
+        );
+
+        assert_eq!(
+            request.source_kind,
+            super::ExportRenderSourceKind::RawFullResolutionArtifact
+        );
+        assert_eq!(
+            request.source_path,
+            "/tmp/silicaraw-library/exports/raw-derived/photo-7-source.jpg"
+        );
+        assert!(!request.uses_viewer_texture_cache_as_source());
+        assert!(request.message.contains("RAW-derived JPEG sRGB export"));
     }
 
     #[test]

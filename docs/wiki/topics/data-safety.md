@@ -30,6 +30,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 10.5.3 adds staged restore from backup artifacts with existing-target rollback copies, restored catalog/sidecar preservation, newer-schema rejection before target mutation, and original-file safety tests.
 - Task 14.7 records the native viewer disposable texture lifecycle boundary: viewer texture identity is rebuildable runtime state and cleanup on photo change, drawable resize, library close, or app close does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
 - Task 15.2 adds fixture-backed RAW preview artifacts as disposable cache files under library `previews/`; source/output canonical matches, stale source hashes, and preview cache path escapes are rejected before trust claims are made.
+- Task 15.5 adds RAW-derived JPEG sRGB export through a full-resolution source artifact under `render-cache/raw-export-sources/`; final export rejects original overwrite, records source/output/ICC hashes, records original hash unchanged evidence, and does not depend on viewer texture cache.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -50,6 +51,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Cache clear safety. Phase 6.2 simulates the currently scoped cache safety surface by deleting disposable library cache directories because no product cache-clear command exists yet.
 - Native viewer texture lifecycle safety. Task 14.7 covers disposable viewer texture identity and cleanup without catalog writes, sidecar writes, original write destinations, or persistent GPU cache state.
 - RAW preview artifact safety. Task 15.2 covers canonical source/output overwrite rejection, stale probe hash rejection, library `previews/` cache bounding, `..` escape rejection, unsupported-class no-write behavior, and original hash preservation for legal local RAW fixture classes.
+- RAW-derived export safety. Task 15.5 covers canonical RAW source/output overwrite rejection, full-resolution export source artifact separation from preview cache, source/output/ICC hash recording, no preview cache dependency, unsupported-class no-write behavior, and original hash preservation for legal local RAW fixture classes.
 
 ## Links
 

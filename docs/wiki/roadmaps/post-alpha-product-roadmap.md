@@ -506,28 +506,45 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No-draft-write test.
   - Viewer performance checklist.
 
-### Task 15.4: RAW-Derived JPEG sRGB Export with ICC
+### Task 15.4: Exposure and Contrast Metal Draft Path
 
-- **Location:** `crates/silica-export`, `crates/silica-core`, `apps/desktop/src-tauri`
+- **Location:** `crates/silica-render`, `crates/silica-core`, `apps/desktop/src-tauri`
+- **Description:** Carry exposure/contrast drafts to the Metal preview request path without catalog or history writes per slider tick.
+- **Dependencies:** Task 15.3
+- **Acceptance Criteria:**
+  - Draft payloads validate through the edit graph exposure/contrast validator.
+  - Draft render requests do not write catalog, sidecar, export, or original state.
+  - Commit still writes one validated edit graph.
+- **Status:** Completed on 2026-06-12.
+- **Validation:**
+  - `cargo test -p silica-edit -p silica-render -p silica-core`
+  - `cargo test -p silica-desktop --features native-metal-viewer`
+  - `scripts/harness/check.sh`
+
+### Task 15.5: RAW-Derived JPEG sRGB Export with ICC
+
+- **Location:** `crates/silica-decode`, `crates/silica-export`, `crates/silica-render`, `crates/silica-core`, `apps/desktop/src-tauri`
 - **Description:** Export full-resolution RAW-derived JPEG sRGB with ICC embedding.
-- **Dependencies:** Tasks 13.2 and 15.3
+- **Dependencies:** Tasks 13.2 and 15.4
 - **Acceptance Criteria:**
   - Export path is separate from preview.
   - sRGB ICC is embedded.
   - Decoder/color metadata is recorded.
   - Original RAW files remain unchanged.
+- **Status:** Completed on 2026-06-12. Added the full-resolution RAW export source artifact path, RAW-derived JPEG sRGB export orchestration, committed exposure/contrast export application, ICC/hash/decoder/profile evidence recording, and fixture-gated Class A RAW export validation.
 - **Validation:**
   - Export inspection.
   - Original hash protection.
   - `scripts/harness/check.sh`
 
-### Task 15.5: Installed-App RAW Vertical Smoke
+### Task 15.6: RAW Export Manual Color QA
 
-- **Location:** `scripts/harness/`, `checklists/LOCAL_DMG_INSTALL_CHECKLIST.md`
-- **Description:** Extend installed-app QA to cover the fixture-backed RAW vertical slice.
-- **Dependencies:** Task 15.4
+- **Location:** `checklists/`, `docs/wiki/topics/color-management.md`
+- **Description:** Record Preview.app or Photos review for RAW-derived sRGB JPEG export before broadening color claims.
+- **Dependencies:** Task 15.5
 - **Acceptance Criteria:**
-  - Installed app imports supported RAW fixtures, shows preview, edits exposure/contrast, exports JPEG sRGB, and preserves originals.
+  - Manual review record exists for exported RAW-derived JPEG sRGB.
+  - Release language remains evidence-limited and does not claim broad color correctness.
   - Unsupported RAWs remain blocked and reviewable.
 - **Validation:** Clean-Mac install QA record.
 

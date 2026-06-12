@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | RAW-derived JPEG sRGB export added
+
+- Completed Task 15.5 with a fixture-gated full-resolution RAW export source artifact path under `render-cache/raw-export-sources/`.
+- Added RAW-derived JPEG sRGB export evidence for source SHA-256, output SHA-256, embedded ICC state, ICC profile SHA-256, decoder backend, input profile, working space, and original hash preservation.
+- Kept viewer texture cache, preview cache, unsupported RAW classes, broad RAW/color correctness claims, and original-file mutation out of the export source-of-truth path.
+
 ## [2026-06-12] phase-15 | Exposure contrast Metal draft path added
 
 - Completed Task 15.4 by carrying exposure/contrast draft values on viewer preview render requests.

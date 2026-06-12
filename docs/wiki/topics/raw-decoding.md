@@ -20,6 +20,7 @@ RAW decoding is one of SilicaRAW's highest-risk technical areas. Spike 002 selec
 - Phase 5.1 adds preview decode readiness routing, not RAW pixels.
 - Phase 12.1 adds a feature-gated Core Image RAW probe contract and macOS metadata path, not product RAW pixels.
 - Task 15.2 adds a narrow feature-gated Core Image RAW preview artifact writer for fixture-backed classes A-D only.
+- Task 15.5 adds a feature-gated full-resolution Core Image RAW export source artifact for fixture-backed RAW-derived JPEG sRGB export. It writes under `render-cache/raw-export-sources/`, not `previews/`, and remains separate from viewer texture cache identity.
 - Full decoder-dependent features remain blocked until real fixture-backed decoding exists.
 
 ## Blocked Work

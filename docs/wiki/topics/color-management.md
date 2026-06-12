@@ -145,10 +145,14 @@ edit_graph.profile.input_profile
 edit_graph.profile.working_space
 edit_graph.profile.decoder_backend
 exports.export_settings_json.color_profile
+exports.export_settings_json.source_sha256
 exports.export_settings_json.output_sha256
 exports.export_settings_json.icc_profile_embedded
 exports.export_settings_json.icc_profile_sha256
 exports.export_settings_json.profile_metadata_source
+exports.export_settings_json.decoder_backend
+exports.export_settings_json.input_profile
+exports.export_settings_json.working_space
 ```
 
 Default edit graphs record `input_profile = "unknown"` and `decoder_backend = null`. Evidence-backed raster profile updates use `decoder_backend = "raster"`.
@@ -168,6 +172,18 @@ unknown profile string -> exportBlocked
 The UI/API distinction is deliberate. Omitted color profile means default sRGB. `display_p3` must be selected or passed explicitly. No other color-space labels silently run.
 
 This task does not prove visual color correctness; it only connects the already-proven ICC embedding path to product controls.
+
+## Phase 15.5 RAW-Derived JPEG sRGB Export
+
+Task 15.5 keeps RAW-derived export claims evidence-limited:
+
+```txt
+Core Image RAW fixture evidence -> full-resolution RAW export source artifact
+full-resolution source artifact -> JPEG sRGB export path
+JPEG sRGB export path -> embedded sRGB ICC and recorded ICC/profile/hash evidence
+```
+
+The export record stores source SHA-256, output SHA-256, ICC embedded state, ICC profile SHA-256, decoder backend, input profile, working space, and `profile_metadata_source`. This proves ICC/profile evidence for the fixture-backed RAW export path. It still does not prove broad visual color correctness.
 
 ## Phase 15 Entry Gate
 

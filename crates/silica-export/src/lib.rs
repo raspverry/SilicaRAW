@@ -58,6 +58,7 @@ pub struct JpegExportResult {
     pub format: ExportImageFormat,
     pub color_profile: ExportColorProfile,
     pub bytes_written: u64,
+    pub source_sha256: String,
     pub output_sha256: String,
     pub icc_profile_embedded: bool,
     pub icc_profile_sha256: String,
@@ -234,6 +235,7 @@ pub fn export_jpeg_with_color_profile(
         return Err(ExportError::NonFiniteAdjustment);
     }
 
+    let source_sha256 = sha256_file(&request.source_path)?;
     let icc_profile = export_icc_profile(request.color_profile)?;
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -269,6 +271,7 @@ pub fn export_jpeg_with_color_profile(
         output_path: request.output_path,
         format: ExportImageFormat::Jpeg,
         color_profile: request.color_profile,
+        source_sha256,
         output_sha256,
         icc_profile_embedded: inspection.embedded,
         icc_profile_sha256,
@@ -551,6 +554,10 @@ mod tests {
         assert_eq!(
             result.output_sha256,
             super::sha256_file(&result.output_path).expect("hash exported jpeg")
+        );
+        assert_eq!(
+            result.source_sha256,
+            super::sha256_file(&source_path).expect("hash source jpeg")
         );
         assert_eq!(
             std::fs::read(&source_path).expect("read original after"),

@@ -13,6 +13,7 @@ use std::time::UNIX_EPOCH;
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-core";
 
+pub use silica_decode::RawFullResolutionExportSourceError;
 pub use silica_decode::RawPreviewArtifactError;
 pub use silica_storage::CatalogRebuildDryRunAction;
 pub use silica_storage::CatalogRebuildDryRunEntry;
@@ -532,6 +533,13 @@ pub struct PhotoExportSession {
     pub format: String,
     pub color_profile: String,
     pub bytes_written: u64,
+    pub source_sha256: Option<String>,
+    pub output_sha256: String,
+    pub icc_profile_embedded: bool,
+    pub icc_profile_sha256: String,
+    pub decoder_backend: Option<String>,
+    pub input_profile: Option<String>,
+    pub working_space: Option<String>,
     pub export_record_id: String,
     pub message: String,
 }
@@ -585,6 +593,7 @@ impl LibraryCacheClearSession {
 pub enum CoreError {
     Storage(silica_storage::LibraryStorageError),
     Decode(silica_decode::RawPreviewArtifactError),
+    RawExport(silica_decode::RawFullResolutionExportSourceError),
     EditGraph(silica_edit::EditGraphValidationError),
     Export(silica_export::ExportError),
     ExportBlocked(String),
@@ -596,6 +605,7 @@ impl fmt::Display for CoreError {
         match self {
             Self::Storage(error) => write!(formatter, "{error}"),
             Self::Decode(error) => write!(formatter, "{error}"),
+            Self::RawExport(error) => write!(formatter, "{error}"),
             Self::EditGraph(error) => write!(formatter, "{error}"),
             Self::Export(error) => write!(formatter, "{error}"),
             Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
@@ -609,6 +619,7 @@ impl Error for CoreError {
         match self {
             Self::Storage(error) => Some(error),
             Self::Decode(error) => Some(error),
+            Self::RawExport(error) => Some(error),
             Self::EditGraph(error) => Some(error),
             Self::Export(error) => Some(error),
             Self::ExportBlocked(_) => None,
@@ -626,6 +637,12 @@ impl From<silica_storage::LibraryStorageError> for CoreError {
 impl From<silica_decode::RawPreviewArtifactError> for CoreError {
     fn from(error: silica_decode::RawPreviewArtifactError) -> Self {
         Self::Decode(error)
+    }
+}
+
+impl From<silica_decode::RawFullResolutionExportSourceError> for CoreError {
+    fn from(error: silica_decode::RawFullResolutionExportSourceError) -> Self {
+        Self::RawExport(error)
     }
 }
 
@@ -1371,6 +1388,9 @@ pub fn export_photo_jpeg(
     let format = export_format_string(export_result.format).to_string();
     let exported_color_profile =
         export_color_profile_string(export_result.color_profile).to_string();
+    let source_sha256 = export_result.source_sha256.clone();
+    let output_sha256 = export_result.output_sha256.clone();
+    let icc_profile_sha256 = export_result.icc_profile_sha256.clone();
     let settings_json = serde_json::json!({
         "format": format,
         "color_profile": exported_color_profile,
@@ -1379,9 +1399,10 @@ pub fn export_photo_jpeg(
         "contrast": render_request.contrast,
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
-        "output_sha256": export_result.output_sha256,
+        "source_sha256": source_sha256.clone(),
+        "output_sha256": output_sha256.clone(),
         "icc_profile_embedded": export_result.icc_profile_embedded,
-        "icc_profile_sha256": export_result.icc_profile_sha256,
+        "icc_profile_sha256": icc_profile_sha256.clone(),
         "profile_metadata_source": "silica-export",
     })
     .to_string();
@@ -1399,8 +1420,136 @@ pub fn export_photo_jpeg(
         format,
         color_profile: exported_color_profile,
         bytes_written: export_result.bytes_written,
+        source_sha256: Some(source_sha256),
+        output_sha256,
+        icc_profile_embedded: export_result.icc_profile_embedded,
+        icc_profile_sha256,
+        decoder_backend: None,
+        input_profile: None,
+        working_space: None,
         export_record_id: export_record.id,
         message: export_color_profile_message(color_profile).to_string(),
+    }))
+}
+
+/// Export one fixture-backed RAW catalog photo as JPEG sRGB through a full-resolution source artifact.
+pub fn export_raw_photo_jpeg_srgb_from_probe(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    fixture_class: impl AsRef<str>,
+    probe: &silica_decode::RawProbeResult,
+    output_path: impl AsRef<Path>,
+) -> Result<Option<PhotoExportSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let output_path = output_path.as_ref();
+    let candidate = match silica_storage::get_photo_preview_candidate(library_root_path, photo_id)?
+    {
+        Some(candidate) => candidate,
+        None => return Ok(None),
+    };
+    let raw_source_path = PathBuf::from(&probe.source_path);
+    if paths_match(&raw_source_path, output_path)? {
+        return Err(CoreError::RawExport(
+            silica_decode::RawFullResolutionExportSourceError::OutputMatchesSource(
+                output_path.to_path_buf(),
+            ),
+        ));
+    }
+    if !paths_match(&PathBuf::from(&candidate.path), &raw_source_path)? {
+        return Err(CoreError::ExportBlocked(
+            "RAW export probe source does not match the catalog photo source.".to_string(),
+        ));
+    }
+
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let exposure = graph.basic.exposure.as_f64().unwrap_or(0.0);
+    let contrast = graph.basic.contrast.as_f64().unwrap_or(0.0);
+    let source_artifact_path =
+        raw_full_resolution_export_source_path(library_root_path, photo_id, probe);
+    let source_artifact = silica_decode::write_raw_full_resolution_export_source(
+        silica_decode::RawFullResolutionExportSourceRequest {
+            fixture_class: fixture_class.as_ref().to_string(),
+            probe: probe.clone(),
+            output_path: source_artifact_path,
+        },
+    )?;
+    let render_request = silica_render::plan_raw_derived_jpeg_srgb_export(
+        source_artifact.artifact_path.display().to_string(),
+        output_path.display().to_string(),
+        exposure,
+        contrast,
+        LOCAL_ALPHA_JPEG_QUALITY,
+    );
+    let export_result =
+        silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
+            source_path: PathBuf::from(&render_request.source_path),
+            output_path: output_path.to_path_buf(),
+            exposure: render_request.exposure,
+            contrast: render_request.contrast,
+            quality: render_request.quality,
+            color_profile: silica_export::ExportColorProfile::Srgb,
+        })?;
+    let format = export_format_string(export_result.format).to_string();
+    let exported_color_profile =
+        export_color_profile_string(export_result.color_profile).to_string();
+    let output_sha256 = export_result.output_sha256.clone();
+    let icc_profile_sha256 = export_result.icc_profile_sha256.clone();
+    let decoder_backend = source_artifact.decoder_backend.as_str().to_string();
+    let input_profile = source_artifact.input_profile.clone();
+    let working_space = source_artifact.working_space.clone();
+    let settings_json = serde_json::json!({
+        "format": format,
+        "color_profile": exported_color_profile,
+        "quality": render_request.quality,
+        "exposure": render_request.exposure,
+        "contrast": render_request.contrast,
+        "source_path": source_artifact.source_path.clone(),
+        "source_sha256": source_artifact.source_sha256.clone(),
+        "raw_source_path": source_artifact.source_path.clone(),
+        "raw_source_sha256": source_artifact.source_sha256.clone(),
+        "raw_export_source_artifact_path": source_artifact.artifact_path.display().to_string(),
+        "raw_export_source_artifact_sha256": source_artifact.artifact_sha256.clone(),
+        "raw_export_source_artifact_bytes": source_artifact.bytes_written,
+        "raw_source_original_hash_unchanged": source_artifact.original_hash_unchanged,
+        "output_path": render_request.output_path,
+        "output_sha256": output_sha256.clone(),
+        "icc_profile_embedded": export_result.icc_profile_embedded,
+        "icc_profile_sha256": icc_profile_sha256.clone(),
+        "profile_metadata_source": "silica-export",
+        "decoder_backend": decoder_backend.clone(),
+        "input_profile": input_profile.clone(),
+        "working_space": working_space.clone(),
+        "export_source_kind": "raw_full_resolution_artifact",
+        "viewer_texture_cache_source": render_request.uses_viewer_texture_cache_as_source(),
+    })
+    .to_string();
+    let export_record = silica_storage::record_export(
+        library_root_path,
+        &candidate.photo_id,
+        &export_result.output_path,
+        settings_json,
+    )?;
+
+    Ok(Some(PhotoExportSession {
+        photo_id: candidate.photo_id,
+        source_path: source_artifact.source_path,
+        output_path: export_result.output_path,
+        format,
+        color_profile: exported_color_profile,
+        bytes_written: export_result.bytes_written,
+        source_sha256: Some(source_artifact.source_sha256),
+        output_sha256,
+        icc_profile_embedded: export_result.icc_profile_embedded,
+        icc_profile_sha256,
+        decoder_backend: Some(decoder_backend),
+        input_profile: Some(input_profile),
+        working_space: Some(working_space),
+        export_record_id: export_record.id,
+        message: "RAW-derived JPEG sRGB export completed.".to_string(),
     }))
 }
 
@@ -2075,6 +2224,46 @@ fn raw_preview_artifact_cache_key(photo_id: &str, probe: &silica_decode::RawProb
         probe.width.unwrap_or(0),
         probe.height.unwrap_or(0)
     )
+}
+
+fn raw_full_resolution_export_source_path(
+    library_root_path: &Path,
+    photo_id: &str,
+    probe: &silica_decode::RawProbeResult,
+) -> PathBuf {
+    let source_sha = probe.source_sha256.as_deref().unwrap_or("missing-sha256");
+    library_root_path
+        .join("render-cache")
+        .join("raw-export-sources")
+        .join(format!("raw-export-{photo_id}-{source_sha}.jpg"))
+}
+
+fn paths_match(source_path: &PathBuf, output_path: &Path) -> Result<bool, CoreError> {
+    if source_path == output_path {
+        return Ok(true);
+    }
+    if !output_path.exists() {
+        return Ok(false);
+    }
+
+    let source_path = match std::fs::canonicalize(source_path) {
+        Ok(path) => path,
+        Err(error) => {
+            return Err(CoreError::Storage(
+                silica_storage::LibraryStorageError::from(error),
+            ))
+        }
+    };
+    let output_path = match std::fs::canonicalize(output_path) {
+        Ok(path) => path,
+        Err(error) => {
+            return Err(CoreError::Storage(
+                silica_storage::LibraryStorageError::from(error),
+            ))
+        }
+    };
+
+    Ok(source_path == output_path)
 }
 
 fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> PhotoPreviewStatus {
@@ -3530,6 +3719,20 @@ mod tests {
         assert_eq!(exported.color_profile, "srgb");
         assert!(exported.bytes_written > 0);
         assert_eq!(
+            exported
+                .source_sha256
+                .as_deref()
+                .expect("source SHA-256 evidence")
+                .len(),
+            64
+        );
+        assert_eq!(exported.output_sha256.len(), 64);
+        assert!(exported.icc_profile_embedded);
+        assert_eq!(
+            exported.icc_profile_sha256,
+            "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e"
+        );
+        assert_eq!(
             std::fs::read(&jpeg_file).expect("read original after"),
             original_before
         );
@@ -3563,6 +3766,10 @@ mod tests {
                 .len(),
             64
         );
+        assert_eq!(
+            settings["source_sha256"].as_str(),
+            exported.source_sha256.as_deref()
+        );
 
         let flags = get_photo_flags(&created.root_path, &exported.photo_id)
             .expect("read flags")
@@ -3576,6 +3783,154 @@ mod tests {
             )
             .expect("exported flag");
         assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn raw_derived_jpeg_srgb_export_rejects_original_overwrite_before_decode() {
+        let workspace = unique_library_root("core-raw-export-overwrite");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let raw_file = import_root.join("sample.cr2");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&raw_file, b"raw placeholder").expect("write raw placeholder");
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.cr2'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+        let probe = successful_raw_probe(&raw_file.display().to_string(), Some(5184), Some(3456));
+
+        let error = export_raw_photo_jpeg_srgb_from_probe(
+            &created.root_path,
+            &photo_id,
+            "A",
+            &probe,
+            &raw_file,
+        )
+        .expect_err("RAW export cannot overwrite original");
+
+        assert!(matches!(
+            error,
+            CoreError::RawExport(
+                silica_decode::RawFullResolutionExportSourceError::OutputMatchesSource(_)
+            )
+        ));
+        assert_original_hash(&raw_file, &file_hash(&raw_file), "RAW overwrite rejection");
+
+        remove_library_root(&workspace);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[test]
+    #[ignore]
+    fn raw_derived_jpeg_srgb_export_from_fixture_records_evidence_without_preview_cache() {
+        let manifest = std::env::var("SILICARAW_RAW_FIXTURE_MANIFEST")
+            .expect("SILICARAW_RAW_FIXTURE_MANIFEST must point to a legal RAW fixture manifest");
+        let report =
+            silica_decode::probe_raw_fixture_manifest(manifest).expect("probe RAW fixtures");
+        let fixture = report
+            .results
+            .iter()
+            .find(|result| result.fixture_class == "A")
+            .expect("Class A fixture evidence");
+        let raw_path = PathBuf::from(&fixture.probe.source_path);
+        let import_root = raw_path.parent().expect("fixture parent");
+        let workspace = unique_library_root("core-raw-export-fixture");
+        let library_root = workspace.join("SilicaRAW Library");
+        let export_root = workspace.join("Exports");
+        let baseline_output = export_root.join("baseline.jpg");
+        let adjusted_output = export_root.join("adjusted.jpg");
+
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, import_root).expect("import RAW fixture folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE path = ?1",
+                [&fixture.probe.source_path],
+                |row| row.get(0),
+            )
+            .expect("fixture photo id");
+        drop(connection);
+
+        let baseline = export_raw_photo_jpeg_srgb_from_probe(
+            &created.root_path,
+            &photo_id,
+            &fixture.fixture_class,
+            &fixture.probe,
+            &baseline_output,
+        )
+        .expect("export baseline RAW photo")
+        .expect("baseline export result");
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit exposure/contrast")
+            .expect("commit result");
+        let adjusted = export_raw_photo_jpeg_srgb_from_probe(
+            &created.root_path,
+            &photo_id,
+            &fixture.fixture_class,
+            &fixture.probe,
+            &adjusted_output,
+        )
+        .expect("export adjusted RAW photo")
+        .expect("adjusted export result");
+
+        assert_eq!(
+            adjusted.source_sha256.as_deref(),
+            fixture.probe.source_sha256.as_deref()
+        );
+        assert_ne!(baseline.output_sha256, adjusted.output_sha256);
+        assert!(adjusted.icc_profile_embedded);
+        assert_eq!(adjusted.decoder_backend.as_deref(), Some("core_image_raw"));
+        assert_eq!(adjusted.input_profile.as_deref(), Some("core_image_raw"));
+        assert_eq!(adjusted.working_space.as_deref(), Some("srgb"));
+        assert!(adjusted.output_path.is_file());
+        assert_ne!(adjusted.output_path, raw_path);
+        assert!(silica_storage::get_photo_cache_record(
+            &created.root_path,
+            &photo_id,
+            silica_storage::PREVIEW_CACHE_TYPE,
+        )
+        .expect("preview cache lookup")
+        .is_none());
+
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(
+            settings["source_sha256"],
+            fixture.probe.source_sha256.clone().unwrap()
+        );
+        assert_eq!(settings["output_sha256"], adjusted.output_sha256);
+        assert_eq!(settings["icc_profile_embedded"], true);
+        assert_eq!(settings["icc_profile_sha256"], adjusted.icc_profile_sha256);
+        assert_eq!(settings["decoder_backend"], "core_image_raw");
+        assert_eq!(settings["input_profile"], "core_image_raw");
+        assert_eq!(settings["working_space"], "srgb");
+        assert_eq!(settings["profile_metadata_source"], "silica-export");
+        assert_eq!(
+            settings["export_source_kind"],
+            "raw_full_resolution_artifact"
+        );
+        assert_eq!(settings["viewer_texture_cache_source"], false);
+        assert_eq!(settings["raw_source_original_hash_unchanged"], true);
+        let artifact_path = settings["raw_export_source_artifact_path"]
+            .as_str()
+            .expect("artifact path");
+        assert!(artifact_path.contains("render-cache/raw-export-sources"));
+        assert!(!artifact_path.contains("/previews/"));
 
         remove_library_root(&workspace);
     }
@@ -3898,5 +4253,27 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn successful_raw_probe(
+        source_path: &str,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> silica_decode::RawProbeResult {
+        silica_decode::RawProbeResult {
+            backend: silica_decode::RawProbeBackend::CoreImageRaw,
+            platform: silica_decode::RawProbePlatform::Macos,
+            macos_version: Some("26.4".to_string()),
+            source_path: source_path.to_string(),
+            source_sha256: Some(file_hash(Path::new(source_path))),
+            original_file_size: Some(1024),
+            original_modified_at: Some("2026-06-12T00:00:00Z".to_string()),
+            status: silica_decode::RawProbeStatus::Success,
+            width,
+            height,
+            orientation: None,
+            error_category: None,
+            message: "Core Image opened the RAW source.".to_string(),
+        }
     }
 }

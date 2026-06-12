@@ -96,7 +96,7 @@ Task 15.0 completed the evidence gate on 2026-06-12. The allowed scope is record
 - Task 15.2: fixture-backed RAW preview artifact tests and original hash checks. Completed on 2026-06-12.
 - Task 15.3: feature-gated desktop/native viewer tests. Completed on 2026-06-12.
 - Task 15.4: no-draft-write tests and edit graph commit tests. Completed on 2026-06-12.
-- Task 15.5: export inspection, ICC evidence, output/source hash checks.
+- Task 15.5: export inspection, ICC evidence, output/source hash checks, full-resolution RAW export source artifact proof. Completed on 2026-06-12.
 - Task 15.6: manual Preview.app or Photos QA record.
 - Before completion: `scripts/harness/check.sh`.
 

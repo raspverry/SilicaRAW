@@ -43,7 +43,8 @@ As of 2026-06-12:
 - Task 15.2 RAW decode to preview artifact is complete.
 - Task 15.3 Metal preview display is complete.
 - Task 15.4 Exposure/contrast Metal draft path is complete.
-- Next task: [15.5 RAW-Derived JPEG sRGB Export](../tasks/15.5-raw-derived-jpeg-srgb-export.md).
+- Task 15.5 RAW-derived JPEG sRGB export is complete.
+- Next task: [15.6 RAW Export Manual Color QA](../tasks/15.6-raw-export-manual-color-qa.md).
 
 ## Wave Map
 
@@ -373,9 +374,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 15.5 from the existing task card.
-2. Continue through Task 15.6 in order.
-3. After Phase 15 completes, create only the missing next-phase task cards from this master plan, then implement them atomically.
+1. Execute Task 15.6 from the existing task card.
+2. After Phase 15 completes, create only the missing next-phase task cards from this master plan, then implement them atomically.
 
 ## Links
 

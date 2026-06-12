@@ -291,6 +291,27 @@ pub struct RawPreviewArtifactResult {
     pub original_hash_unchanged: Option<bool>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawFullResolutionExportSourceRequest {
+    pub fixture_class: String,
+    pub probe: RawProbeResult,
+    pub output_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawFullResolutionExportSourceResult {
+    pub source_path: String,
+    pub artifact_path: PathBuf,
+    pub bytes_written: u64,
+    pub source_sha256: String,
+    pub artifact_sha256: String,
+    pub decoder_backend: DecodedImageDecoderBackend,
+    pub input_profile: String,
+    pub working_space: String,
+    pub pixel_format: DecodedImagePixelFormat,
+    pub original_hash_unchanged: bool,
+}
+
 #[derive(Debug)]
 pub enum RawPreviewArtifactError {
     OutputMatchesSource(PathBuf),
@@ -348,6 +369,104 @@ impl From<std::io::Error> for RawPreviewArtifactError {
     }
 }
 
+#[derive(Debug)]
+pub enum RawFullResolutionExportSourceError {
+    OutputMatchesSource(PathBuf),
+    SourceHashMismatch { expected: String, actual: String },
+    MissingSourceHash(String),
+    UnsupportedFixtureClass(String),
+    InvalidProbeEvidence(String),
+    CoreImageUnavailable(String),
+    CoreImageWrite(String),
+    Io(std::io::Error),
+}
+
+impl fmt::Display for RawFullResolutionExportSourceError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OutputMatchesSource(path) => {
+                write!(
+                    formatter,
+                    "RAW full-resolution export source output matches original source: {}",
+                    path.display()
+                )
+            }
+            Self::SourceHashMismatch { expected, actual } => write!(
+                formatter,
+                "RAW full-resolution export source hash mismatch: expected {expected}, actual {actual}"
+            ),
+            Self::MissingSourceHash(path) => {
+                write!(
+                    formatter,
+                    "RAW full-resolution export requires fixture source SHA-256 evidence: {path}"
+                )
+            }
+            Self::UnsupportedFixtureClass(fixture_class) => {
+                write!(
+                    formatter,
+                    "RAW fixture class {fixture_class} is not enabled for full-resolution export"
+                )
+            }
+            Self::InvalidProbeEvidence(message) => {
+                write!(formatter, "invalid RAW export probe evidence: {message}")
+            }
+            Self::CoreImageUnavailable(message) => {
+                write!(formatter, "Core Image unavailable: {message}")
+            }
+            Self::CoreImageWrite(message) => {
+                write!(
+                    formatter,
+                    "Core Image RAW full-resolution export source write failed: {message}"
+                )
+            }
+            Self::Io(error) => {
+                write!(
+                    formatter,
+                    "RAW full-resolution export source filesystem error: {error}"
+                )
+            }
+        }
+    }
+}
+
+impl Error for RawFullResolutionExportSourceError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::OutputMatchesSource(_)
+            | Self::SourceHashMismatch { .. }
+            | Self::MissingSourceHash(_)
+            | Self::UnsupportedFixtureClass(_)
+            | Self::InvalidProbeEvidence(_)
+            | Self::CoreImageUnavailable(_)
+            | Self::CoreImageWrite(_) => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for RawFullResolutionExportSourceError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+impl From<RawPreviewArtifactError> for RawFullResolutionExportSourceError {
+    fn from(error: RawPreviewArtifactError) -> Self {
+        match error {
+            RawPreviewArtifactError::OutputMatchesSource(path) => Self::OutputMatchesSource(path),
+            RawPreviewArtifactError::SourceHashMismatch { expected, actual } => {
+                Self::SourceHashMismatch { expected, actual }
+            }
+            RawPreviewArtifactError::InvalidRequest(message) => Self::InvalidProbeEvidence(message),
+            RawPreviewArtifactError::CoreImageUnavailable(message) => {
+                Self::CoreImageUnavailable(message)
+            }
+            RawPreviewArtifactError::CoreImageWrite(message) => Self::CoreImageWrite(message),
+            RawPreviewArtifactError::Io(error) => Self::Io(error),
+        }
+    }
+}
+
 pub fn write_raw_preview_artifact(
     request: RawPreviewArtifactRequest,
 ) -> Result<RawPreviewArtifactResult, RawPreviewArtifactError> {
@@ -396,6 +515,57 @@ pub fn write_raw_preview_artifact(
         artifact_path: Some(write_result.output_path),
         bytes_written: Some(write_result.bytes_written),
         original_hash_unchanged: Some(write_result.original_hash_unchanged),
+    })
+}
+
+pub fn write_raw_full_resolution_export_source(
+    request: RawFullResolutionExportSourceRequest,
+) -> Result<RawFullResolutionExportSourceResult, RawFullResolutionExportSourceError> {
+    let source_path = PathBuf::from(&request.probe.source_path);
+    if paths_refer_to_same_file(&source_path, &request.output_path) {
+        return Err(RawFullResolutionExportSourceError::OutputMatchesSource(
+            request.output_path,
+        ));
+    }
+    let raw_plan = plan_product_raw_decode_from_probe(&request.fixture_class, &request.probe);
+    if raw_plan.status != ProductRawDecodeStatus::Supported {
+        if !is_core_image_supported_fixture_class(request.fixture_class.trim()) {
+            return Err(RawFullResolutionExportSourceError::UnsupportedFixtureClass(
+                request.fixture_class,
+            ));
+        }
+        return Err(RawFullResolutionExportSourceError::InvalidProbeEvidence(
+            raw_plan.message,
+        ));
+    }
+    let Some(expected_source_sha256) = request.probe.source_sha256.as_deref() else {
+        return Err(RawFullResolutionExportSourceError::MissingSourceHash(
+            request.probe.source_path,
+        ));
+    };
+
+    let write_result = core_image_raw_probe::write_core_image_raw_full_resolution_export_source(
+        &request.probe,
+        &request.output_path,
+    )?;
+    if !expected_source_sha256.eq_ignore_ascii_case(&write_result.source_sha256) {
+        return Err(RawFullResolutionExportSourceError::SourceHashMismatch {
+            expected: expected_source_sha256.to_string(),
+            actual: write_result.source_sha256,
+        });
+    }
+
+    Ok(RawFullResolutionExportSourceResult {
+        source_path: raw_plan.source_path,
+        artifact_path: write_result.output_path,
+        bytes_written: write_result.bytes_written,
+        source_sha256: expected_source_sha256.to_string(),
+        artifact_sha256: write_result.artifact_sha256,
+        decoder_backend: DecodedImageDecoderBackend::CoreImageRaw,
+        input_profile: "core_image_raw".to_string(),
+        working_space: "srgb".to_string(),
+        pixel_format: DecodedImagePixelFormat::JpegSrgb8,
+        original_hash_unchanged: write_result.original_hash_unchanged,
     })
 }
 
@@ -957,6 +1127,46 @@ mod tests {
         assert_eq!(result.original_hash_unchanged, None);
     }
 
+    #[test]
+    fn raw_full_resolution_export_source_rejects_unproven_classes_without_file() {
+        let output_path = unique_temp_probe_path("raw-export-source.jpg");
+        let probe = successful_raw_probe("/tmp/sample.raw", Some(1200), Some(800));
+
+        let error = super::write_raw_full_resolution_export_source(
+            super::RawFullResolutionExportSourceRequest {
+                fixture_class: "E".to_string(),
+                probe,
+                output_path: output_path.clone(),
+            },
+        )
+        .expect_err("unproven RAW fixture classes must not export");
+
+        assert!(matches!(
+            error,
+            super::RawFullResolutionExportSourceError::UnsupportedFixtureClass(_)
+        ));
+        assert!(!output_path.exists());
+    }
+
+    #[test]
+    fn raw_full_resolution_export_source_refuses_to_write_over_original_source() {
+        let probe = successful_raw_probe("/tmp/sample.cr2", Some(5184), Some(3456));
+
+        let error = super::write_raw_full_resolution_export_source(
+            super::RawFullResolutionExportSourceRequest {
+                fixture_class: "A".to_string(),
+                probe,
+                output_path: std::path::PathBuf::from("/tmp/sample.cr2"),
+            },
+        )
+        .expect_err("RAW export source artifact must not overwrite original source");
+
+        assert!(matches!(
+            error,
+            super::RawFullResolutionExportSourceError::OutputMatchesSource(_)
+        ));
+    }
+
     #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
     #[test]
     #[ignore]
@@ -1054,6 +1264,59 @@ mod tests {
             super::RawPreviewArtifactError::SourceHashMismatch { .. }
         ));
         assert!(!output_path.exists());
+    }
+
+    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[test]
+    #[ignore]
+    fn writes_raw_full_resolution_export_source_from_fixture_manifest_without_preview_cache() {
+        let manifest = std::env::var("SILICARAW_RAW_FIXTURE_MANIFEST")
+            .expect("SILICARAW_RAW_FIXTURE_MANIFEST must point to a legal RAW fixture manifest");
+        let report =
+            super::probe_raw_fixture_manifest(manifest).expect("probe legal RAW fixture manifest");
+        let fixture = report
+            .results
+            .iter()
+            .find(|result| result.fixture_class == "A")
+            .expect("Class A fixture evidence");
+        let output_root = unique_temp_probe_path("raw-full-resolution-export-sources");
+        std::fs::create_dir_all(&output_root).expect("create output root");
+        let output_path = output_root.join(format!("{}-source.jpg", fixture.fixture_id));
+
+        let result = super::write_raw_full_resolution_export_source(
+            super::RawFullResolutionExportSourceRequest {
+                fixture_class: fixture.fixture_class.clone(),
+                probe: fixture.probe.clone(),
+                output_path: output_path.clone(),
+            },
+        )
+        .expect("write full-resolution RAW export source");
+
+        assert_eq!(result.artifact_path, output_path);
+        assert_eq!(
+            result.source_sha256,
+            fixture.probe.source_sha256.clone().unwrap()
+        );
+        assert_eq!(
+            result.decoder_backend,
+            super::DecodedImageDecoderBackend::CoreImageRaw
+        );
+        assert_eq!(result.input_profile, "core_image_raw");
+        assert_eq!(result.working_space, "srgb");
+        assert_eq!(
+            result.pixel_format,
+            super::DecodedImagePixelFormat::JpegSrgb8
+        );
+        assert!(result.bytes_written > 0);
+        assert_eq!(result.artifact_sha256.len(), 64);
+        assert!(result.original_hash_unchanged);
+        assert!(output_path.is_file());
+        assert!(!output_path
+            .components()
+            .any(|component| { component.as_os_str() == std::ffi::OsStr::new("previews") }));
+
+        let _ = std::fs::remove_file(output_path);
+        let _ = std::fs::remove_dir_all(output_root);
     }
 
     #[test]

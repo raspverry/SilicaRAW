@@ -72,7 +72,11 @@ The current implementation order starts with:
 - Phase 15 task cards now route the RAW/color/Metal vertical slice.
 - Task 15.0, the vertical slice evidence gate, is complete.
 - Task 15.1, the decoded image handoff contract, is complete.
-- Next roadmap step is Task 15.5, RAW-derived JPEG sRGB export.
+- Task 15.2, RAW decode to preview artifact, is complete.
+- Task 15.3, Metal preview display, is complete.
+- Task 15.4, exposure/contrast Metal draft path, is complete.
+- Task 15.5, RAW-derived JPEG sRGB export, is complete.
+- Next roadmap step is Task 15.6, RAW export manual color QA.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
