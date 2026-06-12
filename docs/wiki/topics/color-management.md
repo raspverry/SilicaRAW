@@ -23,6 +23,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Committed tagged color fixtures are still missing.
 - Local ignored Class F fixtures now have profile-probe evidence for sRGB, Display P3, and untagged JPEG handling.
 - Phase 13 now has an execution plan, brief, and task cards for fixture-backed color proof.
+- The local export UI/API now keeps sRGB as the default and exposes Display P3 only as an explicit ICC-backed choice.
 
 ## Blocked Work
 
@@ -88,12 +89,12 @@ Current planned order:
 13.3 feature-gated color probe [complete]
 13.4 probe harness [complete]
 13.5 support matrix [complete]
-13.6 ICC export proof
+13.6 ICC export proof [complete]
 13.7 schema-safe color metadata [complete]
-13.8 explicit export color options
+13.8 explicit export color options [complete]
 ```
 
-Until those tasks produce evidence, color correctness and user-facing Display P3 export claims remain blocked.
+Phase 13 now has profile-probe, ICC embedding, metadata, and explicit option wiring evidence. Color correctness claims remain blocked until approved tolerance results and executed manual visual review exist.
 
 Task 13.3 added a non-default `color-probe` feature in `silica-render`. It records JPEG profile metadata and source hashes for fixture proof only. It does not apply a ColorSync transform, write ICC profiles, render pixels, or prove color correctness.
 
@@ -117,7 +118,7 @@ Blocked states remain explicit:
 | --- | --- | --- |
 | Color correctness | `blocked_pending_tolerance_and_visual_review` | No approved pixel or perceptual comparison and no manual visual QA record. |
 | Transform output appearance | `blocked_pending_tolerance_and_visual_review` | ICC/profile inspection does not prove rendered pixel correctness. |
-| Display P3 user-facing option | `blocked_pending_task_13_8` | The UI/API option stays blocked until explicit product wiring exists. |
+| Display P3 user-facing option | `explicit_export_option_available` | Task 13.8 wires Display P3 as an explicit ICC-backed JPEG export option only. |
 | Committed fixture corpus | `blocked_pending_redistribution_review` | Local macOS profile-derived fixture files remain ignored by git. |
 
 ## Phase 13.6 ICC Export Proof
@@ -133,7 +134,7 @@ Manual visual review is ready but not executed:
 
 - [Color Export Manual QA Checklist](../../../checklists/COLOR_EXPORT_MANUAL_QA.md)
 
-User-facing Display P3 export remains blocked until Task 13.8 wires an explicit product option.
+User-facing Display P3 export stays limited to an explicit ICC-backed output option; visual color correctness remains blocked.
 
 ## Phase 13.7 Color Metadata Contract
 
@@ -153,6 +154,20 @@ exports.export_settings_json.profile_metadata_source
 Default edit graphs record `input_profile = "unknown"` and `decoder_backend = null`. Evidence-backed raster profile updates use `decoder_backend = "raster"`.
 
 No new edit graph schema fields were added.
+
+## Phase 13.8 Explicit Export Color Options
+
+Task 13.8 wires the proven export profiles into the local desktop boundary:
+
+```txt
+sRGB -> default JPEG export path
+Display P3 -> explicit JPEG export choice using embedded ICC evidence
+unknown profile string -> exportBlocked
+```
+
+The UI/API distinction is deliberate. Omitted color profile means default sRGB. `display_p3` must be selected or passed explicitly. No other color-space labels silently run.
+
+This task does not prove visual color correctness; it only connects the already-proven ICC embedding path to product controls.
 
 ## Color-Dependent Tags
 

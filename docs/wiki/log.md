@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Explicit export color options added
+
+- Completed Task 13.8 with sRGB as the default JPEG export path and Display P3 as an explicit ICC-backed option.
+- Added desktop command parsing that rejects unsupported export color profile strings instead of silently falling through.
+- Marked Phase 13 implementation complete while keeping visual color correctness blocked pending tolerance results and manual review.
+
 ## [2026-06-12] phase-13 | Color metadata contract added
 
 - Completed Task 13.7 with schema-owned edit graph profile metadata helpers and validation.

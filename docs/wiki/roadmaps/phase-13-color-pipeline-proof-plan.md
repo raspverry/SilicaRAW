@@ -1,6 +1,6 @@
 ---
 title: Phase 13 Color Pipeline Proof Plan
-status: active
+status: complete
 audience: all
 updated: 2026-06-12
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
@@ -34,7 +34,8 @@ As of 2026-06-12:
 - Task 13.5 color support matrix is complete.
 - Task 13.6 ICC export proof is complete.
 - Task 13.7 color metadata contract is complete.
-- Task 13.8 explicit export color options is next.
+- Task 13.8 explicit export color options is complete.
+- Phase 13 implementation tasks are complete. Color correctness claims remain blocked pending approved tolerance results and executed manual visual review.
 
 ## Goal
 
@@ -118,13 +119,13 @@ Create fixture-backed evidence for:
 ### Task 13.8: Explicit Export Color Options
 
 - **Card:** [13.8 Explicit Export Color Options](../tasks/13.8-explicit-export-color-options.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** Export UI/API makes sRGB default and Display P3 explicit only after fixture-backed proof.
 - **Validation:** export UI smoke and color export tests.
 
 ## Completion Gate
 
-Phase 13 is not complete until all of these are true:
+Phase 13 implementation is complete because all of these are true:
 
 - Legal Color Class F fixture evidence is recorded.
 - Profile probe evidence exists for tagged sRGB, tagged Display P3, and untagged raster fixtures.

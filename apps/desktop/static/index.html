@@ -457,13 +457,28 @@
                   <button class="sr-path-picker-button" id="chooseExportOutputPath" type="button">Choose...</button>
                 </div>
               </div>
-              <div class="sr-export-fixed-grid" aria-label="JPEG sRGB settings">
+              <div class="sr-export-fixed-grid" aria-label="JPEG settings">
                 <label for="exportFormat">Format</label>
                 <input id="exportFormat" type="text" value="JPEG" readonly>
-                <label for="exportColorSpace">Color Space</label>
-                <input id="exportColorSpace" type="text" value="sRGB" readonly>
                 <label for="exportQuality">Quality</label>
                 <input id="exportQuality" type="number" value="90" min="90" max="90" readonly>
+              </div>
+              <div class="sr-export-setting-row sr-export-color-options">
+                <label for="exportColorSpace">Color Space</label>
+                <div class="sr-export-color-control">
+                  <input id="exportColorSpace" type="text" value="sRGB" readonly>
+                  <div class="sr-export-color-choices" role="group" aria-label="JPEG color space">
+                    <button class="sr-export-color-choice is-selected" id="exportColorSrgb" type="button" data-export-color="srgb" aria-pressed="true">
+                      <span>sRGB</span>
+                      <small>Default</small>
+                    </button>
+                    <button class="sr-export-color-choice" id="exportColorDisplayP3" type="button" data-export-color="display_p3" aria-pressed="false">
+                      <span>Display P3</span>
+                      <small>Explicit ICC</small>
+                    </button>
+                  </div>
+                  <p class="sr-export-color-proof" id="exportColorProof">sRGB is the default export path. Display P3 requires explicit selection and writes ICC metadata.</p>
+                </div>
               </div>
               <div class="sr-export-safety" id="exportSafetyNote">
                 Original files will not be modified. SilicaRAW writes a separate JPEG sRGB file to the output path.
@@ -593,9 +608,13 @@
       const exportSelectedPhotoName = document.querySelector("#exportSelectedPhotoName");
       const exportSelectedInline = document.querySelector("#exportSelectedInline");
       const exportOutputPath = document.querySelector("#exportOutputPath");
+      const exportColorSpace = document.querySelector("#exportColorSpace");
+      const exportColorOptionButtons = Array.from(document.querySelectorAll("[data-export-color]"));
       const chooseExportOutputPathButton = document.querySelector("#chooseExportOutputPath");
       const exportStatus = document.querySelector("#exportStatus");
+      const exportSafetyNote = document.querySelector("#exportSafetyNote");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
+      const exportSummaryColor = document.querySelector("#exportSummaryColor");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
@@ -624,6 +643,7 @@
       let selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
       let selectionAnchorPhotoId = selectedPhotoId;
       let activeLibraryPath = "";
+      let selectedExportColorProfile = "srgb";
       let libraryGridPage = {
         offset: 0,
         limit: LIBRARY_GRID_PAGE_LIMIT,
@@ -2101,9 +2121,32 @@
         }));
       }
 
+      function exportColorProfileLabel(profile) {
+        return profile === "display_p3" ? "Display P3" : "sRGB";
+      }
+
+      function exportColorSafetyText(profile) {
+        const label = exportColorProfileLabel(profile);
+        return `Original files will not be modified. SilicaRAW writes a separate JPEG ${label} file to the output path.`;
+      }
+
+      function setExportColorProfile(profile) {
+        selectedExportColorProfile = profile === "display_p3" ? "display_p3" : "srgb";
+        const label = exportColorProfileLabel(selectedExportColorProfile);
+        exportColorSpace.value = label;
+        exportSummaryColor.textContent = label;
+        exportSafetyNote.textContent = exportColorSafetyText(selectedExportColorProfile);
+        exportColorOptionButtons.forEach((button) => {
+          const selected = button.dataset.exportColor === selectedExportColorProfile;
+          button.classList.toggle("is-selected", selected);
+          button.setAttribute("aria-pressed", String(selected));
+        });
+      }
+
       function syncExportDialog() {
         const photo = selectedPhoto();
         const hasPhoto = Boolean(photo);
+        setExportColorProfile(selectedExportColorProfile);
         exportSelectedPhotoName.textContent = photo?.fileName ?? "No photo selected";
         exportSelectedInline.textContent = photo?.fileName ?? "None";
         exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg` : "None";
@@ -2146,6 +2189,8 @@
       async function runJpegExport() {
         const photo = selectedPhoto();
         const outputPath = exportOutputPath.value.trim();
+        const exportColorProfile = selectedExportColorProfile;
+        const exportColorLabel = exportColorProfileLabel(exportColorProfile);
         if (!isRasterExportCandidate(photo)) {
           syncExportDialog();
           setStatus(exportStatus.value);
@@ -2169,16 +2214,17 @@
         }
 
         setBusy(true);
-        exportStatus.value = "Exporting JPEG sRGB...";
+        exportStatus.value = `Exporting JPEG ${exportColorLabel}...`;
         setStatus(exportStatus.value);
         try {
-          const response = await invoke("export_photo_jpeg_srgb", {
+          const response = await invoke("export_photo_jpeg", {
             libraryPath: activeLibraryPath,
             photoId: photo.photoId,
             outputPath,
+            colorProfile: exportColorProfile === "srgb" ? null : exportColorProfile,
           });
           if (commandFailed(response)) {
-            exportStatus.value = responseErrorMessage(response, "JPEG sRGB export failed.");
+            exportStatus.value = responseErrorMessage(response, `JPEG ${exportColorLabel} export failed.`);
             setStatus(exportStatus.value);
             return;
           }
@@ -2189,10 +2235,10 @@
           }
           const exportedPath = response.data.outputPath;
           exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
-          exportStatus.value = response.data.message || responseMessage(response, "JPEG sRGB export completed.");
+          exportStatus.value = response.data.message || responseMessage(response, `JPEG ${exportColorLabel} export completed.`);
           setStatus(responseMessage(response));
         } catch (error) {
-          exportStatus.value = responseErrorMessage(error, "JPEG sRGB export failed.");
+          exportStatus.value = responseErrorMessage(error, `JPEG ${exportColorLabel} export failed.`);
           setStatus(exportStatus.value);
         } finally {
           setBusy(false);
@@ -2788,6 +2834,9 @@
         });
         runJpegExportButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
         chooseExportOutputPathButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
+        exportColorOptionButtons.forEach((button) => {
+          button.disabled = isBusy;
+        });
       }
 
       async function runLibraryCommand(command) {
@@ -2952,6 +3001,12 @@
       cancelExportButton.addEventListener("click", closeExportDialog);
       chooseExportOutputPathButton.addEventListener("click", () => chooseExportPath());
       runJpegExportButton.addEventListener("click", runJpegExport);
+      exportColorOptionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          setExportColorProfile(button.dataset.exportColor);
+          syncExportDialog();
+        });
+      });
       exportOutputPath.addEventListener("input", () => {
         exportOutputPath.dataset.autofilled = "false";
         syncExportDialog();

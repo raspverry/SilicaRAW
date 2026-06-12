@@ -382,7 +382,7 @@ impl PhotoEditState {
     }
 }
 
-/// Completed JPEG sRGB export returned through the core boundary.
+/// Completed JPEG export returned through the core boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoExportSession {
     pub photo_id: String,
@@ -393,6 +393,13 @@ pub struct PhotoExportSession {
     pub bytes_written: u64,
     pub export_record_id: String,
     pub message: String,
+}
+
+/// JPEG output color profile accepted by the core export boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoExportColorProfile {
+    Srgb,
+    DisplayP3,
 }
 
 impl PhotoExportSession {
@@ -1161,6 +1168,21 @@ pub fn export_photo_jpeg_srgb(
     photo_id: &str,
     output_path: impl AsRef<Path>,
 ) -> Result<Option<PhotoExportSession>, CoreError> {
+    export_photo_jpeg(
+        library_root_path,
+        photo_id,
+        output_path,
+        PhotoExportColorProfile::Srgb,
+    )
+}
+
+/// Export one edited catalog photo as a JPEG file with an explicit output color profile.
+pub fn export_photo_jpeg(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+    color_profile: PhotoExportColorProfile,
+) -> Result<Option<PhotoExportSession>, CoreError> {
     let library_root_path = library_root_path.as_ref();
     let output_path = output_path.as_ref();
     let (photo_id, _file_name, render_plan) =
@@ -1187,18 +1209,21 @@ pub fn export_photo_jpeg_srgb(
         LOCAL_ALPHA_JPEG_QUALITY,
     );
 
-    let export_result = silica_export::export_jpeg_srgb(silica_export::JpegSrgbExportRequest {
-        source_path: PathBuf::from(&render_request.source_path),
-        output_path: output_path.to_path_buf(),
-        exposure: render_request.exposure,
-        contrast: render_request.contrast,
-        quality: render_request.quality,
-    })?;
+    let export_result =
+        silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
+            source_path: PathBuf::from(&render_request.source_path),
+            output_path: output_path.to_path_buf(),
+            exposure: render_request.exposure,
+            contrast: render_request.contrast,
+            quality: render_request.quality,
+            color_profile: export_color_profile_to_export(color_profile),
+        })?;
     let format = export_format_string(export_result.format).to_string();
-    let color_profile = export_color_profile_string(export_result.color_profile).to_string();
+    let exported_color_profile =
+        export_color_profile_string(export_result.color_profile).to_string();
     let settings_json = serde_json::json!({
         "format": format,
-        "color_profile": color_profile,
+        "color_profile": exported_color_profile,
         "quality": render_request.quality,
         "exposure": render_request.exposure,
         "contrast": render_request.contrast,
@@ -1222,10 +1247,10 @@ pub fn export_photo_jpeg_srgb(
         source_path: render_plan.source_path,
         output_path: export_result.output_path,
         format,
-        color_profile,
+        color_profile: exported_color_profile,
         bytes_written: export_result.bytes_written,
         export_record_id: export_record.id,
-        message: "JPEG sRGB export completed.".to_string(),
+        message: export_color_profile_message(color_profile).to_string(),
     }))
 }
 
@@ -1897,10 +1922,26 @@ fn export_format_string(format: silica_export::ExportImageFormat) -> &'static st
     }
 }
 
+fn export_color_profile_to_export(
+    profile: PhotoExportColorProfile,
+) -> silica_export::ExportColorProfile {
+    match profile {
+        PhotoExportColorProfile::Srgb => silica_export::ExportColorProfile::Srgb,
+        PhotoExportColorProfile::DisplayP3 => silica_export::ExportColorProfile::DisplayP3,
+    }
+}
+
 fn export_color_profile_string(profile: silica_export::ExportColorProfile) -> &'static str {
     match profile {
         silica_export::ExportColorProfile::Srgb => "srgb",
         silica_export::ExportColorProfile::DisplayP3 => "display_p3",
+    }
+}
+
+fn export_color_profile_message(profile: PhotoExportColorProfile) -> &'static str {
+    match profile {
+        PhotoExportColorProfile::Srgb => "JPEG sRGB export completed.",
+        PhotoExportColorProfile::DisplayP3 => "JPEG Display P3 export completed.",
     }
 }
 
@@ -3186,6 +3227,64 @@ mod tests {
             )
             .expect("exported flag");
         assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn exports_edited_photo_to_jpeg_display_p3_when_explicit() {
+        let workspace = unique_library_root("core-export-display-p3");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-display-p3.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let exported = export_photo_jpeg(
+            &created.root_path,
+            &photo_id,
+            &output_path,
+            PhotoExportColorProfile::DisplayP3,
+        )
+        .expect("export photo")
+        .expect("export result");
+
+        assert_eq!(exported.output_path, output_path);
+        assert_eq!(exported.format, "jpeg");
+        assert_eq!(exported.color_profile, "display_p3");
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
+        let latest =
+            silica_storage::get_latest_export_record(&created.root_path, &exported.photo_id)
+                .expect("read latest export")
+                .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["color_profile"], "display_p3");
+        assert_eq!(
+            settings["icc_profile_sha256"],
+            "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0"
+        );
 
         remove_library_root(&workspace);
     }

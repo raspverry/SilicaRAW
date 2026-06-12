@@ -1,6 +1,6 @@
 ---
 title: Phase 13 Color Pipeline Proof Brief
-status: active
+status: complete
 audience: all
 updated: 2026-06-12
 source_of_truth: docs/wiki/roadmaps/phase-13-color-pipeline-proof-plan.md
@@ -13,6 +13,8 @@ source_of_truth: docs/wiki/roadmaps/phase-13-color-pipeline-proof-plan.md
 Phase 13 proves the local color pipeline before SilicaRAW expands preview or export color claims.
 
 The phase starts with evidence planning and fixture legality, then adds feature-gated probes, harness checks, export ICC proof, schema-safe metadata propagation, and explicit export color options.
+
+As of 2026-06-12, Phase 13 implementation tasks are complete. Color correctness claims remain blocked until approved tolerance results and executed manual visual review exist.
 
 ## Required Read Set
 

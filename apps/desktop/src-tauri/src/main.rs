@@ -1134,11 +1134,77 @@ fn export_photo_jpeg_srgb(
     output_path: String,
 ) -> DesktopCommandResponse {
     let command = "export_photo_jpeg_srgb";
-    match silica_core::export_photo_jpeg_srgb(
-        PathBuf::from(&library_path),
-        &photo_id,
-        PathBuf::from(&output_path),
-    ) {
+    desktop_photo_export_response(
+        command,
+        silica_core::export_photo_jpeg_srgb(
+            PathBuf::from(&library_path),
+            &photo_id,
+            PathBuf::from(&output_path),
+        ),
+        library_path,
+        output_path,
+        photo_id,
+    )
+}
+
+#[tauri::command]
+fn export_photo_jpeg(
+    library_path: String,
+    photo_id: String,
+    output_path: String,
+    color_profile: Option<String>,
+) -> DesktopCommandResponse {
+    let command = "export_photo_jpeg";
+    let requested_profile = match parse_export_color_profile(color_profile.as_deref()) {
+        Ok(profile) => profile,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    output_path: Some(output_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+
+    desktop_photo_export_response(
+        command,
+        silica_core::export_photo_jpeg(
+            PathBuf::from(&library_path),
+            &photo_id,
+            PathBuf::from(&output_path),
+            requested_profile,
+        ),
+        library_path,
+        output_path,
+        photo_id,
+    )
+}
+
+fn parse_export_color_profile(
+    color_profile: Option<&str>,
+) -> Result<silica_core::PhotoExportColorProfile, silica_core::CoreError> {
+    match color_profile.unwrap_or("srgb") {
+        "srgb" => Ok(silica_core::PhotoExportColorProfile::Srgb),
+        "display_p3" => Ok(silica_core::PhotoExportColorProfile::DisplayP3),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported export color profile: {unsupported}. Supported profiles: srgb, display_p3."
+        ))),
+    }
+}
+
+fn desktop_photo_export_response(
+    command: &'static str,
+    export_result: Result<Option<silica_core::PhotoExportSession>, silica_core::CoreError>,
+    library_path: String,
+    output_path: String,
+    photo_id: String,
+) -> DesktopCommandResponse {
+    match export_result {
         Ok(Some(export)) => DesktopCommandResponse::ok(
             command,
             export.message.clone(),
@@ -1702,6 +1768,7 @@ fn main() {
             commit_exposure_contrast_edit,
             get_photo_edit_state,
             export_photo_jpeg_srgb,
+            export_photo_jpeg,
             clear_library_cache
         ])
         .run(tauri::generate_context!())
@@ -2628,6 +2695,66 @@ mod tests {
         assert!(output_path.is_file());
 
         remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_exports_photo_jpeg_display_p3_explicitly() {
+        let workspace = unique_library_root("desktop-export-display-p3");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-display-p3.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let export = super::export_photo_jpeg(
+            library_root.display().to_string(),
+            photo_id,
+            output_path.display().to_string(),
+            Some("display_p3".to_string()),
+        );
+
+        assert!(export.ok);
+        match response_data(&export) {
+            super::DesktopCommandData::Export {
+                format,
+                color_profile,
+                output_path: actual_output_path,
+                ..
+            } => {
+                assert_eq!(format, "jpeg");
+                assert_eq!(color_profile, "display_p3");
+                assert_eq!(actual_output_path, &output_path.display().to_string());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(output_path.is_file());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_blocks_unsupported_jpeg_color_profile() {
+        let rejected = super::export_photo_jpeg(
+            "/tmp/missing-library".to_string(),
+            "photo-1".to_string(),
+            "/tmp/output.jpg".to_string(),
+            Some("adobe_rgb".to_string()),
+        );
+
+        assert!(!rejected.ok);
+        let error = rejected.error.as_ref().expect("error payload");
+        assert_eq!(error.kind, "exportBlocked");
+        assert!(error
+            .message
+            .contains("Unsupported export color profile: adobe_rgb"));
     }
 
     #[test]

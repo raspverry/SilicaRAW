@@ -365,7 +365,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Prove the Core Image/ColorSync-compatible path before expanding export and preview claims.
 
-**Planning Status:** Phase 13 now has a dedicated [Color Pipeline Proof Plan](phase-13-color-pipeline-proof-plan.md), [brief](../phases/phase-13-color-pipeline-proof.md), and task cards.
+**Planning Status:** Phase 13 implementation is complete in the dedicated [Color Pipeline Proof Plan](phase-13-color-pipeline-proof-plan.md), [brief](../phases/phase-13-color-pipeline-proof.md), and task cards. Color correctness claims remain blocked pending approved tolerance results and executed manual visual review.
 
 ### Task 13.1: Tagged Raster Color Probe
 

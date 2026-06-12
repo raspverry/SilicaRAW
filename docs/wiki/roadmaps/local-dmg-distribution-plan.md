@@ -522,7 +522,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Export success/error state is visible.
 - **Validation:** Export smoke test, exported JPEG inspection, and catalog export record check.
 
-**Status:** Completed on 2026-06-09. Export mode now opens an M007-style Export Photos dialog for the selected catalog photo. The dialog accepts a local output path, locks the local-alpha settings to JPEG, sRGB, and quality 90, shows a non-destructive original-file safety note, validates that the output path differs from the referenced original, and surfaces ready, blocked, success, and error states. Runtime export uses the existing `export_photo_jpeg_srgb` command, while static smoke mode shows that the desktop runtime is required to write the JPEG and catalog export record. This does not add native folder picking, multi-photo export, presets, alternate formats, Display P3, resizing, metadata policy editing, RAW decoding, Metal rendering, or sidecar writing.
+**Status:** Completed on 2026-06-09. Export mode now opens an M007-style Export Photos dialog for the selected catalog photo. The dialog accepts a local output path, locks the local-alpha settings to JPEG, sRGB, and quality 90, shows a non-destructive original-file safety note, validates that the output path differs from the referenced original, and surfaces ready, blocked, success, and error states. Runtime export originally used `export_photo_jpeg_srgb`; Phase 13.8 later added `export_photo_jpeg` with default sRGB and explicit Display P3. This task did not add native folder picking, multi-photo export, presets, alternate formats, resizing, metadata policy editing, RAW decoding, Metal rendering, or sidecar writing.
 
 ### Task 5.5.9: Add UI Workflow Smoke Harness
 
@@ -534,7 +534,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - It does not require MLX, MCP, plugin runtime, cloud, or telemetry.
 - **Validation:** Harness passes locally and in CI where feasible.
 
-**Status:** Completed on 2026-06-09. The main harness now runs `scripts/harness/check-ui-workflow-smoke.py`, a Python stdlib static workflow contract check for the connected local alpha path: open/create library, import by reference, browse/cull the grid, open loupe preview, apply Develop exposure/contrast, and export JPEG sRGB. The harness verifies required UI element IDs, command wiring, non-destructive original-file copy/reference messaging, Develop edit bounds, locked JPEG sRGB export settings, and the export guard that blocks writing over the referenced original path. It does not require a browser automation dependency, MLX, MCP, plugin runtime, cloud services, telemetry, RAW decoding, or Metal rendering.
+**Status:** Completed on 2026-06-09. The main harness now runs `scripts/harness/check-ui-workflow-smoke.py`, a Python stdlib static workflow contract check for the connected local alpha path: open/create library, import by reference, browse/cull the grid, open loupe preview, apply Develop exposure/contrast, and export JPEG. The harness verifies required UI element IDs, command wiring, non-destructive original-file copy/reference messaging, Develop edit bounds, default JPEG sRGB export settings, explicit Display P3 export choice wiring, and the export guard that blocks writing over the referenced original path. It does not require a browser automation dependency, MLX, MCP, plugin runtime, cloud services, telemetry, RAW decoding, or Metal rendering.
 
 ### Task 5.5.10: Run Visual and Responsive QA Pass
 

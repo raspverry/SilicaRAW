@@ -22,9 +22,11 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 12 is complete. The next planned product work is Phase 13: Color Pipeline Proof.
+Phase 13 is complete. The next planned product area is Phase 14: Product Metal Viewer Bridge.
 
-For Phase 13 work, read:
+Before Phase 14 implementation, create a dedicated Phase 14 plan, brief, and atomic task cards from the [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md).
+
+For Phase 13 historical color-proof context, read:
 
 - [Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md)
 - [Phase 13 Brief](../phases/phase-13-color-pipeline-proof.md)

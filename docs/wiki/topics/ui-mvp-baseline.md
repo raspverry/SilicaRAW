@@ -176,13 +176,13 @@ Task 5.5.8 adds the M007 Export Dialog MVP:
 
 - Export mode and the toolbar Export action open the same modal dialog.
 - The dialog uses the selected Library photo as the export target.
-- The local-alpha settings are locked to JPEG, sRGB, and quality 90.
+- The local-alpha settings default to JPEG, sRGB, and quality 90. Phase 13.8 adds an explicit Display P3 choice after ICC proof.
 - The user can enter a local output path.
 - The UI states that original files are not modified and blocks output paths that equal the referenced original path.
-- Runtime export calls `export_photo_jpeg_srgb`.
+- Runtime export calls `export_photo_jpeg`; omitted color profile means default sRGB, while `display_p3` is explicit.
 - Static smoke mode does not claim to write a file; it shows that desktop runtime is required for the JPEG and catalog export record.
 - RAW, missing, and unsupported candidates show blocked states instead of implying exportable pixels.
-- Native folder picking, multi-photo export, export presets, alternate formats, resizing, metadata policy editing, real image pixels, RAW decoding, Metal output, and sidecar writing remain future work.
+- Native folder picking, multi-photo export, export presets, alternate formats, resizing, metadata policy editing, real image pixels, RAW decoding, Metal output, sidecar writing, and visual color correctness proof remain future work.
 
 ## Task 5.5.9 UI Workflow Smoke Harness
 
@@ -190,7 +190,7 @@ Task 5.5.9 adds a lightweight static harness for the connected local alpha UI wo
 
 - `scripts/harness/check.sh` runs `scripts/harness/check-ui-workflow-smoke.py` after the static UI contract check.
 - The smoke harness verifies the path `open/create library -> import by reference -> grid/cull -> loupe -> develop -> export`.
-- It checks required element IDs, Tauri command wiring, import-by-reference copy safety text, Develop exposure/contrast bounds, locked JPEG sRGB export settings, static runtime messaging, and the guard that blocks exporting over the referenced original source path.
+- It checks required element IDs, Tauri command wiring, import-by-reference copy safety text, Develop exposure/contrast bounds, default JPEG sRGB export settings, explicit Display P3 export choice wiring, static runtime messaging, and the guard that blocks exporting over the referenced original source path.
 - It intentionally avoids browser automation and new dependencies so the check can run locally and in CI as part of the existing harness.
 - It does not require MLX, MCP, plugin runtime, cloud, telemetry, RAW decoding, or Metal rendering.
 

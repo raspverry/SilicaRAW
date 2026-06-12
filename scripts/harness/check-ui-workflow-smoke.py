@@ -26,6 +26,7 @@ ALLOWED_COMMANDS = {
     "commit_exposure_contrast_edit",
     "get_photo_edit_state",
     "export_photo_jpeg_srgb",
+    "export_photo_jpeg",
     "clear_library_cache",
 }
 
@@ -161,12 +162,17 @@ WORKFLOW_STEPS = [
             "exportSafetyNote",
             "exportFormat",
             "exportColorSpace",
+            "exportColorSrgb",
+            "exportColorDisplayP3",
+            "exportColorProof",
             "exportQuality",
         ],
-        "commands": ["export_photo_jpeg_srgb"],
+        "commands": ["export_photo_jpeg"],
         "text": [
             "JPEG",
             "sRGB",
+            "Display P3",
+            "explicit selection",
             "Original files will not be modified",
             "Output path must differ from the original source path.",
         ],
@@ -474,7 +480,13 @@ def main():
         parser.ids.get("exportFormat", {}).get("value") == "JPEG"
         and parser.ids.get("exportColorSpace", {}).get("value") == "sRGB"
         and parser.ids.get("exportQuality", {}).get("value") == "90",
-        "export workflow must lock local alpha to JPEG sRGB quality 90",
+        "export workflow must keep JPEG quality 90 and sRGB as default",
+        failures,
+    )
+    require(
+        parser.ids.get("exportColorSrgb", {}).get("data-export-color") == "srgb"
+        and parser.ids.get("exportColorDisplayP3", {}).get("data-export-color") == "display_p3",
+        "export workflow must expose explicit sRGB and Display P3 color choices",
         failures,
     )
 
