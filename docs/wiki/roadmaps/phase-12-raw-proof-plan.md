@@ -23,7 +23,8 @@ As of 2026-06-12:
 - Task 12.2 fixture harness exists, but fixture execution is blocked until a legal local RAW fixture manifest is available.
 - Task 12.3 support matrix is complete in a `blocked_pending_evidence` state.
 - Task 12.4 product RAW decode API contract is complete in a blocked state.
-- Task 12.5 is the next evidence gate: legally source fixtures, run the probe, and update the matrix without committing media files.
+- Task 12.5.1 source review is complete for raw.pixls.us candidates A-D.
+- Task 12.5.2 is next: download accepted fixtures into an ignored local path and verify SHA-256.
 
 ## Goal
 
@@ -94,6 +95,7 @@ The output of this phase is a support decision, not user-visible RAW editing.
   - Unclear licenses are rejected.
   - User photos are not used unless explicitly approved and documented as local-only private fixtures.
 - **Validation:** Manual source review recorded in docs.
+- **Status:** complete for raw.pixls.us candidates A-D; fixture class E remains pending.
 
 ### Task 12.5.2: Ignored Local Fixture Corpus
 

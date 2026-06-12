@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | RAW fixture source review added
+
+- Completed Task 12.5.1 source review for raw.pixls.us candidates.
+- Accepted local-only CC0 candidates for fixture classes A-D.
+- Kept fixture class E pending and kept all RAW media out of git.
+
 ## [2026-06-12] phase-12 | RAW proof plan page added
 
 - Added a public wiki Phase 12 RAW proof plan page.

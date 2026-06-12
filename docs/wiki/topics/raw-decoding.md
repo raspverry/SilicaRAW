@@ -139,6 +139,21 @@ SILICARAW_RAW_FIXTURE_MANIFEST=/absolute/path/to/local/raw-fixtures.json scripts
 
 Do not fabricate RAW samples or use user photos without a reviewed legal fixture manifest.
 
+## Phase 12.5 Legal Fixture Source Review
+
+[raw.pixls.us Source Review](../sources/raw-pixls-us.md) accepts raw.pixls.us as the first external source for local ignored RAW probe fixtures.
+
+Accepted local-only candidates:
+
+| Fixture class | Candidate id | Format | License | SHA-256 | Status |
+| --- | --- | --- | --- | --- | --- |
+| A | `raw_pixls_canon_eos_7d_cr2_raw_3_2` | cr2 | CC0 1.0 Universal | `b5e47c5fcf7332ac03e0134926f17a338a42e68c1fd7f83e16f45f4b767544e8` | accepted_for_local_ignored_probe |
+| B | `raw_pixls_canon_eos_r6_mark_iii_cr3_full_frame` | cr3 | CC0 1.0 Universal | `e491e4bb960961b5fa299361bf698310a80cbe7b15d30d8dad3bb21bc5457dab` | accepted_for_local_ignored_probe |
+| C | `raw_pixls_fujifilm_x_t30_iii_raf_compressed` | raf | CC0 1.0 Universal | `49f77d6162abfa5c94d2d8b90e4e926b7386c42bcf7e84a152c9ffe1ebd584da` | accepted_for_local_ignored_probe |
+| D | `raw_pixls_apple_iphone_12_pro_dng` | dng | CC0 1.0 Universal | `e91e77a4533ed7cce551d83330676ea5c47dd5e55fb38adda7819366afdbdfc2` | accepted_for_local_ignored_probe |
+
+Fixture class E remains pending source review. No candidate is probe evidence until the file is downloaded into an ignored local path, hash-verified, declared in a local fixture manifest, and run through `scripts/harness/check-raw-probe-fixtures.py`.
+
 ## Phase 12 Core Image Support Matrix
 
 No legal RAW fixture probe evidence is available yet. The matrix records blocked status for each RAW fixture class without inferring support from file extensions.
