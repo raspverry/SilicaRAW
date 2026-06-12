@@ -549,6 +549,25 @@ pub fn apply_white_balance_temperature_tint(
     Ok(edited)
 }
 
+/// Return a draft graph with tone recovery controls adjusted.
+pub fn apply_tone_recovery(
+    graph: &EditGraph,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.highlights = number_from_f64("basic.highlights", highlights)?;
+    edited.basic.shadows = number_from_f64("basic.shadows", shadows)?;
+    edited.basic.whites = number_from_f64("basic.whites", whites)?;
+    edited.basic.blacks = number_from_f64("basic.blacks", blacks)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Return a graph with evidence-backed color profile metadata in schema-owned fields.
 pub fn apply_color_profile_metadata(
     graph: &EditGraph,
@@ -1074,6 +1093,42 @@ mod tests {
     }
 
     #[test]
+    fn applies_tone_recovery_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_tone_recovery(&graph, -35.0, 42.0, 10.0, -12.5, "unix:3")
+            .expect("apply tone recovery");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.basic.highlights.as_f64(), Some(-35.0));
+        assert_eq!(edited.basic.shadows.as_f64(), Some(42.0));
+        assert_eq!(edited.basic.whites.as_f64(), Some(10.0));
+        assert_eq!(edited.basic.blacks.as_f64(), Some(-12.5));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.basic.highlights.as_f64(), Some(-35.0));
+        assert_eq!(round_tripped.basic.shadows.as_f64(), Some(42.0));
+        assert_eq!(round_tripped.basic.whites.as_f64(), Some(10.0));
+        assert_eq!(round_tripped.basic.blacks.as_f64(), Some(-12.5));
+        assert_eq!(serialized["basic"]["highlights"].as_f64(), Some(-35.0));
+        assert_eq!(serialized["basic"]["shadows"].as_f64(), Some(42.0));
+        assert_eq!(serialized["basic"]["whites"].as_f64(), Some(10.0));
+        assert_eq!(serialized["basic"]["blacks"].as_f64(), Some(-12.5));
+        super::validate_edit_graph_json(&serialized).expect("tone recovery graph validates");
+    }
+
+    #[test]
     fn applies_color_profile_metadata_to_schema_owned_fields() {
         let graph = super::default_edit_graph(
             super::EditGraphSource {
@@ -1162,5 +1217,28 @@ mod tests {
 
         assert!(cold_error.to_string().contains("basic.temperature"));
         assert!(tint_error.to_string().contains("basic.tint"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_tone_recovery_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let highlights_error = super::apply_tone_recovery(&graph, 101.0, 0.0, 0.0, 0.0, "unix:3")
+            .expect_err("highlights above schema range");
+        let blacks_error = super::apply_tone_recovery(&graph, 0.0, 0.0, 0.0, -101.0, "unix:3")
+            .expect_err("blacks below schema range");
+
+        assert!(highlights_error.to_string().contains("basic.highlights"));
+        assert!(blacks_error.to_string().contains("basic.blacks"));
     }
 }

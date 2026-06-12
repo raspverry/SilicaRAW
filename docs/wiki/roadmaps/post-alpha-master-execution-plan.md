@@ -54,8 +54,8 @@ As of 2026-06-13:
 - Task 16.5 Append-Only Action Log is complete.
 - Task 16.6 Sidecar Sync Status After History Commits is complete.
 - Phase 16 is complete.
-- Task 17.1.1 White Balance Temperature Tint Mutators is complete.
-- Next task: [17.1.2 Tone Recovery Mutators](../tasks/17.1.2-tone-recovery-mutators.md).
+- Tasks 17.1.1 White Balance Temperature Tint Mutators and 17.1.2 Tone Recovery Mutators are complete.
+- Next task: [17.1.3 Color Presence Mutators](../tasks/17.1.3-color-presence-mutators.md).
 
 ## Wave Map
 
@@ -386,7 +386,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 17.1.2 from the existing task card.
+1. Execute Task 17.1.3 from the existing task card.
 2. Continue through Phase 17 in order.
 
 ## Links

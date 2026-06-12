@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-17 | Tone recovery edit graph mutator added
+
+- Completed Task 17.1.2 with a graph-only mutator for highlights, shadows, whites, and blacks.
+- Kept preview, export, UI, storage, and sidecar behavior unchanged.
+- Routed Phase 17 execution to Task 17.1.3.
+
 ## [2026-06-13] phase-17 | White balance edit graph mutator added
 
 - Completed Task 17.1.1 with a graph-only mutator for white balance, temperature, and tint.
