@@ -25,6 +25,9 @@ ALLOWED_COMMANDS = {
     "preview_exposure_contrast_edit",
     "commit_exposure_contrast_edit",
     "get_photo_edit_state",
+    "get_photo_history",
+    "undo_last_history_action",
+    "redo_last_history_action",
     "export_photo_jpeg_srgb",
     "export_photo_jpeg",
     "clear_library_cache",
@@ -141,13 +144,21 @@ WORKFLOW_STEPS = [
             "developCommitEdit",
             "developRevertEdit",
             "developEditState",
+            "developHistoryPanel",
+            "developHistoryStatus",
+            "developHistoryList",
+            "developUndoHistory",
+            "developRedoHistory",
         ],
         "commands": [
             "get_photo_edit_state",
+            "get_photo_history",
+            "undo_last_history_action",
+            "redo_last_history_action",
             "preview_exposure_contrast_edit",
             "commit_exposure_contrast_edit",
         ],
-        "text": ["Draft not committed", "Commit Edit", "Revert Draft"],
+        "text": ["Draft not committed", "Commit Edit", "Revert Draft", "History", "No committed history yet."],
     },
     {
         "name": "export-jpeg-srgb",
@@ -380,6 +391,18 @@ def main():
         "Restored committed edit state.",
     ]:
         require(marker in source, f"persisted develop readback marker missing: {marker}", failures)
+    for marker in [
+        "loadDevelopHistory",
+        "get_photo_history",
+        "runDevelopHistoryCommand",
+        "undo_last_history_action",
+        "redo_last_history_action",
+        "developHistoryList.replaceChildren",
+        "Desktop runtime is required to load committed history.",
+        "Next undo",
+        "Next redo",
+    ]:
+        require(marker in source, f"develop history marker missing: {marker}", failures)
     for marker in [
         "runCacheClearCommand",
         "clear_library_cache",

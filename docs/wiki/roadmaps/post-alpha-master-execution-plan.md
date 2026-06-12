@@ -50,7 +50,8 @@ As of 2026-06-12:
 - Task 16.1 Undo, History, and Action Semantics Contract is complete.
 - Task 16.2 Edit History Persistence is complete.
 - Task 16.3 Undo and Redo Core Commands is complete.
-- Next task: [16.4 Develop History Panel Contract](../tasks/16.4-develop-history-panel-contract.md).
+- Task 16.4 Develop History Panel Contract is complete.
+- Next task: [16.5 Append-Only Action Log](../tasks/16.5-append-only-action-log.md).
 
 ## Wave Map
 
@@ -381,7 +382,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 16.4 from the existing task card.
+1. Execute Task 16.5 from the existing task card.
 2. Continue through Phase 16 in order.
 
 ## Links

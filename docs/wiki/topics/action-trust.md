@@ -133,6 +133,8 @@ Disabled undo/redo is a normal product state, not an error.
 
 Task 16.3 implements the first runtime form of this contract for edit commits and culling flag changes. `edit_history.history_state` records `applied`, `undone`, or `invalidated`; undo selects the latest applied row for the photo, redo selects the earliest undone row for the photo, and both restore state in a SQLite transaction. Export records and export output files are not touched by these commands.
 
+Task 16.4 exposes this state to the Develop history panel without adding a second mutation path. The panel lists only runtime `edit_history` checkpoints for the selected photo, hides invalidated redo rows, and enables selection only for the next valid undo or redo row. Row selection calls the same core undo/redo commands; it does not jump directly to arbitrary catalog states.
+
 ## Schema Boundary
 
 Existing catalog tables already reserve the first Phase 16 surfaces:
@@ -145,7 +147,7 @@ Existing catalog tables already reserve the first Phase 16 surfaces:
 - `cache_records`: disposable cache metadata.
 - `action_log`: append-only evidence for sensitive actions and future extension permissions.
 
-Task 16.0 does not change migrations. Task 16.1 owns the typed action semantics contract before runtime behavior. Task 16.2 adds ordered edit history checkpoints. Task 16.3 adds transaction-safe undo/redo state via `history_state`. If a later task needs queryable columns that are not present, it must add them through `silica-storage` migrations and update `docs/DEPENDENCIES.md` only if dependencies change.
+Task 16.0 does not change migrations. Task 16.1 owns the typed action semantics contract before runtime behavior. Task 16.2 adds ordered edit history checkpoints. Task 16.3 adds transaction-safe undo/redo state via `history_state`. Task 16.4 adds a read-only history panel query over existing state and does not require a new migration. If a later task needs queryable columns that are not present, it must add them through `silica-storage` migrations and update `docs/DEPENDENCIES.md` only if dependencies change.
 
 ## Sidecar Status After History
 

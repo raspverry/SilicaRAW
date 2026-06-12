@@ -4,7 +4,7 @@ Storage and persistence boundary for SilicaRAW.
 
 Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations.
 
-This crate currently owns the catalog migration runner, initial empty catalog schema/index proof, local library create/open, Phase 4.3 folder import scanner, Phase 4.4 photo flags persistence, Phase 5.3 active edit graph commit/read behavior, Task 10.3 library-local sidecar read/write behavior, Task 10.4 catalog rebuild dry-run reports from sidecars, Task 10.5.2 checkpointed backup boundary creation, Task 10.5.3 staged restore boundaries, and Task 16.2 edit history checkpoint persistence. It does not decode photos, extract camera metadata, mutate originals, write sidecars next to originals, manage automatic sidecar sync, or expose database access to plugins/MCP.
+This crate currently owns the catalog migration runner, initial empty catalog schema/index proof, local library create/open, Phase 4.3 folder import scanner, Phase 4.4 photo flags persistence, Phase 5.3 active edit graph commit/read behavior, Task 10.3 library-local sidecar read/write behavior, Task 10.4 catalog rebuild dry-run reports from sidecars, Task 10.5.2 checkpointed backup boundary creation, Task 10.5.3 staged restore boundaries, Task 16.2 edit history checkpoint persistence, Task 16.3 undo/redo state changes, and Task 16.4 read-only photo history listing. It does not decode photos, extract camera metadata, mutate originals, write sidecars next to originals, manage automatic sidecar sync, or expose database access to plugins/MCP.
 
 Phase 4.1 aligns migration verification with the domain-facing schema contract in `silica-catalog`. `silica-storage` applies migrations and checks that the required alpha tables and indexes exist; `silica-catalog` defines the contract names.
 
@@ -21,6 +21,8 @@ Phase 5.3 adds active edit graph persistence in `edit_states`. Draft exposure/co
 Task 16.2 adds schema version 6 and writes one ordered `edit_history` checkpoint for each committed exposure/contrast edit. Checkpoints use `silica.action` version 1 payloads with schema-valid before/after edit graphs. Draft preview updates still write no history rows.
 
 Task 16.3 adds schema version 7 plus transaction-safe undo/redo for edit checkpoints and culling flags. Undo/redo updates catalog state and `edit_history.history_state`; it does not delete export outputs, restore cache bytes, write sidecars, or touch originals.
+
+Task 16.4 adds `list_photo_history`, a read-only per-photo history panel query over `edit_history`. It returns applied/undone real checkpoints, hides invalidated redo rows, and marks only the next legal undo or redo row selectable.
 
 Task 10.3 adds explicit sidecar write/read APIs. Sidecars are written only under `sidecars/` inside the library root, validate the sidecar and nested edit graph payloads, mirror rating/picked/rejected/color-label state only, update `sidecar_status` after successful writes, and do not mutate original referenced files.
 

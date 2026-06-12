@@ -182,6 +182,14 @@ enum DesktopCommandData {
         history_id: Option<String>,
         message: String,
     },
+    HistoryPanel {
+        photo_id: String,
+        items: Vec<DesktopHistoryItem>,
+        can_undo: bool,
+        can_redo: bool,
+        status: String,
+        message: String,
+    },
     Export {
         photo_id: String,
         source_path: String,
@@ -226,6 +234,7 @@ impl DesktopCommandData {
             Self::EditCommit { .. } => "editCommit",
             Self::EditState { .. } => "editState",
             Self::HistoryCommand { .. } => "historyCommand",
+            Self::HistoryPanel { .. } => "historyPanel",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
         }
@@ -567,6 +576,20 @@ struct DesktopPhotoGridItem {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct DesktopHistoryItem {
+    history_id: String,
+    photo_id: String,
+    sequence: i64,
+    action_kind: String,
+    label: String,
+    history_state: String,
+    can_undo: bool,
+    can_redo: bool,
+    created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DesktopMetadataField<T> {
     state: &'static str,
     value: Option<T>,
@@ -590,6 +613,22 @@ impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
             picked: photo.picked,
             rejected: photo.rejected,
             color_label: photo.color_label,
+        }
+    }
+}
+
+impl From<silica_core::PhotoHistoryItem> for DesktopHistoryItem {
+    fn from(item: silica_core::PhotoHistoryItem) -> Self {
+        Self {
+            history_id: item.history_id,
+            photo_id: item.photo_id,
+            sequence: item.sequence,
+            action_kind: item.action_kind,
+            label: item.label,
+            history_state: item.history_state,
+            can_undo: item.can_undo,
+            can_redo: item.can_redo,
+            created_at: item.created_at,
         }
     }
 }
@@ -1188,6 +1227,27 @@ fn redo_last_history_action(library_path: String, photo_id: String) -> DesktopCo
 }
 
 #[tauri::command]
+fn get_photo_history(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_history";
+    match silica_core::list_photo_history(PathBuf::from(&library_path), &photo_id) {
+        Ok(panel) => DesktopCommandResponse::ok(
+            command,
+            panel.message.clone(),
+            photo_history_panel_data(panel),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn export_photo_jpeg_srgb(
     library_path: String,
     photo_id: String,
@@ -1574,6 +1634,21 @@ fn history_command_data(result: silica_core::HistoryCommandResult) -> DesktopCom
     }
 }
 
+fn photo_history_panel_data(panel: silica_core::PhotoHistoryPanel) -> DesktopCommandData {
+    DesktopCommandData::HistoryPanel {
+        photo_id: panel.photo_id,
+        items: panel
+            .items
+            .into_iter()
+            .map(DesktopHistoryItem::from)
+            .collect(),
+        can_undo: panel.can_undo,
+        can_redo: panel.can_redo,
+        status: panel.status,
+        message: panel.message,
+    }
+}
+
 fn photo_metadata_data(metadata: silica_core::PhotoMetadata) -> DesktopCommandData {
     DesktopCommandData::PhotoMetadata {
         photo_id: metadata.photo_id,
@@ -1878,6 +1953,7 @@ fn main() {
             get_photo_edit_state,
             undo_last_history_action,
             redo_last_history_action,
+            get_photo_history,
             export_photo_jpeg_srgb,
             export_photo_jpeg,
             clear_library_cache
@@ -2836,6 +2912,71 @@ mod tests {
                 assert_eq!(action_kind.as_deref(), Some("edit_commit"));
             }
             other => panic!("unexpected redo response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_returns_history_panel_contract() {
+        let workspace = unique_library_root("desktop-history-panel");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let empty = super::get_photo_history(library_root.display().to_string(), photo_id.clone());
+        assert!(empty.ok, "empty history failed: {empty:?}");
+        match response_data(&empty) {
+            super::DesktopCommandData::HistoryPanel {
+                items,
+                can_undo,
+                can_redo,
+                status,
+                ..
+            } => {
+                assert!(items.is_empty());
+                assert!(!can_undo);
+                assert!(!can_redo);
+                assert_eq!(status, "empty");
+            }
+            other => panic!("unexpected empty history response data: {other:?}"),
+        }
+
+        let commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.5,
+            -8.0,
+        );
+        assert!(commit.ok, "commit failed: {commit:?}");
+
+        let history = super::get_photo_history(library_root.display().to_string(), photo_id);
+        assert!(history.ok, "history failed: {history:?}");
+        assert_eq!(response_data(&history).kind(), "historyPanel");
+        match response_data(&history) {
+            super::DesktopCommandData::HistoryPanel {
+                items,
+                can_undo,
+                can_redo,
+                status,
+                ..
+            } => {
+                assert_eq!(status, "ready");
+                assert!(*can_undo);
+                assert!(!can_redo);
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0].action_kind, "edit_commit");
+                assert_eq!(items[0].label, "Exposure / contrast");
+                assert_eq!(items[0].history_state, "applied");
+            }
+            other => panic!("unexpected history response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

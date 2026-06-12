@@ -14,6 +14,7 @@ SilicaRAW is not production-ready. Current repository claims are limited to fixt
 - Non-recursive folder import scanner for catalog candidates
 - Rating, pick, reject, and color label persistence in SQLite `photo_flags`
 - JPEG/JPG thumbnail, loupe preview, Develop preview, exposure/contrast, edit-state persistence, and JPEG sRGB export path
+- Undo/redo for edit and culling checkpoints plus a real Develop history panel backed by catalog history
 - Product cache clear command for disposable cache directories
 - Connected static UI vertical slice for the local alpha workflow
 - Clear RAW/unsupported/missing-file blocked states without RAW decoding claims

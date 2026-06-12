@@ -34,6 +34,8 @@ pub use silica_storage::LibraryQueryPage;
 pub use silica_storage::LibraryQueryRequest;
 pub use silica_storage::LibraryQuerySort;
 pub use silica_storage::PhotoFlags;
+pub use silica_storage::PhotoHistoryItem;
+pub use silica_storage::PhotoHistoryPanel;
 pub use silica_storage::PhotoMetadata;
 pub use silica_storage::PhotoMetadataField;
 pub use silica_storage::PhotoMetadataFieldState;
@@ -1156,6 +1158,14 @@ pub fn redo_last_history_action(
     photo_id: &str,
 ) -> Result<silica_storage::HistoryCommandResult, CoreError> {
     silica_storage::redo_last_history_action(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// List real undoable history checkpoints for one photo through the core boundary.
+pub fn list_photo_history(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<silica_storage::PhotoHistoryPanel, CoreError> {
+    silica_storage::list_photo_history(library_root_path, photo_id).map_err(CoreError::from)
 }
 
 /// Read stored photo metadata through the core command boundary.
@@ -3736,6 +3746,45 @@ mod tests {
             .expect("edit state");
         assert_eq!(redone.exposure, 0.5);
         assert_eq!(redone.contrast, -8.0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn photo_history_through_core_lists_real_checkpoints() {
+        let workspace = unique_library_root("core-history-panel");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("commit result");
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("read history");
+        assert_eq!(history.photo_id, photo_id);
+        assert_eq!(history.status, "ready");
+        assert!(history.can_undo);
+        assert!(!history.can_redo);
+        assert_eq!(history.items.len(), 1);
+        assert_eq!(history.items[0].action_kind, "edit_commit");
+        assert_eq!(history.items[0].label, "Exposure / contrast");
+        assert_eq!(history.items[0].history_state, "applied");
 
         remove_library_root(&workspace);
     }

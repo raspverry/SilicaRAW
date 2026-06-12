@@ -228,6 +228,16 @@ Reset layout means only `AppSession.layout` returns to these defaults. It must n
 
 The default sort remains `imported_at_desc` so Task 11.5 can introduce paged, sorted, and filtered query APIs without changing the first page ordering contract.
 
+## Task 16.4 Develop History Panel
+
+Task 16.4 adds the first real history surface to the Develop inspector:
+
+- The static HTML ships an empty `developHistoryList`; no demo or hard-coded checkpoint rows are allowed.
+- Runtime history data comes from the desktop `get_photo_history` command, which delegates to `silica-core::list_photo_history`.
+- Empty, loading, error, runtime-unavailable, undo-disabled, and redo-disabled states are explicit.
+- Only the next valid undo row or next valid redo row is selectable. Selection calls `undo_last_history_action` or `redo_last_history_action`; it does not jump directly to arbitrary historical state.
+- The panel uses existing tokens and fits inside the Develop inspector without changing the reserved native viewer host.
+
 ## QA Strategy
 
 UI QA should happen in vertical slices, not after every future screen exists.

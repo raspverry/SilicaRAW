@@ -31,6 +31,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.1 records the undo/history action semantics contract: `silica.action` payload version 1, per-photo checkpoint units, redo invalidation after new undoable changes, and explicit disabled undo/redo states.
 - Task 16.2 adds catalog schema version 6 for edit history checkpoints: `edit_history.sequence`, `edit_history.action_class`, `edit_history.action_kind`, and `idx_edit_history_photo_sequence`.
 - Task 16.3 adds catalog schema version 7 for undo/redo state: `edit_history.history_state` and `idx_edit_history_photo_state_sequence`.
+- Task 16.4 adds the read-only photo history panel query over `edit_history` and exposes only applied/undone real checkpoints to the Develop UI.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -153,7 +154,6 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - Automatic sidecar synchronization.
 - Applied catalog rebuild or restore from sidecars.
 - Sidecar conflict handling and conflict UI.
-- Develop history panel data and checkpoint selection UI.
 - Cache clear undo behavior beyond the Phase 16 action-trust policy.
 - Full paged grid UI states and pagination controls.
 - Broad catalog UI screens beyond the local alpha workflow.

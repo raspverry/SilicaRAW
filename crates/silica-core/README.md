@@ -21,3 +21,5 @@ Core delegates SQLite, filesystem details, sidecar JSON validation, and sidecar 
 Task 10.3 adds thin sidecar workflow wrappers for explicit sidecar write/read. Core does not duplicate sidecar path or schema logic.
 
 Task 10.4 adds a thin sidecar rebuild dry-run wrapper. Core exposes the report to command-facing callers without duplicating precedence, conflict, or schema handling.
+
+Task 16.4 adds a thin `list_photo_history` wrapper for the Develop history panel. Core keeps UI callers on the same undo/history boundary and does not expose raw SQLite or arbitrary checkpoint mutation.

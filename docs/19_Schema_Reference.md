@@ -170,6 +170,18 @@ idx_edit_history_photo_state_sequence -> per-photo undo/redo lookup
 
 Undo restores the latest applied undoable row for a photo. Redo reapplies the earliest undone row for a photo. New undoable checkpoints invalidate undone rows for that photo. Runtime support currently covers `edit_commit` and `flag_change`; logged-only actions remain outside undo/redo mutation.
 
+Task 16.4 runtime query status:
+
+```txt
+list_photo_history -> reads edit_history rows for one photo
+get_photo_history -> desktop command envelope for the Develop history panel
+visible row states -> applied | undone
+invalidated rows -> hidden from the product history panel
+selectable row -> latest applied row for undo or earliest undone row for redo only
+```
+
+The Develop history panel is presentation only. It must not own raw SQL, schema shape, or arbitrary checkpoint jumps. Selecting a row calls the same core undo/redo command path used by toolbar/buttons.
+
 ## Migration Policy
 
 ```txt

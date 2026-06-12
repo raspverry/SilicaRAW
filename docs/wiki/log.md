@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Develop history panel contract added
+
+- Completed Task 16.4 with storage/core history listing, desktop `get_photo_history`, and a Develop history panel backed only by runtime checkpoints.
+- Kept static HTML history rows empty; the UI renders loading, empty, error, disabled, undo, and redo states from real command responses.
+- Verified row selection uses the existing core undo/redo command path instead of direct checkpoint jumps.
+
 ## [2026-06-12] phase-16 | Undo redo commands added
 
 - Completed Task 16.3 with storage, core, and desktop undo/redo command boundaries for edit checkpoints and culling flags.

@@ -604,8 +604,10 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Acceptance Criteria:**
   - Panel lists real checkpoints only.
   - Keyboard focus and disabled states are coherent.
-  - Selecting a checkpoint previews and commits according to the documented semantics.
-- **Validation:** UI smoke and visual QA.
+  - Selecting a checkpoint routes through documented undo/redo semantics, not direct state jumps.
+- **Validation:** UI smoke, static UI contract, and command tests.
+
+**Status:** Completed on 2026-06-12. Storage/core expose real `edit_history` checkpoints through `list_photo_history`, desktop exposes `get_photo_history`, and the Develop history panel renders only runtime checkpoint rows. Empty, loading, error, disabled, undo, and redo states are explicit.
 
 ### Task 16.5: Action Log Storage API
 

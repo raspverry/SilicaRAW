@@ -395,6 +395,15 @@
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
           </div>
+          <div class="sr-history-panel" id="developHistoryPanel" data-history-state="empty">
+            <div class="sr-panel-heading">History</div>
+            <div class="sr-history-command-row" role="group" aria-label="Develop history commands">
+              <button id="developUndoHistory" type="button" disabled>Undo</button>
+              <button id="developRedoHistory" type="button" disabled>Redo</button>
+            </div>
+            <output class="sr-history-status" id="developHistoryStatus" aria-live="polite">No committed history yet.</output>
+            <ol class="sr-history-list" id="developHistoryList" aria-live="polite"></ol>
+          </div>
           <button class="sr-collapse-row" type="button">Tone</button>
           <button class="sr-collapse-row" type="button">Color</button>
           <button class="sr-collapse-row" type="button">Detail</button>
@@ -599,6 +608,11 @@
       const developContrastReset = document.querySelector("#developContrastReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
+      const developHistoryPanel = document.querySelector("#developHistoryPanel");
+      const developHistoryStatus = document.querySelector("#developHistoryStatus");
+      const developHistoryList = document.querySelector("#developHistoryList");
+      const developUndoHistory = document.querySelector("#developUndoHistory");
+      const developRedoHistory = document.querySelector("#developRedoHistory");
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -658,6 +672,7 @@
       let gridVirtualRenderFrame = 0;
       let gridVirtualWindow = { start: 0, end: 0 };
       let metadataRequestSequence = 0;
+      let historyRequestSequence = 0;
       let lastImportIssues = [];
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
@@ -1657,6 +1672,160 @@
         }
       }
 
+      function setDevelopHistoryButtons(canUndo, canRedo) {
+        developHistoryPanel.dataset.canUndo = String(Boolean(canUndo));
+        developHistoryPanel.dataset.canRedo = String(Boolean(canRedo));
+        developUndoHistory.disabled = controlsBusy || !canUndo;
+        developRedoHistory.disabled = controlsBusy || !canRedo;
+      }
+
+      function renderDevelopHistoryPanel(panel) {
+        const items = Array.isArray(panel?.items) ? panel.items : [];
+        const status = panel?.status || (items.length ? "ready" : "empty");
+        developHistoryPanel.dataset.historyState = status;
+        developHistoryStatus.value = panel?.message || (items.length ? "History checkpoints loaded." : "No committed history yet.");
+        setDevelopHistoryButtons(Boolean(panel?.canUndo), Boolean(panel?.canRedo));
+        developHistoryList.replaceChildren();
+
+        items.forEach((item) => {
+          const row = document.createElement("li");
+          row.className = "sr-history-item";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "sr-history-button";
+          const command = item.canUndo ? "undo" : item.canRedo ? "redo" : "";
+          button.disabled = !command;
+          button.dataset.historyId = item.historyId || "";
+          button.dataset.historyState = item.historyState || "";
+          button.dataset.historyCommand = command;
+          button.setAttribute("aria-label", `${item.label || item.actionKind || "History checkpoint"} ${command || "not selectable"}`);
+
+          const label = document.createElement("span");
+          label.className = "sr-history-label";
+          label.textContent = item.label || item.actionKind || "History checkpoint";
+          const state = document.createElement("span");
+          state.className = "sr-history-state";
+          state.textContent = command === "undo"
+            ? "Next undo"
+            : command === "redo"
+              ? "Next redo"
+              : item.historyState || "Locked";
+          button.append(label, state);
+          if (command) {
+            button.addEventListener("click", () => runDevelopHistoryCommand(command));
+          }
+          row.append(button);
+          developHistoryList.append(row);
+        });
+      }
+
+      function renderDevelopHistoryLoading(photo) {
+        developHistoryPanel.dataset.historyState = "loading";
+        developHistoryStatus.value = photo ? "Loading history checkpoints..." : "No photo selected.";
+        setDevelopHistoryButtons(false, false);
+        developHistoryList.replaceChildren();
+      }
+
+      function renderDevelopHistoryError(message) {
+        developHistoryPanel.dataset.historyState = "error";
+        developHistoryStatus.value = message || "History could not be loaded.";
+        setDevelopHistoryButtons(false, false);
+        developHistoryList.replaceChildren();
+      }
+
+      async function loadDevelopHistory() {
+        const photo = selectedPhoto();
+        if (!photo) {
+          renderDevelopHistoryPanel({
+            status: "empty",
+            message: "No photo selected.",
+            items: [],
+            canUndo: false,
+            canRedo: false,
+          });
+          return;
+        }
+
+        if (!activeLibraryPath || !invoke) {
+          renderDevelopHistoryPanel({
+            status: "empty",
+            message: "Desktop runtime is required to load committed history.",
+            items: [],
+            canUndo: false,
+            canRedo: false,
+          });
+          return;
+        }
+
+        const requestId = ++historyRequestSequence;
+        const historyPhotoId = photo.photoId;
+        renderDevelopHistoryLoading(photo);
+        try {
+          const response = await invoke("get_photo_history", {
+            libraryPath: activeLibraryPath,
+            photoId: historyPhotoId,
+          });
+          if (requestId !== historyRequestSequence || selectedPhotoId !== historyPhotoId) {
+            return;
+          }
+          if (commandFailed(response)) {
+            renderDevelopHistoryError(responseErrorMessage(response, "History failed to load."));
+            return;
+          }
+          renderDevelopHistoryPanel(response.data || {
+            status: "empty",
+            message: "No committed history yet.",
+            items: [],
+            canUndo: false,
+            canRedo: false,
+          });
+        } catch (error) {
+          if (requestId !== historyRequestSequence || selectedPhotoId !== historyPhotoId) {
+            return;
+          }
+          renderDevelopHistoryError(responseErrorMessage(error, "History failed to load."));
+        }
+      }
+
+      async function runDevelopHistoryCommand(command) {
+        const photo = selectedPhoto();
+        if (!photo) {
+          setStatus("Select a photo before using history.");
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          setStatus("Desktop runtime is required for undo and redo.");
+          return;
+        }
+        setBusy(true);
+        try {
+          const response = command === "redo"
+            ? await invoke("redo_last_history_action", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+            })
+            : await invoke("undo_last_history_action", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+            });
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, `${command} failed.`));
+            await loadDevelopHistory();
+            return;
+          }
+          await readPersistedDevelopState(photo, { force: true });
+          await loadDevelopHistory();
+          await previewDevelopEdit();
+          setStatus(responseMessage(response, `${command} applied.`));
+        } catch (error) {
+          setStatus(responseErrorMessage(error, `${command} failed.`));
+          await loadDevelopHistory();
+        } finally {
+          setBusy(false);
+          await loadDevelopHistory();
+        }
+      }
+
       function cardState(photo) {
         if (photo.missing) {
           return { className: "", label: "Missing" };
@@ -2156,6 +2325,7 @@
         }
         if (appFrame.dataset.activeMode === "develop") {
           readPersistedDevelopState(selected).then(() => previewDevelopEdit());
+          void loadDevelopHistory();
         }
         if (options.persist !== false) {
           void recordActiveSessionState();
@@ -2534,6 +2704,7 @@
           state.readbackLibraryPath = activeLibraryPath || "";
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
+          await loadDevelopHistory();
           setStatus(responseMessage(response));
         } catch (error) {
           setStatus(responseErrorMessage(error, "Develop edit commit failed."));
@@ -2867,6 +3038,7 @@
         if (mode === "develop") {
           syncDevelopSelection();
           readPersistedDevelopState(selectedPhoto()).then(() => previewDevelopEdit());
+          void loadDevelopHistory();
         }
         if (mode === "export") {
           openExportDialog();
@@ -2907,6 +3079,10 @@
         ].forEach((control) => {
           control.disabled = developDisabled;
         });
+        setDevelopHistoryButtons(
+          developHistoryPanel.dataset.canUndo === "true",
+          developHistoryPanel.dataset.canRedo === "true",
+        );
         runJpegExportButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
         chooseExportOutputPathButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
         exportColorOptionButtons.forEach((button) => {

@@ -178,6 +178,11 @@ def main():
         "developContrastReset",
         "developCommitEdit",
         "developRevertEdit",
+        "developHistoryPanel",
+        "developHistoryStatus",
+        "developHistoryList",
+        "developUndoHistory",
+        "developRedoHistory",
         "developFilmstrip",
         "developEditState",
         "openExportDialog",
@@ -201,6 +206,18 @@ def main():
         require(element_id in parser.ids, f"missing #{element_id}", failures)
     for rating in range(6):
         require(f"ratePhoto{rating}" in parser.ids, f"missing #ratePhoto{rating}", failures)
+
+    require(
+        '<ol class="sr-history-list" id="developHistoryList" aria-live="polite"></ol>' in source,
+        "#developHistoryList must be empty static markup backed only by runtime checkpoints",
+        failures,
+    )
+    for command in [
+        "get_photo_history",
+        "undo_last_history_action",
+        "redo_last_history_action",
+    ]:
+        require(command in source, f"index.html must wire {command}", failures)
 
     require(
         "disabled" in parser.ids.get("openRecent", {}),

@@ -473,6 +473,29 @@ pub struct HistoryCommandResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoHistoryPanel {
+    pub photo_id: String,
+    pub items: Vec<PhotoHistoryItem>,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoHistoryItem {
+    pub history_id: String,
+    pub photo_id: String,
+    pub sequence: i64,
+    pub action_kind: String,
+    pub label: String,
+    pub history_state: String,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct HistoryActionRow {
     id: String,
     action_kind: String,
@@ -2750,6 +2773,99 @@ pub fn redo_last_history_action(
     photo_id: &str,
 ) -> Result<HistoryCommandResult, LibraryStorageError> {
     apply_history_action(library_root_path, photo_id, "redo")
+}
+
+pub fn list_photo_history(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<PhotoHistoryPanel, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let mut statement = connection.prepare(
+        r#"
+        SELECT id, sequence, action_kind, action_json, history_state, created_at
+        FROM edit_history
+        WHERE photo_id = ?1
+          AND action_class = 'undoable'
+          AND history_state IN ('applied', 'undone')
+        ORDER BY sequence DESC
+        "#,
+    )?;
+    let mut items = statement
+        .query_map(params![photo_id], |row| {
+            let history_id: String = row.get(0)?;
+            let sequence: i64 = row.get(1)?;
+            let action_kind: String = row.get(2)?;
+            let action_json: String = row.get(3)?;
+            let history_state: String = row.get(4)?;
+            let created_at: String = row.get(5)?;
+            Ok((
+                history_id,
+                sequence,
+                action_kind,
+                action_json,
+                history_state,
+                created_at,
+            ))
+        })?
+        .map(|row| {
+            let (history_id, sequence, action_kind, action_json, history_state, created_at) = row?;
+            let action: serde_json::Value = serde_json::from_str(&action_json)?;
+            validate_history_action_header(&action, photo_id, &action_kind)?;
+            let label = action
+                .get("label")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(&action_kind)
+                .to_string();
+            Ok(PhotoHistoryItem {
+                history_id,
+                photo_id: photo_id.to_string(),
+                sequence,
+                action_kind,
+                label,
+                can_undo: false,
+                can_redo: false,
+                history_state,
+                created_at,
+            })
+        })
+        .collect::<Result<Vec<_>, LibraryStorageError>>()?;
+
+    let undo_sequence = items
+        .iter()
+        .filter(|item| item.history_state == "applied")
+        .map(|item| item.sequence)
+        .max();
+    let redo_sequence = items
+        .iter()
+        .filter(|item| item.history_state == "undone")
+        .map(|item| item.sequence)
+        .min();
+    for item in &mut items {
+        item.can_undo = Some(item.sequence) == undo_sequence && item.history_state == "applied";
+        item.can_redo = Some(item.sequence) == redo_sequence && item.history_state == "undone";
+    }
+
+    let can_undo = undo_sequence.is_some();
+    let can_redo = redo_sequence.is_some();
+    let (status, message) = if items.is_empty() {
+        ("empty", "No committed history yet.")
+    } else {
+        ("ready", "History checkpoints loaded.")
+    };
+
+    Ok(PhotoHistoryPanel {
+        photo_id: photo_id.to_string(),
+        items,
+        can_undo,
+        can_redo,
+        status: status.to_string(),
+        message: message.to_string(),
+    })
 }
 
 fn apply_history_action(
@@ -7041,6 +7157,67 @@ mod tests {
             )
             .expect("count invalidated history");
         assert_eq!(invalidated_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn lists_real_history_checkpoints_with_command_state() {
+        let workspace = unique_library_root("history-panel");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let empty = list_photo_history(&library.root_path, &photo_id).expect("read empty history");
+        assert_eq!(empty.photo_id, photo_id);
+        assert_eq!(empty.status, "empty");
+        assert_eq!(empty.message, "No committed history yet.");
+        assert!(!empty.can_undo);
+        assert!(!empty.can_redo);
+        assert!(empty.items.is_empty());
+
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft edit graph")
+            .expect("draft edit graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("blue".to_string()),
+        )
+        .expect("set flags");
+        undo_last_history_action(&library.root_path, &photo_id).expect("undo latest flags");
+
+        let history = list_photo_history(&library.root_path, &photo_id).expect("read history");
+        assert_eq!(history.status, "ready");
+        assert_eq!(history.message, "History checkpoints loaded.");
+        assert!(history.can_undo);
+        assert!(history.can_redo);
+        assert_eq!(history.items.len(), 2);
+        assert_eq!(history.items[0].sequence, 2);
+        assert_eq!(history.items[0].action_kind, "flag_change");
+        assert_eq!(history.items[0].label, "Culling flags");
+        assert_eq!(history.items[0].history_state, "undone");
+        assert!(history.items[0].can_redo);
+        assert!(!history.items[0].can_undo);
+        assert_eq!(history.items[1].sequence, 1);
+        assert_eq!(history.items[1].action_kind, "edit_commit");
+        assert_eq!(history.items[1].label, "Exposure / contrast");
+        assert_eq!(history.items[1].history_state, "applied");
+        assert!(history.items[1].can_undo);
+        assert!(!history.items[1].can_redo);
 
         remove_library_root(&workspace);
     }

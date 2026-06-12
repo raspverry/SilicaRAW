@@ -60,12 +60,14 @@ Task 16.2 implements the first durable edit checkpoints: catalog schema version 
 
 Task 16.3 implements storage/core/desktop undo and redo commands for edit checkpoints and culling flags. Catalog schema version 7 adds `history_state`; redo is invalidated by new undoable actions; tests prove export outputs survive undo/redo.
 
+Task 16.4 implements the first real Develop history panel contract. Storage/core expose photo history checkpoints from `edit_history`; desktop exposes `get_photo_history`; the static UI renders an empty list until runtime data arrives, and checkpoint row actions use only the documented undo/redo commands.
+
 ## Validation Strategy
 
 - Task 16.0 and 16.1: docs/static checks and schema boundary review.
 - Task 16.2: `cargo test -p silica-storage -p silica-core -p silica-edit`.
 - Task 16.3: `cargo test -p silica-storage -p silica-core -p silica-desktop`.
-- Task 16.4: static UI smoke plus visual QA only after real history data exists.
+- Task 16.4: `cargo test -p silica-storage -p silica-core -p silica-desktop`, `python3 scripts/harness/check-static-ui.py`, and full harness before completion.
 - Task 16.5 and 16.6: `cargo test -p silica-storage -p silica-core` plus `scripts/harness/check.sh`.
 - Before phase completion: `scripts/harness/check.sh`.
 
