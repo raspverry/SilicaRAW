@@ -5,6 +5,8 @@
 
 use std::path::Path;
 
+mod core_image_raw_probe;
+
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-decode";
 
@@ -80,6 +82,81 @@ pub struct PreviewDecodePlan {
     pub backend: PreviewDecodeBackend,
     pub status: PreviewDecodeStatus,
     pub message: String,
+}
+
+/// Request for a proof-only Core Image RAW probe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawProbeRequest {
+    pub source_path: String,
+    pub expected_sha256: Option<String>,
+}
+
+impl RawProbeRequest {
+    pub fn new(source_path: impl AsRef<str>) -> Self {
+        Self {
+            source_path: source_path.as_ref().to_string(),
+            expected_sha256: None,
+        }
+    }
+}
+
+/// Backend used by a RAW probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawProbeBackend {
+    CoreImageRaw,
+}
+
+/// Platform path used by a RAW probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawProbePlatform {
+    Macos,
+    UnsupportedPlatform,
+}
+
+/// High-level status of a RAW probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawProbeStatus {
+    Success,
+    Unsupported,
+    Failed,
+    Unavailable,
+}
+
+/// Recoverable category for failed or unavailable RAW probes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawProbeErrorCategory {
+    UnsupportedPlatform,
+    MissingFile,
+    SourceHashMismatch,
+    CoreImageUnavailable,
+    CoreImageOpenFailed,
+    CoreImageMetadataMissing,
+    PermissionDenied,
+    InvalidFixture,
+    Unknown,
+}
+
+/// Structured proof result for Core Image RAW probing. This is not decoded pixels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawProbeResult {
+    pub backend: RawProbeBackend,
+    pub platform: RawProbePlatform,
+    pub macos_version: Option<String>,
+    pub source_path: String,
+    pub source_sha256: Option<String>,
+    pub original_file_size: Option<u64>,
+    pub original_modified_at: Option<String>,
+    pub status: RawProbeStatus,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub orientation: Option<i32>,
+    pub error_category: Option<RawProbeErrorCategory>,
+    pub message: String,
+}
+
+/// Run the proof-only Core Image RAW probe route.
+pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
+    core_image_raw_probe::probe_core_image_raw(request)
 }
 
 /// Build the local alpha preview decode plan for a catalog photo path.
@@ -169,5 +246,22 @@ mod tests {
             super::PreviewDecodeStatus::Unsupported
         );
         assert_eq!(unsupported_plan.backend, super::PreviewDecodeBackend::None);
+    }
+
+    #[test]
+    fn core_image_raw_probe_contract_does_not_change_preview_readiness() {
+        let unavailable =
+            super::probe_core_image_raw(super::RawProbeRequest::new("/tmp/missing.dng"));
+        assert_eq!(unavailable.backend, super::RawProbeBackend::CoreImageRaw);
+        assert!(matches!(
+            unavailable.status,
+            super::RawProbeStatus::Unavailable | super::RawProbeStatus::Failed
+        ));
+
+        let raw_plan = super::plan_preview_decode("/tmp/sample.dng", false);
+        assert_eq!(
+            raw_plan.status,
+            super::PreviewDecodeStatus::BlockedByMissingRawFixtureProbe
+        );
     }
 }

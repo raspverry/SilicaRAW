@@ -191,7 +191,7 @@ Expected: commit only dependency/feature gate files if implementation types are 
 - Modify: `crates/silica-decode/src/lib.rs`
 - Create: `crates/silica-decode/src/core_image_raw_probe.rs`
 
-- [ ] **Step 1: Write the failing probe contract test**
+- [x] **Step 1: Write the failing probe contract test**
 
 Add this test to `crates/silica-decode/src/lib.rs`:
 
@@ -225,7 +225,7 @@ cargo test -p silica-decode core_image_raw_probe_contract_does_not_change_previe
 
 Expected: compile failure for missing `RawProbeRequest`, `probe_core_image_raw`, `RawProbeBackend`, and `RawProbeStatus`.
 
-- [ ] **Step 2: Add probe contract types**
+- [x] **Step 2: Add probe contract types**
 
 Add these public types to `crates/silica-decode/src/lib.rs`:
 
@@ -295,7 +295,7 @@ pub struct RawProbeResult {
 }
 ```
 
-- [ ] **Step 3: Add stable fallback probe function**
+- [x] **Step 3: Add stable fallback probe function**
 
 Add this public function:
 
@@ -334,7 +334,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
 
 Add `mod core_image_raw_probe;` in `lib.rs`.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 
@@ -345,7 +345,7 @@ cargo test -p silica-decode --features core-image-raw-probe
 
 Expected: tests pass, even before true Core Image metadata extraction is implemented.
 
-- [ ] **Step 5: Commit Task 12.1.2**
+- [x] **Step 5: Commit Task 12.1.2**
 
 Run:
 

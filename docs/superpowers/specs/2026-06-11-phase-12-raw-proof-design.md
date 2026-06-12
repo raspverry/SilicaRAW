@@ -239,6 +239,7 @@ The product API must not:
   - Unsupported platform has an explicit result path.
   - No RAW pixels are returned.
 - **Validation:** `cargo test -p silica-decode`
+- **Status:** Completed on 2026-06-12. Added the proof-only RAW probe request/result/status/error contracts plus an unsupported fallback route, and verified the contract does not change existing preview readiness.
 
 ### Task 12.1.3: macOS Core Image Probe Backend
 
