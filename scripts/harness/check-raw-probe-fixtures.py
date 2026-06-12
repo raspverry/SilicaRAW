@@ -29,19 +29,34 @@ def main() -> int:
         )
         return 2
 
-    command = [
+    test_command = [
         "cargo",
         "test",
         "-p",
         "silica-decode",
         "--features",
         "core-image-raw-probe",
-        "probes_raw_fixture_manifest_without_mutating_originals",
+        "tests::probes_raw_fixture_manifest_without_mutating_originals",
         "--",
         "--ignored",
         "--exact",
     ]
-    return subprocess.run(command, cwd=ROOT, check=False).returncode
+    test_result = subprocess.run(test_command, cwd=ROOT, check=False)
+    if test_result.returncode != 0:
+        return test_result.returncode
+
+    report_command = [
+        "cargo",
+        "run",
+        "-p",
+        "silica-decode",
+        "--features",
+        "core-image-raw-probe",
+        "--example",
+        "raw_probe_report",
+        "--quiet",
+    ]
+    return subprocess.run(report_command, cwd=ROOT, check=False).returncode
 
 
 if __name__ == "__main__":

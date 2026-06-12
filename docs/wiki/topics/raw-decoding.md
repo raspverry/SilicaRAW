@@ -120,13 +120,13 @@ Phase 12.1 does not prove RAW support. Support claims remain blocked until Task 
 
 ## Phase 12.2 Fixture Probe Harness
 
-The RAW fixture probe harness exists, but no fixture-backed RAW evidence has been recorded.
+The RAW fixture probe harness exists and now emits a JSON report after running the ignored fixture test.
 
-Current blocked state:
+Current local fixture state:
 
 ```txt
-SILICARAW_RAW_FIXTURE_MANIFEST -> unset
-legal local RAW fixture manifest -> not available
+SILICARAW_RAW_FIXTURE_MANIFEST -> .tmp/legal-raw-fixtures/raw-fixtures.json in this maintainer workspace
+legal local RAW fixture manifest -> available locally, ignored by git
 committed legal RAW fixture corpus -> not present
 .tmp blocked placeholder RAW files -> not valid RAW proof evidence
 ```
@@ -154,17 +154,38 @@ Accepted local-only candidates:
 
 Fixture class E remains pending source review. No candidate is probe evidence until the file is downloaded into an ignored local path, hash-verified, declared in a local fixture manifest, and run through `scripts/harness/check-raw-probe-fixtures.py`.
 
+## Phase 12.5 Local Probe Evidence
+
+The local ignored fixture manifest ran successfully on macOS 26.4.
+
+Evidence command:
+
+```bash
+SILICARAW_RAW_FIXTURE_MANIFEST=/Users/hansol/dev/personal/SilicaRAW/.tmp/legal-raw-fixtures/raw-fixtures.json scripts/harness/check-raw-probe-fixtures.py
+```
+
+Evidence summary:
+
+| Fixture class | Fixture id | Format | Probe status | Dimensions | Orientation | Original hash unchanged |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | `raw_pixls_canon_eos_7d_cr2_raw_3_2` | cr2 | success | 5184 x 3456 | unknown | true |
+| B | `raw_pixls_canon_eos_r6_mark_iii_cr3_full_frame` | cr3 | success | 6960 x 4640 | unknown | true |
+| C | `raw_pixls_fujifilm_x_t30_iii_raf_compressed` | raf | success | 6240 x 4160 | unknown | true |
+| D | `raw_pixls_apple_iphone_12_pro_dng` | dng | success | 4032 x 3024 | unknown | true |
+
+This evidence proves Core Image can open these local legal fixtures and report dimensions. It does not prove final color correctness, camera profiles, lens correction, product UI RAW display, or export behavior.
+
 ## Phase 12 Core Image Support Matrix
 
-No legal RAW fixture probe evidence is available yet. The matrix records blocked status for each RAW fixture class without inferring support from file extensions.
+The matrix records fixture-backed Core Image support for classes A-D and keeps class E blocked pending a legal source decision.
 
 | Fixture class | Fixture role | Fixture id | Format | Backend | Probe status | Dimensions | Orientation | Product status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A | Ordinary Core Image candidate RAW | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
-| B | High-risk or edge-case RAW | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
-| C | Fuji RAF candidate | pending_legal_fixture | raf | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
-| D | Apple ProRAW DNG candidate | pending_legal_fixture | dng | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
-| E | RAW-like file expected to stay unsupported or blocked | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Task 12.2 harness exists; no legal manifest supplied |
+| A | Ordinary Core Image candidate RAW | `raw_pixls_canon_eos_7d_cr2_raw_3_2` | cr2 | core_image_raw | success | 5184 x 3456 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| B | High-risk or edge-case RAW | `raw_pixls_canon_eos_r6_mark_iii_cr3_full_frame` | cr3 | core_image_raw | success | 6960 x 4640 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| C | Fuji RAF candidate | `raw_pixls_fujifilm_x_t30_iii_raf_compressed` | raf | core_image_raw | success | 6240 x 4160 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| D | Apple ProRAW DNG candidate | `raw_pixls_apple_iphone_12_pro_dng` | dng | core_image_raw | success | 4032 x 3024 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| E | RAW-like file expected to stay unsupported or blocked | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Source decision still pending; no legal manifest entry supplied |
 
 LibRaw remains deferred. No fixture-backed Core Image gap has been recorded, and no decoder dependency should be added from this matrix.
 
@@ -177,10 +198,12 @@ Current behavior:
 ```txt
 RAW candidate -> BlockedPendingEvidence
 non-RAW candidate -> BlockedUnsupportedClass
-Supported -> unreachable until fixture evidence changes the matrix
+Supported -> pending a follow-up product API mapping task for fixture-proven classes A-D
 ```
 
 The API returns backend, status, optional dimensions, optional orientation, and a UI-suitable message. It does not return decoded pixels and does not trigger rendering, cache writes, export, or original-file mutation.
+
+The next product API task may map fixture-proven classes A-D to `Supported` metadata-only plans. It must still avoid UI pixels, export behavior, cache writes, broad camera claims, and original mutation.
 
 ## Links
 

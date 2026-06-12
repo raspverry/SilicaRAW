@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | RAW fixture probe evidence recorded
+
+- Completed local Task 12.5.2 through Task 12.5.4 for raw.pixls.us candidates A-D.
+- The ignored local manifest probe succeeded on macOS 26.4, and original hashes remained unchanged.
+- Classes A-D are now fixture-backed Core Image-supported in the RAW support matrix; class E remains pending source review.
+
 ## [2026-06-12] phase-12 | RAW fixture source review added
 
 - Completed Task 12.5.1 source review for raw.pixls.us candidates.

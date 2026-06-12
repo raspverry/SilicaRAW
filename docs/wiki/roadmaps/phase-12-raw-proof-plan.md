@@ -24,7 +24,8 @@ As of 2026-06-12:
 - Task 12.3 support matrix is complete in a `blocked_pending_evidence` state.
 - Task 12.4 product RAW decode API contract is complete in a blocked state.
 - Task 12.5.1 source review is complete for raw.pixls.us candidates A-D.
-- Task 12.5.2 is next: download accepted fixtures into an ignored local path and verify SHA-256.
+- Task 12.5.2 through Task 12.5.4 are complete locally for raw.pixls.us candidates A-D.
+- Task 12.5.5 is complete: the support matrix records fixture-backed Core Image support for classes A-D.
 
 ## Goal
 
@@ -106,6 +107,7 @@ The output of this phase is a support decision, not user-visible RAW editing.
   - Fixture file SHA-256 is recorded.
   - Original file hash is stable before the probe.
 - **Validation:** `git status --short` shows no fixture media staged.
+- **Status:** complete locally for candidates A-D.
 
 ### Task 12.5.3: Local Fixture Manifest
 
@@ -116,6 +118,7 @@ The output of this phase is a support decision, not user-visible RAW editing.
   - `integrity.sha256` and `expected_source_hashes.sha256` match the fixture file.
   - RAW metadata and blocked decode gate fields are present.
 - **Validation:** `scripts/harness/check-raw-probe-fixtures.py` reaches the probe instead of manifest validation failure.
+- **Status:** complete locally at `.tmp/legal-raw-fixtures/raw-fixtures.json`.
 
 ### Task 12.5.4: Probe Run and Evidence Review
 
@@ -126,6 +129,7 @@ The output of this phase is a support decision, not user-visible RAW editing.
   - Original SHA-256 remains unchanged after probing.
   - Failures are classified instead of hidden.
 - **Validation:** `SILICARAW_RAW_FIXTURE_MANIFEST=... scripts/harness/check-raw-probe-fixtures.py`
+- **Status:** complete locally for candidates A-D on macOS 26.4.
 
 ### Task 12.5.5: Matrix and Follow-Up Decision
 
@@ -137,6 +141,7 @@ The output of this phase is a support decision, not user-visible RAW editing.
   - LibRaw remains deferred unless a concrete fixture-backed Core Image gap is recorded.
   - Any code change to product RAW decode support is a separate atomic task after the matrix update.
 - **Validation:** `python3 scripts/harness/check-md-links.py`
+- **Status:** complete for classes A-D; class E remains pending source review.
 
 ## Completion Gate
 

@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
@@ -11,11 +12,13 @@ use crate::{
 pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
     let source_path = request.source_path.clone();
     let path = PathBuf::from(&request.source_path);
+    let macos_version = macos_version();
 
     let metadata = match fs::metadata(&path) {
         Ok(metadata) if metadata.is_file() => metadata,
         Ok(_) => {
             return failed_result(
+                macos_version,
                 source_path,
                 None,
                 None,
@@ -26,6 +29,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
         }
         Err(error) => {
             return failed_result(
+                macos_version,
                 source_path,
                 None,
                 None,
@@ -42,6 +46,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
         Ok(hash) => hash,
         Err(error) => {
             return failed_result(
+                macos_version,
                 source_path,
                 None,
                 original_file_size,
@@ -55,6 +60,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
     if let Some(expected_sha256) = request.expected_sha256.as_deref() {
         if !expected_sha256.eq_ignore_ascii_case(&source_sha256) {
             return failed_result(
+                macos_version,
                 source_path,
                 Some(source_sha256),
                 original_file_size,
@@ -69,7 +75,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
         Ok((width, height)) => RawProbeResult {
             backend: RawProbeBackend::CoreImageRaw,
             platform: RawProbePlatform::Macos,
-            macos_version: None,
+            macos_version,
             source_path,
             source_sha256: Some(source_sha256),
             original_file_size,
@@ -82,6 +88,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
             message: "Core Image opened the RAW source and reported image dimensions.".to_string(),
         },
         Err((category, message)) => failed_result(
+            macos_version,
             source_path,
             Some(source_sha256),
             original_file_size,
@@ -93,6 +100,7 @@ pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
 }
 
 fn failed_result(
+    macos_version: Option<String>,
     source_path: String,
     source_sha256: Option<String>,
     original_file_size: Option<u64>,
@@ -103,7 +111,7 @@ fn failed_result(
     RawProbeResult {
         backend: RawProbeBackend::CoreImageRaw,
         platform: RawProbePlatform::Macos,
-        macos_version: None,
+        macos_version,
         source_path,
         source_sha256,
         original_file_size,
@@ -114,6 +122,24 @@ fn failed_result(
         orientation: None,
         error_category: Some(error_category),
         message: message.into(),
+    }
+}
+
+fn macos_version() -> Option<String> {
+    let output = Command::new("/usr/bin/sw_vers")
+        .arg("-productVersion")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let version = String::from_utf8(output.stdout).ok()?;
+    let trimmed = version.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
     }
 }
 
