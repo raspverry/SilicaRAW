@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Undo redo commands added
+
+- Completed Task 16.3 with storage, core, and desktop undo/redo command boundaries for edit checkpoints and culling flags.
+- Added catalog schema version 7 with `edit_history.history_state` and state/sequence lookup.
+- Tested transaction restore behavior, redo invalidation, desktop command responses, and export-output preservation.
+
 ## [2026-06-12] phase-16 | Edit history persistence added
 
 - Completed Task 16.2 with catalog schema version 6 and ordered edit history checkpoint columns.

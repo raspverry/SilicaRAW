@@ -160,6 +160,16 @@ idx_edit_history_photo_sequence -> ordered per-photo history lookup
 
 Committed exposure/contrast edits write one active `edit_states` row and one `edit_history` row in the same transaction. The history `action_json` stores schema-valid before/after edit graphs. Slider drafts still write no `edit_states` or `edit_history` rows.
 
+Task 16.3 storage status:
+
+```txt
+catalog schema version -> 7
+edit_history.history_state -> applied | undone | invalidated
+idx_edit_history_photo_state_sequence -> per-photo undo/redo lookup
+```
+
+Undo restores the latest applied undoable row for a photo. Redo reapplies the earliest undone row for a photo. New undoable checkpoints invalidate undone rows for that photo. Runtime support currently covers `edit_commit` and `flag_change`; logged-only actions remain outside undo/redo mutation.
+
 ## Migration Policy
 
 ```txt

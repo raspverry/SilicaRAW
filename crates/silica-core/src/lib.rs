@@ -22,6 +22,7 @@ pub use silica_storage::CatalogRebuildDryRunIssueKind;
 pub use silica_storage::CatalogRebuildDryRunReport;
 pub use silica_storage::CatalogRebuildFlagSource;
 pub use silica_storage::FolderImportOptions;
+pub use silica_storage::HistoryCommandResult;
 pub use silica_storage::ImportIssue;
 pub use silica_storage::ImportIssueKind;
 pub use silica_storage::LibraryPhotoGridItem;
@@ -1139,6 +1140,22 @@ pub fn get_photo_flags(
     photo_id: &str,
 ) -> Result<Option<silica_storage::PhotoFlags>, CoreError> {
     silica_storage::get_photo_flags(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Undo the latest undoable history action for one photo through the core boundary.
+pub fn undo_last_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<silica_storage::HistoryCommandResult, CoreError> {
+    silica_storage::undo_last_history_action(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Redo the next redoable history action for one photo through the core boundary.
+pub fn redo_last_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<silica_storage::HistoryCommandResult, CoreError> {
+    silica_storage::redo_last_history_action(library_root_path, photo_id).map_err(CoreError::from)
 }
 
 /// Read stored photo metadata through the core command boundary.
@@ -3674,6 +3691,51 @@ mod tests {
         assert_eq!(restored.exposure, 0.5);
         assert_eq!(restored.contrast, -8.0);
         assert!(restored.persisted);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn undo_and_redo_edit_history_through_core() {
+        let workspace = unique_library_root("core-undo-redo");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("commit result");
+
+        let undo = undo_last_history_action(&created.root_path, &photo_id).expect("undo");
+        assert!(undo.applied);
+        let undone = get_photo_edit_state(&created.root_path, &photo_id)
+            .expect("read undone edit")
+            .expect("edit state");
+        assert_eq!(undone.exposure, 0.0);
+        assert_eq!(undone.contrast, 0.0);
+
+        let redo = redo_last_history_action(&created.root_path, &photo_id).expect("redo");
+        assert!(redo.applied);
+        let redone = get_photo_edit_state(&created.root_path, &photo_id)
+            .expect("read redone edit")
+            .expect("edit state");
+        assert_eq!(redone.exposure, 0.5);
+        assert_eq!(redone.contrast, -8.0);
 
         remove_library_root(&workspace);
     }

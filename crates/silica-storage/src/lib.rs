@@ -16,7 +16,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use rusqlite::{named_params, params, Connection, OpenFlags, OptionalExtension};
+use rusqlite::{named_params, params, Connection, OpenFlags, OptionalExtension, Transaction};
 use silica_catalog::{
     is_supported_photo_extension, CatalogFlagError, ImportCandidate,
     ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
@@ -462,6 +462,23 @@ struct BackupManifest {
     files: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryCommandResult {
+    pub photo_id: String,
+    pub command: String,
+    pub applied: bool,
+    pub action_kind: Option<String>,
+    pub history_id: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HistoryActionRow {
+    id: String,
+    action_kind: String,
+    action_json: String,
+}
+
 /// Errors returned by local library create/open operations.
 #[derive(Debug)]
 pub enum LibraryStorageError {
@@ -479,6 +496,7 @@ pub enum LibraryStorageError {
     CacheValidation(String),
     SidecarValidation(String),
     BackupValidation(String),
+    HistoryValidation(String),
 }
 
 impl fmt::Display for LibraryStorageError {
@@ -513,6 +531,9 @@ impl fmt::Display for LibraryStorageError {
             Self::BackupValidation(message) => {
                 write!(formatter, "backup validation error: {message}")
             }
+            Self::HistoryValidation(message) => {
+                write!(formatter, "history validation error: {message}")
+            }
         }
     }
 }
@@ -533,7 +554,8 @@ impl Error for LibraryStorageError {
             | Self::InvalidSidecarPhotoId(_)
             | Self::CacheValidation(_)
             | Self::SidecarValidation(_)
-            | Self::BackupValidation(_) => None,
+            | Self::BackupValidation(_)
+            | Self::HistoryValidation(_) => None,
         }
     }
 }
@@ -605,6 +627,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 6,
         name: "edit_history_checkpoint_columns",
         sql: EDIT_HISTORY_CHECKPOINT_COLUMNS_SQL,
+    },
+    Migration {
+        version: 7,
+        name: "edit_history_state_columns",
+        sql: EDIT_HISTORY_STATE_COLUMNS_SQL,
     },
 ];
 
@@ -1404,27 +1431,50 @@ pub fn set_photo_flags(
 ) -> Result<PhotoFlags, LibraryStorageError> {
     let flags = PhotoFlags::new(photo_id, rating, picked, rejected, color_label)?;
     let library = open_existing_library_for_read(library_root_path)?;
-    let connection = open_catalog(&library.catalog_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let before_flags = get_photo_flags_from_connection(&connection, &flags.photo_id)?
+        .unwrap_or_else(|| default_rebuild_flags(&flags.photo_id));
+    let action_json = serde_json::to_string(&serde_json::json!({
+        "schema": ACTION_SCHEMA,
+        "version": ACTION_VERSION,
+        "class": "undoable",
+        "kind": "flag_change",
+        "photo_id": flags.photo_id.clone(),
+        "label": "Culling flags",
+        "before": {
+            "flags": photo_flags_action_value(&before_flags),
+        },
+        "after": {
+            "flags": photo_flags_action_value(&flags),
+        },
+        "created_by": "core",
+    }))?;
 
-    connection.execute(
+    let transaction = connection.transaction()?;
+    invalidate_redo_history(&transaction, &flags.photo_id)?;
+    restore_photo_flags_in_transaction(&transaction, &flags)?;
+    let sequence = next_history_sequence(&transaction, &flags.photo_id)?;
+    let edit_history_id = stable_catalog_id(
+        "edit-history",
+        &format!("{}\nflag_change\n{sequence}", flags.photo_id),
+    );
+    transaction.execute(
         r#"
-        INSERT INTO photo_flags(photo_id, rating, picked, rejected, color_label, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
-        ON CONFLICT(photo_id) DO UPDATE SET
-          rating = excluded.rating,
-          picked = excluded.picked,
-          rejected = excluded.rejected,
-          color_label = excluded.color_label,
-          updated_at = CURRENT_TIMESTAMP
+        INSERT INTO edit_history(
+          id,
+          photo_id,
+          edit_state_id,
+          action_json,
+          sequence,
+          action_class,
+          action_kind,
+          history_state
+        )
+        VALUES (?1, ?2, NULL, ?3, ?4, 'undoable', 'flag_change', 'applied')
         "#,
-        params![
-            flags.photo_id,
-            i64::from(flags.rating),
-            bool_to_sql(flags.picked),
-            bool_to_sql(flags.rejected),
-            flags.color_label,
-        ],
+        params![edit_history_id, flags.photo_id, action_json, sequence],
     )?;
+    transaction.commit()?;
 
     Ok(flags)
 }
@@ -2628,23 +2678,20 @@ pub fn commit_edit_graph(
         "version": ACTION_VERSION,
         "class": "undoable",
         "kind": "edit_commit",
-        "photo_id": photo_id,
+        "photo_id": photo_id.clone(),
         "label": "Exposure / contrast",
         "before": {
-            "edit_graph": before_graph,
+            "edit_graph": &before_graph,
         },
         "after": {
-            "edit_graph": graph,
+            "edit_graph": &graph,
         },
         "created_by": "core",
     }))?;
 
     let transaction = connection.transaction()?;
-    let sequence: i64 = transaction.query_row(
-        "SELECT COALESCE(MAX(sequence), 0) + 1 FROM edit_history WHERE photo_id = ?1",
-        params![photo_id],
-        |row| row.get(0),
-    )?;
+    invalidate_redo_history(&transaction, &photo_id)?;
+    let sequence = next_history_sequence(&transaction, &photo_id)?;
     transaction.execute(
         "UPDATE edit_states SET active = 0 WHERE photo_id = ?1",
         params![photo_id],
@@ -2665,9 +2712,10 @@ pub fn commit_edit_graph(
           action_json,
           sequence,
           action_class,
-          action_kind
+          action_kind,
+          history_state
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, 'undoable', 'edit_commit')
+        VALUES (?1, ?2, ?3, ?4, ?5, 'undoable', 'edit_commit', 'applied')
         "#,
         params![
             edit_history_id,
@@ -2688,6 +2736,193 @@ pub fn commit_edit_graph(
     transaction.commit()?;
 
     Ok(graph)
+}
+
+pub fn undo_last_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<HistoryCommandResult, LibraryStorageError> {
+    apply_history_action(library_root_path, photo_id, "undo")
+}
+
+pub fn redo_last_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<HistoryCommandResult, LibraryStorageError> {
+    apply_history_action(library_root_path, photo_id, "redo")
+}
+
+fn apply_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    command: &str,
+) -> Result<HistoryCommandResult, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_local_library(library_root_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let transaction = connection.transaction()?;
+    let row = next_history_action_for_command(&transaction, photo_id, command)?;
+    let Some(row) = row else {
+        transaction.commit()?;
+        return Ok(HistoryCommandResult {
+            photo_id: photo_id.to_string(),
+            command: command.to_string(),
+            applied: false,
+            action_kind: None,
+            history_id: None,
+            message: format!("No {command} history is available."),
+        });
+    };
+
+    apply_history_row(&transaction, photo_id, command, &row)?;
+    let next_state = if command == "undo" {
+        "undone"
+    } else {
+        "applied"
+    };
+    transaction.execute(
+        "UPDATE edit_history SET history_state = ?1 WHERE id = ?2",
+        params![next_state, row.id],
+    )?;
+    transaction.commit()?;
+
+    Ok(HistoryCommandResult {
+        photo_id: photo_id.to_string(),
+        command: command.to_string(),
+        applied: true,
+        action_kind: Some(row.action_kind),
+        history_id: Some(row.id),
+        message: format!("{command} applied."),
+    })
+}
+
+fn next_history_action_for_command(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+    command: &str,
+) -> Result<Option<HistoryActionRow>, LibraryStorageError> {
+    let sql = match command {
+        "undo" => {
+            r#"
+            SELECT id, action_kind, action_json
+            FROM edit_history
+            WHERE photo_id = ?1
+              AND action_class = 'undoable'
+              AND history_state = 'applied'
+            ORDER BY sequence DESC
+            LIMIT 1
+            "#
+        }
+        "redo" => {
+            r#"
+            SELECT id, action_kind, action_json
+            FROM edit_history
+            WHERE photo_id = ?1
+              AND action_class = 'undoable'
+              AND history_state = 'undone'
+            ORDER BY sequence ASC
+            LIMIT 1
+            "#
+        }
+        other => {
+            return Err(LibraryStorageError::HistoryValidation(format!(
+                "unsupported history command: {other}"
+            )));
+        }
+    };
+
+    transaction
+        .query_row(sql, params![photo_id], |row| {
+            Ok(HistoryActionRow {
+                id: row.get(0)?,
+                action_kind: row.get(1)?,
+                action_json: row.get(2)?,
+            })
+        })
+        .optional()
+        .map_err(LibraryStorageError::from)
+}
+
+fn apply_history_row(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+    command: &str,
+    row: &HistoryActionRow,
+) -> Result<(), LibraryStorageError> {
+    let action: serde_json::Value = serde_json::from_str(&row.action_json)?;
+    validate_history_action_header(&action, photo_id, &row.action_kind)?;
+    let snapshot_key = if command == "undo" { "before" } else { "after" };
+
+    match row.action_kind.as_str() {
+        "edit_commit" => {
+            let graph_value = action
+                .get(snapshot_key)
+                .and_then(|snapshot| snapshot.get("edit_graph"))
+                .ok_or_else(|| {
+                    LibraryStorageError::HistoryValidation(format!(
+                        "{snapshot_key}.edit_graph is required"
+                    ))
+                })?;
+            let graph: silica_edit::EditGraph = serde_json::from_value(graph_value.clone())?;
+            silica_edit::validate_edit_graph(&graph)?;
+            restore_edit_graph_in_transaction(transaction, &graph)?;
+        }
+        "flag_change" => {
+            let flags_value = action
+                .get(snapshot_key)
+                .and_then(|snapshot| snapshot.get("flags"))
+                .ok_or_else(|| {
+                    LibraryStorageError::HistoryValidation(format!(
+                        "{snapshot_key}.flags is required"
+                    ))
+                })?;
+            let flags = photo_flags_from_action_value(photo_id, flags_value)?;
+            restore_photo_flags_in_transaction(transaction, &flags)?;
+        }
+        other => {
+            return Err(LibraryStorageError::HistoryValidation(format!(
+                "unsupported history action kind: {other}"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_history_action_header(
+    action: &serde_json::Value,
+    photo_id: &str,
+    action_kind: &str,
+) -> Result<(), LibraryStorageError> {
+    if action.get("schema").and_then(serde_json::Value::as_str) != Some(ACTION_SCHEMA) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action schema mismatch".to_string(),
+        ));
+    }
+    if action.get("version").and_then(serde_json::Value::as_i64) != Some(ACTION_VERSION) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action version mismatch".to_string(),
+        ));
+    }
+    if action.get("class").and_then(serde_json::Value::as_str) != Some("undoable") {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action must be undoable".to_string(),
+        ));
+    }
+    if action.get("kind").and_then(serde_json::Value::as_str) != Some(action_kind) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action kind mismatch".to_string(),
+        ));
+    }
+    if action.get("photo_id").and_then(serde_json::Value::as_str) != Some(photo_id) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action photo_id mismatch".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Record a completed export and mark the source photo as exported.
@@ -3458,6 +3693,141 @@ fn unique_catalog_id(prefix: &str) -> String {
     stable_catalog_id(prefix, &format!("{prefix}\n{nanos}"))
 }
 
+fn next_history_sequence(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+) -> Result<i64, LibraryStorageError> {
+    transaction
+        .query_row(
+            "SELECT COALESCE(MAX(sequence), 0) + 1 FROM edit_history WHERE photo_id = ?1",
+            params![photo_id],
+            |row| row.get(0),
+        )
+        .map_err(LibraryStorageError::from)
+}
+
+fn invalidate_redo_history(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+) -> Result<(), LibraryStorageError> {
+    transaction.execute(
+        r#"
+        UPDATE edit_history
+        SET history_state = 'invalidated'
+        WHERE photo_id = ?1 AND history_state = 'undone'
+        "#,
+        params![photo_id],
+    )?;
+    Ok(())
+}
+
+fn restore_edit_graph_in_transaction(
+    transaction: &Transaction<'_>,
+    graph: &silica_edit::EditGraph,
+) -> Result<(), LibraryStorageError> {
+    silica_edit::validate_edit_graph(graph)?;
+    let photo_id = graph.source.photo_id.clone();
+    let edit_state_id = unique_catalog_id("edit-state");
+    let edit_graph_json = serde_json::to_string(graph)?;
+
+    transaction.execute(
+        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1",
+        params![photo_id],
+    )?;
+    transaction.execute(
+        r#"
+        INSERT INTO edit_states(id, photo_id, active, edit_graph_json, updated_at)
+        VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP)
+        "#,
+        params![edit_state_id, photo_id, edit_graph_json],
+    )?;
+    transaction.execute(
+        r#"
+        UPDATE photo_flags
+        SET edited = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE photo_id = ?1
+        "#,
+        params![graph.source.photo_id],
+    )?;
+    Ok(())
+}
+
+fn restore_photo_flags_in_transaction(
+    transaction: &Transaction<'_>,
+    flags: &PhotoFlags,
+) -> Result<(), LibraryStorageError> {
+    transaction.execute(
+        r#"
+        INSERT INTO photo_flags(photo_id, rating, picked, rejected, color_label, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
+        ON CONFLICT(photo_id) DO UPDATE SET
+          rating = excluded.rating,
+          picked = excluded.picked,
+          rejected = excluded.rejected,
+          color_label = excluded.color_label,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            flags.photo_id,
+            i64::from(flags.rating),
+            bool_to_sql(flags.picked),
+            bool_to_sql(flags.rejected),
+            flags.color_label,
+        ],
+    )?;
+    Ok(())
+}
+
+fn photo_flags_action_value(flags: &PhotoFlags) -> serde_json::Value {
+    serde_json::json!({
+        "rating": flags.rating,
+        "picked": flags.picked,
+        "rejected": flags.rejected,
+        "color_label": flags.color_label,
+    })
+}
+
+fn photo_flags_from_action_value(
+    photo_id: &str,
+    value: &serde_json::Value,
+) -> Result<PhotoFlags, LibraryStorageError> {
+    let rating = value
+        .get("rating")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| {
+            LibraryStorageError::HistoryValidation("history flags.rating is required".to_string())
+        })?;
+    let picked = value
+        .get("picked")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            LibraryStorageError::HistoryValidation("history flags.picked is required".to_string())
+        })?;
+    let rejected = value
+        .get("rejected")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            LibraryStorageError::HistoryValidation("history flags.rejected is required".to_string())
+        })?;
+    let color_label = match value.get("color_label") {
+        Some(serde_json::Value::Null) | None => None,
+        Some(serde_json::Value::String(label)) => Some(label.clone()),
+        _ => {
+            return Err(LibraryStorageError::HistoryValidation(
+                "history flags.color_label must be string or null".to_string(),
+            ));
+        }
+    };
+    PhotoFlags::new(
+        photo_id.to_string(),
+        rating as u8,
+        picked,
+        rejected,
+        color_label,
+    )
+    .map_err(LibraryStorageError::from)
+}
+
 fn bool_to_sql(value: bool) -> i64 {
     if value {
         1
@@ -3803,6 +4173,14 @@ ALTER TABLE edit_history
 
 CREATE INDEX IF NOT EXISTS idx_edit_history_photo_sequence
   ON edit_history(photo_id, sequence);
+"#;
+
+const EDIT_HISTORY_STATE_COLUMNS_SQL: &str = r#"
+ALTER TABLE edit_history
+  ADD COLUMN history_state TEXT NOT NULL DEFAULT 'applied';
+
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_state_sequence
+  ON edit_history(photo_id, history_state, sequence);
 "#;
 
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
@@ -4277,6 +4655,10 @@ mod tests {
             catalog_object_exists(&connection, "idx_edit_history_photo_sequence")
                 .expect("history sequence index lookup")
         );
+        assert!(
+            catalog_object_exists(&connection, "idx_edit_history_photo_state_sequence")
+                .expect("history state index lookup")
+        );
         let history_columns: Vec<String> = {
             let mut statement = connection
                 .prepare("SELECT name FROM pragma_table_info('edit_history')")
@@ -4287,7 +4669,7 @@ mod tests {
                 .map(|row| row.expect("history column"))
                 .collect()
         };
-        for column in ["sequence", "action_class", "action_kind"] {
+        for column in ["sequence", "action_class", "action_kind", "history_state"] {
             assert!(
                 history_columns.contains(&column.to_string()),
                 "missing edit_history column {column}"
@@ -6514,6 +6896,151 @@ mod tests {
             .expect("read latest export")
             .expect("latest export row");
         assert_eq!(latest, record);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn undo_redo_history_restores_edit_state_and_preserves_exports() {
+        let workspace = unique_library_root("undo-redo-edit");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let output_path = workspace.join("Exports").join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create export directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        std::fs::write(&output_path, b"export bytes").expect("write export output");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+        record_export(
+            &library.root_path,
+            &photo_id,
+            &output_path,
+            r#"{"format":"jpeg","color_profile":"srgb"}"#,
+        )
+        .expect("record export");
+
+        let undo = undo_last_history_action(&library.root_path, &photo_id).expect("undo edit");
+        assert!(undo.applied);
+        assert_eq!(undo.action_kind.as_deref(), Some("edit_commit"));
+        assert!(output_path.exists(), "undo must not delete export output");
+        let undone = load_active_edit_graph(&library.root_path, &photo_id)
+            .expect("load undone edit")
+            .expect("undone edit graph");
+        assert_eq!(undone.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(undone.basic.contrast.as_f64(), Some(0.0));
+
+        let redo = redo_last_history_action(&library.root_path, &photo_id).expect("redo edit");
+        assert!(redo.applied);
+        let redone = load_active_edit_graph(&library.root_path, &photo_id)
+            .expect("load redone edit")
+            .expect("redone edit graph");
+        assert_eq!(redone.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(redone.basic.contrast.as_f64(), Some(-8.0));
+        assert!(output_path.exists(), "redo must not delete export output");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn undo_redo_history_restores_photo_flags() {
+        let workspace = unique_library_root("undo-redo-flags");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("blue".into()),
+        )
+        .expect("set flags");
+
+        let undo = undo_last_history_action(&library.root_path, &photo_id).expect("undo flags");
+        assert!(undo.applied);
+        assert_eq!(undo.action_kind.as_deref(), Some("flag_change"));
+        let undone = get_photo_flags(&library.root_path, &photo_id)
+            .expect("read undone flags")
+            .expect("flags row");
+        assert_eq!(undone.rating, 0);
+        assert!(!undone.picked);
+        assert!(!undone.rejected);
+        assert_eq!(undone.color_label, None);
+
+        let redo = redo_last_history_action(&library.root_path, &photo_id).expect("redo flags");
+        assert!(redo.applied);
+        let redone = get_photo_flags(&library.root_path, &photo_id)
+            .expect("read redone flags")
+            .expect("flags row");
+        assert_eq!(redone.rating, 4);
+        assert!(redone.picked);
+        assert!(!redone.rejected);
+        assert_eq!(redone.color_label.as_deref(), Some("blue"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn new_undoable_action_invalidates_redo_history() {
+        let workspace = unique_library_root("redo-invalidated");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let first =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("first edit");
+        commit_edit_graph(&library.root_path, first).expect("commit first edit");
+        undo_last_history_action(&library.root_path, &photo_id).expect("undo first edit");
+
+        let current = load_active_edit_graph(&library.root_path, &photo_id)
+            .expect("load current graph")
+            .expect("current graph");
+        let second = silica_edit::apply_exposure_contrast(&current, 1.0, 3.0, "unix:4")
+            .expect("second edit");
+        commit_edit_graph(&library.root_path, second).expect("commit second edit");
+
+        let redo = redo_last_history_action(&library.root_path, &photo_id).expect("redo command");
+        assert!(!redo.applied);
+        assert_eq!(redo.action_kind, None);
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let invalidated_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM edit_history WHERE photo_id = ?1 AND history_state = 'invalidated'",
+                params![photo_id],
+                |row| row.get(0),
+            )
+            .expect("count invalidated history");
+        assert_eq!(invalidated_count, 1);
 
         remove_library_root(&workspace);
     }

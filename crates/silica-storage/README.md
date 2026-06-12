@@ -20,6 +20,8 @@ Phase 5.3 adds active edit graph persistence in `edit_states`. Draft exposure/co
 
 Task 16.2 adds schema version 6 and writes one ordered `edit_history` checkpoint for each committed exposure/contrast edit. Checkpoints use `silica.action` version 1 payloads with schema-valid before/after edit graphs. Draft preview updates still write no history rows.
 
+Task 16.3 adds schema version 7 plus transaction-safe undo/redo for edit checkpoints and culling flags. Undo/redo updates catalog state and `edit_history.history_state`; it does not delete export outputs, restore cache bytes, write sidecars, or touch originals.
+
 Task 10.3 adds explicit sidecar write/read APIs. Sidecars are written only under `sidecars/` inside the library root, validate the sidecar and nested edit graph payloads, mirror rating/picked/rejected/color-label state only, update `sidecar_status` after successful writes, and do not mutate original referenced files.
 
 Task 10.4 adds `dry_run_catalog_rebuild_from_sidecars`. It scans library-local sidecars in deterministic order, reports resolved portable flag state and non-fatal issues, uses `sidecar.flags` before `edit_graph.metadata` before defaults, and does not mutate catalog tables or original referenced files.

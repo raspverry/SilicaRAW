@@ -30,12 +30,13 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.0 records the [Action Trust](action-trust.md) taxonomy before undo/history runtime work: edit commits and flag changes are undoable catalog transactions, while export, cache clear, sidecar write, and import-by-reference behavior stay outside Develop undo.
 - Task 16.1 records the undo/history action semantics contract: `silica.action` payload version 1, per-photo checkpoint units, redo invalidation after new undoable changes, and explicit disabled undo/redo states.
 - Task 16.2 adds catalog schema version 6 for edit history checkpoints: `edit_history.sequence`, `edit_history.action_class`, `edit_history.action_kind`, and `idx_edit_history_photo_sequence`.
+- Task 16.3 adds catalog schema version 7 for undo/redo state: `edit_history.history_state` and `idx_edit_history_photo_state_sequence`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
 ## Implemented Foundation
 
-- Current alpha schema version: `6`.
+- Current alpha schema version: `7`.
 - Migration table: `schema_migrations`.
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
@@ -43,6 +44,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Migration 4 adds nullable `photo_metadata.width`, `photo_metadata.height`, and `photo_metadata.orientation` columns for import-time metadata extraction.
 - Migration 5 adds `idx_photo_metadata_dimensions_photo_id` for the accepted `has_dimensions` metadata filter.
 - Migration 6 adds edit history checkpoint columns and the `idx_edit_history_photo_sequence` index.
+- Migration 7 adds `edit_history.history_state` and `idx_edit_history_photo_state_sequence` for undo/redo lookup.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.
@@ -56,6 +58,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Exposure/contrast draft preview updates do not write SQLite.
 - Exposure/contrast commit/release writes the active edit graph to `edit_states`.
 - Exposure/contrast commit/release also writes one `edit_history` checkpoint with a `silica.action` payload containing schema-valid before/after edit graphs. Draft preview updates still write no history rows.
+- Undo/redo commands restore edit checkpoints and culling flags through catalog transactions, mark history rows applied/undone/invalidated, and never delete export outputs.
 - Sidecar write/read validates sidecar and nested edit graph JSON, mirrors rating/picked/rejected/color-label state only, writes under library `sidecars/`, and updates `sidecar_status` after successful writes.
 - Sidecar rebuild dry-run scans `sidecars/` in deterministic order, resolves portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults, and reports malformed sidecars, schema issues, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts without applying changes.
 - Backup creation checkpoints WAL state before copying `catalog.db`, copies `sidecars/`, writes `backup-manifest.json`, and excludes originals, disposable caches, export outputs, logs, and nested backups.
@@ -150,8 +153,7 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - Automatic sidecar synchronization.
 - Applied catalog rebuild or restore from sidecars.
 - Sidecar conflict handling and conflict UI.
-- Full edit history and undo/redo persistence.
-- Product undo/redo commands and history panel data.
+- Develop history panel data and checkpoint selection UI.
 - Cache clear undo behavior beyond the Phase 16 action-trust policy.
 - Full paged grid UI states and pagination controls.
 - Broad catalog UI screens beyond the local alpha workflow.

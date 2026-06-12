@@ -201,6 +201,9 @@ CREATE INDEX IF NOT EXISTS idx_edit_history_photo_id
 CREATE INDEX IF NOT EXISTS idx_edit_history_photo_sequence
   ON edit_history(photo_id, sequence);
 
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_state_sequence
+  ON edit_history(photo_id, history_state, sequence);
+
 CREATE INDEX IF NOT EXISTS idx_cache_records_photo_type
   ON cache_records(photo_id, cache_type);
 

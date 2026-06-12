@@ -174,6 +174,14 @@ enum DesktopCommandData {
         persisted: bool,
         message: String,
     },
+    HistoryCommand {
+        photo_id: String,
+        command: String,
+        applied: bool,
+        action_kind: Option<String>,
+        history_id: Option<String>,
+        message: String,
+    },
     Export {
         photo_id: String,
         source_path: String,
@@ -217,6 +225,7 @@ impl DesktopCommandData {
             Self::EditPreview { .. } => "editPreview",
             Self::EditCommit { .. } => "editCommit",
             Self::EditState { .. } => "editState",
+            Self::HistoryCommand { .. } => "historyCommand",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
         }
@@ -1137,6 +1146,48 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
 }
 
 #[tauri::command]
+fn undo_last_history_action(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "undo_last_history_action";
+    match silica_core::undo_last_history_action(PathBuf::from(&library_path), &photo_id) {
+        Ok(result) => DesktopCommandResponse::ok(
+            command,
+            result.message.clone(),
+            history_command_data(result),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn redo_last_history_action(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "redo_last_history_action";
+    match silica_core::redo_last_history_action(PathBuf::from(&library_path), &photo_id) {
+        Ok(result) => DesktopCommandResponse::ok(
+            command,
+            result.message.clone(),
+            history_command_data(result),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn export_photo_jpeg_srgb(
     library_path: String,
     photo_id: String,
@@ -1512,6 +1563,17 @@ fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
     }
 }
 
+fn history_command_data(result: silica_core::HistoryCommandResult) -> DesktopCommandData {
+    DesktopCommandData::HistoryCommand {
+        photo_id: result.photo_id,
+        command: result.command,
+        applied: result.applied,
+        action_kind: result.action_kind,
+        history_id: result.history_id,
+        message: result.message,
+    }
+}
+
 fn photo_metadata_data(metadata: silica_core::PhotoMetadata) -> DesktopCommandData {
     DesktopCommandData::PhotoMetadata {
         photo_id: metadata.photo_id,
@@ -1814,6 +1876,8 @@ fn main() {
             preview_exposure_contrast_edit,
             commit_exposure_contrast_edit,
             get_photo_edit_state,
+            undo_last_history_action,
+            redo_last_history_action,
             export_photo_jpeg_srgb,
             export_photo_jpeg,
             clear_library_cache
@@ -2719,6 +2783,59 @@ mod tests {
                 assert!(*persisted);
             }
             other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_undo_and_redo_history() {
+        let workspace = unique_library_root("desktop-undo-redo");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.5,
+            -8.0,
+        );
+        assert!(commit.ok, "commit failed: {commit:?}");
+
+        let undo =
+            super::undo_last_history_action(library_root.display().to_string(), photo_id.clone());
+        assert!(undo.ok, "undo failed: {undo:?}");
+        match response_data(&undo) {
+            super::DesktopCommandData::HistoryCommand {
+                applied,
+                action_kind,
+                ..
+            } => {
+                assert!(*applied);
+                assert_eq!(action_kind.as_deref(), Some("edit_commit"));
+            }
+            other => panic!("unexpected undo response data: {other:?}"),
+        }
+
+        let redo = super::redo_last_history_action(library_root.display().to_string(), photo_id);
+        assert!(redo.ok, "redo failed: {redo:?}");
+        match response_data(&redo) {
+            super::DesktopCommandData::HistoryCommand {
+                applied,
+                action_kind,
+                ..
+            } => {
+                assert!(*applied);
+                assert_eq!(action_kind.as_deref(), Some("edit_commit"));
+            }
+            other => panic!("unexpected redo response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

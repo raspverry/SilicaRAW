@@ -33,6 +33,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 15.5 adds RAW-derived JPEG sRGB export through a full-resolution source artifact under `render-cache/raw-export-sources/`; final export rejects original overwrite, records source/output/ICC hashes, records original hash unchanged evidence, and does not depend on viewer texture cache.
 - Task 16.0 records the [Action Trust](action-trust.md) boundary: undo/redo covers catalog state only, exports and cache bytes are not deleted or reconstructed by undo, sidecar writes are explicit, and original-file mutation remains blocked.
 - Task 16.1 records exact action semantics so edit commits and culling flags can be undone through catalog state, while export output files, cache bytes, sidecars, backups, imports, restore attempts, and originals remain outside undo mutation.
+- Task 16.3 adds transaction-safe undo/redo for edit checkpoints and culling flags. Tests verify export output files survive undo/redo and original files remain outside the command path.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -56,6 +57,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - RAW-derived export safety. Task 15.5 covers canonical RAW source/output overwrite rejection, full-resolution export source artifact separation from preview cache, source/output/ICC hash recording, no preview cache dependency, unsupported-class no-write behavior, and original hash preservation for legal local RAW fixture classes.
 - Action trust safety. Task 16.0 covers undoable vs logged-only vs non-reversible vs blocked action classes before runtime undo/history changes.
 - Action semantics safety. Task 16.1 covers checkpoint units, redo invalidation, disabled states, and slider drafts creating no history entries.
+- Undo/redo safety. Task 16.3 covers edit and flag undo/redo transactions, redo invalidation after a new undoable action, and export-output preservation.
 
 ## Links
 
