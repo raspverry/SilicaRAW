@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | RAW fixture probe harness added
+
+- Added Task 12.2.1 RAW fixture probe report types, manifest loader, ignored fixture test, and manual harness command.
+- The harness rejects unsafe or incomplete manifest entries before probing.
+- Running the ignored fixture probe remains blocked until `SILICARAW_RAW_FIXTURE_MANIFEST` points to a legal local RAW fixture manifest.
+
 ## [2026-06-12] phase-12 | Core Image RAW probe backend added
 
 - Completed Task 12.1.3 macOS Core Image probe backend.

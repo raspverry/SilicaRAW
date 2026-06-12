@@ -463,7 +463,7 @@ git commit -m "feat(decode): add core image raw probe"
 - Create: `scripts/harness/check-raw-probe-fixtures.py` if a Python wrapper is useful
 - Modify: `docs/wiki/tasks/12.2-raw-fixture-probe-harness.md`
 
-- [ ] **Step 1: Add ignored fixture test**
+- [x] **Step 1: Add ignored fixture test**
 
 Add an ignored test in `silica-decode`:
 
@@ -482,7 +482,7 @@ fn probes_raw_fixture_manifest_without_mutating_originals() {
 
 Expected initial failure: `probe_raw_fixture_manifest` and report types do not exist.
 
-- [ ] **Step 2: Add manifest probe report types**
+- [x] **Step 2: Add manifest probe report types**
 
 Add types:
 
@@ -503,7 +503,7 @@ pub struct RawFixtureProbeResult {
 }
 ```
 
-- [ ] **Step 3: Implement minimal manifest loading**
+- [x] **Step 3: Implement minimal manifest loading**
 
 Add direct `serde_json = "1.0.150"` to `crates/silica-decode/Cargo.toml` if the Rust fixture loader parses manifests, and update `docs/DEPENDENCIES.md` for direct `silica-decode` use. Keep it behind normal dependencies only if the public fixture report API needs it outside the feature; otherwise make it optional behind `core-image-raw-probe`.
 
@@ -525,6 +525,8 @@ SILICARAW_RAW_FIXTURE_MANIFEST=/absolute/path/to/local/raw-fixtures.json cargo t
 ```
 
 Expected: pass only with a legal local fixture manifest. If no legal fixtures exist, stop and report the blocked condition instead of fabricating samples.
+
+Current result on 2026-06-12: blocked pending a legal local RAW fixture manifest. `SILICARAW_RAW_FIXTURE_MANIFEST` is unset, and the repository only contains `.tmp` blocked placeholder fixtures that must not be used as RAW proof evidence.
 
 - [ ] **Step 5: Commit Task 12.2.1**
 

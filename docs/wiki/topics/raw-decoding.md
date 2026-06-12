@@ -118,6 +118,27 @@ Default builds still return an unavailable probe result and do not compile the C
 
 Phase 12.1 does not prove RAW support. Support claims remain blocked until Task 12.2 fixture probe evidence and Task 12.3 support-matrix decisions exist.
 
+## Phase 12.2 Fixture Probe Harness
+
+The RAW fixture probe harness exists, but no fixture-backed RAW evidence has been recorded.
+
+Current blocked state:
+
+```txt
+SILICARAW_RAW_FIXTURE_MANIFEST -> unset
+legal local RAW fixture manifest -> not available
+committed legal RAW fixture corpus -> not present
+.tmp blocked placeholder RAW files -> not valid RAW proof evidence
+```
+
+The manual harness command is:
+
+```bash
+SILICARAW_RAW_FIXTURE_MANIFEST=/absolute/path/to/local/raw-fixtures.json scripts/harness/check-raw-probe-fixtures.py
+```
+
+Do not fabricate RAW samples or use user photos without a reviewed legal fixture manifest.
+
 ## Links
 
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)

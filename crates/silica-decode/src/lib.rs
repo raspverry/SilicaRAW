@@ -6,6 +6,7 @@
 use std::path::Path;
 
 mod core_image_raw_probe;
+mod raw_probe_fixture;
 
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-decode";
@@ -157,6 +158,35 @@ pub struct RawProbeResult {
 /// Run the proof-only Core Image RAW probe route.
 pub fn probe_core_image_raw(request: RawProbeRequest) -> RawProbeResult {
     core_image_raw_probe::probe_core_image_raw(request)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawFixtureProbeReport {
+    pub manifest_path: String,
+    pub results: Vec<RawFixtureProbeResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawFixtureProbeResult {
+    pub fixture_id: String,
+    pub fixture_class: String,
+    pub relative_path: String,
+    pub probe: RawProbeResult,
+    pub original_hash_unchanged: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RawFixtureProbeError {
+    FeatureDisabled,
+    ReadManifest { path: String, message: String },
+    InvalidManifest { path: String, message: String },
+    InvalidFixture { fixture_id: String, message: String },
+}
+
+pub fn probe_raw_fixture_manifest(
+    manifest_path: impl AsRef<str>,
+) -> Result<RawFixtureProbeReport, RawFixtureProbeError> {
+    raw_probe_fixture::probe_raw_fixture_manifest(manifest_path.as_ref())
 }
 
 /// Build the local alpha preview decode plan for a catalog photo path.
@@ -315,12 +345,78 @@ mod tests {
         assert_eq!(result.height, None);
     }
 
-    #[cfg(all(target_os = "macos", feature = "core-image-raw-probe"))]
+    #[cfg(feature = "core-image-raw-probe")]
     fn unique_temp_probe_path(label: &str) -> std::path::PathBuf {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time after unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("silicaraw-core-image-raw-probe-{nonce}-{label}"))
+    }
+
+    #[cfg(feature = "core-image-raw-probe")]
+    #[test]
+    #[ignore]
+    fn probes_raw_fixture_manifest_without_mutating_originals() {
+        let manifest = std::env::var("SILICARAW_RAW_FIXTURE_MANIFEST")
+            .expect("SILICARAW_RAW_FIXTURE_MANIFEST must point to a legal RAW fixture manifest");
+        let report =
+            super::probe_raw_fixture_manifest(manifest).expect("probe legal RAW fixture manifest");
+        assert!(!report.results.is_empty());
+        assert!(report
+            .results
+            .iter()
+            .all(|result| result.original_hash_unchanged));
+    }
+
+    #[cfg(feature = "core-image-raw-probe")]
+    #[test]
+    fn raw_fixture_manifest_rejects_entries_that_cannot_be_legal_raw_probes() {
+        let cases = [
+            ("absolute-path", "\"/tmp/sample.dng\"", "\"raw\"", true),
+            ("parent-dir", "\"../sample.dng\"", "\"raw\"", true),
+            ("missing-hash", "\"sample.dng\"", "\"raw\"", false),
+            ("non-raw-kind", "\"sample.dng\"", "\"tagged_raster\"", true),
+        ];
+
+        for (case, relative_path, kind, include_hash) in cases {
+            let manifest_path = unique_temp_probe_path(&format!("{case}.json"));
+            let expected_hashes = if include_hash {
+                "\"sample.dng\": \"8f48f233d3b6daa5e4735c8b695ec2754d9bffa3876e9ef5f541eef7b5e6c9fc\""
+            } else {
+                ""
+            };
+            let manifest = format!(
+                r#"{{
+                  "schema": "silica.fixture_manifest",
+                  "version": 1,
+                  "manifest_kind": "raw-fixtures",
+                  "expected_source_hashes": {{{expected_hashes}}},
+                  "fixtures": [{{
+                    "id": "{case}",
+                    "class": "A",
+                    "kind": {kind},
+                    "relative_path": {relative_path},
+                    "integrity": {{
+                      "sha256": "8f48f233d3b6daa5e4735c8b695ec2754d9bffa3876e9ef5f541eef7b5e6c9fc"
+                    }}
+                  }}]
+                }}"#
+            );
+            std::fs::write(&manifest_path, manifest).expect("write invalid manifest");
+
+            let error = super::probe_raw_fixture_manifest(manifest_path.to_string_lossy())
+                .expect_err("invalid fixture manifest should fail before probing");
+            let _ = std::fs::remove_file(&manifest_path);
+
+            assert!(
+                matches!(
+                    error,
+                    super::RawFixtureProbeError::InvalidFixture { .. }
+                        | super::RawFixtureProbeError::InvalidManifest { .. }
+                ),
+                "{case} returned {error:?}"
+            );
+        }
     }
 }

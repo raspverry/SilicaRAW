@@ -264,6 +264,7 @@ The product API must not:
   - Missing manifest fails clearly.
   - Original hash preservation is checked.
 - **Validation:** `SILICARAW_RAW_FIXTURE_MANIFEST=... cargo test -p silica-decode --features core-image-raw-probe -- --ignored`
+- **Status:** In progress on 2026-06-12. Added the manifest probe report types, feature-gated JSON loader, ignored fixture test, and manual harness command. Running the ignored fixture probe is blocked until a legal local RAW fixture manifest is supplied through `SILICARAW_RAW_FIXTURE_MANIFEST`.
 
 ### Task 12.2.2: RAW Probe Evidence Documentation
 
