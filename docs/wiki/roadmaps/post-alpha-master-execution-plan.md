@@ -35,9 +35,9 @@ As of 2026-06-12:
 
 - Phase 12 RAW proof is complete for fixture-backed Core Image support mapping.
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
-- Phase 14 is active.
-- Task 14.0 through Task 14.7 are complete.
-- Next task: [14.8 Viewer QA Harness and Checklist](../tasks/14.8-viewer-qa-harness.md).
+- Phase 14 is complete.
+- Task 14.0 through Task 14.8 are complete.
+- Next step: create Phase 15 task cards from the Phase 15 split before implementation.
 
 ## Wave Map
 
@@ -367,10 +367,9 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 14.8 from the existing task card.
-2. Continue through Task 14.8 without creating another Phase 14 plan.
-3. After Phase 14 completes, create Phase 15 task cards from the Phase 15 split in this master plan.
-4. Execute Phase 15 cards in order.
+1. Create Phase 15 task cards from the Phase 15 split in this master plan.
+2. Execute Phase 15 cards in order.
+3. Repeat: create only the missing task cards from this master plan, then implement them atomically.
 5. Repeat: create only the missing task cards from this master plan, then implement them atomically.
 
 ## Links

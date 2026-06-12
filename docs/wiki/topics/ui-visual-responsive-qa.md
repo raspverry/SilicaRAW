@@ -133,6 +133,7 @@ The CSS fix:
 - Static thumbnail art remains a placeholder until real thumbnail cache generation is scoped.
 - User-supplied sample imagery should be used later for import, thumbnail, preview, and local install QA. It was not committed or wired into this static UI QA task because real image pixels are outside Task 5.5.10 scope.
 - Temporary screenshots captured during this pass were review artifacts, not committed assets.
+- Phase 14.8 reuses viewport targets `1280x800`, `1440x900`, and `1728x965` for native viewer bridge QA. That pass is recorded separately in [Native Viewer QA Checklist](../../../checklists/NATIVE_VIEWER_QA.md) because feature-gated native viewer proof must not be confused with the default static visual QA path.
 
 ## Links
 

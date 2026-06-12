@@ -70,6 +70,8 @@ Task 14.6 added the first typed viewer preview render request boundary in `silic
 
 Task 14.7 added disposable texture lifecycle identity and cleanup boundaries. Texture state can be bound and released for photo change, drawable resize, library close, and app close; it remains rebuildable runtime state and does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
 
+Task 14.8 adds [Native Viewer QA Checklist](../../../checklists/NATIVE_VIEWER_QA.md) and a lightweight default harness check that verifies QA routing and reserved-layout evidence without requiring feature-gated native viewer execution in default CI.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.

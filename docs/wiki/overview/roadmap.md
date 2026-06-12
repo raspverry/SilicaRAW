@@ -68,7 +68,8 @@ The current implementation order starts with:
 - Phase 10 has completed fixture manifest, golden tolerance policy, sidecar v1, rebuild dry-run, backup/restore boundaries, project license, contribution/security templates, and public trust regression checks.
 - Phase 11 is complete: app session, real recents, relaunch restore, layout persistence, paged grid queries, grid interaction behavior, stored metadata display/filtering, structured import issues, opt-in recursive import, and connected runtime smoke.
 - Phase 12 RAW proof and Phase 13 color proof are complete.
-- Phase 14 is current: product Metal viewer bridge proof before Phase 15 RAW/color/Metal vertical slice.
+- Phase 14 product Metal viewer bridge proof is complete.
+- Next roadmap step is creating Phase 15 task cards from the master execution plan before starting the RAW/color/Metal vertical slice.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

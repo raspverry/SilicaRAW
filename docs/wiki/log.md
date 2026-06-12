@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Viewer QA harness and checklist added
+
+- Completed Task 14.8 with `checklists/NATIVE_VIEWER_QA.md` and `scripts/harness/check-native-viewer-qa.py`.
+- Added default harness routing that checks native viewer QA documentation and static reserved-layout evidence without requiring feature-gated native viewer execution in default CI.
+- Recorded feature-gated macOS commands, manual proof fields, and viewport targets `1280x800`, `1440x900`, and `1728x965`.
+
 ## [2026-06-12] phase-14 | Disposable texture lifecycle boundary added
 
 - Completed Task 14.7 with `silica-render` disposable texture identity, drawable size, lifecycle state, and release reason contracts.

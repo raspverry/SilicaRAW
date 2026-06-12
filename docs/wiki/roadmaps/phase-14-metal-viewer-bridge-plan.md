@@ -31,7 +31,7 @@ As of 2026-06-12:
 - Task 14.5 viewer input ownership proof is complete.
 - Task 14.6 render request boundary is complete.
 - Task 14.7 disposable texture lifecycle boundary is complete.
-- No viewer QA checklist exists yet.
+- Task 14.8 viewer QA harness and checklist is complete.
 
 ## Goal
 
@@ -128,7 +128,7 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.8: Viewer QA Harness and Checklist
 
 - **Card:** [14.8 Viewer QA Harness and Checklist](../tasks/14.8-viewer-qa-harness.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** Manual and automated QA cover viewer layout, input, resize, Retina, external display movement, and UI responsiveness.
 - **Validation:** `scripts/harness/check.sh`, manual checklist output
 
