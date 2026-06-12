@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] roadmap | Post-alpha master execution plan added
+
+- Added a Phase 14 through v1.0 master execution plan so maintainers and agents do not recreate phase-wide plans before each phase.
+- Recorded wave order, dependency graph, stop gates, validation matrix, and future task splits for Phase 15, Phase 16, Phase 17, Phase 20, Phase 22, Phase 23, Phase 27, and Phase 28.
+- Linked the master plan from the wiki index, LLM routing index, roadmap overview, post-alpha roadmap, Phase 14 plan, Phase 14 brief, task index, wiki README, and root README.
+
 ## [2026-06-12] phase-14 | Product Metal viewer bridge plan added
 
 - Added the Phase 14 Product Metal Viewer Bridge plan, phase brief, and task cards 14.0 through 14.8.

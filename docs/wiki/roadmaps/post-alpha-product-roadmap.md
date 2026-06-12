@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -13,6 +13,8 @@ source_of_truth: docs/13_Development_Roadmap.md
 This roadmap starts after the local DMG alpha distribution track is complete.
 
 The local DMG plan proves that a user can download a GitHub Release DMG, install `SilicaRAW.app`, and complete the minimal local alpha workflow. This post-alpha roadmap defines the atomic product tasks needed to grow that alpha into a credible RAW editor.
+
+Use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md) as the Phase 14 through v1.0 execution router. This roadmap defines scope; the master plan defines cross-phase dependency order, stop gates, and known future task splits.
 
 The order is deliberate:
 
@@ -417,7 +419,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Replace the Spike 001 proof with a product viewer bridge boundary.
 
-**Planning Status:** Phase 14 now has a dedicated [Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md), [brief](../phases/phase-14-product-metal-viewer-bridge.md), and task cards.
+**Planning Status:** Phase 14 now has a dedicated [Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md), [brief](../phases/phase-14-product-metal-viewer-bridge.md), and task cards. Phase 14 through v1.0 sequencing is routed by the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md).
 
 ### Task 14.1: AppKit/Metal Viewer Bridge Contract
 
@@ -1206,6 +1208,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 - [Local DMG Distribution Plan](local-dmg-distribution-plan.md)
 - [Roadmap Overview](../overview/roadmap.md)
+- [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)
 - [Metal Rendering](../topics/metal-rendering.md)
 - [Color Management](../topics/color-management.md)
@@ -1219,7 +1222,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 ## Notes for LLM Agents
 
-Pick the next task by dependency order. Do not jump to MLX, plugins, MCP, masks, or broad RAW support because this roadmap mentions them. A task name is permission only for that task's explicit scope.
+Pick the next task by dependency order using the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md). Do not jump to MLX, plugins, MCP, masks, or broad RAW support because this roadmap mentions them. A task name is permission only for that task's explicit scope.
 
 When implementing a task from this roadmap:
 

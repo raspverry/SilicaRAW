@@ -12,6 +12,8 @@ source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 
 Task cards are small, LLM-readable pages for the next atomic work items. Use them instead of reading large roadmap or design-spec files when the task is already selected.
 
+For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md). If a future phase has no task cards yet, create them from that master plan before implementation.
+
 ## Phase 12
 
 - [12.0: Phase 12 Design Gate](12.0-phase-12-design-gate.md)

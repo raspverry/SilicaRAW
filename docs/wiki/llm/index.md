@@ -24,8 +24,11 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 Phase 13 is complete. The current planned product area is Phase 14: Product Metal Viewer Bridge.
 
+For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
+
 For Phase 14 work, read:
 
+- [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Phase 14 Product Metal Viewer Bridge Plan](../roadmaps/phase-14-metal-viewer-bridge-plan.md)
 - [Phase 14 Brief](../phases/phase-14-product-metal-viewer-bridge.md)
 - The matching task card under [Task Cards](../tasks/index.md)
@@ -51,7 +54,7 @@ For Phase 12 historical context, read:
 - [Phase 12 Brief](../phases/phase-12-raw-proof.md)
 - [RAW Decoding](../topics/raw-decoding.md)
 
-Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md) unless the current phase brief or task card is missing required information.
+Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md) unless the current phase brief, task card, or master execution plan is missing required information.
 
 ## Completed Context
 
@@ -62,6 +65,7 @@ Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product
 
 - Prefer phase briefs over full roadmaps.
 - Prefer task cards over phase briefs when the task is already selected.
+- Prefer the master execution plan over new phase-wide planning when choosing Phase 14+ order.
 - Prefer topic pages for durable facts.
 - Use numbered docs and schemas only when the task touches their source-of-truth area.
 - Do not use `docs/archive/` for implementation.

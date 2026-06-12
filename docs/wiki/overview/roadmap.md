@@ -36,7 +36,7 @@ The current implementation order starts with:
 18. Establish UI MVP baseline and then implement the connected UI vertical slice.
 19. Complete the product alpha runtime loop before clean-Mac install QA: real JPEG/JPG pixels, native/selectable paths, persisted UI readback, cache clear, fixture generation, and installed/runtime smoke.
 20. Complete local DMG install, signing, notarization, GitHub Release, and release hardening.
-21. Follow the post-alpha product roadmap for fixture-backed RAW, color, Metal, Library, Develop, masks, export, permissions, MLX, plugins, MCP, public beta, and v1.0.
+21. Follow the post-alpha product roadmap and master execution plan for fixture-backed RAW, color, Metal, Library, Develop, masks, export, permissions, MLX, plugins, MCP, public beta, and v1.0.
 
 ## Gate Logic
 
@@ -69,6 +69,7 @@ The current implementation order starts with:
 - Phase 11 is complete: app session, real recents, relaunch restore, layout persistence, paged grid queries, grid interaction behavior, stored metadata display/filtering, structured import issues, opt-in recursive import, and connected runtime smoke.
 - Phase 12 RAW proof and Phase 13 color proof are complete.
 - Phase 14 is current: product Metal viewer bridge proof before Phase 15 RAW/color/Metal vertical slice.
+- The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
 
@@ -85,6 +86,7 @@ The current implementation order starts with:
 - [UI MVP Baseline](../topics/ui-mvp-baseline.md)
 - [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md)
+- [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [LLM Routing Index](../llm/index.md)
 - [Phase 11 Summary](../phases/phase-11-summary.md)
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)

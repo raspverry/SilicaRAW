@@ -18,6 +18,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - Start with [LLM Routing Index](llm/index.md) if you are an agent trying to minimize read context.
 - Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
 - Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
+- For Phase 14 through v1.0 sequencing, use the [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md) before creating new phase task cards.
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
 - Check [Open Questions](questions/open-questions.md) before inventing answers.
 - Use [Conventions](conventions.md) when adding or editing wiki pages.
@@ -39,6 +40,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local DMG Release Runbook](roadmaps/local-dmg-release-runbook.md): maintainer steps for signed local releases and current unsigned preview artifacts.
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
+- [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through v1.0.
 - [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
 - [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): completed color proof execution plan and fixture evidence gate.
 - [Phase 14 Product Metal Viewer Bridge Plan](roadmaps/phase-14-metal-viewer-bridge-plan.md): current native viewer bridge plan and Path B evidence gate.

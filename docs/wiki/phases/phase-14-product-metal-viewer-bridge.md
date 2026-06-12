@@ -18,6 +18,7 @@ The phase starts with a design gate and bridge contract, then adds a feature-gat
 
 For all Phase 14 tasks, read:
 
+- [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Phase 14 Product Metal Viewer Bridge Plan](../roadmaps/phase-14-metal-viewer-bridge-plan.md)
 - [Metal Rendering](../topics/metal-rendering.md)
 - [Spike 001 Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
@@ -76,4 +77,4 @@ When the task adds or changes dependencies, also read:
 
 ## Notes for LLM Agents
 
-Read this brief instead of the full post-alpha roadmap when doing Phase 14 work. Then read exactly one task card for the selected task. Stop if a task would treat the spike module as production viewer code by rename.
+Read this brief instead of the full post-alpha roadmap when doing Phase 14 work. Use the master execution plan for Phase 14+ sequencing, then read exactly one task card for the selected task. Stop if a task would treat the spike module as production viewer code by rename.

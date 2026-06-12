@@ -14,6 +14,8 @@ Phase 14 turns Spike 001 Path B into a product-grade native viewer bridge bounda
 
 This phase is not the full RAW/color/Metal vertical slice. It proves that SilicaRAW can reserve a native AppKit/Metal viewer region, host a feature-gated product module separate from the spike, own lifecycle and input deliberately, and define the render-request boundary needed by Phase 15.
 
+For Phase 14 through v1.0 sequencing, use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md). This Phase 14 plan remains the detailed Wave A execution plan.
+
 ## Current Status
 
 As of 2026-06-12:
@@ -143,6 +145,7 @@ Phase 14 is complete only when all of these are true:
 - [Spike 001 Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Metal Render Pipeline Specification](../../08_Metal_Render_Pipeline_Specification.md)
+- [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap](post-alpha-product-roadmap.md)
 
 ## Notes for LLM Agents
