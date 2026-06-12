@@ -25,7 +25,8 @@ As of 2026-06-12:
 - Phase 12 RAW proof and Phase 13 color proof are complete enough for Metal bridge planning.
 - Task 14.0 design gate is complete.
 - Task 14.1 bridge contract is complete.
-- No product native viewer module, texture lifecycle, or viewer QA checklist exists yet.
+- Task 14.2 feature-gated product module shell is complete.
+- No reserved layout handshake, lifecycle proof, texture lifecycle, or viewer QA checklist exists yet.
 
 ## Goal
 
@@ -80,14 +81,14 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.2: Native Viewer Feature Gate and Module Shell
 
 - **Card:** [14.2 Native Viewer Feature Gate and Module Shell](../tasks/14.2-native-viewer-feature-gate.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** A macOS-only `native-metal-viewer` feature and product module skeleton exist separately from `metal_host_spike.rs`.
 - **Validation:** `cargo check -p silica-desktop`, `cargo check -p silica-desktop --features native-metal-viewer`
 
 ### Task 14.3: Reserved Viewer Layout Handshake
 
 - **Card:** [14.3 Reserved Viewer Layout Handshake](../tasks/14.3-reserved-viewer-layout-handshake.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** The web shell exposes a stable viewer host rectangle and the native bridge consumes that geometry without overlapping panels or controls.
 - **Validation:** static UI contract, viewer layout smoke, `cargo test -p silica-desktop --features native-metal-viewer`
 

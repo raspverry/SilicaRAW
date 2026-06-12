@@ -22,7 +22,7 @@ Metal rendering is central to SilicaRAW's product identity. The app should be Me
 
 ## Blocked Work
 
-- Product native Metal viewer implementation.
+- Product native Metal viewer implementation beyond the feature-gated module shell.
 - Shader passes.
 - Texture manager implementation.
 - Final viewer event ownership.
@@ -57,6 +57,8 @@ Current planned order:
 ```
 
 The phase does not include RAW pixel display, exposure/contrast Metal rendering, shader pass breadth, or color correctness proof.
+
+Task 14.2 added the non-default `native-metal-viewer` feature and `native_metal_viewer` product module shell. The shell records the product boundary only; it does not install an AppKit view, reserve layout, render pixels, allocate textures, or change UI behavior.
 
 ## Product Bridge Contract
 

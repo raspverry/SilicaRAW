@@ -1,5 +1,7 @@
 #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
 mod metal_host_spike;
+#[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
+mod native_metal_viewer;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -1742,6 +1744,9 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
 fn main() {
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
 
+    #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
+    let _native_viewer_contract = native_metal_viewer::module_contract();
+
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
     let builder = builder.setup(metal_host_spike::install);
 
@@ -1779,6 +1784,19 @@ fn main() {
 mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
+    #[test]
+    fn product_native_viewer_contract_is_separate_from_spike() {
+        let contract = super::native_metal_viewer::module_contract();
+
+        assert_eq!(contract.module_name, "native_metal_viewer");
+        assert_eq!(contract.feature_name, "native-metal-viewer");
+        assert_eq!(contract.phase_task, "14.2");
+        assert!(contract.product_module);
+        assert!(!contract.uses_spike_module);
+        assert!(!contract.installs_in_default_build);
+    }
 
     #[test]
     fn desktop_app_session_commands_round_trip_temp_path() {

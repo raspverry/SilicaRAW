@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Native viewer feature gate added
+
+- Completed Task 14.2 with a non-default `native-metal-viewer` feature and macOS-only `native_metal_viewer` product module shell.
+- Added a module contract test proving the product shell is separate from `metal_host_spike.rs` and not compiled into the default app path.
+- Kept RAW pixels, shader passes, texture cache, AppKit view installation, and UI layout changes out of scope.
+
 ## [2026-06-12] phase-14 | AppKit Metal viewer bridge contract added
 
 - Completed Task 14.1 with the product bridge contract for reserved viewer layout, AppKit/Metal lifecycle, event ownership, render request boundaries, disposable texture boundaries, and Path B stop gates.

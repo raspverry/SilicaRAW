@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [features]
 default = []
+native-metal-viewer = []
 metal-host-spike = [
   "dep:objc2",
   "dep:objc2-app-kit",
