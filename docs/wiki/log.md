@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Color probe harness added
+
+- Completed Task 13.4 with a manifest-driven local color probe harness.
+- The harness validates Class F fixture safety, runs the feature-gated `silica-render` probe, and records structured source hash, profile, transform-path, file size, modified-time, status, and original-preservation evidence.
+- No ColorSync transform, export ICC embedding, rendered pixels, or color correctness claim was added.
+
 ## [2026-06-12] phase-13 | Color profile probe added
 
 - Completed Task 13.3 with a non-default `silica-render` `color-probe` feature.

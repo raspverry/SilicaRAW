@@ -85,7 +85,7 @@ Current planned order:
 13.1 source review [complete]
 13.2 ignored local fixtures and manifest [complete locally]
 13.3 feature-gated color probe [complete]
-13.4 probe harness [next]
+13.4 probe harness [complete]
 13.5 support matrix
 13.6 ICC export proof
 13.7 schema-safe color metadata
@@ -95,6 +95,10 @@ Current planned order:
 Until those tasks produce evidence, color correctness and Display P3 export claims remain blocked.
 
 Task 13.3 added a non-default `color-probe` feature in `silica-render`. It records JPEG profile metadata and source hashes for fixture proof only. It does not apply a ColorSync transform, write ICC profiles, render pixels, or prove color correctness.
+
+Task 13.4 added `scripts/harness/check-color-probe-fixtures.py` and a feature-gated `silica-render` `color_probe_report` example. With `SILICARAW_COLOR_FIXTURE_MANIFEST` pointed at the ignored local manifest, the harness records profile probe status, input profile, working space, output profile, transform path, source hash, file size, modified time, and original hash preservation.
+
+The local Task 13.4 run passed for sRGB, Display P3, and untagged Class F fixtures. This is profile-probe evidence only; color correctness, export ICC embedding, and transform output remain blocked.
 
 ## Color-Dependent Tags
 

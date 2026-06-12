@@ -29,7 +29,8 @@ As of 2026-06-12:
 - Task 13.1 color fixture source review is complete with a local-only synthetic fixture source.
 - Task 13.2 local color fixture corpus and manifest is complete locally.
 - Task 13.3 feature-gated color profile probe is complete.
-- Task 13.4 color probe harness is next.
+- Task 13.4 color probe harness is complete.
+- Task 13.5 color support matrix is next.
 
 ## Goal
 
@@ -85,14 +86,14 @@ Create fixture-backed evidence for:
 ### Task 13.4: Color Probe Harness
 
 - **Card:** [13.4 Color Probe Harness](../tasks/13.4-color-probe-harness.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** A manifest-driven harness can run ignored color probe tests and check original hash preservation.
 - **Validation:** `SILICARAW_COLOR_FIXTURE_MANIFEST=... scripts/harness/check-color-probe-fixtures.py`
 
 ### Task 13.5: Color Support Matrix
 
 - **Card:** [13.5 Color Support Matrix](../tasks/13.5-color-support-matrix.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** [Color Management](../topics/color-management.md) records fixture-backed states for sRGB, Display P3, and untagged raster classes.
 - **Validation:** `python3 scripts/harness/check-md-links.py`, `python3 scripts/harness/check-cargo-deps.py`
 
