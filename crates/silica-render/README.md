@@ -8,4 +8,6 @@ Phase 5.1 adds a preview render readiness contract that wraps decode readiness w
 
 Phase 5.3 adds a render request contract for draft exposure/contrast preview updates. This records the requested adjustment values and preview readiness, but still does not render pixels.
 
+Phase 13.3 adds a non-default `color-probe` feature that reads JPEG marker/profile metadata for fixture proof and records source hashes. This is probe evidence only; it does not render pixels or apply transforms.
+
 No Metal viewer, shader, Core Image context, ColorSync transform, ICC embedding, or image processing implementation is present yet.

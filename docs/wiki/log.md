@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Color profile probe added
+
+- Completed Task 13.3 with a non-default `silica-render` `color-probe` feature.
+- The probe records source SHA-256, embedded ICC marker state, input profile classification, working space, output profile, transform path, and failure category.
+- No ColorSync transform, ICC export embedding, rendered pixels, or color correctness claim was added.
+
 ## [2026-06-12] phase-13 | Local color fixture manifest added
 
 - Completed Task 13.2 locally with ignored synthetic Color Class F fixtures and `.tmp/legal-color-fixtures/color-fixtures.json`.

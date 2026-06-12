@@ -409,16 +409,16 @@ Verification source: `cargo info objc2-core-image@0.3.2 --verbose`.
 ```txt
 Name: sha2
 Version: 0.10.9
-Purpose: Compute SHA-256 source hashes for feature-gated RAW fixture probe evidence.
+Purpose: Compute SHA-256 source hashes for feature-gated RAW and color fixture probe evidence.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/RustCrypto/hashes
-Used by: crates/silica-decode behind the `core-image-raw-probe` feature.
-Why needed: Task 12.2 evidence must verify source hashes and original-file preservation.
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature.
+Why needed: Task 12.2 RAW evidence and Task 13.3 color profile evidence must verify source hashes and original-file preservation.
 Alternatives considered: Python-only hash verification, existing partial FNV-style test hash, platform-specific hashing APIs.
-Risk notes: Non-default probe feature only; do not use partial hashes for fixture evidence.
+Risk notes: Non-default probe features only; do not use partial hashes for fixture evidence.
 Binary size impact: No default build impact while feature is disabled. Pure Rust hashing code is linked only into feature builds.
 Security notes: Reads local fixture files only and does not mutate originals.
-Verification source: `cargo info sha2@0.10.9`.
+Verification source: `cargo info sha2@0.10.9`; Task 13.3 color-probe tests.
 ```
 
 ```txt

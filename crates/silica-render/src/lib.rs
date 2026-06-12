@@ -3,6 +3,14 @@
 //! Spike 003 records the color-managed preview/export gate. This crate still
 //! does not render images, apply color transforms, or export files.
 
+#[cfg(feature = "color-probe")]
+use std::fs;
+#[cfg(feature = "color-probe")]
+use std::path::PathBuf;
+
+#[cfg(feature = "color-probe")]
+use sha2::{Digest, Sha256};
+
 use silica_decode::{PreviewDecodePlan, PreviewDecodeStatus};
 
 /// Stable crate name used by scaffold verification.
@@ -108,6 +116,182 @@ pub struct JpegSrgbExportRenderRequest {
     pub message: String,
 }
 
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorProbeRequest {
+    pub source_path: String,
+}
+
+#[cfg(feature = "color-probe")]
+impl ColorProbeRequest {
+    pub fn new(source_path: impl AsRef<str>) -> Self {
+        Self {
+            source_path: source_path.as_ref().to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProbePlatform {
+    Macos,
+    UnsupportedPlatform,
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProbeStatus {
+    Success,
+    Failed,
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProbeInputProfile {
+    Srgb,
+    DisplayP3,
+    None,
+    Unknown,
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProbeOutputProfile {
+    Srgb,
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProbeTransformPath {
+    EmbeddedIccToLinearDisplayP3ToSrgb,
+    AssumeSrgbToLinearDisplayP3ToSrgb,
+    Unavailable,
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorProbeErrorCategory {
+    UnsupportedPlatform,
+    MissingFile,
+    NotAFile,
+    ReadFailed,
+    InvalidJpeg,
+}
+
+#[cfg(feature = "color-probe")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorProbeResult {
+    pub platform: ColorProbePlatform,
+    pub source_path: String,
+    pub source_sha256: Option<String>,
+    pub status: ColorProbeStatus,
+    pub input_profile: ColorProbeInputProfile,
+    pub embedded_icc: bool,
+    pub working_space: WorkingColorSpace,
+    pub output_profile: ColorProbeOutputProfile,
+    pub transform_path: ColorProbeTransformPath,
+    pub error_category: Option<ColorProbeErrorCategory>,
+    pub message: String,
+}
+
+#[cfg(feature = "color-probe")]
+pub fn probe_color_profile(request: ColorProbeRequest) -> ColorProbeResult {
+    let source_path = request.source_path;
+    let path = PathBuf::from(&source_path);
+    let platform = current_color_probe_platform();
+
+    if platform == ColorProbePlatform::UnsupportedPlatform {
+        return failed_color_probe(
+            platform,
+            source_path,
+            None,
+            ColorProbeErrorCategory::UnsupportedPlatform,
+            "Color probe is available only on macOS for Phase 13 proof work.",
+        );
+    }
+
+    let metadata = match fs::metadata(&path) {
+        Ok(metadata) if metadata.is_file() => metadata,
+        Ok(_) => {
+            return failed_color_probe(
+                platform,
+                source_path,
+                None,
+                ColorProbeErrorCategory::NotAFile,
+                "Color probe source is not a file.",
+            );
+        }
+        Err(error) => {
+            let category = if error.kind() == std::io::ErrorKind::NotFound {
+                ColorProbeErrorCategory::MissingFile
+            } else {
+                ColorProbeErrorCategory::ReadFailed
+            };
+            return failed_color_probe(
+                platform,
+                source_path,
+                None,
+                category,
+                "Color probe source could not be read.",
+            );
+        }
+    };
+
+    let bytes = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return failed_color_probe(
+                platform,
+                source_path,
+                None,
+                ColorProbeErrorCategory::ReadFailed,
+                "Color probe source could not be read.",
+            );
+        }
+    };
+    let source_sha256 = sha256_hex(&bytes);
+
+    let icc_profile = match first_icc_profile(&bytes) {
+        Ok(profile) => profile,
+        Err(category) => {
+            return failed_color_probe(
+                platform,
+                source_path,
+                Some(source_sha256),
+                category,
+                "Color probe source is not a readable JPEG marker stream.",
+            );
+        }
+    };
+
+    let input_profile = match icc_profile.as_deref() {
+        Some(profile) => classify_icc_profile(profile),
+        None => ColorProbeInputProfile::None,
+    };
+    let transform_path = if icc_profile.is_some() {
+        ColorProbeTransformPath::EmbeddedIccToLinearDisplayP3ToSrgb
+    } else {
+        ColorProbeTransformPath::AssumeSrgbToLinearDisplayP3ToSrgb
+    };
+
+    ColorProbeResult {
+        platform,
+        source_path,
+        source_sha256: Some(source_sha256),
+        status: ColorProbeStatus::Success,
+        input_profile,
+        embedded_icc: icc_profile.is_some(),
+        working_space: SPIKE_003_COLOR_GATE.working_space,
+        output_profile: ColorProbeOutputProfile::Srgb,
+        transform_path,
+        error_category: None,
+        message: format!(
+            "Color probe recorded profile metadata for {} bytes.",
+            metadata.len()
+        ),
+    }
+}
+
 /// Build a local alpha render plan from a decode plan.
 pub fn plan_preview_render(decode_plan: PreviewDecodePlan) -> PreviewRenderPlan {
     let status = match decode_plan.status {
@@ -133,6 +317,100 @@ pub fn plan_preview_render(decode_plan: PreviewDecodePlan) -> PreviewRenderPlan 
         color_behavior: SPIKE_003_COLOR_GATE.preview,
         message,
     }
+}
+
+#[cfg(feature = "color-probe")]
+fn failed_color_probe(
+    platform: ColorProbePlatform,
+    source_path: String,
+    source_sha256: Option<String>,
+    category: ColorProbeErrorCategory,
+    message: &str,
+) -> ColorProbeResult {
+    ColorProbeResult {
+        platform,
+        source_path,
+        source_sha256,
+        status: ColorProbeStatus::Failed,
+        input_profile: ColorProbeInputProfile::Unknown,
+        embedded_icc: false,
+        working_space: SPIKE_003_COLOR_GATE.working_space,
+        output_profile: ColorProbeOutputProfile::Srgb,
+        transform_path: ColorProbeTransformPath::Unavailable,
+        error_category: Some(category),
+        message: message.to_string(),
+    }
+}
+
+#[cfg(feature = "color-probe")]
+fn current_color_probe_platform() -> ColorProbePlatform {
+    if cfg!(target_os = "macos") {
+        ColorProbePlatform::Macos
+    } else {
+        ColorProbePlatform::UnsupportedPlatform
+    }
+}
+
+#[cfg(feature = "color-probe")]
+fn first_icc_profile(bytes: &[u8]) -> Result<Option<Vec<u8>>, ColorProbeErrorCategory> {
+    if bytes.len() < 2 || bytes[0..2] != [0xff, 0xd8] {
+        return Err(ColorProbeErrorCategory::InvalidJpeg);
+    }
+
+    let mut index = 2;
+    while index + 4 <= bytes.len() {
+        if bytes[index] != 0xff {
+            return Err(ColorProbeErrorCategory::InvalidJpeg);
+        }
+
+        let marker = bytes[index + 1];
+        if marker == 0xd9 || marker == 0xda {
+            return Ok(None);
+        }
+
+        let length = u16::from_be_bytes([bytes[index + 2], bytes[index + 3]]) as usize;
+        if length < 2 || index + 2 + length > bytes.len() {
+            return Err(ColorProbeErrorCategory::InvalidJpeg);
+        }
+
+        let marker_payload = &bytes[index + 4..index + 2 + length];
+        if marker == 0xe2
+            && marker_payload.starts_with(b"ICC_PROFILE\0")
+            && marker_payload.len() >= 14
+        {
+            return Ok(Some(marker_payload[14..].to_vec()));
+        }
+
+        index += 2 + length;
+    }
+
+    Ok(None)
+}
+
+#[cfg(feature = "color-probe")]
+fn classify_icc_profile(profile: &[u8]) -> ColorProbeInputProfile {
+    match sha256_hex(profile).as_str() {
+        "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e" => {
+            ColorProbeInputProfile::Srgb
+        }
+        "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0" => {
+            ColorProbeInputProfile::DisplayP3
+        }
+        _ if profile
+            .windows(b"sRGB".len())
+            .any(|window| window.eq_ignore_ascii_case(b"sRGB")) =>
+        {
+            ColorProbeInputProfile::Srgb
+        }
+        _ => ColorProbeInputProfile::Unknown,
+    }
+}
+
+#[cfg(feature = "color-probe")]
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }
 
 /// Build a render request for a draft exposure/contrast preview update.
@@ -274,5 +552,118 @@ mod tests {
             super::ExportColorBehavior::SrgbDefaultDisplayP3Supported
         );
         assert!(request.message.contains("JPEG sRGB export"));
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[test]
+    fn color_probe_classifies_embedded_srgb_profile() {
+        let path = write_color_probe_fixture(
+            "srgb",
+            jpeg_with_icc_profile(b"header IEC sRGB profile bytes"),
+        );
+
+        let result =
+            super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(result.source_path, path.to_string_lossy());
+        assert_eq!(result.status, super::ColorProbeStatus::Success);
+        assert_eq!(result.input_profile, super::ColorProbeInputProfile::Srgb);
+        assert!(result.embedded_icc);
+        assert!(result.source_sha256.is_some());
+        assert_eq!(
+            result.working_space,
+            super::WorkingColorSpace::LinearDisplayP3
+        );
+        assert_eq!(result.output_profile, super::ColorProbeOutputProfile::Srgb);
+        assert_eq!(
+            result.transform_path,
+            super::ColorProbeTransformPath::EmbeddedIccToLinearDisplayP3ToSrgb
+        );
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[test]
+    fn color_probe_classifies_local_display_p3_profile() {
+        let profile = std::fs::read("/System/Library/ColorSync/Profiles/Display P3.icc")
+            .expect("local Display P3 profile");
+        let path = write_color_probe_fixture("display-p3", jpeg_with_icc_profile(&profile));
+
+        let result =
+            super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(result.status, super::ColorProbeStatus::Success);
+        assert_eq!(
+            result.input_profile,
+            super::ColorProbeInputProfile::DisplayP3
+        );
+        assert!(result.embedded_icc);
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[test]
+    fn color_probe_records_untagged_raster_as_assume_srgb() {
+        let path = write_color_probe_fixture("untagged", minimal_jpeg_without_icc());
+
+        let result =
+            super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(result.status, super::ColorProbeStatus::Success);
+        assert_eq!(result.input_profile, super::ColorProbeInputProfile::None);
+        assert!(!result.embedded_icc);
+        assert_eq!(
+            result.transform_path,
+            super::ColorProbeTransformPath::AssumeSrgbToLinearDisplayP3ToSrgb
+        );
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[test]
+    fn color_probe_reports_missing_file_without_panicking() {
+        let path = std::env::temp_dir().join(unique_color_probe_name("missing"));
+        let result =
+            super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
+
+        assert_eq!(result.status, super::ColorProbeStatus::Failed);
+        assert_eq!(
+            result.error_category,
+            Some(super::ColorProbeErrorCategory::MissingFile)
+        );
+        assert_eq!(result.source_sha256, None);
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    fn write_color_probe_fixture(name: &str, bytes: Vec<u8>) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(unique_color_probe_name(name));
+        std::fs::write(&path, bytes).expect("write color probe fixture");
+        path
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    fn unique_color_probe_name(name: &str) -> String {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        format!("silicaraw-color-probe-{name}-{nanos}.jpg")
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    fn jpeg_with_icc_profile(profile: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0xff, 0xd8];
+        let mut payload = b"ICC_PROFILE\0\x01\x01".to_vec();
+        payload.extend_from_slice(profile);
+        bytes.extend_from_slice(&[0xff, 0xe2]);
+        bytes.extend_from_slice(&((payload.len() + 2) as u16).to_be_bytes());
+        bytes.extend_from_slice(&payload);
+        bytes.extend_from_slice(&minimal_jpeg_without_icc()[2..]);
+        bytes
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    fn minimal_jpeg_without_icc() -> Vec<u8> {
+        vec![0xff, 0xd8, 0xff, 0xd9]
     }
 }

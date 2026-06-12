@@ -28,7 +28,8 @@ As of 2026-06-12:
 - Task 13.0 design gate is complete.
 - Task 13.1 color fixture source review is complete with a local-only synthetic fixture source.
 - Task 13.2 local color fixture corpus and manifest is complete locally.
-- Task 13.3 feature-gated color profile probe is next.
+- Task 13.3 feature-gated color profile probe is complete.
+- Task 13.4 color probe harness is next.
 
 ## Goal
 
@@ -77,14 +78,14 @@ Create fixture-backed evidence for:
 ### Task 13.3: Feature-Gated Color Profile Probe
 
 - **Card:** [13.3 Feature-Gated Color Profile Probe](../tasks/13.3-feature-gated-color-profile-probe.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** `silica-render` exposes a non-default `color-probe` path that records profile and transform metadata without changing normal product behavior.
 - **Validation:** `cargo test -p silica-render --features color-probe`
 
 ### Task 13.4: Color Probe Harness
 
 - **Card:** [13.4 Color Probe Harness](../tasks/13.4-color-probe-harness.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** A manifest-driven harness can run ignored color probe tests and check original hash preservation.
 - **Validation:** `SILICARAW_COLOR_FIXTURE_MANIFEST=... scripts/harness/check-color-probe-fixtures.py`
 
