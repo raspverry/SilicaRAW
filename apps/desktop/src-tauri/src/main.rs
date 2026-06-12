@@ -1544,6 +1544,98 @@ fn commit_color_presence_edit(
 }
 
 #[tauri::command]
+fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "commit_p0_basic_reset";
+    match silica_core::commit_p0_basic_reset(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_basic_preset_edit(
+    library_path: String,
+    photo_id: String,
+    preset: String,
+) -> DesktopCommandResponse {
+    let command = "commit_basic_preset_edit";
+    let preset = match parse_basic_preset(&preset) {
+        Ok(preset) => preset,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    match silica_core::commit_basic_preset_edit(PathBuf::from(&library_path), &photo_id, preset) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopCommandResponse {
     let command = "get_photo_edit_state";
     match silica_core::get_photo_edit_state(PathBuf::from(&library_path), &photo_id) {
@@ -1762,6 +1854,17 @@ fn parse_white_balance(
         "custom" => Ok(silica_core::WhiteBalance::Custom),
         unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
             "Unsupported white balance mode: {unsupported}."
+        ))),
+    }
+}
+
+fn parse_basic_preset(preset: &str) -> Result<silica_core::BasicPreset, silica_core::CoreError> {
+    match preset {
+        "silica_neutral" => Ok(silica_core::BasicPreset::SilicaNeutral),
+        "warm_contrast" => Ok(silica_core::BasicPreset::WarmContrast),
+        "soft_matte" => Ok(silica_core::BasicPreset::SoftMatte),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported basic preset: {unsupported}."
         ))),
     }
 }
@@ -2428,6 +2531,8 @@ fn main() {
             commit_white_balance_edit,
             commit_tone_recovery_edit,
             commit_color_presence_edit,
+            commit_p0_basic_reset,
+            commit_basic_preset_edit,
             get_photo_edit_state,
             get_photo_histogram,
             undo_last_history_action,
@@ -3564,6 +3669,80 @@ mod tests {
                 assert!(*persisted);
             }
             other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_commit_basic_preset_and_reset() {
+        let workspace = unique_library_root("desktop-basic-preset-reset");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preset = super::commit_basic_preset_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            "warm_contrast".to_string(),
+        );
+        assert!(preset.ok, "preset failed: {preset:?}");
+        match response_data(&preset) {
+            super::DesktopCommandData::EditCommit {
+                white_balance,
+                temperature,
+                contrast,
+                vibrance,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*white_balance, "custom");
+                assert_eq!(*temperature, 6200.0);
+                assert_eq!(*contrast, 18.0);
+                assert_eq!(*vibrance, 12.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected preset response data: {other:?}"),
+        }
+
+        let reset =
+            super::commit_p0_basic_reset(library_root.display().to_string(), photo_id.clone());
+        assert!(reset.ok, "reset failed: {reset:?}");
+        match response_data(&reset) {
+            super::DesktopCommandData::EditCommit {
+                white_balance,
+                temperature,
+                exposure,
+                contrast,
+                highlights,
+                shadows,
+                whites,
+                blacks,
+                vibrance,
+                saturation,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*white_balance, "as_shot");
+                assert_eq!(*temperature, 5200.0);
+                assert_eq!(*exposure, 0.0);
+                assert_eq!(*contrast, 0.0);
+                assert_eq!(*highlights, 0.0);
+                assert_eq!(*shadows, 0.0);
+                assert_eq!(*whites, 0.0);
+                assert_eq!(*blacks, 0.0);
+                assert_eq!(*vibrance, 0.0);
+                assert_eq!(*saturation, 0.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected reset response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

@@ -155,6 +155,14 @@ pub enum WhiteBalance {
     Custom,
 }
 
+/// Built-in P0 Basic presets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BasicPreset {
+    SilicaNeutral,
+    WarmContrast,
+    SoftMatte,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToneAdjustments {
@@ -578,6 +586,71 @@ pub fn apply_color_presence(
     let mut edited = graph.clone();
     edited.basic.vibrance = number_from_f64("basic.vibrance", vibrance)?;
     edited.basic.saturation = number_from_f64("basic.saturation", saturation)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Reset P0 Basic controls to schema-valid defaults.
+pub fn reset_p0_basic_controls(
+    graph: &EditGraph,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.white_balance = WhiteBalance::AsShot;
+    edited.basic.temperature = Number::from(5200);
+    edited.basic.tint = Number::from(0);
+    edited.basic.exposure = Number::from(0);
+    edited.basic.contrast = Number::from(0);
+    edited.basic.highlights = Number::from(0);
+    edited.basic.shadows = Number::from(0);
+    edited.basic.whites = Number::from(0);
+    edited.basic.blacks = Number::from(0);
+    edited.basic.vibrance = Number::from(0);
+    edited.basic.saturation = Number::from(0);
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Apply one built-in P0 Basic preset through the edit graph validator.
+pub fn apply_basic_preset(
+    graph: &EditGraph,
+    preset: BasicPreset,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    match preset {
+        BasicPreset::SilicaNeutral => {
+            return reset_p0_basic_controls(graph, updated_at);
+        }
+        BasicPreset::WarmContrast => {
+            edited.basic.white_balance = WhiteBalance::Custom;
+            edited.basic.temperature = Number::from(6200);
+            edited.basic.tint = Number::from(4);
+            edited.basic.exposure = number_from_f64("basic.exposure", 0.15)?;
+            edited.basic.contrast = Number::from(18);
+            edited.basic.highlights = Number::from(-20);
+            edited.basic.shadows = Number::from(10);
+            edited.basic.whites = Number::from(12);
+            edited.basic.blacks = Number::from(-8);
+            edited.basic.vibrance = Number::from(12);
+            edited.basic.saturation = Number::from(4);
+        }
+        BasicPreset::SoftMatte => {
+            edited.basic.white_balance = WhiteBalance::Custom;
+            edited.basic.temperature = Number::from(5400);
+            edited.basic.tint = Number::from(2);
+            edited.basic.exposure = Number::from(0);
+            edited.basic.contrast = Number::from(-18);
+            edited.basic.highlights = Number::from(-30);
+            edited.basic.shadows = Number::from(24);
+            edited.basic.whites = Number::from(-12);
+            edited.basic.blacks = Number::from(18);
+            edited.basic.vibrance = Number::from(8);
+            edited.basic.saturation = Number::from(-6);
+        }
+    }
     edited.updated_at = updated_at.into();
     validate_edit_graph(&edited)?;
     Ok(edited)
@@ -1171,6 +1244,93 @@ mod tests {
         assert_eq!(serialized["basic"]["vibrance"].as_f64(), Some(24.0));
         assert_eq!(serialized["basic"]["saturation"].as_f64(), Some(-8.5));
         super::validate_edit_graph_json(&serialized).expect("color presence graph validates");
+    }
+
+    #[test]
+    fn resets_p0_basic_controls_to_schema_defaults_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        let graph = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Custom,
+            6400.0,
+            12.0,
+            "unix:3",
+        )
+        .expect("apply white balance");
+        let graph = super::apply_tone_recovery(&graph, -20.0, 15.0, 8.0, -10.0, "unix:4")
+            .expect("apply tone");
+        let graph = super::apply_color_presence(&graph, 18.0, -6.0, "unix:5").expect("apply color");
+        let graph =
+            super::apply_exposure_contrast(&graph, 0.75, 24.0, "unix:6").expect("apply exposure");
+
+        let reset = super::reset_p0_basic_controls(&graph, "unix:7").expect("reset P0 basic");
+        let serialized = serde_json::to_value(&reset).expect("serialize reset graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip reset graph");
+
+        assert_eq!(reset.basic.white_balance, super::WhiteBalance::AsShot);
+        assert_eq!(reset.basic.temperature.as_f64(), Some(5200.0));
+        assert_eq!(reset.basic.tint.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.contrast.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.highlights.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.shadows.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.whites.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.blacks.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.vibrance.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.saturation.as_f64(), Some(0.0));
+        assert_eq!(reset.updated_at, "unix:7");
+        assert_eq!(round_tripped.basic.exposure.as_f64(), Some(0.0));
+        super::validate_edit_graph_json(&serialized).expect("reset graph validates");
+    }
+
+    #[test]
+    fn applies_builtin_basic_presets_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let warm = super::apply_basic_preset(&graph, super::BasicPreset::WarmContrast, "unix:3")
+            .expect("apply warm contrast preset");
+        let soft = super::apply_basic_preset(&graph, super::BasicPreset::SoftMatte, "unix:4")
+            .expect("apply soft matte preset");
+        let serialized = serde_json::to_value(&warm).expect("serialize preset graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip preset graph");
+
+        assert_eq!(warm.basic.white_balance, super::WhiteBalance::Custom);
+        assert_eq!(warm.basic.temperature.as_f64(), Some(6200.0));
+        assert_eq!(warm.basic.tint.as_f64(), Some(4.0));
+        assert_eq!(warm.basic.exposure.as_f64(), Some(0.15));
+        assert_eq!(warm.basic.contrast.as_f64(), Some(18.0));
+        assert_eq!(warm.basic.highlights.as_f64(), Some(-20.0));
+        assert_eq!(warm.basic.shadows.as_f64(), Some(10.0));
+        assert_eq!(warm.basic.whites.as_f64(), Some(12.0));
+        assert_eq!(warm.basic.blacks.as_f64(), Some(-8.0));
+        assert_eq!(warm.basic.vibrance.as_f64(), Some(12.0));
+        assert_eq!(warm.basic.saturation.as_f64(), Some(4.0));
+        assert_eq!(soft.basic.contrast.as_f64(), Some(-18.0));
+        assert_eq!(soft.basic.blacks.as_f64(), Some(18.0));
+        assert_eq!(round_tripped.basic.contrast.as_f64(), Some(18.0));
+        super::validate_edit_graph_json(&serialized).expect("preset graph validates");
     }
 
     #[test]

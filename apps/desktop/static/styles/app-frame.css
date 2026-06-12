@@ -2057,6 +2057,7 @@ progress::-webkit-progress-value {
 
 .sr-adjustment-header,
 .sr-adjustment-control,
+.sr-develop-reset-row,
 .sr-develop-commit-row,
 .sr-collapse-row {
   display: grid;
@@ -2094,6 +2095,12 @@ progress::-webkit-progress-value {
 .sr-adjustment-control button {
   min-height: 32px;
   padding: var(--sr-space-xs) var(--sr-space-sm);
+}
+
+.sr-develop-reset-row button {
+  min-width: 0;
+  min-height: 32px;
+  padding-inline: var(--sr-space-sm);
 }
 
 .sr-develop-commit-row {

@@ -13,6 +13,7 @@ Implemented:
 - Validation for the schema marker, version, enum deserialization, and numeric ranges.
 - Phase 5.3 default edit graph construction for imported catalog photos.
 - Phase 5.3 exposure/contrast graph updates with validation.
+- Task 17.4 P0 Basic reset and built-in preset graph helpers with validation.
 
 Not implemented:
 

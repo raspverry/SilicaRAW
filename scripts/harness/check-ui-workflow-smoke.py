@@ -30,6 +30,8 @@ ALLOWED_COMMANDS = {
     "commit_white_balance_edit",
     "commit_tone_recovery_edit",
     "commit_color_presence_edit",
+    "commit_p0_basic_reset",
+    "commit_basic_preset_edit",
     "get_photo_edit_state",
     "get_photo_histogram",
     "get_photo_history",
@@ -146,6 +148,8 @@ WORKFLOW_STEPS = [
         "ids": [
             "modeDevelop",
             "developPreviewSurface",
+            "developBeforeView",
+            "developAfterView",
             "developExposureSlider",
             "developContrastSlider",
             "developWhiteBalanceMode",
@@ -159,6 +163,10 @@ WORKFLOW_STEPS = [
             "developSaturationSlider",
             "developCommitEdit",
             "developRevertEdit",
+            "developResetBasic",
+            "presetSilicaNeutral",
+            "presetWarmContrast",
+            "presetSoftMatte",
             "developEditState",
             "developHistoryPanel",
             "developHistoryStatus",
@@ -183,8 +191,19 @@ WORKFLOW_STEPS = [
             "commit_white_balance_edit",
             "commit_tone_recovery_edit",
             "commit_color_presence_edit",
+            "commit_p0_basic_reset",
+            "commit_basic_preset_edit",
         ],
-        "text": ["Draft not committed", "Commit Edit", "Revert Draft", "History", "No committed history yet."],
+        "text": [
+            "Draft not committed",
+            "Before",
+            "After",
+            "Commit Edit",
+            "Revert Draft",
+            "Reset All",
+            "History",
+            "No committed history yet.",
+        ],
     },
     {
         "name": "export-jpeg-srgb",
@@ -437,6 +456,16 @@ def main():
         "Next redo",
     ]:
         require(marker in source, f"develop history marker missing: {marker}", failures)
+    for marker in [
+        "setDevelopBeforeAfterMode",
+        "data-before-after-mode",
+        "applyBasicPreset",
+        "commit_basic_preset_edit",
+        "resetP0BasicControls",
+        "commit_p0_basic_reset",
+        "Preset/reset applies one undoable edit checkpoint.",
+    ]:
+        require(marker in source, f"develop preset/reset/before-after marker missing: {marker}", failures)
     for marker in [
         "runCacheClearCommand",
         "clear_library_cache",

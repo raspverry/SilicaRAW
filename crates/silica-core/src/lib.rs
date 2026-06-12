@@ -15,6 +15,7 @@ pub const CRATE_NAME: &str = "silica-core";
 
 pub use silica_decode::RawFullResolutionExportSourceError;
 pub use silica_decode::RawPreviewArtifactError;
+pub use silica_edit::BasicPreset;
 pub use silica_edit::WhiteBalance;
 pub use silica_storage::ActionLogEntry;
 pub use silica_storage::CatalogRebuildDryRunAction;
@@ -2016,6 +2017,71 @@ pub fn commit_color_presence_edit(
         saturation: persisted.basic.saturation.as_f64().unwrap_or(saturation),
         persisted: true,
         message: "Color presence edit persisted on commit.".to_string(),
+    }))
+}
+
+/// Persist a full P0 Basic reset as one undoable edit checkpoint.
+pub fn commit_p0_basic_reset(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::reset_p0_basic_controls(&graph, current_timestamp_string())?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id,
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        persisted: true,
+        message: "P0 Basic reset persisted on commit.".to_string(),
+    }))
+}
+
+/// Persist a built-in Basic preset as one undoable edit checkpoint.
+pub fn commit_basic_preset_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    preset: silica_edit::BasicPreset,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_basic_preset(&graph, preset, current_timestamp_string())?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id,
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        persisted: true,
+        message: "Basic preset persisted on commit.".to_string(),
     }))
 }
 
@@ -5131,6 +5197,76 @@ mod tests {
             serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
         assert_eq!(settings["vibrance"], 24.0);
         assert_eq!(settings["saturation"], -8.5);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn reset_and_basic_preset_commits_are_undoable_without_mutating_original() {
+        let workspace = unique_library_root("core-basic-preset-reset");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let preset = commit_basic_preset_edit(
+            &created.root_path,
+            &photo_id,
+            silica_edit::BasicPreset::WarmContrast,
+        )
+        .expect("commit preset")
+        .expect("preset result");
+        assert_eq!(preset.white_balance, silica_edit::WhiteBalance::Custom);
+        assert_eq!(preset.temperature, 6200.0);
+        assert_eq!(preset.contrast, 18.0);
+        assert_eq!(preset.vibrance, 12.0);
+        assert!(preset.persisted);
+
+        let reset = commit_p0_basic_reset(&created.root_path, &photo_id)
+            .expect("commit reset")
+            .expect("reset result");
+        assert_eq!(reset.white_balance, silica_edit::WhiteBalance::AsShot);
+        assert_eq!(reset.temperature, 5200.0);
+        assert_eq!(reset.tint, 0.0);
+        assert_eq!(reset.exposure, 0.0);
+        assert_eq!(reset.contrast, 0.0);
+        assert_eq!(reset.highlights, 0.0);
+        assert_eq!(reset.shadows, 0.0);
+        assert_eq!(reset.whites, 0.0);
+        assert_eq!(reset.blacks, 0.0);
+        assert_eq!(reset.vibrance, 0.0);
+        assert_eq!(reset.saturation, 0.0);
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 2);
+        assert!(history.can_undo);
+
+        undo_last_history_action(&created.root_path, &photo_id).expect("undo reset");
+        let restored = get_photo_edit_state(&created.root_path, &photo_id)
+            .expect("read restored preset")
+            .expect("edit state");
+        assert_eq!(restored.temperature, 6200.0);
+        assert_eq!(restored.contrast, 18.0);
+        assert_eq!(restored.vibrance, 12.0);
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
 
         remove_library_root(&workspace);
     }

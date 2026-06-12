@@ -35,3 +35,5 @@ Task 17.2.2 adds tone recovery preview and commit APIs for highlights, shadows, 
 Task 17.2.3 adds color presence preview and commit APIs for vibrance and saturation under the same draft/commit/export boundary.
 
 Task 17.3 adds `get_photo_histogram` for the current committed JPEG/JPG Develop state. Core records histogram JSON only as disposable render cache and returns explicit ready, missing, blocked, or unsupported states.
+
+Task 17.4 adds `commit_p0_basic_reset` and `commit_basic_preset_edit`. Both commit one validated full edit graph checkpoint through storage so reset/preset actions are undoable without hidden sidecar or original-file writes.

@@ -28,6 +28,10 @@ Task 5.6.12 is now the Phase 6 readiness visual gate. The Phase 5.5 notes below 
 
 Task 17.3 replaces the inspector's fake histogram placeholder with command-backed luminance bars from real histogram data. The histogram surface must keep the existing inspector footprint, avoid text overlap at the checked desktop widths, and show explicit blocked or unavailable text when real data is not available.
 
+## Phase 17 Reset Preset Note
+
+Task 17.4 makes the existing left Develop preset rows active, keeps Reset All inside the Develop inspector action area, and keeps Before/After in the preview toolbar as a two-state view-only control. These controls must use existing dark editor tokens and must not add horizontal preset strips or duplicate preset badges that crowd the current workbench.
+
 ## Final Phase 5.6.12 Refresh
 
 Final QA command:

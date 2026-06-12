@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-17 | Reset before-after presets added
+
+- Completed Task 17.4 with validated P0 Basic reset and built-in preset graph helpers.
+- Reset and preset application commit one undoable edit checkpoint through the existing history transaction path.
+- Added static Develop Before/After view-only controls and routed Phase 17 execution to Task 17.5.
+
 ## [2026-06-13] phase-17 | Real histogram cache display added
 
 - Completed Task 17.3 with real RGB/luminance histogram data for supported local JPEG/JPG committed Develop state.

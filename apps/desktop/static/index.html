@@ -54,9 +54,9 @@
         </section>
         <section class="sr-sidebar-section" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Presets</div>
-          <button class="sr-preset-row is-active" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
-          <button class="sr-preset-row" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
-          <button class="sr-preset-row" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
+          <button class="sr-preset-row is-active" id="presetSilicaNeutral" type="button" data-basic-preset="silica_neutral" aria-pressed="true"><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
+          <button class="sr-preset-row" id="presetWarmContrast" type="button" data-basic-preset="warm_contrast" aria-pressed="false"><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
+          <button class="sr-preset-row" id="presetSoftMatte" type="button" data-basic-preset="soft_matte" aria-pressed="false"><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
         </section>
         <section class="sr-sidebar-section" data-mode-panel="export" hidden>
           <div class="sr-panel-heading">Export</div>
@@ -302,12 +302,11 @@
                 <p id="developPhotoName">No photo selected</p>
               </div>
               <div class="sr-view-controls" aria-label="Develop preview controls">
-                <button type="button">Before</button>
-                <button type="button" class="is-active">After</button>
-                <button type="button">Split</button>
+                <button id="developBeforeView" type="button" data-before-after-mode="before" aria-pressed="false">Before</button>
+                <button id="developAfterView" type="button" class="is-active" data-before-after-mode="after" aria-pressed="true">After</button>
               </div>
             </div>
-            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false" data-native-viewer-host="reserved" data-native-viewer-surface="develop" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
+            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false" data-before-after-mode="after" data-native-viewer-host="reserved" data-native-viewer-surface="develop" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
               <div class="sr-develop-art sr-thumb-art-a" id="developPreviewArt" aria-hidden="true"></div>
               <div class="sr-develop-status">
                 <strong id="developPreviewStatus">No Preview</strong>
@@ -490,6 +489,9 @@
               <button id="developSaturationReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-develop-reset-row">
+            <button id="developResetBasic" type="button" title="Preset/reset applies one undoable edit checkpoint.">Reset All</button>
+          </div>
           <div class="sr-develop-commit-row">
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
@@ -660,6 +662,8 @@
       const developPreviewMessage = document.querySelector("#developPreviewMessage");
       const developFilmstrip = document.querySelector("#developFilmstrip");
       const developEditState = document.querySelector("#developEditState");
+      const developBeforeView = document.querySelector("#developBeforeView");
+      const developAfterView = document.querySelector("#developAfterView");
       const libraryPhotoCount = document.querySelector("#libraryPhotoCount");
       const allPhotosCount = document.querySelector("#allPhotosCount");
       const selectedPhotoName = document.querySelector("#selectedPhotoName");
@@ -735,6 +739,8 @@
       const developSaturationReset = document.querySelector("#developSaturationReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
+      const developResetBasic = document.querySelector("#developResetBasic");
+      const basicPresetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
       const developHistoryPanel = document.querySelector("#developHistoryPanel");
       const developHistoryStatus = document.querySelector("#developHistoryStatus");
       const developHistoryList = document.querySelector("#developHistoryList");
@@ -793,6 +799,8 @@
       };
       let recentLibraries = [];
       let developPreviewSequence = 0;
+      let developBeforeAfterMode = "after";
+      let lastDevelopPreviewState = null;
       let controlsBusy = false;
       let layoutHydrating = false;
       let layoutSaveTimer = 0;
@@ -2145,9 +2153,15 @@
         return url;
       }
 
+      function developBeforePreviewBlobUrl() {
+        return thumbnailBlobUrl(selectedPhoto(), thumbnailObjectUrls);
+      }
+
       function renderDevelopPreviewImage(preview) {
         developPreviewSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
-        const previewUrl = developPreviewBlobUrl(preview);
+        const previewUrl = developBeforeAfterMode === "before"
+          ? developBeforePreviewBlobUrl()
+          : developPreviewBlobUrl(preview);
         developPreviewSurface.dataset.hasPreviewImage = String(Boolean(previewUrl));
         if (!previewUrl) {
           return;
@@ -2781,19 +2795,45 @@
       }
 
       function renderDevelopPreviewState(preview) {
+        lastDevelopPreviewState = preview;
         const normalized = preview.status === "Ready"
           ? "ready"
           : preview.status === "Unsupported"
             ? "unsupported"
             : "blocked";
         developPreviewSurface.dataset.previewStatus = normalized;
-        developPreviewStatus.textContent = preview.status === "BlockedByDecode"
+        developPreviewSurface.dataset.beforeAfterMode = developBeforeAfterMode;
+        developPreviewStatus.textContent = developBeforeAfterMode === "before" && preview.status === "Ready"
+          ? "Before Preview"
+          : preview.status === "BlockedByDecode"
           ? "Blocked by Decode"
           : preview.status === "Ready"
             ? "Preview Ready"
             : preview.status || "No Preview";
-        developPreviewMessage.textContent = preview.message || "No preview session.";
+        developPreviewMessage.textContent = developBeforeAfterMode === "before" && preview.status === "Ready"
+          ? "Before view is display-only and writes no edit history."
+          : preview.message || "No preview session.";
         renderDevelopPreviewImage(preview);
+      }
+
+      function setDevelopBeforeAfterMode(mode) {
+        developBeforeAfterMode = mode === "before" ? "before" : "after";
+        developPreviewSurface.dataset.beforeAfterMode = developBeforeAfterMode;
+        [
+          [developBeforeView, "before"],
+          [developAfterView, "after"],
+        ].forEach(([button, buttonMode]) => {
+          const active = developBeforeAfterMode === buttonMode;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        renderDevelopPreviewState(lastDevelopPreviewState || localDevelopPreviewPlan(
+          selectedPhoto(),
+          selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null,
+        ));
+        setStatus(developBeforeAfterMode === "before"
+          ? "Before view is display-only; no edit history is written."
+          : "After view shows the current Develop preview.");
       }
 
       function syncDevelopSelection() {
@@ -2835,9 +2875,15 @@
           developSaturationReset,
           developCommitEdit,
           developRevertEdit,
+          developResetBasic,
         ].forEach((control) => {
           control.disabled = disabled;
         });
+        basicPresetButtons.forEach((button) => {
+          button.disabled = disabled;
+        });
+        developBeforeView.disabled = !photo;
+        developAfterView.disabled = !photo;
         const state = photo ? developAdjustmentState(photo.photoId) : {
           draftExposure: 0,
           draftContrast: 0,
@@ -3239,6 +3285,101 @@
         }
       }
 
+      function applyCommittedP0BasicState(state, editState) {
+        state.committedExposure = editStateNumber(editState?.exposure, 0);
+        state.committedContrast = editStateNumber(editState?.contrast, 0);
+        state.committedWhiteBalance = normalizeWhiteBalance(editState?.whiteBalance);
+        state.committedTemperature = editStateNumber(editState?.temperature, 5200);
+        state.committedTint = editStateNumber(editState?.tint, 0);
+        state.committedHighlights = editStateNumber(editState?.highlights, 0);
+        state.committedShadows = editStateNumber(editState?.shadows, 0);
+        state.committedWhites = editStateNumber(editState?.whites, 0);
+        state.committedBlacks = editStateNumber(editState?.blacks, 0);
+        state.committedVibrance = editStateNumber(editState?.vibrance, 0);
+        state.committedSaturation = editStateNumber(editState?.saturation, 0);
+        state.draftExposure = state.committedExposure;
+        state.draftContrast = state.committedContrast;
+        state.draftWhiteBalance = state.committedWhiteBalance;
+        state.draftTemperature = state.committedTemperature;
+        state.draftTint = state.committedTint;
+        state.draftHighlights = state.committedHighlights;
+        state.draftShadows = state.committedShadows;
+        state.draftWhites = state.committedWhites;
+        state.draftBlacks = state.committedBlacks;
+        state.draftVibrance = state.committedVibrance;
+        state.draftSaturation = state.committedSaturation;
+        state.readbackLoaded = true;
+        state.readbackLibraryPath = activeLibraryPath || "";
+      }
+
+      function setActiveBasicPreset(preset) {
+        basicPresetButtons.forEach((button) => {
+          const active = button.dataset.basicPreset === preset;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+      }
+
+      async function persistP0BasicResponse(activePreset, fallbackMessage, invokeRequest) {
+        const photo = selectedPhoto();
+        if (!isDevelopable(photo)) {
+          setStatus("Select a supported catalog photo before applying Develop reset or preset.");
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          setStatus("Desktop runtime is required for undoable preset/reset commits.");
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        setBusy(true);
+        try {
+          const response = await invokeRequest(photo);
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, fallbackMessage));
+            return;
+          }
+          if (!response.data) {
+            setStatus("Develop reset or preset was not committed because the catalog photo was not found.");
+            return;
+          }
+          applyCommittedP0BasicState(state, response.data);
+          syncAdjustmentControls(state);
+          updateDevelopDirtyState(state);
+          setActiveBasicPreset(activePreset);
+          await loadDevelopHistory();
+          await loadPhotoHistogram();
+          await previewDevelopEdit();
+          setStatus(responseMessage(response, fallbackMessage));
+        } catch (error) {
+          setStatus(responseErrorMessage(error, fallbackMessage));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function resetP0BasicControls() {
+        await persistP0BasicResponse(
+          "silica_neutral",
+          "P0 Basic reset failed.",
+          (photo) => invoke("commit_p0_basic_reset", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+          }),
+        );
+      }
+
+      async function applyBasicPreset(preset) {
+        await persistP0BasicResponse(
+          preset,
+          "Basic preset failed.",
+          (photo) => invoke("commit_basic_preset_edit", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+            preset,
+          }),
+        );
+      }
+
       function stepDevelopAdjustment(kind, event) {
         if (!["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp"].includes(event.key)) {
           return;
@@ -3617,9 +3758,15 @@
           developSaturationReset,
           developCommitEdit,
           developRevertEdit,
+          developResetBasic,
         ].forEach((control) => {
           control.disabled = developDisabled;
         });
+        basicPresetButtons.forEach((button) => {
+          button.disabled = developDisabled;
+        });
+        developBeforeView.disabled = isBusy || !selectedPhoto();
+        developAfterView.disabled = isBusy || !selectedPhoto();
         setDevelopHistoryButtons(
           developHistoryPanel.dataset.canUndo === "true",
           developHistoryPanel.dataset.canRedo === "true",
@@ -3866,6 +4013,12 @@
       developSaturationReset.addEventListener("click", () => resetDevelopAdjustment("saturation"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
+      developResetBasic.addEventListener("click", resetP0BasicControls);
+      developBeforeView.addEventListener("click", () => setDevelopBeforeAfterMode("before"));
+      developAfterView.addEventListener("click", () => setDevelopBeforeAfterMode("after"));
+      basicPresetButtons.forEach((button) => {
+        button.addEventListener("click", () => applyBasicPreset(button.dataset.basicPreset));
+      });
       openExportDialogButton.addEventListener("click", openExportDialog);
       exportDialogButtons.forEach((button) => {
         button.addEventListener("click", openExportDialog);

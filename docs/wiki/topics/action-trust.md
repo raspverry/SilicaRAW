@@ -55,6 +55,8 @@ External file effects are not inside undo/redo transactions. Export files, sidec
 | Operation | Class | Policy |
 | --- | --- | --- |
 | Exposure/contrast commit | Undoable and redoable | Store a validated edit graph checkpoint. Undo/redo changes active catalog edit state only. |
+| P0 Basic reset or built-in preset apply | Undoable and redoable | Commit one validated full edit graph checkpoint through Core and storage. Do not split one preset into multiple history rows. |
+| Before/after Develop view | View-only | Switch presentation state only. No edit state, history, action log, sidecar, export, or cache write. |
 | Slider draft preview | Not persisted | Render-only request. No `edit_states`, `edit_history`, sidecar, export, or action-log write. |
 | Rating, pick, reject, color label | Undoable and redoable | Change `photo_flags` in a catalog transaction and record action semantics. |
 | Import by reference | Logged-only for Phase 16 | Adds catalog references and default state. Develop undo must not remove imported photos. A future explicit remove-from-catalog command may define its own policy. |
@@ -162,6 +164,8 @@ Committed history changes can make a previously written sidecar stale. Phase 16 
 - Conflict status must not be cleared by undo, redo, import, export, or cache clear.
 
 Task 16.6 implements the runtime path: edit commits, flag commits, undo, and redo mark clean sidecars as `catalog_newer` in the same catalog transaction and preserve `conflict` and `sidecar_newer`. Storage/Core expose `get_photo_sidecar_status` for status data. These commands do not write, delete, or overwrite sidecar files.
+
+Task 17.4 applies P0 Basic reset and built-in presets through the same edit commit transaction path. Before/after controls are explicitly presentation state and must not enter the action tables.
 
 ## Stop Gates
 
