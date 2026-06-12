@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Color proof plan added
+
+- Added Phase 13 color pipeline proof plan, phase brief, and task cards 13.0 through 13.8.
+- Routed current LLM work from completed Phase 12 to Phase 13.
+- Kept color correctness, Display P3 export claims, RAW color behavior, and new dependencies behind explicit evidence gates.
+
 ## [2026-06-12] phase-12 | RAW proof phase completed
 
 - Phase 12 completion gate is satisfied for legal fixture classes A-D.

@@ -2,7 +2,7 @@
 title: Color Management
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/09_Color_Management_Specification.md
 ---
 
@@ -21,6 +21,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Decoder-specific color assumptions must be documented.
 - Phase 5.1 records display-profile-aware preview readiness but does not prove color correctness.
 - Tagged color fixtures are still missing, so sRGB and Display P3 behavior is not yet proven.
+- Phase 13 now has an execution plan, brief, and task cards for fixture-backed color proof.
 
 ## Blocked Work
 
@@ -64,6 +65,26 @@ The policy separates byte equality, file/profile inspection, pixel or perceptual
 
 Color correctness claims remain blocked until fixture-backed proof, approved tolerance values, automated comparison results, and manual visual review records exist.
 
+## Phase 13 Plan
+
+[Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md) is the active route for turning the Spike 003 recommendation into fixture-backed evidence.
+
+Current planned order:
+
+```txt
+13.0 design gate
+13.1 source review
+13.2 ignored local fixtures and manifest
+13.3 feature-gated color probe
+13.4 probe harness
+13.5 support matrix
+13.6 ICC export proof
+13.7 schema-safe color metadata
+13.8 explicit export color options
+```
+
+Until those tasks produce evidence, color correctness and Display P3 export claims remain blocked.
+
 ## Color-Dependent Tags
 
 ```txt
@@ -77,6 +98,7 @@ RAW Camera Profiles: decoder-dependent color-dependent
 ## Links
 
 - [Spike 003 Report](../../spikes/003-color-managed-preview-export.md)
+- [Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md)
 - [Color Management Specification](../../09_Color_Management_Specification.md)
 - [Testing and QA Plan](../../15_Testing_QA_Plan.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)

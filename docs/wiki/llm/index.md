@@ -24,13 +24,13 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 Phase 12 is complete. The next planned product work is Phase 13: Color Pipeline Proof.
 
-Before implementing Phase 13 code, create the Phase 13 plan, phase brief, and task cards from [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-13-color-pipeline-proof).
+For Phase 13 work, read:
 
-For Phase 13 planning work, read:
-
-- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-13-color-pipeline-proof)
-- [RAW Decoding](../topics/raw-decoding.md)
+- [Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md)
+- [Phase 13 Brief](../phases/phase-13-color-pipeline-proof.md)
+- The matching task card under [Task Cards](../tasks/index.md)
 - [Color Management](../topics/color-management.md)
+- [Golden Image and Tolerance Policy](../../../checklists/GOLDEN_IMAGE_TOLERANCE_POLICY.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
