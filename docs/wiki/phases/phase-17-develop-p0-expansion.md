@@ -29,7 +29,7 @@ Phase 17 expands basic controls beyond exposure/contrast. Work must stay vertica
 | 17.1.1 | White Balance Mutators | Complete: edit graph validates temperature/tint changes and round-trips schema |
 | 17.1.2 | Tone Recovery Mutators | Complete: edit graph validates highlights/shadows/whites/blacks and round-trips schema |
 | 17.1.3 | Color Presence Mutators | Complete: edit graph validates vibrance/saturation and round-trips schema |
-| 17.2.1 | White Balance Preview/Commit/Export Parity | WB draft/commit/export use the same validated edit state |
+| 17.2.1 | White Balance Preview/Commit/Export Parity | Complete: WB draft/commit/export use the same validated edit state |
 | 17.2.2 | Tone Recovery Preview/Commit/Export Parity | Tone recovery draft/commit/export use the same validated edit state |
 | 17.2.3 | Color Presence Preview/Commit/Export Parity | Vibrance/saturation draft/commit/export use the same validated edit state |
 | 17.3 | Real Histogram Cache and Display | Histogram cache is disposable and honest about unsupported/missing states |

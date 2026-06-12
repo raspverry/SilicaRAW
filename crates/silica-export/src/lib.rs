@@ -37,6 +37,7 @@ pub struct JpegSrgbExportRequest {
     pub output_path: PathBuf,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
     pub quality: u8,
 }
 
@@ -47,8 +48,41 @@ pub struct JpegColorExportRequest {
     pub output_path: PathBuf,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
+}
+
+/// White balance mode carried through local JPEG preview/export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WhiteBalanceMode {
+    AsShot,
+    Auto,
+    Daylight,
+    Cloudy,
+    Shade,
+    Tungsten,
+    Fluorescent,
+    Flash,
+    Custom,
+}
+
+/// White balance values applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WhiteBalanceAdjustment {
+    pub mode: WhiteBalanceMode,
+    pub temperature: f64,
+    pub tint: f64,
+}
+
+impl WhiteBalanceAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            mode: WhiteBalanceMode::AsShot,
+            temperature: 5200.0,
+            tint: 0.0,
+        }
+    }
 }
 
 /// Result returned after a JPEG export is written.
@@ -93,6 +127,7 @@ pub struct JpegDevelopPreviewRequest {
     pub quality: u8,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
 }
 
 /// Result returned after a JPEG thumbnail is written.
@@ -216,6 +251,7 @@ pub fn export_jpeg_srgb(
         output_path: request.output_path,
         exposure: request.exposure,
         contrast: request.contrast,
+        white_balance: request.white_balance,
         quality: request.quality,
         color_profile: ExportColorProfile::Srgb,
     })
@@ -231,7 +267,7 @@ pub fn export_jpeg_with_color_profile(
     if !(1..=100).contains(&request.quality) {
         return Err(ExportError::InvalidQuality(request.quality));
     }
-    if !request.exposure.is_finite() || !request.contrast.is_finite() {
+    if !adjustments_are_finite(request.exposure, request.contrast, request.white_balance) {
         return Err(ExportError::NonFiniteAdjustment);
     }
 
@@ -242,6 +278,7 @@ pub fn export_jpeg_with_color_profile(
         .decode()?;
     let mut rgb = decoded.to_rgb8();
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -360,7 +397,7 @@ pub fn write_jpeg_develop_preview(
     if request.max_edge == 0 {
         return Err(ExportError::InvalidThumbnailEdge(request.max_edge));
     }
-    if !request.exposure.is_finite() || !request.contrast.is_finite() {
+    if !adjustments_are_finite(request.exposure, request.contrast, request.white_balance) {
         return Err(ExportError::NonFiniteAdjustment);
     }
 
@@ -371,6 +408,7 @@ pub fn write_jpeg_develop_preview(
         .thumbnail(request.max_edge, request.max_edge)
         .to_rgb8();
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -413,6 +451,35 @@ fn apply_exposure_contrast(image: &mut image::RgbImage, exposure: f64, contrast:
             *channel = (adjusted * 255.0).round() as u8;
         }
     }
+}
+
+fn apply_white_balance(image: &mut image::RgbImage, white_balance: WhiteBalanceAdjustment) {
+    let warmth = ((white_balance.temperature - 5200.0) / 4800.0).clamp(-1.0, 1.0) as f32;
+    let tint = (white_balance.tint / 150.0).clamp(-1.0, 1.0) as f32;
+    let red_scale = (1.0 + warmth * 0.20 + tint * 0.04).clamp(0.25, 2.0);
+    let green_scale = (1.0 + tint * 0.12).clamp(0.25, 2.0);
+    let blue_scale = (1.0 - warmth * 0.20 - tint * 0.04).clamp(0.25, 2.0);
+
+    for pixel in image.pixels_mut() {
+        pixel.0[0] = scale_channel(pixel.0[0], red_scale);
+        pixel.0[1] = scale_channel(pixel.0[1], green_scale);
+        pixel.0[2] = scale_channel(pixel.0[2], blue_scale);
+    }
+}
+
+fn scale_channel(channel: u8, scale: f32) -> u8 {
+    (f32::from(channel) * scale).clamp(0.0, 255.0).round() as u8
+}
+
+fn adjustments_are_finite(
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceAdjustment,
+) -> bool {
+    exposure.is_finite()
+        && contrast.is_finite()
+        && white_balance.temperature.is_finite()
+        && white_balance.tint.is_finite()
 }
 
 fn export_icc_profile(profile: ExportColorProfile) -> Result<Vec<u8>, ExportError> {
@@ -542,6 +609,7 @@ mod tests {
             output_path: output_path.clone(),
             exposure: 0.5,
             contrast: -8.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -602,6 +670,7 @@ mod tests {
             output_path: output_path.clone(),
             exposure: 0.0,
             contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::DisplayP3,
         })
@@ -647,6 +716,7 @@ mod tests {
             output_path: source_path.clone(),
             exposure: 0.0,
             contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -710,6 +780,7 @@ mod tests {
             quality: 82,
             exposure: 0.0,
             contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -719,6 +790,7 @@ mod tests {
             quality: 82,
             exposure: 1.0,
             contrast: 20.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
         })
         .expect("write adjusted preview");
 
@@ -729,6 +801,69 @@ mod tests {
         assert_ne!(
             std::fs::read(neutral.output_path).expect("read neutral preview"),
             std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_white_balance_adjusted_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("white-balance");
+        let source_path = root.join("source.jpg");
+        let neutral_preview_path = root.join("previews").join("neutral.jpg");
+        let adjusted_preview_path = root.join("previews").join("adjusted.jpg");
+        let adjusted_export_path = root.join("export").join("adjusted.jpg");
+        std::fs::create_dir_all(adjusted_export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(neutral_preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let white_balance = super::WhiteBalanceAdjustment {
+            mode: super::WhiteBalanceMode::Custom,
+            temperature: 6500.0,
+            tint: 20.0,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance,
+        })
+        .expect("write white balance preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+            white_balance,
+        })
+        .expect("export white balance jpeg");
+
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
         );
 
         remove_export_root(&root);

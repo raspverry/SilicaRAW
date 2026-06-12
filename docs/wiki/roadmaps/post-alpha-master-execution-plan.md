@@ -54,8 +54,8 @@ As of 2026-06-13:
 - Task 16.5 Append-Only Action Log is complete.
 - Task 16.6 Sidecar Sync Status After History Commits is complete.
 - Phase 16 is complete.
-- Tasks 17.1.1 through 17.1.3 are complete.
-- Next task: [17.2.1 White Balance Preview Commit Export Parity](../tasks/17.2.1-white-balance-preview-commit-export-parity.md).
+- Tasks 17.1.1 through 17.2.1 are complete.
+- Next task: [17.2.2 Tone Recovery Preview Commit Export Parity](../tasks/17.2.2-tone-recovery-preview-commit-export-parity.md).
 
 ## Wave Map
 
@@ -386,7 +386,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 17.2.1 from the existing task card.
+1. Execute Task 17.2.2 from the existing task card.
 2. Continue through Phase 17 in order.
 
 ## Links

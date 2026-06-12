@@ -79,7 +79,7 @@ The current implementation order starts with:
 - Task 15.6, RAW export manual color QA, is complete.
 - Phase 15 is complete.
 - Phase 16 is complete: action trust, semantics, edit history, undo/redo, Develop history panel data, append-only action log, and sidecar status after history commits are implemented.
-- Tasks 17.1.1 through 17.1.3 are complete. Next roadmap step is Task 17.2.1, White Balance Preview/Commit/Export Parity.
+- Tasks 17.1.1 through 17.2.1 are complete. Next roadmap step is Task 17.2.2, Tone Recovery Preview/Commit/Export Parity.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

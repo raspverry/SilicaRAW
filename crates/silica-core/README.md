@@ -27,3 +27,5 @@ Task 16.4 adds a thin `list_photo_history` wrapper for the Develop history panel
 Task 16.5 adds thin append/read wrappers for the action log and records sensitive local Core actions: import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear. Core keeps this as evidence, not undo behavior, and does not expose plugin/MCP raw database writes.
 
 Task 16.6 adds a thin `get_photo_sidecar_status` wrapper. History-changing Core calls rely on storage to mark clean sidecars as `catalog_newer` without hidden sidecar file writes.
+
+Task 17.2.1 adds white-balance-family preview and commit APIs. Core validates the edit graph, keeps draft previews non-persistent, commits one undoable history checkpoint, and passes the committed white-balance state into JPEG export settings.

@@ -391,6 +391,42 @@
               <button id="developContrastReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-adjustment-slider" data-adjustment="white-balance">
+            <div class="sr-adjustment-header">
+              <label for="developWhiteBalanceMode">White Balance</label>
+              <select id="developWhiteBalanceMode" aria-label="White balance mode">
+                <option value="as_shot">As Shot</option>
+                <option value="auto">Auto</option>
+                <option value="daylight">Daylight</option>
+                <option value="cloudy">Cloudy</option>
+                <option value="shade">Shade</option>
+                <option value="tungsten">Tungsten</option>
+                <option value="fluorescent">Fluorescent</option>
+                <option value="flash">Flash</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="temperature">
+            <div class="sr-adjustment-header">
+              <label for="developTemperatureSlider">Temperature</label>
+              <input id="developTemperatureValue" type="number" min="1000" max="50000" step="50" value="5200" aria-label="Temperature value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developTemperatureSlider" type="range" min="1000" max="50000" step="50" value="5200" aria-label="Temperature">
+              <button id="developTemperatureReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="tint">
+            <div class="sr-adjustment-header">
+              <label for="developTintSlider">Tint</label>
+              <input id="developTintValue" type="number" min="-150" max="150" step="1" value="0" aria-label="Tint value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developTintSlider" type="range" min="-150" max="150" step="1" value="0" aria-label="Tint">
+              <button id="developTintReset" type="button">Reset</button>
+            </div>
+          </div>
           <div class="sr-develop-commit-row">
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
@@ -606,6 +642,13 @@
       const developContrastSlider = document.querySelector("#developContrastSlider");
       const developContrastValue = document.querySelector("#developContrastValue");
       const developContrastReset = document.querySelector("#developContrastReset");
+      const developWhiteBalanceMode = document.querySelector("#developWhiteBalanceMode");
+      const developTemperatureSlider = document.querySelector("#developTemperatureSlider");
+      const developTemperatureValue = document.querySelector("#developTemperatureValue");
+      const developTemperatureReset = document.querySelector("#developTemperatureReset");
+      const developTintSlider = document.querySelector("#developTintSlider");
+      const developTintValue = document.querySelector("#developTintValue");
+      const developTintReset = document.querySelector("#developTintReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developHistoryPanel = document.querySelector("#developHistoryPanel");
@@ -1553,6 +1596,19 @@
         return String(Math.round(clamp(value, -100, 100)));
       }
 
+      function formatTemperature(value) {
+        return String(Math.round(clamp(value || 5200, 1000, 50000) / 50) * 50);
+      }
+
+      function formatTint(value) {
+        return String(Math.round(clamp(value, -150, 150)));
+      }
+
+      function normalizeWhiteBalance(value) {
+        const supported = new Set(["as_shot", "auto", "daylight", "cloudy", "shade", "tungsten", "fluorescent", "flash", "custom"]);
+        return supported.has(value) ? value : "as_shot";
+      }
+
       function selectedPhoto() {
         return libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
       }
@@ -1619,8 +1675,14 @@
           developAdjustmentsByPhoto.set(photoId, {
             draftExposure: 0,
             draftContrast: 0,
+            draftWhiteBalance: "as_shot",
+            draftTemperature: 5200,
+            draftTint: 0,
             committedExposure: 0,
             committedContrast: 0,
+            committedWhiteBalance: "as_shot",
+            committedTemperature: 5200,
+            committedTint: 0,
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -1637,6 +1699,11 @@
         developExposureValue.value = formatExposure(state.draftExposure);
         developContrastSlider.value = formatContrast(state.draftContrast);
         developContrastValue.value = formatContrast(state.draftContrast);
+        developWhiteBalanceMode.value = normalizeWhiteBalance(state.draftWhiteBalance);
+        developTemperatureSlider.value = formatTemperature(state.draftTemperature);
+        developTemperatureValue.value = formatTemperature(state.draftTemperature);
+        developTintSlider.value = formatTint(state.draftTint);
+        developTintValue.value = formatTint(state.draftTint);
       }
 
       function updateDevelopDirtyState(state) {
@@ -1645,6 +1712,9 @@
           && (
             Number(state.draftExposure) !== Number(state.committedExposure)
             || Number(state.draftContrast) !== Number(state.committedContrast)
+            || normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
+            || Number(state.draftTemperature) !== Number(state.committedTemperature)
+            || Number(state.draftTint) !== Number(state.committedTint)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -1660,8 +1730,14 @@
         const state = developAdjustmentState(photoId);
         state.committedExposure = editStateNumber(editState?.exposure, 0);
         state.committedContrast = editStateNumber(editState?.contrast, 0);
+        state.committedWhiteBalance = normalizeWhiteBalance(editState?.whiteBalance);
+        state.committedTemperature = editStateNumber(editState?.temperature, 5200);
+        state.committedTint = editStateNumber(editState?.tint, 0);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
+        state.draftWhiteBalance = state.committedWhiteBalance;
+        state.draftTemperature = state.committedTemperature;
+        state.draftTint = state.committedTint;
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -1929,7 +2005,7 @@
         if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.developPreviewBytes.length}`;
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.developPreviewBytes.length}`;
         if (developObjectUrls.has(cacheKey)) {
           return developObjectUrls.get(cacheKey);
         }
@@ -2500,7 +2576,7 @@
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}.`;
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}.`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
         }
@@ -2538,6 +2614,13 @@
           developContrastSlider,
           developContrastValue,
           developContrastReset,
+          developWhiteBalanceMode,
+          developTemperatureSlider,
+          developTemperatureValue,
+          developTemperatureReset,
+          developTintSlider,
+          developTintValue,
+          developTintReset,
           developCommitEdit,
           developRevertEdit,
         ].forEach((control) => {
@@ -2546,8 +2629,14 @@
         const state = photo ? developAdjustmentState(photo.photoId) : {
           draftExposure: 0,
           draftContrast: 0,
+          draftWhiteBalance: "as_shot",
+          draftTemperature: 5200,
+          draftTint: 0,
           committedExposure: 0,
           committedContrast: 0,
+          committedWhiteBalance: "as_shot",
+          committedTemperature: 5200,
+          committedTint: 0,
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -2591,6 +2680,9 @@
           applyPersistedDevelopState(readbackPhotoId, {
             exposure: response.data.exposure,
             contrast: response.data.contrast,
+            whiteBalance: response.data.whiteBalance,
+            temperature: response.data.temperature,
+            tint: response.data.tint,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -2602,7 +2694,7 @@
         }
       }
 
-      async function previewDevelopEdit() {
+      async function previewDevelopEdit(family = "exposureContrast") {
         const photo = selectedPhoto();
         if (!photo) {
           syncDevelopSelection();
@@ -2625,12 +2717,20 @@
 
         const sequence = ++developPreviewSequence;
         try {
-          const response = await invoke("preview_exposure_contrast_edit", {
-            libraryPath: activeLibraryPath,
-            photoId: photo.photoId,
-            exposure: state.draftExposure,
-            contrast: state.draftContrast,
-          });
+          const response = family === "whiteBalance"
+            ? await invoke("preview_white_balance_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              whiteBalance: normalizeWhiteBalance(state.draftWhiteBalance),
+              temperature: state.draftTemperature,
+              tint: state.draftTint,
+            })
+            : await invoke("preview_exposure_contrast_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              exposure: state.draftExposure,
+              contrast: state.draftContrast,
+            });
           if (sequence !== developPreviewSequence) {
             return;
           }
@@ -2651,6 +2751,9 @@
             status: response.data.status,
             exposure: response.data.exposure,
             contrast: response.data.contrast,
+            whiteBalance: response.data.whiteBalance,
+            temperature: response.data.temperature,
+            tint: response.data.tint,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -2669,10 +2772,18 @@
           return;
         }
         const state = developAdjustmentState(photo.photoId);
+        const whiteBalanceDirty = normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
+          || Number(state.draftTemperature) !== Number(state.committedTemperature)
+          || Number(state.draftTint) !== Number(state.committedTint);
+        const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
+          || Number(state.draftContrast) !== Number(state.committedContrast);
 
         if (!activeLibraryPath || !invoke) {
           state.committedExposure = state.draftExposure;
           state.committedContrast = state.draftContrast;
+          state.committedWhiteBalance = normalizeWhiteBalance(state.draftWhiteBalance);
+          state.committedTemperature = state.draftTemperature;
+          state.committedTint = state.draftTint;
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -2682,12 +2793,20 @@
 
         setBusy(true);
         try {
-          const response = await invoke("commit_exposure_contrast_edit", {
-            libraryPath: activeLibraryPath,
-            photoId: photo.photoId,
-            exposure: state.draftExposure,
-            contrast: state.draftContrast,
-          });
+          const response = whiteBalanceDirty
+            ? await invoke("commit_white_balance_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              whiteBalance: normalizeWhiteBalance(state.draftWhiteBalance),
+              temperature: state.draftTemperature,
+              tint: state.draftTint,
+            })
+            : await invoke("commit_exposure_contrast_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              exposure: state.draftExposure,
+              contrast: state.draftContrast,
+            });
           if (commandFailed(response)) {
             setStatus(responseErrorMessage(response, "Develop edit commit failed."));
             return;
@@ -2698,14 +2817,25 @@
           }
           state.committedExposure = editStateNumber(response.data.exposure, state.draftExposure);
           state.committedContrast = editStateNumber(response.data.contrast, state.draftContrast);
-          state.draftExposure = state.committedExposure;
-          state.draftContrast = state.committedContrast;
+          state.committedWhiteBalance = normalizeWhiteBalance(response.data.whiteBalance);
+          state.committedTemperature = editStateNumber(response.data.temperature, state.draftTemperature);
+          state.committedTint = editStateNumber(response.data.tint, state.draftTint);
+          if (whiteBalanceDirty) {
+            state.draftWhiteBalance = state.committedWhiteBalance;
+            state.draftTemperature = state.committedTemperature;
+            state.draftTint = state.committedTint;
+          } else {
+            state.draftExposure = state.committedExposure;
+            state.draftContrast = state.committedContrast;
+          }
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
           await loadDevelopHistory();
-          setStatus(responseMessage(response));
+          setStatus(whiteBalanceDirty && exposureContrastDirty
+            ? `${responseMessage(response)} Exposure/contrast draft remains uncommitted.`
+            : responseMessage(response));
         } catch (error) {
           setStatus(responseErrorMessage(error, "Develop edit commit failed."));
         } finally {
@@ -2721,6 +2851,9 @@
         const state = developAdjustmentState(photo.photoId);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
+        state.draftWhiteBalance = state.committedWhiteBalance;
+        state.draftTemperature = state.committedTemperature;
+        state.draftTint = state.committedTint;
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -2734,14 +2867,30 @@
         const state = developAdjustmentState(photo.photoId);
         if (kind === "exposure") {
           state.draftExposure = clamp(value, -5, 5);
-        } else {
+          previewDevelopEdit("exposureContrast");
+        } else if (kind === "contrast") {
           state.draftContrast = Math.round(clamp(value, -100, 100));
+          previewDevelopEdit("exposureContrast");
+        } else if (kind === "whiteBalance") {
+          state.draftWhiteBalance = normalizeWhiteBalance(value);
+          previewDevelopEdit("whiteBalance");
+        } else if (kind === "temperature") {
+          state.draftTemperature = Number(formatTemperature(value));
+          previewDevelopEdit("whiteBalance");
+        } else if (kind === "tint") {
+          state.draftTint = Number(formatTint(value));
+          previewDevelopEdit("whiteBalance");
         }
-        previewDevelopEdit();
       }
 
       function resetDevelopAdjustment(kind) {
-        updateDevelopAdjustment(kind, 0);
+        if (kind === "whiteBalance") {
+          updateDevelopAdjustment(kind, "as_shot");
+        } else if (kind === "temperature") {
+          updateDevelopAdjustment(kind, 5200);
+        } else {
+          updateDevelopAdjustment(kind, 0);
+        }
       }
 
       function stepDevelopAdjustment(kind, event) {
@@ -2760,8 +2909,16 @@
         const direction = ["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1;
         const step = kind === "exposure"
           ? event.shiftKey ? 0.25 : 0.01
-          : event.shiftKey ? 10 : 1;
-        const current = kind === "exposure" ? state.draftExposure : state.draftContrast;
+          : kind === "temperature"
+            ? event.shiftKey ? 500 : 50
+            : event.shiftKey ? 10 : 1;
+        const current = kind === "exposure"
+          ? state.draftExposure
+          : kind === "temperature"
+            ? state.draftTemperature
+            : kind === "tint"
+              ? state.draftTint
+              : state.draftContrast;
         updateDevelopAdjustment(kind, current + direction * step);
       }
 
@@ -3074,6 +3231,13 @@
           developContrastSlider,
           developContrastValue,
           developContrastReset,
+          developWhiteBalanceMode,
+          developTemperatureSlider,
+          developTemperatureValue,
+          developTemperatureReset,
+          developTintSlider,
+          developTintValue,
+          developTintReset,
           developCommitEdit,
           developRevertEdit,
         ].forEach((control) => {
@@ -3242,6 +3406,27 @@
       developContrastValue.addEventListener("dblclick", () => resetDevelopAdjustment("contrast"));
       developExposureReset.addEventListener("click", () => resetDevelopAdjustment("exposure"));
       developContrastReset.addEventListener("click", () => resetDevelopAdjustment("contrast"));
+      developWhiteBalanceMode.addEventListener("change", () => updateDevelopAdjustment("whiteBalance", developWhiteBalanceMode.value));
+      developTemperatureSlider.addEventListener("input", () => updateDevelopAdjustment("temperature", developTemperatureSlider.value));
+      developTemperatureSlider.addEventListener("dblclick", () => resetDevelopAdjustment("temperature"));
+      developTemperatureSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("temperature", event));
+      developTemperatureValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developTemperatureValue.value)) {
+          updateDevelopAdjustment("temperature", developTemperatureValue.value);
+        }
+      });
+      developTemperatureValue.addEventListener("dblclick", () => resetDevelopAdjustment("temperature"));
+      developTintSlider.addEventListener("input", () => updateDevelopAdjustment("tint", developTintSlider.value));
+      developTintSlider.addEventListener("dblclick", () => resetDevelopAdjustment("tint"));
+      developTintSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("tint", event));
+      developTintValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developTintValue.value)) {
+          updateDevelopAdjustment("tint", developTintValue.value);
+        }
+      });
+      developTintValue.addEventListener("dblclick", () => resetDevelopAdjustment("tint"));
+      developTemperatureReset.addEventListener("click", () => resetDevelopAdjustment("temperature"));
+      developTintReset.addEventListener("click", () => resetDevelopAdjustment("tint"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       openExportDialogButton.addEventListener("click", openExportDialog);

@@ -2079,9 +2079,13 @@ progress::-webkit-progress-value {
   font-weight: 600;
 }
 
-.sr-adjustment-header input {
+.sr-adjustment-header input,
+.sr-adjustment-header select {
   min-height: 32px;
   padding: var(--sr-space-xs) var(--sr-space-sm);
+}
+
+.sr-adjustment-header input {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }

@@ -15,6 +15,7 @@ pub const CRATE_NAME: &str = "silica-core";
 
 pub use silica_decode::RawFullResolutionExportSourceError;
 pub use silica_decode::RawPreviewArtifactError;
+pub use silica_edit::WhiteBalance;
 pub use silica_storage::ActionLogEntry;
 pub use silica_storage::CatalogRebuildDryRunAction;
 pub use silica_storage::CatalogRebuildDryRunEntry;
@@ -472,6 +473,9 @@ pub struct PhotoEditPreviewSession {
     pub status: PhotoPreviewStatus,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: silica_edit::WhiteBalance,
+    pub temperature: f64,
+    pub tint: f64,
     pub message: String,
 }
 
@@ -479,12 +483,15 @@ impl PhotoEditPreviewSession {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
         format!(
-            "Photo: {}\nPreview: {:?}\nSource: {}\nExposure: {}\nContrast: {}\nMessage: {}",
+            "Photo: {}\nPreview: {:?}\nSource: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nMessage: {}",
             self.photo_id,
             self.status,
             self.source_path,
             self.exposure,
             self.contrast,
+            self.white_balance,
+            self.temperature,
+            self.tint,
             self.message
         )
     }
@@ -496,6 +503,9 @@ pub struct PhotoEditCommit {
     pub photo_id: String,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: silica_edit::WhiteBalance,
+    pub temperature: f64,
+    pub tint: f64,
     pub persisted: bool,
     pub message: String,
 }
@@ -504,8 +514,15 @@ impl PhotoEditCommit {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
         format!(
-            "Photo: {}\nExposure: {}\nContrast: {}\nPersisted: {}\nMessage: {}",
-            self.photo_id, self.exposure, self.contrast, self.persisted, self.message
+            "Photo: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nPersisted: {}\nMessage: {}",
+            self.photo_id,
+            self.exposure,
+            self.contrast,
+            self.white_balance,
+            self.temperature,
+            self.tint,
+            self.persisted,
+            self.message
         )
     }
 }
@@ -516,6 +533,9 @@ pub struct PhotoEditState {
     pub photo_id: String,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: silica_edit::WhiteBalance,
+    pub temperature: f64,
+    pub tint: f64,
     pub persisted: bool,
     pub message: String,
 }
@@ -524,8 +544,15 @@ impl PhotoEditState {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
         format!(
-            "Photo: {}\nExposure: {}\nContrast: {}\nPersisted: {}\nMessage: {}",
-            self.photo_id, self.exposure, self.contrast, self.persisted, self.message
+            "Photo: {}\nExposure: {}\nContrast: {}\nWhite Balance: {:?}\nTemperature: {}\nTint: {}\nPersisted: {}\nMessage: {}",
+            self.photo_id,
+            self.exposure,
+            self.contrast,
+            self.white_balance,
+            self.temperature,
+            self.tint,
+            self.persisted,
+            self.message
         )
     }
 }
@@ -1342,10 +1369,82 @@ pub fn preview_exposure_contrast_edit(
             Some(plan) => plan,
             None => return Ok(None),
         };
-    let request = silica_render::plan_exposure_contrast_preview(
+    let mut request = silica_render::plan_exposure_contrast_preview(
         render_plan,
         edited.basic.exposure.as_f64().unwrap_or(exposure),
         edited.basic.contrast.as_f64().unwrap_or(contrast),
+    );
+    request.white_balance = render_white_balance_from_graph(&graph);
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+            export_white_balance_from_render(request.white_balance),
+        )?
+    } else {
+        None
+    };
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        develop_preview_bytes,
+        status,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        message,
+    }))
+}
+
+/// Build a draft white-balance preview request without writing the catalog.
+pub fn preview_white_balance_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    white_balance: silica_edit::WhiteBalance,
+    temperature: f64,
+    tint: f64,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_white_balance_temperature_tint(
+        &graph,
+        white_balance,
+        temperature,
+        tint,
+        current_timestamp_string(),
+    )?;
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let exposure = graph.basic.exposure.as_f64().unwrap_or(0.0);
+    let contrast = graph.basic.contrast.as_f64().unwrap_or(0.0);
+    let request = silica_render::plan_white_balance_preview(
+        render_plan,
+        exposure,
+        contrast,
+        render_white_balance_from_graph(&edited),
     );
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
@@ -1364,6 +1463,7 @@ pub fn preview_exposure_contrast_edit(
             &request.source_path,
             request.exposure,
             request.contrast,
+            export_white_balance_from_render(request.white_balance),
         )?
     } else {
         None
@@ -1376,6 +1476,9 @@ pub fn preview_exposure_contrast_edit(
         status,
         exposure: request.exposure,
         contrast: request.contrast,
+        white_balance: edited.basic.white_balance,
+        temperature: edited.basic.temperature.as_f64().unwrap_or(temperature),
+        tint: edited.basic.tint.as_f64().unwrap_or(tint),
         message,
     }))
 }
@@ -1403,10 +1506,48 @@ pub fn commit_exposure_contrast_edit(
 
     Ok(Some(PhotoEditCommit {
         photo_id: persisted.source.photo_id,
-        exposure,
-        contrast,
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(exposure),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(contrast),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
         persisted: true,
         message: "Exposure/contrast edit persisted on commit.".to_string(),
+    }))
+}
+
+/// Persist a white-balance edit on commit/release.
+pub fn commit_white_balance_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    white_balance: silica_edit::WhiteBalance,
+    temperature: f64,
+    tint: f64,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_white_balance_temperature_tint(
+        &graph,
+        white_balance,
+        temperature,
+        tint,
+        current_timestamp_string(),
+    )?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id,
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(temperature),
+        tint: persisted.basic.tint.as_f64().unwrap_or(tint),
+        persisted: true,
+        message: "White balance edit persisted on commit.".to_string(),
     }))
 }
 
@@ -1421,6 +1562,9 @@ pub fn get_photo_edit_state(
             photo_id: graph.source.photo_id,
             exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
             contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
+            white_balance: graph.basic.white_balance,
+            temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+            tint: graph.basic.tint.as_f64().unwrap_or(0.0),
             persisted: true,
             message: "Restored committed edit state.".to_string(),
         }));
@@ -1436,6 +1580,9 @@ pub fn get_photo_edit_state(
         photo_id: graph.source.photo_id,
         exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
         persisted: false,
         message: "Default clean edit state loaded.".to_string(),
     }))
@@ -1480,11 +1627,12 @@ pub fn export_photo_jpeg(
         };
     let exposure = graph.basic.exposure.as_f64().unwrap_or(0.0);
     let contrast = graph.basic.contrast.as_f64().unwrap_or(0.0);
-    let render_request = silica_render::plan_jpeg_srgb_export(
+    let render_request = silica_render::plan_jpeg_srgb_export_with_white_balance(
         render_plan.source_path.clone(),
         output_path.display().to_string(),
         exposure,
         contrast,
+        render_white_balance_from_graph(&graph),
         LOCAL_ALPHA_JPEG_QUALITY,
     );
 
@@ -1494,6 +1642,7 @@ pub fn export_photo_jpeg(
             output_path: output_path.to_path_buf(),
             exposure: render_request.exposure,
             contrast: render_request.contrast,
+            white_balance: export_white_balance_from_render(render_request.white_balance),
             quality: render_request.quality,
             color_profile: export_color_profile_to_export(color_profile),
         })?;
@@ -1509,6 +1658,9 @@ pub fn export_photo_jpeg(
         "quality": render_request.quality,
         "exposure": render_request.exposure,
         "contrast": render_request.contrast,
+        "white_balance": white_balance_render_mode_string(render_request.white_balance.mode),
+        "temperature": render_request.white_balance.temperature,
+        "tint": render_request.white_balance.tint,
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
@@ -1599,11 +1751,12 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             output_path: source_artifact_path,
         },
     )?;
-    let render_request = silica_render::plan_raw_derived_jpeg_srgb_export(
+    let render_request = silica_render::plan_raw_derived_jpeg_srgb_export_with_white_balance(
         source_artifact.artifact_path.display().to_string(),
         output_path.display().to_string(),
         exposure,
         contrast,
+        render_white_balance_from_graph(&graph),
         LOCAL_ALPHA_JPEG_QUALITY,
     );
     let export_result =
@@ -1612,6 +1765,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             output_path: output_path.to_path_buf(),
             exposure: render_request.exposure,
             contrast: render_request.contrast,
+            white_balance: export_white_balance_from_render(render_request.white_balance),
             quality: render_request.quality,
             color_profile: silica_export::ExportColorProfile::Srgb,
         })?;
@@ -1629,6 +1783,9 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         "quality": render_request.quality,
         "exposure": render_request.exposure,
         "contrast": render_request.contrast,
+        "white_balance": white_balance_render_mode_string(render_request.white_balance.mode),
+        "temperature": render_request.white_balance.temperature,
+        "tint": render_request.white_balance.tint,
         "source_path": source_artifact.source_path.clone(),
         "source_sha256": source_artifact.source_sha256.clone(),
         "raw_source_path": source_artifact.source_path.clone(),
@@ -1791,6 +1948,7 @@ fn write_jpeg_develop_preview_bytes(
     source_path: &str,
     exposure: f64,
     contrast: f64,
+    white_balance: silica_export::WhiteBalanceAdjustment,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
     if !is_jpeg_path(&source_path) || !source_path.is_file() {
@@ -1810,6 +1968,7 @@ fn write_jpeg_develop_preview_bytes(
             quality: LOCAL_ALPHA_DEVELOP_PREVIEW_QUALITY,
             exposure,
             contrast,
+            white_balance,
         }) {
             Ok(result) => result,
             Err(silica_export::ExportError::Image(_)) => return Ok(None),
@@ -2439,6 +2598,80 @@ fn export_color_profile_string(profile: silica_export::ExportColorProfile) -> &'
     match profile {
         silica_export::ExportColorProfile::Srgb => "srgb",
         silica_export::ExportColorProfile::DisplayP3 => "display_p3",
+    }
+}
+
+fn render_white_balance_from_graph(
+    graph: &silica_edit::EditGraph,
+) -> silica_render::WhiteBalanceRenderAdjustment {
+    silica_render::WhiteBalanceRenderAdjustment {
+        mode: render_white_balance_mode(graph.basic.white_balance),
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+    }
+}
+
+fn render_white_balance_mode(
+    mode: silica_edit::WhiteBalance,
+) -> silica_render::WhiteBalanceRenderMode {
+    match mode {
+        silica_edit::WhiteBalance::AsShot => silica_render::WhiteBalanceRenderMode::AsShot,
+        silica_edit::WhiteBalance::Auto => silica_render::WhiteBalanceRenderMode::Auto,
+        silica_edit::WhiteBalance::Daylight => silica_render::WhiteBalanceRenderMode::Daylight,
+        silica_edit::WhiteBalance::Cloudy => silica_render::WhiteBalanceRenderMode::Cloudy,
+        silica_edit::WhiteBalance::Shade => silica_render::WhiteBalanceRenderMode::Shade,
+        silica_edit::WhiteBalance::Tungsten => silica_render::WhiteBalanceRenderMode::Tungsten,
+        silica_edit::WhiteBalance::Fluorescent => {
+            silica_render::WhiteBalanceRenderMode::Fluorescent
+        }
+        silica_edit::WhiteBalance::Flash => silica_render::WhiteBalanceRenderMode::Flash,
+        silica_edit::WhiteBalance::Custom => silica_render::WhiteBalanceRenderMode::Custom,
+    }
+}
+
+fn export_white_balance_from_render(
+    white_balance: silica_render::WhiteBalanceRenderAdjustment,
+) -> silica_export::WhiteBalanceAdjustment {
+    silica_export::WhiteBalanceAdjustment {
+        mode: export_white_balance_mode(white_balance.mode),
+        temperature: white_balance.temperature,
+        tint: white_balance.tint,
+    }
+}
+
+fn export_white_balance_mode(
+    mode: silica_render::WhiteBalanceRenderMode,
+) -> silica_export::WhiteBalanceMode {
+    match mode {
+        silica_render::WhiteBalanceRenderMode::AsShot => silica_export::WhiteBalanceMode::AsShot,
+        silica_render::WhiteBalanceRenderMode::Auto => silica_export::WhiteBalanceMode::Auto,
+        silica_render::WhiteBalanceRenderMode::Daylight => {
+            silica_export::WhiteBalanceMode::Daylight
+        }
+        silica_render::WhiteBalanceRenderMode::Cloudy => silica_export::WhiteBalanceMode::Cloudy,
+        silica_render::WhiteBalanceRenderMode::Shade => silica_export::WhiteBalanceMode::Shade,
+        silica_render::WhiteBalanceRenderMode::Tungsten => {
+            silica_export::WhiteBalanceMode::Tungsten
+        }
+        silica_render::WhiteBalanceRenderMode::Fluorescent => {
+            silica_export::WhiteBalanceMode::Fluorescent
+        }
+        silica_render::WhiteBalanceRenderMode::Flash => silica_export::WhiteBalanceMode::Flash,
+        silica_render::WhiteBalanceRenderMode::Custom => silica_export::WhiteBalanceMode::Custom,
+    }
+}
+
+fn white_balance_render_mode_string(mode: silica_render::WhiteBalanceRenderMode) -> &'static str {
+    match mode {
+        silica_render::WhiteBalanceRenderMode::AsShot => "as_shot",
+        silica_render::WhiteBalanceRenderMode::Auto => "auto",
+        silica_render::WhiteBalanceRenderMode::Daylight => "daylight",
+        silica_render::WhiteBalanceRenderMode::Cloudy => "cloudy",
+        silica_render::WhiteBalanceRenderMode::Shade => "shade",
+        silica_render::WhiteBalanceRenderMode::Tungsten => "tungsten",
+        silica_render::WhiteBalanceRenderMode::Fluorescent => "fluorescent",
+        silica_render::WhiteBalanceRenderMode::Flash => "flash",
+        silica_render::WhiteBalanceRenderMode::Custom => "custom",
     }
 }
 
@@ -4013,6 +4246,118 @@ mod tests {
             )
             .expect("exported flag");
         assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn previews_commits_and_exports_white_balance_through_core() {
+        let workspace = unique_library_root("core-white-balance");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph before preview")
+                .is_none()
+        );
+        assert!(list_photo_history(&created.root_path, &photo_id)
+            .expect("read history before preview")
+            .items
+            .is_empty());
+
+        let preview = preview_white_balance_edit(
+            &created.root_path,
+            &photo_id,
+            silica_edit::WhiteBalance::Custom,
+            6500.0,
+            20.0,
+        )
+        .expect("preview white balance")
+        .expect("preview result");
+
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(preview.white_balance, silica_edit::WhiteBalance::Custom);
+        assert_eq!(preview.temperature, 6500.0);
+        assert_eq!(preview.tint, 20.0);
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after preview")
+                .is_none(),
+            "white balance preview must not write edit state"
+        );
+        assert!(
+            list_photo_history(&created.root_path, &photo_id)
+                .expect("read history after preview")
+                .items
+                .is_empty(),
+            "white balance preview must not write edit history"
+        );
+
+        let committed = commit_white_balance_edit(
+            &created.root_path,
+            &photo_id,
+            silica_edit::WhiteBalance::Custom,
+            6500.0,
+            20.0,
+        )
+        .expect("commit white balance")
+        .expect("commit result");
+        assert_eq!(committed.white_balance, silica_edit::WhiteBalance::Custom);
+        assert_eq!(committed.temperature, 6500.0);
+        assert_eq!(committed.tint, 20.0);
+        assert!(committed.persisted);
+
+        let persisted =
+            silica_storage::load_active_edit_graph_or_default(&created.root_path, &photo_id)
+                .expect("load active graph")
+                .expect("active graph");
+        assert_eq!(
+            persisted.basic.white_balance,
+            silica_edit::WhiteBalance::Custom
+        );
+        assert_eq!(persisted.basic.temperature.as_f64(), Some(6500.0));
+        assert_eq!(persisted.basic.tint.as_f64(), Some(20.0));
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 1);
+        assert_eq!(history.items[0].label, "White balance");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+        assert!(exported.bytes_written > 0);
+
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["white_balance"], "custom");
+        assert_eq!(settings["temperature"], 6500.0);
+        assert_eq!(settings["tint"], 20.0);
 
         remove_library_root(&workspace);
     }

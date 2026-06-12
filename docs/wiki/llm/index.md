@@ -31,7 +31,7 @@ For Phase 17 planning or implementation, read:
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-17-develop-p0-expansion)
 - [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md)
-- [Task 17.2.1 White Balance Preview Commit Export Parity](../tasks/17.2.1-white-balance-preview-commit-export-parity.md)
+- [Task 17.2.2 Tone Recovery Preview Commit Export Parity](../tasks/17.2.2-tone-recovery-preview-commit-export-parity.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)

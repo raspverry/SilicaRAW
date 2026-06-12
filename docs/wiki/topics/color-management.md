@@ -2,7 +2,7 @@
 title: Color Management
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-06-13
 source_of_truth: docs/09_Color_Management_Specification.md
 ---
 
@@ -24,6 +24,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Local ignored Class F fixtures now have profile-probe evidence for sRGB, Display P3, and untagged JPEG handling.
 - Phase 13 now has an execution plan, brief, and task cards for fixture-backed color proof.
 - The local export UI/API now keeps sRGB as the default and exposes Display P3 only as an explicit ICC-backed choice.
+- Task 17.2.1 adds deterministic local white-balance adjustment for supported JPEG/JPG Develop preview and JPEG export parity. This is product edit behavior, not a fixture-backed color-correctness claim.
 
 ## Blocked Work
 

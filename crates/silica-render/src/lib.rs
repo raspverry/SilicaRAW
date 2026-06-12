@@ -101,6 +101,7 @@ pub struct ExposureContrastPreviewRequest {
     pub color_behavior: PreviewColorBehavior,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceRenderAdjustment,
     pub message: String,
 }
 
@@ -113,8 +114,41 @@ pub struct JpegSrgbExportRenderRequest {
     pub color_behavior: ExportColorBehavior,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceRenderAdjustment,
     pub quality: u8,
     pub message: String,
+}
+
+/// White balance mode carried through render planning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WhiteBalanceRenderMode {
+    AsShot,
+    Auto,
+    Daylight,
+    Cloudy,
+    Shade,
+    Tungsten,
+    Fluorescent,
+    Flash,
+    Custom,
+}
+
+/// White balance values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WhiteBalanceRenderAdjustment {
+    pub mode: WhiteBalanceRenderMode,
+    pub temperature: f64,
+    pub tint: f64,
+}
+
+impl WhiteBalanceRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            mode: WhiteBalanceRenderMode::AsShot,
+            temperature: 5200.0,
+            tint: 0.0,
+        }
+    }
 }
 
 /// Source class for export rendering.
@@ -805,10 +839,27 @@ pub fn plan_exposure_contrast_preview(
     exposure: f64,
     contrast: f64,
 ) -> ExposureContrastPreviewRequest {
+    let mut request = plan_white_balance_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        WhiteBalanceRenderAdjustment::neutral(),
+    );
+    if request.status == PreviewRenderStatus::Ready {
+        request.message = "Draft exposure/contrast preview request is ready.".to_string();
+    }
+    request
+}
+
+/// Build a render request for a draft white-balance preview update.
+pub fn plan_white_balance_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
     let message = match preview_plan.status {
-        PreviewRenderStatus::Ready => {
-            "Draft exposure/contrast preview request is ready.".to_string()
-        }
+        PreviewRenderStatus::Ready => "White balance preview request is ready.".to_string(),
         PreviewRenderStatus::BlockedByDecode | PreviewRenderStatus::Unsupported => {
             preview_plan.message.clone()
         }
@@ -820,6 +871,7 @@ pub fn plan_exposure_contrast_preview(
         color_behavior: preview_plan.color_behavior,
         exposure,
         contrast,
+        white_balance,
         message,
     }
 }
@@ -832,6 +884,25 @@ pub fn plan_jpeg_srgb_export(
     contrast: f64,
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
+    plan_jpeg_srgb_export_with_white_balance(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        WhiteBalanceRenderAdjustment::neutral(),
+        quality,
+    )
+}
+
+/// Build a render-side request for exporting an edited raster source with white balance.
+pub fn plan_jpeg_srgb_export_with_white_balance(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
         source_kind: ExportRenderSourceKind::RasterSource,
         source_path: source_path.into(),
@@ -839,6 +910,7 @@ pub fn plan_jpeg_srgb_export(
         color_behavior: SPIKE_003_COLOR_GATE.export,
         exposure,
         contrast,
+        white_balance,
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
@@ -852,6 +924,25 @@ pub fn plan_raw_derived_jpeg_srgb_export(
     contrast: f64,
     quality: u8,
 ) -> JpegSrgbExportRenderRequest {
+    plan_raw_derived_jpeg_srgb_export_with_white_balance(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        WhiteBalanceRenderAdjustment::neutral(),
+        quality,
+    )
+}
+
+/// Build a render-side request for exporting a RAW-derived source artifact with white balance.
+pub fn plan_raw_derived_jpeg_srgb_export_with_white_balance(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
     JpegSrgbExportRenderRequest {
         source_kind: ExportRenderSourceKind::RawFullResolutionArtifact,
         source_path: source_path.into(),
@@ -859,6 +950,7 @@ pub fn plan_raw_derived_jpeg_srgb_export(
         color_behavior: SPIKE_003_COLOR_GATE.export,
         exposure,
         contrast,
+        white_balance,
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
@@ -963,6 +1055,39 @@ mod tests {
             super::ExportColorBehavior::SrgbDefaultDisplayP3Supported
         );
         assert!(request.message.contains("JPEG sRGB export"));
+    }
+
+    #[test]
+    fn plans_white_balance_preview_and_export_requests() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let white_balance = super::WhiteBalanceRenderAdjustment {
+            mode: super::WhiteBalanceRenderMode::Custom,
+            temperature: 6500.0,
+            tint: 20.0,
+        };
+
+        let preview = super::plan_white_balance_preview(preview_plan, 0.25, -3.0, white_balance);
+        let export = super::plan_jpeg_srgb_export_with_white_balance(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            white_balance,
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.exposure, 0.25);
+        assert_eq!(preview.contrast, -3.0);
+        assert_eq!(preview.white_balance, white_balance);
+        assert!(preview.message.contains("White balance"));
+        assert_eq!(export.white_balance, white_balance);
+        assert_eq!(export.exposure, 0.25);
+        assert_eq!(export.contrast, -3.0);
+        assert!(!export.uses_viewer_texture_cache_as_source());
     }
 
     #[test]

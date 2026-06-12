@@ -2786,13 +2786,14 @@ pub fn commit_edit_graph(
     let edit_state_id = unique_catalog_id("edit-state");
     let edit_history_id = stable_catalog_id("edit-history", &edit_state_id);
     let edit_graph_json = serde_json::to_string(&graph)?;
+    let label = edit_graph_history_label(before_graph.as_ref(), &graph);
     let action_json = serde_json::to_string(&serde_json::json!({
         "schema": ACTION_SCHEMA,
         "version": ACTION_VERSION,
         "class": "undoable",
         "kind": "edit_commit",
         "photo_id": photo_id.clone(),
-        "label": "Exposure / contrast",
+        "label": label,
         "before": {
             "edit_graph": &before_graph,
         },
@@ -2850,6 +2851,41 @@ pub fn commit_edit_graph(
     transaction.commit()?;
 
     Ok(graph)
+}
+
+fn edit_graph_history_label(
+    before_graph: Option<&silica_edit::EditGraph>,
+    after_graph: &silica_edit::EditGraph,
+) -> &'static str {
+    let Some(before_graph) = before_graph else {
+        return "Develop edit";
+    };
+    let before = &before_graph.basic;
+    let after = &after_graph.basic;
+    let exposure_contrast_changed =
+        before.exposure != after.exposure || before.contrast != after.contrast;
+    let white_balance_changed = before.white_balance != after.white_balance
+        || before.temperature != after.temperature
+        || before.tint != after.tint;
+    let tone_recovery_changed = before.highlights != after.highlights
+        || before.shadows != after.shadows
+        || before.whites != after.whites
+        || before.blacks != after.blacks;
+    let color_presence_changed =
+        before.vibrance != after.vibrance || before.saturation != after.saturation;
+
+    match (
+        exposure_contrast_changed,
+        white_balance_changed,
+        tone_recovery_changed,
+        color_presence_changed,
+    ) {
+        (true, false, false, false) => "Exposure / contrast",
+        (false, true, false, false) => "White balance",
+        (false, false, true, false) => "Tone recovery",
+        (false, false, false, true) => "Color presence",
+        _ => "Develop edit",
+    }
 }
 
 pub fn undo_last_history_action(
