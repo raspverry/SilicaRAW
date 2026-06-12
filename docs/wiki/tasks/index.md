@@ -58,6 +58,16 @@ For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](.
 - [15.5: RAW-Derived JPEG sRGB Export](15.5-raw-derived-jpeg-srgb-export.md)
 - [15.6: RAW Export Manual Color QA](15.6-raw-export-manual-color-qa.md)
 
+## Phase 16
+
+- [16.0: Phase 16 Design Gate](16.0-phase-16-design-gate.md)
+- [16.1: Undo, History, and Action Semantics Contract](16.1-undo-history-action-semantics-contract.md)
+- [16.2: Edit History Persistence](16.2-edit-history-persistence.md)
+- [16.3: Undo and Redo Core Commands](16.3-undo-redo-core-commands.md)
+- [16.4: Develop History Panel Contract](16.4-develop-history-panel-contract.md)
+- [16.5: Append-Only Action Log](16.5-append-only-action-log.md)
+- [16.6: Sidecar Sync Status After History Commits](16.6-sidecar-sync-status-after-history.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.

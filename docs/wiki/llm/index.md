@@ -29,7 +29,8 @@ For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](..
 For Phase 16 planning or implementation, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- The Phase 16 task card after it is created
+- [Phase 16 Brief](../phases/phase-16-undo-history-action-trust.md)
+- [Task 16.0 Phase 16 Design Gate](../tasks/16.0-phase-16-design-gate.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)
@@ -73,7 +74,8 @@ Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product
 ## Completed Context
 
 - Phase 11 is complete. For context, read [Phase 11 Summary](../phases/phase-11-summary.md) instead of the full Phase 11 design spec.
-- Phase 10 evidence, recovery, and public trust gates are complete enough for Phase 12 to begin. Read the full Phase 10 spec only when changing fixtures, backup/restore, public trust files, or recovery policy.
+- Phase 10 evidence, recovery, and public trust gates are complete. Read the full Phase 10 spec only when changing fixtures, backup/restore, public trust files, or recovery policy.
+- Phase 15 is complete. For context, read [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md) and [Phase 15 RAW Export Manual Color QA](../../../checklists/PHASE_15_RAW_EXPORT_MANUAL_QA.md) instead of replaying Phase 15 task cards.
 
 ## Read Avoidance Rules
 

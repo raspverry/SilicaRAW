@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Undo history action trust task cards added
+
+- Added the Phase 16 Undo History Action Trust brief and task cards 16.0 through 16.6.
+- Split the trust gate into design, semantics, edit history persistence, undo/redo commands, history panel contract, append-only action log, and sidecar sync status tasks.
+- Routed the next task to 16.0 while keeping broad Develop controls, masks, MLX, plugins, MCP, and original-file mutation out of scope.
+
 ## [2026-06-12] phase-15 | RAW export manual color QA recorded
 
 - Completed Task 15.6 with a Preview.app manual QA record for one Class A fixture-backed RAW-derived JPEG sRGB export.

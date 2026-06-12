@@ -552,6 +552,17 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Protect non-destructive editing before adding more Develop controls.
 
+### Task 16.0: Phase 16 Design Gate
+
+- **Location:** `docs/wiki/phases/phase-16-undo-history-action-trust.md`, `docs/wiki/topics/catalog.md`, `docs/wiki/topics/data-safety.md`, `docs/wiki/topics/edit-graph.md`
+- **Description:** Lock action classes, transaction boundaries, schema ownership, and sidecar sync policy before migrations or runtime changes.
+- **Dependencies:** Phase 15
+- **Acceptance Criteria:**
+  - Undoable, redoable, logged-only, non-reversible, and blocked action classes are documented.
+  - Export, cache clear, sidecar, original-file, and extension stop gates are explicit.
+  - No runtime behavior or migrations are added in this design gate.
+- **Validation:** `python3 scripts/harness/check-md-links.py`
+
 ### Task 16.1: Undo, History, and Action Semantics
 
 - **Location:** `docs/wiki/topics/edit-graph.md`, `docs/wiki/topics/catalog.md`
@@ -605,6 +616,17 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Log entries are written through Core APIs, not direct SQLite from extension layers.
   - Action log records actor, action, target, timestamp, and side-effect category.
   - Original file mutation remains forbidden.
+- **Validation:** `cargo test -p silica-storage -p silica-core`
+
+### Task 16.6: Sidecar Sync Status After History Commits
+
+- **Location:** `crates/silica-storage`, `crates/silica-core`, `schemas/sidecar.schema.json`, `docs/wiki/topics/catalog.md`
+- **Description:** Update sidecar sync status after committed history changes without silently overwriting conflicts or newer sidecars.
+- **Dependencies:** Task 16.5
+- **Acceptance Criteria:**
+  - History commits update sidecar sync status only after validated catalog commits.
+  - Newer or conflicting sidecars are reported, not overwritten.
+  - `sidecar.flags` remains limited to portable culling fields.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
 
 ## Phase 17: Develop P0 Expansion
