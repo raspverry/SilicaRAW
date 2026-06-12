@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Disposable texture lifecycle boundary added
+
+- Completed Task 14.7 with `silica-render` disposable texture identity, drawable size, lifecycle state, and release reason contracts.
+- Added a feature-gated desktop native viewer texture boundary for photo change, drawable resize, library close, and app close cleanup.
+- Kept real product texture allocation, image pixel upload, persistent GPU cache state, catalog writes, sidecar writes, and original-file mutation out of scope.
+
 ## [2026-06-12] phase-14 | Render request boundary added
 
 - Completed Task 14.6 with typed `silica-render` viewer preview requests, viewport, future texture identity, and latest-request-wins scheduler behavior.

@@ -260,6 +260,131 @@ impl ViewerPreviewRenderScheduler {
     }
 }
 
+/// Drawable size attached to disposable viewer texture identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ViewerTextureDrawableSize {
+    pub width_px: u32,
+    pub height_px: u32,
+}
+
+impl ViewerTextureDrawableSize {
+    pub fn new(width_px: u32, height_px: u32) -> Self {
+        Self {
+            width_px,
+            height_px,
+        }
+    }
+}
+
+/// Identity for a disposable viewer texture. This does not carry texture bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewerTextureIdentity {
+    pub request_id: ViewerPreviewRenderRequestId,
+    pub texture_key: String,
+    pub drawable_size: ViewerTextureDrawableSize,
+}
+
+impl ViewerTextureIdentity {
+    pub fn new(
+        request_id: ViewerPreviewRenderRequestId,
+        texture_key: impl Into<String>,
+        drawable_size: ViewerTextureDrawableSize,
+    ) -> Self {
+        Self {
+            request_id,
+            texture_key: texture_key.into(),
+            drawable_size,
+        }
+    }
+}
+
+/// Current lifecycle state for disposable viewer texture identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewerTextureLifecycleState {
+    Empty,
+    Bound,
+    Released,
+}
+
+/// Reason a disposable viewer texture identity was released.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewerTextureReleaseReason {
+    PhotoChanged,
+    LibraryClosed,
+    AppClosed,
+    DrawableResized,
+}
+
+/// Disposable viewer texture lifecycle boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewerTextureLifecycle {
+    state: ViewerTextureLifecycleState,
+    current_texture: Option<ViewerTextureIdentity>,
+    last_release_reason: Option<ViewerTextureReleaseReason>,
+    release_count: u64,
+}
+
+impl Default for ViewerTextureLifecycle {
+    fn default() -> Self {
+        Self {
+            state: ViewerTextureLifecycleState::Empty,
+            current_texture: None,
+            last_release_reason: None,
+            release_count: 0,
+        }
+    }
+}
+
+impl ViewerTextureLifecycle {
+    pub fn bind_texture(&mut self, identity: ViewerTextureIdentity) {
+        self.current_texture = Some(identity);
+        self.state = ViewerTextureLifecycleState::Bound;
+    }
+
+    pub fn release(&mut self, reason: ViewerTextureReleaseReason) {
+        self.current_texture = None;
+        self.state = ViewerTextureLifecycleState::Released;
+        self.last_release_reason = Some(reason);
+        self.release_count += 1;
+    }
+
+    pub fn state(&self) -> ViewerTextureLifecycleState {
+        self.state
+    }
+
+    pub fn current_texture(&self) -> Option<&ViewerTextureIdentity> {
+        self.current_texture.as_ref()
+    }
+
+    pub fn last_release_reason(&self) -> Option<ViewerTextureReleaseReason> {
+        self.last_release_reason
+    }
+
+    pub fn release_count(&self) -> u64 {
+        self.release_count
+    }
+
+    pub fn writes_catalog_state(&self) -> bool {
+        false
+    }
+
+    pub fn writes_sidecar_state(&self) -> bool {
+        false
+    }
+
+    pub fn uses_original_path_as_write_destination(&self) -> bool {
+        false
+    }
+
+    pub fn persistent_gpu_cache_enabled(&self) -> bool {
+        false
+    }
+
+    pub fn is_rebuildable(&self) -> bool {
+        true
+    }
+}
+
 #[cfg(feature = "color-probe")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorProbeRequest {
@@ -778,6 +903,64 @@ mod tests {
             Some(super::ViewerPreviewRenderRequestId(2))
         );
         assert!(!scheduler.latest_request().unwrap().writes_catalog_state());
+    }
+
+    #[test]
+    fn viewer_texture_lifecycle_is_disposable_and_safe_to_clear() {
+        let mut lifecycle = super::ViewerTextureLifecycle::default();
+        assert_eq!(lifecycle.state(), super::ViewerTextureLifecycleState::Empty);
+        assert!(!lifecycle.writes_catalog_state());
+        assert!(!lifecycle.writes_sidecar_state());
+        assert!(!lifecycle.uses_original_path_as_write_destination());
+        assert!(!lifecycle.persistent_gpu_cache_enabled());
+        assert!(lifecycle.is_rebuildable());
+
+        let identity = super::ViewerTextureIdentity::new(
+            super::ViewerPreviewRenderRequestId(12),
+            "texture/request-12",
+            super::ViewerTextureDrawableSize::new(1200, 675),
+        );
+        lifecycle.bind_texture(identity.clone());
+
+        assert_eq!(lifecycle.state(), super::ViewerTextureLifecycleState::Bound);
+        assert_eq!(lifecycle.current_texture(), Some(&identity));
+
+        lifecycle.release(super::ViewerTextureReleaseReason::PhotoChanged);
+        assert_eq!(
+            lifecycle.state(),
+            super::ViewerTextureLifecycleState::Released
+        );
+        assert_eq!(lifecycle.current_texture(), None);
+        assert_eq!(
+            lifecycle.last_release_reason(),
+            Some(super::ViewerTextureReleaseReason::PhotoChanged)
+        );
+        assert_eq!(lifecycle.release_count(), 1);
+
+        lifecycle.bind_texture(super::ViewerTextureIdentity::new(
+            super::ViewerPreviewRenderRequestId(13),
+            "texture/request-13",
+            super::ViewerTextureDrawableSize::new(1600, 900),
+        ));
+        lifecycle.release(super::ViewerTextureReleaseReason::DrawableResized);
+        lifecycle.bind_texture(super::ViewerTextureIdentity::new(
+            super::ViewerPreviewRenderRequestId(14),
+            "texture/request-14",
+            super::ViewerTextureDrawableSize::new(1600, 900),
+        ));
+        lifecycle.release(super::ViewerTextureReleaseReason::LibraryClosed);
+        lifecycle.bind_texture(super::ViewerTextureIdentity::new(
+            super::ViewerPreviewRenderRequestId(15),
+            "texture/request-15",
+            super::ViewerTextureDrawableSize::new(1600, 900),
+        ));
+        lifecycle.release(super::ViewerTextureReleaseReason::AppClosed);
+
+        assert_eq!(lifecycle.release_count(), 4);
+        assert_eq!(
+            lifecycle.last_release_reason(),
+            Some(super::ViewerTextureReleaseReason::AppClosed)
+        );
     }
 
     #[cfg(all(feature = "color-probe", target_os = "macos"))]

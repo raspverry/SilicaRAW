@@ -68,6 +68,8 @@ Task 14.5 added feature-gated input ownership proof state. Mouse down, drag, scr
 
 Task 14.6 added the first typed viewer preview render request boundary in `silica-render` and a feature-gated desktop bridge scheduler. Requests carry request identity, viewport, source identity, edit revision, and optional future texture identity without image bytes. Scheduling is latest-request-wins and does not write catalog state.
 
+Task 14.7 added disposable texture lifecycle identity and cleanup boundaries. Texture state can be bound and released for photo change, drawable resize, library close, and app close; it remains rebuildable runtime state and does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.
@@ -138,7 +140,7 @@ Task 14.6 defines the typed render request shape and desktop bridge scheduler. F
 - Viewer textures are never the source of truth for edits, sidecars, catalog state, or exports.
 - Phase 15 full-resolution export must not depend on the viewer texture cache.
 
-Task 14.7 defines the first disposable texture/cache lifecycle boundary.
+Task 14.7 defines the first disposable texture/cache lifecycle boundary. It carries identity and cleanup state only; real product texture allocation and image pixel upload remain Phase 15 work.
 
 ### Path B Stop Gates
 

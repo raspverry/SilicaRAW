@@ -28,6 +28,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 10.5.1 records the [Backup and Restore](backup-restore.md) policy: checkpoint-before-copy, no original referenced photo files in backups, disposable cache exclusion, rollback-aware restore targets, and explicit migration failure behavior.
 - Task 10.5.2 adds checkpointed backup boundary creation for `catalog.db`, `sidecars/`, and `backup-manifest.json` under `backups/` while excluding originals, caches, export outputs, logs, and nested backups.
 - Task 10.5.3 adds staged restore from backup artifacts with existing-target rollback copies, restored catalog/sidecar preservation, newer-schema rejection before target mutation, and original-file safety tests.
+- Task 14.7 records the native viewer disposable texture lifecycle boundary: viewer texture identity is rebuildable runtime state and cleanup on photo change, drawable resize, library close, or app close does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -46,6 +47,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Backup boundary safety. Task 10.5.2 covers checkpointed backup artifacts, manifest creation, cache/original/export-output exclusion, and latest WAL state preservation in the copied `catalog.db`.
 - Restore boundary safety. Task 10.5.3 covers restore into empty targets, rollback-protected restore into existing targets, restored edit/flag/sidecar/export/migration state, newer-schema rejection before target mutation, and original-file preservation.
 - Cache clear safety. Phase 6.2 simulates the currently scoped cache safety surface by deleting disposable library cache directories because no product cache-clear command exists yet.
+- Native viewer texture lifecycle safety. Task 14.7 covers disposable viewer texture identity and cleanup without catalog writes, sidecar writes, original write destinations, or persistent GPU cache state.
 
 ## Links
 

@@ -717,12 +717,150 @@ pub fn render_request_smoke_evidence() -> String {
     )
 }
 
+/// Feature-gated disposable texture lifecycle boundary for the native viewer.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct NativeViewerTextureBoundary {
+    lifecycle: silica_render::ViewerTextureLifecycle,
+}
+
+impl NativeViewerTextureBoundary {
+    pub fn bind_disposable_texture(&mut self, identity: silica_render::ViewerTextureIdentity) {
+        self.lifecycle.bind_texture(identity);
+    }
+
+    pub fn cleanup_for_photo_change(&mut self) {
+        self.lifecycle
+            .release(silica_render::ViewerTextureReleaseReason::PhotoChanged);
+    }
+
+    pub fn cleanup_for_library_close(&mut self) {
+        self.lifecycle
+            .release(silica_render::ViewerTextureReleaseReason::LibraryClosed);
+    }
+
+    pub fn cleanup_for_app_close(&mut self) {
+        self.lifecycle
+            .release(silica_render::ViewerTextureReleaseReason::AppClosed);
+    }
+
+    pub fn cleanup_for_drawable_resize(&mut self) {
+        self.lifecycle
+            .release(silica_render::ViewerTextureReleaseReason::DrawableResized);
+    }
+
+    pub fn state(&self) -> silica_render::ViewerTextureLifecycleState {
+        self.lifecycle.state()
+    }
+
+    pub fn current_texture(&self) -> Option<&silica_render::ViewerTextureIdentity> {
+        self.lifecycle.current_texture()
+    }
+
+    pub fn last_release_reason(&self) -> Option<silica_render::ViewerTextureReleaseReason> {
+        self.lifecycle.last_release_reason()
+    }
+
+    pub fn release_count(&self) -> u64 {
+        self.lifecycle.release_count()
+    }
+
+    pub fn writes_catalog_state(&self) -> bool {
+        self.lifecycle.writes_catalog_state()
+    }
+
+    pub fn writes_sidecar_state(&self) -> bool {
+        self.lifecycle.writes_sidecar_state()
+    }
+
+    pub fn uses_original_path_as_write_destination(&self) -> bool {
+        self.lifecycle.uses_original_path_as_write_destination()
+    }
+
+    pub fn persistent_gpu_cache_enabled(&self) -> bool {
+        self.lifecycle.persistent_gpu_cache_enabled()
+    }
+
+    pub fn is_rebuildable(&self) -> bool {
+        self.lifecycle.is_rebuildable()
+    }
+}
+
+/// Returns neutral, reviewable texture lifecycle evidence for manual smoke runs.
+pub fn texture_lifecycle_smoke_evidence() -> String {
+    let mut boundary = NativeViewerTextureBoundary::default();
+    boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+        silica_render::ViewerPreviewRenderRequestId(21),
+        "texture/request-21",
+        silica_render::ViewerTextureDrawableSize::new(1200, 675),
+    ));
+    boundary.cleanup_for_photo_change();
+    boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+        silica_render::ViewerPreviewRenderRequestId(22),
+        "texture/request-22",
+        silica_render::ViewerTextureDrawableSize::new(1600, 900),
+    ));
+    boundary.cleanup_for_drawable_resize();
+    boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+        silica_render::ViewerPreviewRenderRequestId(23),
+        "texture/request-23",
+        silica_render::ViewerTextureDrawableSize::new(1600, 900),
+    ));
+    boundary.cleanup_for_library_close();
+    boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+        silica_render::ViewerPreviewRenderRequestId(24),
+        "texture/request-24",
+        silica_render::ViewerTextureDrawableSize::new(1600, 900),
+    ));
+    boundary.cleanup_for_app_close();
+
+    debug_assert_eq!(boundary.release_count(), 4);
+    debug_assert_eq!(boundary.current_texture(), None);
+    debug_assert!(!boundary.writes_catalog_state());
+    debug_assert!(!boundary.writes_sidecar_state());
+    debug_assert!(!boundary.uses_original_path_as_write_destination());
+    debug_assert!(!boundary.persistent_gpu_cache_enabled());
+    debug_assert!(boundary.is_rebuildable());
+
+    format!(
+        "state={} release_count={} last_release={} catalog_write={} sidecar_write={} original_write_destination={} persistent_gpu_cache={} rebuildable={}",
+        texture_state_label(boundary.state()),
+        boundary.release_count(),
+        texture_release_reason_label(boundary.last_release_reason()),
+        boundary.writes_catalog_state(),
+        boundary.writes_sidecar_state(),
+        boundary.uses_original_path_as_write_destination(),
+        boundary.persistent_gpu_cache_enabled(),
+        boundary.is_rebuildable()
+    )
+}
+
+fn texture_state_label(state: silica_render::ViewerTextureLifecycleState) -> &'static str {
+    match state {
+        silica_render::ViewerTextureLifecycleState::Empty => "empty",
+        silica_render::ViewerTextureLifecycleState::Bound => "bound",
+        silica_render::ViewerTextureLifecycleState::Released => "released",
+    }
+}
+
+fn texture_release_reason_label(
+    reason: Option<silica_render::ViewerTextureReleaseReason>,
+) -> &'static str {
+    match reason {
+        Some(silica_render::ViewerTextureReleaseReason::PhotoChanged) => "photo-changed",
+        Some(silica_render::ViewerTextureReleaseReason::LibraryClosed) => "library-closed",
+        Some(silica_render::ViewerTextureReleaseReason::AppClosed) => "app-closed",
+        Some(silica_render::ViewerTextureReleaseReason::DrawableResized) => "drawable-resized",
+        None => "none",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         DrawableSize, NativeViewerCleanupReason, NativeViewerHostGeometry, NativeViewerInputBounds,
         NativeViewerInputEvent, NativeViewerInputOwnership, NativeViewerInputProof,
         NativeViewerLifecycleProof, NativeViewerLifecycleState, NativeViewerRenderBridge,
+        NativeViewerTextureBoundary,
     };
     use std::time::Duration;
 
@@ -933,5 +1071,71 @@ mod tests {
         assert!(evidence.contains("catalog_write_requested=false"));
         assert!(evidence.contains("contains_image_pixels=false"));
         assert!(evidence.contains("future_texture_identity=true"));
+    }
+
+    #[test]
+    fn texture_boundary_releases_disposable_state_without_catalog_or_sidecar_writes() {
+        let mut boundary = NativeViewerTextureBoundary::default();
+        let identity = silica_render::ViewerTextureIdentity::new(
+            silica_render::ViewerPreviewRenderRequestId(21),
+            "texture/request-21",
+            silica_render::ViewerTextureDrawableSize::new(1200, 675),
+        );
+
+        boundary.bind_disposable_texture(identity.clone());
+        assert_eq!(
+            boundary.state(),
+            silica_render::ViewerTextureLifecycleState::Bound
+        );
+        assert_eq!(boundary.current_texture(), Some(&identity));
+
+        boundary.cleanup_for_photo_change();
+        assert_eq!(
+            boundary.last_release_reason(),
+            Some(silica_render::ViewerTextureReleaseReason::PhotoChanged)
+        );
+        assert_eq!(boundary.current_texture(), None);
+        assert_eq!(boundary.release_count(), 1);
+
+        boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+            silica_render::ViewerPreviewRenderRequestId(22),
+            "texture/request-22",
+            silica_render::ViewerTextureDrawableSize::new(1600, 900),
+        ));
+        boundary.cleanup_for_drawable_resize();
+        boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+            silica_render::ViewerPreviewRenderRequestId(23),
+            "texture/request-23",
+            silica_render::ViewerTextureDrawableSize::new(1600, 900),
+        ));
+        boundary.cleanup_for_library_close();
+        boundary.bind_disposable_texture(silica_render::ViewerTextureIdentity::new(
+            silica_render::ViewerPreviewRenderRequestId(24),
+            "texture/request-24",
+            silica_render::ViewerTextureDrawableSize::new(1600, 900),
+        ));
+        boundary.cleanup_for_app_close();
+
+        assert_eq!(boundary.release_count(), 4);
+        assert!(!boundary.writes_catalog_state());
+        assert!(!boundary.writes_sidecar_state());
+        assert!(!boundary.uses_original_path_as_write_destination());
+        assert!(!boundary.persistent_gpu_cache_enabled());
+        assert!(boundary.is_rebuildable());
+    }
+
+    #[test]
+    fn texture_lifecycle_smoke_evidence_is_reviewable() {
+        let evidence = super::texture_lifecycle_smoke_evidence();
+        println!("[SilicaRAW Native Viewer] {evidence}");
+
+        assert!(evidence.contains("state=released"));
+        assert!(evidence.contains("release_count=4"));
+        assert!(evidence.contains("last_release=app-closed"));
+        assert!(evidence.contains("catalog_write=false"));
+        assert!(evidence.contains("sidecar_write=false"));
+        assert!(evidence.contains("original_write_destination=false"));
+        assert!(evidence.contains("persistent_gpu_cache=false"));
+        assert!(evidence.contains("rebuildable=true"));
     }
 }

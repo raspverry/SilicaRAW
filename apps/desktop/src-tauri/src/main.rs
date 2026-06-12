@@ -1767,6 +1767,10 @@ fn main() {
             let evidence = native_metal_viewer::render_request_smoke_evidence();
             eprintln!("[SilicaRAW Native Viewer] {evidence}");
         }
+        if std::env::var_os("SILICA_NATIVE_VIEWER_TEXTURE_LIFECYCLE_PROOF").is_some() {
+            let evidence = native_metal_viewer::texture_lifecycle_smoke_evidence();
+            eprintln!("[SilicaRAW Native Viewer] {evidence}");
+        }
     }
 
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
