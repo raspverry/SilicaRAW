@@ -33,6 +33,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.3 adds catalog schema version 7 for undo/redo state: `edit_history.history_state` and `idx_edit_history_photo_state_sequence`.
 - Task 16.4 adds the read-only photo history panel query over `edit_history` and exposes only applied/undone real checkpoints to the Develop UI.
 - Task 16.5 adds catalog schema version 8 for append-only action log evidence: `action_log.side_effect_category`, `action_log.evidence_ref`, `idx_action_log_action_type_created_at`, and `idx_action_log_subject`.
+- Task 16.6 adds catalog-side sidecar status updates after history commits without a new migration: clean sidecars become `catalog_newer`, while conflict/newer states remain preserved.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -64,6 +65,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Undo/redo commands restore edit checkpoints and culling flags through catalog transactions, mark history rows applied/undone/invalidated, and never delete export outputs.
 - Sensitive local actions append action log rows through Core and storage APIs. Current logged actions cover import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear.
 - Sidecar write/read validates sidecar and nested edit graph JSON, mirrors rating/picked/rejected/color-label state only, writes under library `sidecars/`, and updates `sidecar_status` after successful writes.
+- History commits and undo/redo update `sidecar_status` for already-written sidecars: `clean` becomes `catalog_newer`; `conflict` and `sidecar_newer` are not cleared.
 - Sidecar rebuild dry-run scans `sidecars/` in deterministic order, resolves portable flags by `sidecar.flags`, then `edit_graph.metadata`, then defaults, and reports malformed sidecars, schema issues, photo-id mismatches, flag/metadata disagreements, and catalog reconciliation conflicts without applying changes.
 - Backup creation checkpoints WAL state before copying `catalog.db`, copies `sidecars/`, writes `backup-manifest.json`, and excludes originals, disposable caches, export outputs, logs, and nested backups.
 - Restore copies only `catalog.db` and `sidecars/` from validated backup artifacts, verifies through normal open/migration flow, and creates rollback copies before replacing existing target state.
@@ -154,7 +156,7 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - Camera metadata extraction.
 - Thumbnail or preview generation during import.
 - Original full-hash protection behavior.
-- Automatic sidecar synchronization.
+- Automatic sidecar write synchronization beyond catalog status marking.
 - Applied catalog rebuild or restore from sidecars.
 - Sidecar conflict handling and conflict UI.
 - Cache clear undo behavior beyond the Phase 16 action-trust policy.
@@ -175,4 +177,4 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 
 ## Notes for LLM Agents
 
-Do not treat folder import, flag persistence, active edit graph commits, or explicit sidecar writes as RAW decoding, thumbnail generation, automatic sidecar sync, cache behavior, or library grid behavior. `photo_flags` is the live in-app authority until sidecar synchronization is implemented by an explicit later task.
+Do not treat folder import, flag persistence, active edit graph commits, or explicit sidecar writes as RAW decoding, thumbnail generation, automatic sidecar writes, cache behavior, or library grid behavior. `photo_flags` is the live in-app authority; Task 16.6 only marks stale sidecar status after history changes.

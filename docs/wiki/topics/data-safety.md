@@ -36,6 +36,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 16.3 adds transaction-safe undo/redo for edit checkpoints and culling flags. Tests verify export output files survive undo/redo and original files remain outside the command path.
 - Task 16.4 adds the Develop history panel as a read-only view of real `edit_history` checkpoints plus buttons that call existing undo/redo commands. It does not add raw SQL to the UI, arbitrary state jumps, export deletion, sidecar writes, cache restoration, or original-file access.
 - Task 16.5 adds append-only action log evidence for sensitive local actions through Core and storage APIs. It records import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear without allowing original mutation claims, plugin/MCP raw DB writes, or hidden reversibility.
+- Task 16.6 marks already-written sidecars as `catalog_newer` after edit commits, flag commits, undo, and redo. It preserves `conflict` and `sidecar_newer`, writes no sidecar files, expands no `sidecar.flags`, and keeps original files untouched.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -62,6 +63,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Undo/redo safety. Task 16.3 covers edit and flag undo/redo transactions, redo invalidation after a new undoable action, and export-output preservation.
 - History panel safety. Task 16.4 covers real-checkpoint-only UI data, empty/loading/error/disabled states, and row selection through core undo/redo commands only.
 - Action log safety. Task 16.5 covers append-only action log rows, required side-effect/evidence fields, Core logging for sensitive local actions, and rejection of original mutation claims.
+- Sidecar status safety. Task 16.6 covers catalog-side stale status after history commits, conflict/newer preservation, reopen persistence, no hidden sidecar file writes, and no `sidecar.flags` schema expansion.
 
 ## Links
 

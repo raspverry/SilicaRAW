@@ -43,16 +43,16 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through v1.0.
 - [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
 - [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): completed color proof execution plan and fixture evidence gate.
-- [Phase 14 Product Metal Viewer Bridge Plan](roadmaps/phase-14-metal-viewer-bridge-plan.md): current native viewer bridge plan and Path B evidence gate.
+- [Phase 14 Product Metal Viewer Bridge Plan](roadmaps/phase-14-metal-viewer-bridge-plan.md): completed native viewer bridge plan and Path B evidence gate.
 
 ### Phase Briefs
 
 - [Phase 11 Summary](phases/phase-11-summary.md): completed session, grid, metadata, and import foundation context.
 - [Phase 12 RAW Proof Brief](phases/phase-12-raw-proof.md): completed RAW proof scope and task order.
 - [Phase 13 Color Pipeline Proof Brief](phases/phase-13-color-pipeline-proof.md): completed color proof scope and task order.
-- [Phase 14 Product Metal Viewer Bridge Brief](phases/phase-14-product-metal-viewer-bridge.md): current native viewer bridge scope and task order.
+- [Phase 14 Product Metal Viewer Bridge Brief](phases/phase-14-product-metal-viewer-bridge.md): completed native viewer bridge scope and task order.
 - [Phase 15 RAW Color Metal Vertical Slice Brief](phases/phase-15-raw-color-metal-vertical-slice.md): completed RAW/color/Metal vertical slice scope and task order.
-- [Phase 16 Undo History Action Trust Brief](phases/phase-16-undo-history-action-trust.md): current undo, history, and action trust scope and task order.
+- [Phase 16 Undo History Action Trust Brief](phases/phase-16-undo-history-action-trust.md): completed undo, history, and action trust scope and task order.
 
 ### Decisions
 

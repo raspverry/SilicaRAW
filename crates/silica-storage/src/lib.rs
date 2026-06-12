@@ -369,6 +369,15 @@ pub struct SidecarWriteResult {
     pub bytes_written: u64,
 }
 
+/// Current catalog-side sync state for one library-local sidecar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoSidecarStatus {
+    pub photo_id: String,
+    pub sidecar_path: Option<String>,
+    pub last_written_at: Option<String>,
+    pub conflict_state: String,
+}
+
 /// Sidecar payload that has passed the v1 sidecar and nested edit graph checks.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValidatedSidecar {
@@ -879,6 +888,34 @@ pub fn read_photo_sidecar(
         edit_graph,
         json,
     }))
+}
+
+/// Read catalog-side sidecar sync status without touching sidecar files.
+pub fn get_photo_sidecar_status(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoSidecarStatus>, LibraryStorageError> {
+    validate_sidecar_photo_id(photo_id)?;
+    let (_library, connection) = open_existing_library_for_read_only_query(library_root_path)?;
+    connection
+        .query_row(
+            r#"
+            SELECT photo_id, sidecar_path, last_written_at, conflict_state
+            FROM sidecar_status
+            WHERE photo_id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok(PhotoSidecarStatus {
+                    photo_id: row.get(0)?,
+                    sidecar_path: row.get(1)?,
+                    last_written_at: row.get(2)?,
+                    conflict_state: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
 }
 
 /// Preview how the live catalog would rebuild portable flag state from sidecars.
@@ -1533,6 +1570,7 @@ pub fn set_photo_flags(
         "#,
         params![edit_history_id, flags.photo_id, action_json, sequence],
     )?;
+    mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, &flags.photo_id)?;
     transaction.commit()?;
 
     Ok(flags)
@@ -2717,6 +2755,22 @@ fn update_sidecar_status(
     Ok(())
 }
 
+fn mark_clean_sidecar_catalog_newer_after_history_commit(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+) -> Result<(), LibraryStorageError> {
+    transaction.execute(
+        r#"
+        UPDATE sidecar_status
+        SET conflict_state = 'catalog_newer'
+        WHERE photo_id = ?1
+          AND conflict_state IN ('clean', 'in_sync')
+        "#,
+        params![photo_id],
+    )?;
+    Ok(())
+}
+
 /// Persist the active edit graph for a photo. Draft preview updates should not call this.
 pub fn commit_edit_graph(
     library_root_path: impl AsRef<Path>,
@@ -2792,6 +2846,7 @@ pub fn commit_edit_graph(
         "#,
         params![graph.source.photo_id],
     )?;
+    mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, &photo_id)?;
     transaction.commit()?;
 
     Ok(graph)
@@ -3009,6 +3064,7 @@ fn apply_history_action(
         "UPDATE edit_history SET history_state = ?1 WHERE id = ?2",
         params![next_state, row.id],
     )?;
+    mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, photo_id)?;
     transaction.commit()?;
 
     Ok(HistoryCommandResult {
@@ -5445,6 +5501,191 @@ mod tests {
             .expect("sidecar status");
         assert_eq!(sidecar_path, result.sidecar_relative_path);
         assert_eq!(conflict_state, "clean");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn history_commits_mark_clean_sidecar_catalog_newer_without_rewriting_sidecar() {
+        let workspace = unique_library_root("sidecar-history-commit");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let first_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write first sidecar");
+        let first_bytes = std::fs::read(&first_sidecar.sidecar_path).expect("read first sidecar");
+        let first_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read first sidecar status")
+            .expect("first sidecar status");
+        assert_eq!(first_status.conflict_state, "clean");
+
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("purple".to_string()),
+        )
+        .expect("commit flag history");
+        let flag_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read flag sidecar status")
+            .expect("flag sidecar status");
+        assert_eq!(flag_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&first_sidecar.sidecar_path).expect("read sidecar after flags"),
+            first_bytes,
+            "history commit must not rewrite the sidecar file"
+        );
+
+        let second_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write refreshed sidecar");
+        let second_bytes =
+            std::fs::read(&second_sidecar.sidecar_path).expect("read refreshed sidecar");
+        let clean_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read clean sidecar status")
+            .expect("clean sidecar status");
+        assert_eq!(clean_status.conflict_state, "clean");
+
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit history");
+        let edit_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read edit sidecar status")
+            .expect("edit sidecar status");
+        assert_eq!(edit_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&second_sidecar.sidecar_path).expect("read sidecar after edit"),
+            second_bytes,
+            "edit history commit must not rewrite the sidecar file"
+        );
+
+        let reopened = open_local_library(&library_root).expect("reopen library");
+        let reopened_status = get_photo_sidecar_status(&reopened.root_path, &photo_id)
+            .expect("read reopened sidecar status")
+            .expect("reopened sidecar status");
+        assert_eq!(reopened_status.conflict_state, "catalog_newer");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn undo_redo_history_marks_clean_sidecar_catalog_newer_without_file_effects() {
+        let workspace = unique_library_root("sidecar-history-undo-redo");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+
+        let undo_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write undo baseline sidecar");
+        let undo_bytes = std::fs::read(&undo_sidecar.sidecar_path).expect("read undo sidecar");
+        undo_last_history_action(&library.root_path, &photo_id).expect("undo history");
+        let undo_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read undo sidecar status")
+            .expect("undo sidecar status");
+        assert_eq!(undo_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&undo_sidecar.sidecar_path).expect("read sidecar after undo"),
+            undo_bytes,
+            "undo must not rewrite or delete the sidecar file"
+        );
+
+        let redo_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write redo baseline sidecar");
+        let redo_bytes = std::fs::read(&redo_sidecar.sidecar_path).expect("read redo sidecar");
+        redo_last_history_action(&library.root_path, &photo_id).expect("redo history");
+        let redo_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read redo sidecar status")
+            .expect("redo sidecar status");
+        assert_eq!(redo_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&redo_sidecar.sidecar_path).expect("read sidecar after redo"),
+            redo_bytes,
+            "redo must not rewrite or delete the sidecar file"
+        );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn history_updates_preserve_conflict_and_sidecar_newer_statuses() {
+        let workspace = unique_library_root("sidecar-history-preserve-conflict");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1").expect("write sidecar");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        connection
+            .execute(
+                "UPDATE sidecar_status SET conflict_state = 'conflict' WHERE photo_id = ?1",
+                params![photo_id.clone()],
+            )
+            .expect("mark conflict");
+        drop(connection);
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            3,
+            false,
+            true,
+            Some("red".to_string()),
+        )
+        .expect("commit flags over conflict");
+        let conflict_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read conflict status")
+            .expect("conflict status");
+        assert_eq!(conflict_status.conflict_state, "conflict");
+
+        let connection = open_catalog(&library.catalog_path).expect("reopen catalog");
+        connection
+            .execute(
+                "UPDATE sidecar_status SET conflict_state = 'sidecar_newer' WHERE photo_id = ?1",
+                params![photo_id.clone()],
+            )
+            .expect("mark sidecar newer");
+        drop(connection);
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 1.0, 3.0, "unix:4").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit over sidecar_newer");
+        let sidecar_newer_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read sidecar newer status")
+            .expect("sidecar newer status");
+        assert_eq!(sidecar_newer_status.conflict_state, "sidecar_newer");
 
         remove_library_root(&workspace);
     }

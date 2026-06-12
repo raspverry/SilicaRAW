@@ -4,7 +4,7 @@ Storage and persistence boundary for SilicaRAW.
 
 Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations.
 
-This crate currently owns the catalog migration runner, initial empty catalog schema/index proof, local library create/open, Phase 4.3 folder import scanner, Phase 4.4 photo flags persistence, Phase 5.3 active edit graph commit/read behavior, Task 10.3 library-local sidecar read/write behavior, Task 10.4 catalog rebuild dry-run reports from sidecars, Task 10.5.2 checkpointed backup boundary creation, Task 10.5.3 staged restore boundaries, Task 16.2 edit history checkpoint persistence, Task 16.3 undo/redo state changes, Task 16.4 read-only photo history listing, and Task 16.5 append-only action log persistence. It does not decode photos, extract camera metadata, mutate originals, write sidecars next to originals, manage automatic sidecar sync, or expose database access to plugins/MCP.
+This crate currently owns the catalog migration runner, initial empty catalog schema/index proof, local library create/open, Phase 4.3 folder import scanner, Phase 4.4 photo flags persistence, Phase 5.3 active edit graph commit/read behavior, Task 10.3 library-local sidecar read/write behavior, Task 10.4 catalog rebuild dry-run reports from sidecars, Task 10.5.2 checkpointed backup boundary creation, Task 10.5.3 staged restore boundaries, Task 16.2 edit history checkpoint persistence, Task 16.3 undo/redo state changes, Task 16.4 read-only photo history listing, Task 16.5 append-only action log persistence, and Task 16.6 sidecar status after history changes. It does not decode photos, extract camera metadata, mutate originals, write sidecars next to originals, manage automatic sidecar writes, or expose database access to plugins/MCP.
 
 Phase 4.1 aligns migration verification with the domain-facing schema contract in `silica-catalog`. `silica-storage` applies migrations and checks that the required alpha tables and indexes exist; `silica-catalog` defines the contract names.
 
@@ -25,6 +25,8 @@ Task 16.3 adds schema version 7 plus transaction-safe undo/redo for edit checkpo
 Task 16.4 adds `list_photo_history`, a read-only per-photo history panel query over `edit_history`. It returns applied/undone real checkpoints, hides invalidated redo rows, and marks only the next legal undo or redo row selectable.
 
 Task 16.5 adds schema version 8 plus append-only action log APIs. `append_action_log_entry` records actor/action/subject, side-effect category, evidence reference, JSON object payload, and timestamp context; `list_action_log_entries` reads recent evidence rows without exposing raw SQLite writes.
+
+Task 16.6 adds `get_photo_sidecar_status` and marks clean sidecar status as `catalog_newer` after edit commits, flag commits, undo, and redo. It preserves `conflict` and `sidecar_newer` and does not rewrite sidecar files.
 
 Task 10.3 adds explicit sidecar write/read APIs. Sidecars are written only under `sidecars/` inside the library root, validate the sidecar and nested edit graph payloads, mirror rating/picked/rejected/color-label state only, update `sidecar_status` after successful writes, and do not mutate original referenced files.
 

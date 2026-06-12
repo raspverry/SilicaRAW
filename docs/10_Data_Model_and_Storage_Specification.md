@@ -125,7 +125,9 @@ Phase 5.3 adds active edit graph storage wiring for exposure/contrast commits. D
 
 Task 10.3 adds library-local sidecar read/write foundations. Task 10.4 adds sidecar rebuild dry-run reports. Task 10.5.1 records backup/checkpoint/restore policy. Task 10.5.2 adds checkpointed backup artifact creation for `catalog.db`, `sidecars/`, and `backup-manifest.json`. Task 10.5.3 adds staged restore with existing-target rollback copies and newer-schema rejection before target mutation.
 
-Still needed: broader edit graph storage workflows, automatic sidecar synchronization, sidecar conflict UX, cache size policy, user-facing backup/restore commands and UI, recursive import policy, and original full-hash protection behavior.
+Task 16.6 adds catalog-side sidecar status after history changes. Edit commits, flag commits, undo, and redo mark clean sidecar rows as `catalog_newer` without writing sidecar files. Existing `conflict` and `sidecar_newer` rows are preserved.
+
+Still needed: broader edit graph storage workflows, automatic sidecar write synchronization beyond status marking, sidecar conflict UX, cache size policy, user-facing backup/restore commands and UI, recursive import policy, and original full-hash protection behavior.
 
 ---
 

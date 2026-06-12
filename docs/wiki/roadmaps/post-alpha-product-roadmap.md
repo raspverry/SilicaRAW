@@ -633,6 +633,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - `sidecar.flags` remains limited to portable culling fields.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
 
+**Status:** Completed on 2026-06-12. Storage/core expose sidecar status reads. Edit commits, flag commits, undo, and redo mark clean sidecars as `catalog_newer` without writing sidecar files, while preserving `conflict` and `sidecar_newer`. `sidecar.flags` remains limited to portable culling fields.
+
 ## Phase 17: Develop P0 Expansion
 
 **Goal:** Complete the documented P0 Develop baseline for supported image paths.

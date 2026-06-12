@@ -41,6 +41,7 @@ pub use silica_storage::PhotoHistoryPanel;
 pub use silica_storage::PhotoMetadata;
 pub use silica_storage::PhotoMetadataField;
 pub use silica_storage::PhotoMetadataFieldState;
+pub use silica_storage::PhotoSidecarStatus;
 pub use silica_storage::SidecarWriteResult;
 pub use silica_storage::ValidatedSidecar;
 
@@ -1271,6 +1272,14 @@ pub fn read_photo_sidecar(
     photo_id: &str,
 ) -> Result<Option<ValidatedSidecar>, CoreError> {
     silica_storage::read_photo_sidecar(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Read catalog-side sidecar sync status through the core command boundary.
+pub fn get_photo_sidecar_status(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoSidecarStatus>, CoreError> {
+    silica_storage::get_photo_sidecar_status(library_root_path, photo_id).map_err(CoreError::from)
 }
 
 /// Dry-run catalog rebuild from library-local sidecars through the core boundary.
@@ -4339,6 +4348,47 @@ mod tests {
         assert_eq!(read.flags.rating, 2);
         assert_eq!(read.flags.color_label.as_deref(), Some("blue"));
         assert_original_hash(&jpeg_file, &original_hash, "core sidecar read");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn sidecar_status_after_history_is_exposed_through_core() {
+        let workspace = unique_library_root("core-sidecar-status-history");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        write_photo_sidecar(&created.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write sidecar")
+            .expect("sidecar result");
+        let clean_status = get_photo_sidecar_status(&created.root_path, &photo_id)
+            .expect("read clean status")
+            .expect("clean status");
+        assert_eq!(clean_status.conflict_state, "clean");
+
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("commit result");
+        let stale_status = get_photo_sidecar_status(&created.root_path, &photo_id)
+            .expect("read stale status")
+            .expect("stale status");
+        assert_eq!(stale_status.conflict_state, "catalog_newer");
 
         remove_library_root(&workspace);
     }

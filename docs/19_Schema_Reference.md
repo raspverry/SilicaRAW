@@ -194,6 +194,17 @@ idx_action_log_subject -> target lookup
 
 Core now exposes append/read action-log APIs and records local alpha sensitive actions for import by reference, sidecar write, JPEG export, RAW-derived export, and disposable cache clear. The action log is append-only through Core-facing APIs; it is not an undo stack and must not be used to authorize direct plugin/MCP database writes.
 
+Task 16.6 sidecar status runtime:
+
+```txt
+sidecar_status.conflict_state -> clean | catalog_newer | sidecar_newer | conflict | missing | disabled
+get_photo_sidecar_status -> reads catalog-side status for one photo
+history commit/undo/redo -> clean or in_sync becomes catalog_newer
+conflict and sidecar_newer -> preserved by history commits
+```
+
+No schema migration is required for Task 16.6. Sidecar status changes are catalog metadata only: edit commits, flag commits, undo, and redo must not write sidecar files or add catalog-only fields such as `edited` or `exported` to `sidecar.flags`.
+
 ## Migration Policy
 
 ```txt

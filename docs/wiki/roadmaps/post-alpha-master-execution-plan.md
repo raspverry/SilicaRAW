@@ -37,7 +37,7 @@ As of 2026-06-12:
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
 - Phase 14 is complete.
 - Task 14.0 through Task 14.8 are complete.
-- Phase 15 task cards exist and Phase 16 task cards now exist.
+- Phase 15 and Phase 16 are complete.
 - Task 15.0 evidence gate is complete.
 - Task 15.1 decoded image handoff contract is complete.
 - Task 15.2 RAW decode to preview artifact is complete.
@@ -52,7 +52,9 @@ As of 2026-06-12:
 - Task 16.3 Undo and Redo Core Commands is complete.
 - Task 16.4 Develop History Panel Contract is complete.
 - Task 16.5 Append-Only Action Log is complete.
-- Next task: [16.6 Sidecar Sync Status After History Commits](../tasks/16.6-sidecar-sync-status-after-history.md).
+- Task 16.6 Sidecar Sync Status After History Commits is complete.
+- Phase 16 is complete.
+- Next step: create Phase 17 task cards from this master plan and the post-alpha product roadmap, then execute Task 17.1 Basic Edit Graph Mutators.
 
 ## Wave Map
 
@@ -383,8 +385,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 16.6 from the existing task card.
-2. Continue through Phase 16 in order.
+1. Create Phase 17 task cards from this master plan and [Post-Alpha Product Roadmap](post-alpha-product-roadmap.md).
+2. Execute Task 17.1 Basic Edit Graph Mutators first.
 
 ## Links
 

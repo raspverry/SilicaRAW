@@ -161,7 +161,7 @@ Committed history changes can make a previously written sidecar stale. Phase 16 
 - A sidecar write may mark status clean only after the sidecar payload and nested edit graph validate and the file write succeeds.
 - Conflict status must not be cleared by undo, redo, import, export, or cache clear.
 
-Task 16.6 owns the exact runtime update path for these rules.
+Task 16.6 implements the runtime path: edit commits, flag commits, undo, and redo mark clean sidecars as `catalog_newer` in the same catalog transaction and preserve `conflict` and `sidecar_newer`. Storage/Core expose `get_photo_sidecar_status` for status data. These commands do not write, delete, or overwrite sidecar files.
 
 ## Stop Gates
 

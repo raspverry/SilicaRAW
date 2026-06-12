@@ -30,9 +30,11 @@ Phase 16 is a trust gate, not UI breadth. It defines and implements undoable sta
 | 16.1 | Undo, History, and Action Semantics Contract | Complete: undoable vs logged-only vs irreversible classes documented |
 | 16.2 | Edit History Persistence | Complete: validated checkpoints survive reopen; draft updates write no history |
 | 16.3 | Undo/Redo Core Commands | Complete: undo/redo run as catalog transactions and never delete exports/originals |
-| 16.4 | Develop History Panel Contract | UI lists real checkpoints only; no fake/demo rows |
-| 16.5 | Append-Only Action Log | Core-only action log API for sensitive actions and future permissions |
-| 16.6 | Sidecar Sync Status After History Commits | Sidecar status reflects committed history without silent conflict overwrite |
+| 16.4 | Develop History Panel Contract | Complete: UI lists real checkpoints only; no fake/demo rows |
+| 16.5 | Append-Only Action Log | Complete: Core-only action log API for sensitive actions and future permissions |
+| 16.6 | Sidecar Sync Status After History Commits | Complete: sidecar status reflects committed history without silent conflict overwrite |
+
+Phase 16 is complete. Phase 17 task-card creation can start from the master execution plan before implementation begins.
 
 ## Non-Goals
 
@@ -63,6 +65,8 @@ Task 16.3 implements storage/core/desktop undo and redo commands for edit checkp
 Task 16.4 implements the first real Develop history panel contract. Storage/core expose photo history checkpoints from `edit_history`; desktop exposes `get_photo_history`; the static UI renders an empty list until runtime data arrives, and checkpoint row actions use only the documented undo/redo commands.
 
 Task 16.5 implements the append-only action log groundwork. Catalog schema version 8 adds side-effect and evidence fields to `action_log`; storage and Core expose append/read APIs; Core logs import by reference, sidecar writes, JPEG exports, RAW-derived exports, and disposable cache clear without adding plugin, MCP, MLX, or permission UI runtime.
+
+Task 16.6 implements sidecar status after history changes. Storage and Core expose `get_photo_sidecar_status`; edit commits, flag commits, undo, and redo mark clean sidecars as `catalog_newer` in the same catalog transaction while preserving `conflict` and `sidecar_newer`. It does not write sidecar files, clear conflicts, or add conflict UI.
 
 ## Validation Strategy
 

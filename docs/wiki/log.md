@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Sidecar history status added
+
+- Completed Task 16.6 with storage/core sidecar status read APIs.
+- Marked clean sidecars `catalog_newer` after edit commits, flag commits, undo, and redo without rewriting sidecar files.
+- Preserved `conflict` and `sidecar_newer` states, kept `sidecar.flags` unchanged, and completed Phase 16.
+
 ## [2026-06-12] phase-16 | Append-only action log added
 
 - Completed Task 16.5 with schema version 8 action log side-effect/evidence fields and lookup indexes.
