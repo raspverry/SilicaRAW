@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | Decoded image handoff contract added
+
+- Completed Task 15.1 with typed decode, render, and core handoff contracts.
+- Added fixture-backed decoded image identity fields for source SHA, decoder backend, dimensions, orientation, profile state, working space, disposable cache identity, and pixel format.
+- Kept image bytes, cache file generation, product RAW artifact writing, catalog writes, sidecar writes, export writes, and original-file mutation out of scope.
+
 ## [2026-06-12] phase-15 | Vertical slice evidence gate completed
 
 - Completed Task 15.0 with [Phase 15 Vertical Slice Evidence Gate](../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md).

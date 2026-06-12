@@ -92,7 +92,7 @@ Task 15.0 completed the evidence gate on 2026-06-12. The allowed scope is record
 ## Validation Strategy
 
 - Task 15.0: evidence gate docs and fixture manifest routing. Completed on 2026-06-12.
-- Task 15.1: `cargo test -p silica-decode -p silica-render -p silica-core`.
+- Task 15.1: `cargo test -p silica-decode -p silica-render -p silica-core`. Completed on 2026-06-12.
 - Task 15.2: fixture-backed RAW preview artifact tests and original hash checks.
 - Task 15.3: feature-gated desktop/native viewer tests.
 - Task 15.4: no-draft-write tests and edit graph commit tests.

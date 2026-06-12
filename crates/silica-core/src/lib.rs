@@ -50,6 +50,45 @@ pub fn plan_product_raw_decode_from_probe(
     silica_decode::plan_product_raw_decode_from_probe(fixture_class, probe)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecodedImageViewerHandoffPlan {
+    pub decoded: silica_decode::DecodedImageHandoff,
+    pub viewer_input: silica_render::ViewerPreviewInput,
+}
+
+impl DecodedImageViewerHandoffPlan {
+    pub fn writes_catalog_state(&self) -> bool {
+        false
+    }
+
+    pub fn writes_sidecars(&self) -> bool {
+        false
+    }
+
+    pub fn writes_originals(&self) -> bool {
+        false
+    }
+
+    pub fn writes_exports(&self) -> bool {
+        false
+    }
+}
+
+pub fn plan_decoded_image_viewer_handoff(
+    fixture_class: impl AsRef<str>,
+    probe: &silica_decode::RawProbeResult,
+    cache_key: impl Into<String>,
+) -> DecodedImageViewerHandoffPlan {
+    let decoded =
+        silica_decode::plan_decoded_image_handoff_from_raw_probe(fixture_class, probe, cache_key);
+    let viewer_input = silica_render::ViewerPreviewInput::from_decoded_handoff(&decoded);
+
+    DecodedImageViewerHandoffPlan {
+        decoded,
+        viewer_input,
+    }
+}
+
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
 const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
@@ -2005,6 +2044,42 @@ mod tests {
         );
         assert_eq!(plan.width, Some(5184));
         assert_eq!(plan.height, Some(3456));
+    }
+
+    #[test]
+    fn decoded_image_viewer_handoff_wraps_decode_and_render_without_state_writes() {
+        let probe = silica_decode::RawProbeResult {
+            backend: silica_decode::RawProbeBackend::CoreImageRaw,
+            platform: silica_decode::RawProbePlatform::Macos,
+            macos_version: Some("26.4".to_string()),
+            source_path: "/tmp/sample.cr2".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            original_file_size: Some(1024),
+            original_modified_at: Some("2026-06-12T00:00:00Z".to_string()),
+            status: silica_decode::RawProbeStatus::Success,
+            width: Some(5184),
+            height: Some(3456),
+            orientation: None,
+            error_category: None,
+            message: "Core Image opened the RAW source.".to_string(),
+        };
+
+        let plan = plan_decoded_image_viewer_handoff("A", &probe, "previews/raw/photo-1");
+
+        assert_eq!(
+            plan.decoded.status,
+            silica_decode::DecodedImageHandoffStatus::Ready
+        );
+        assert!(!plan.writes_catalog_state());
+        assert!(!plan.writes_sidecars());
+        assert!(!plan.writes_originals());
+        assert!(!plan.writes_exports());
+        match plan.viewer_input {
+            silica_render::ViewerPreviewInput::DecodedImageArtifact { cache_key, .. } => {
+                assert_eq!(cache_key, "previews/raw/photo-1");
+            }
+            other => panic!("expected decoded image artifact input, got {other:?}"),
+        }
     }
 
     #[test]

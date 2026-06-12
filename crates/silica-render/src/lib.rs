@@ -142,6 +142,7 @@ impl ViewerPreviewViewport {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewerPreviewPixelFormat {
     Bgra8Unorm,
+    Rgba16Float,
 }
 
 /// Input identity for a viewer preview request.
@@ -155,6 +156,16 @@ pub enum ViewerPreviewInput {
         width_px: u32,
         height_px: u32,
         pixel_format: ViewerPreviewPixelFormat,
+    },
+    DecodedImageArtifact {
+        cache_key: String,
+        source_sha256: Option<String>,
+        width_px: u32,
+        height_px: u32,
+        pixel_format: ViewerPreviewPixelFormat,
+        decoder_backend: String,
+        input_profile: String,
+        working_space: String,
     },
 }
 
@@ -177,8 +188,56 @@ impl ViewerPreviewInput {
         }
     }
 
+    pub fn from_decoded_handoff(handoff: &silica_decode::DecodedImageHandoff) -> Self {
+        if handoff.status != silica_decode::DecodedImageHandoffStatus::Ready {
+            return Self::NoPixelsYet {
+                readiness: PreviewRenderStatus::BlockedByDecode,
+            };
+        }
+
+        let Some(cache_identity) = handoff.cache_identity.as_ref() else {
+            return Self::NoPixelsYet {
+                readiness: PreviewRenderStatus::BlockedByDecode,
+            };
+        };
+        if !cache_identity.disposable {
+            return Self::NoPixelsYet {
+                readiness: PreviewRenderStatus::BlockedByDecode,
+            };
+        }
+
+        let (Some(width_px), Some(height_px), Some(pixel_format)) =
+            (handoff.width, handoff.height, handoff.pixel_format)
+        else {
+            return Self::NoPixelsYet {
+                readiness: PreviewRenderStatus::BlockedByDecode,
+            };
+        };
+
+        Self::DecodedImageArtifact {
+            cache_key: cache_identity.cache_key.clone(),
+            source_sha256: handoff.source_sha256.clone(),
+            width_px,
+            height_px,
+            pixel_format: viewer_pixel_format_from_decoded(pixel_format),
+            decoder_backend: handoff.decoder_backend.as_str().to_string(),
+            input_profile: handoff.input_profile.clone(),
+            working_space: handoff.working_space.clone(),
+        }
+    }
+
     fn contains_image_pixels(&self) -> bool {
         false
+    }
+}
+
+fn viewer_pixel_format_from_decoded(
+    pixel_format: silica_decode::DecodedImagePixelFormat,
+) -> ViewerPreviewPixelFormat {
+    match pixel_format {
+        silica_decode::DecodedImagePixelFormat::Rgba16Float => {
+            ViewerPreviewPixelFormat::Rgba16Float
+        }
     }
 }
 
@@ -856,6 +915,81 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn viewer_input_from_decoded_handoff_carries_artifact_identity_without_pixels() {
+        let handoff = silica_decode::DecodedImageHandoff {
+            source_path: "/tmp/sample.cr2".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            decoder_backend: silica_decode::DecodedImageDecoderBackend::CoreImageRaw,
+            status: silica_decode::DecodedImageHandoffStatus::Ready,
+            width: Some(5184),
+            height: Some(3456),
+            orientation: None,
+            input_profile: "unknown".to_string(),
+            working_space: "linear_display_p3".to_string(),
+            cache_identity: Some(silica_decode::DecodedImageCacheIdentity {
+                cache_key: "previews/raw/photo-1".to_string(),
+                disposable: true,
+            }),
+            pixel_format: Some(silica_decode::DecodedImagePixelFormat::Rgba16Float),
+            message: "ready".to_string(),
+        };
+
+        let input = super::ViewerPreviewInput::from_decoded_handoff(&handoff);
+
+        assert!(!input.contains_image_pixels());
+        match &input {
+            super::ViewerPreviewInput::DecodedImageArtifact {
+                cache_key,
+                source_sha256,
+                width_px,
+                height_px,
+                pixel_format,
+                decoder_backend,
+                input_profile,
+                working_space,
+            } => {
+                assert_eq!(cache_key, "previews/raw/photo-1");
+                assert_eq!(source_sha256.as_deref(), Some("fixture-hash"));
+                assert_eq!(*width_px, 5184);
+                assert_eq!(*height_px, 3456);
+                assert_eq!(*pixel_format, super::ViewerPreviewPixelFormat::Rgba16Float);
+                assert_eq!(decoder_backend, "core_image_raw");
+                assert_eq!(input_profile, "unknown");
+                assert_eq!(working_space, "linear_display_p3");
+            }
+            other => panic!("expected decoded image artifact input, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn viewer_input_from_blocked_handoff_stays_decode_blocked() {
+        let handoff = silica_decode::DecodedImageHandoff {
+            source_path: "/tmp/sample.raw".to_string(),
+            source_sha256: Some("fixture-hash".to_string()),
+            decoder_backend: silica_decode::DecodedImageDecoderBackend::CoreImageRaw,
+            status: silica_decode::DecodedImageHandoffStatus::BlockedPendingEvidence,
+            width: None,
+            height: None,
+            orientation: None,
+            input_profile: "unknown".to_string(),
+            working_space: "linear_display_p3".to_string(),
+            cache_identity: None,
+            pixel_format: None,
+            message: "blocked".to_string(),
+        };
+
+        let input = super::ViewerPreviewInput::from_decoded_handoff(&handoff);
+
+        assert_eq!(
+            input,
+            super::ViewerPreviewInput::NoPixelsYet {
+                readiness: super::PreviewRenderStatus::BlockedByDecode,
+            }
+        );
+        assert!(!input.contains_image_pixels());
     }
 
     #[test]

@@ -222,6 +222,19 @@ Class E and unknown RAW classes -> blocked
 
 This gate does not claim broad RAW camera support, RAW support from file extensions, product RAW pixel display, RAW-derived export correctness, final color correctness, camera profile behavior, lens correction, or LibRaw coverage.
 
+## Phase 15.1 Decoded Image Handoff Contract
+
+`silica-decode` now exposes a decoded image handoff contract for the first fixture-backed product path. The contract can represent:
+
+```txt
+ready fixture-backed Core Image RAW handoff
+blocked pending evidence
+blocked Core Image failure
+blocked unsupported class
+```
+
+The handoff records source path, source SHA-256, decoder backend, dimensions, orientation, input profile, working space, disposable cache identity, pixel format, and a UI-suitable message. It intentionally carries no image bytes and does not create cache files. RAW class E and unknown RAW classes remain blocked without cache identity or pixel format.
+
 ## Links
 
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)

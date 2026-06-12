@@ -74,6 +74,8 @@ Task 14.8 adds [Native Viewer QA Checklist](../../../checklists/NATIVE_VIEWER_QA
 
 Task 15.0 confirms that Phase 15 may proceed only as a fixture-limited RAW/color/Metal vertical slice. The native viewer bridge remains bounded by the Phase 14 contracts: disposable texture state, latest-request-wins rendering, reserved viewer geometry, and no catalog, sidecar, original, export, or persistent GPU cache writes.
 
+Task 15.1 adds the decoded image handoff boundary used by future viewer requests. `silica-render` can accept a ready decoded artifact identity with cache key, source hash, dimensions, pixel format, decoder backend, input profile, and working space, but it still does not own catalog writes, sidecar writes, export files, original files, or image bytes.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.

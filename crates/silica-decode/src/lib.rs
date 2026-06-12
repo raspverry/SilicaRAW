@@ -208,6 +208,69 @@ pub struct ProductRawDecodePlan {
     pub message: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecodedImageDecoderBackend {
+    CoreImageRaw,
+}
+
+impl DecodedImageDecoderBackend {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CoreImageRaw => "core_image_raw",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecodedImageHandoffStatus {
+    Ready,
+    BlockedPendingEvidence,
+    BlockedCoreImageFailed,
+    BlockedUnsupportedClass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodedImageCacheIdentity {
+    pub cache_key: String,
+    pub disposable: bool,
+}
+
+impl DecodedImageCacheIdentity {
+    pub fn disposable(cache_key: impl Into<String>) -> Self {
+        Self {
+            cache_key: cache_key.into(),
+            disposable: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecodedImagePixelFormat {
+    Rgba16Float,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodedImageHandoff {
+    pub source_path: String,
+    pub source_sha256: Option<String>,
+    pub decoder_backend: DecodedImageDecoderBackend,
+    pub status: DecodedImageHandoffStatus,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub orientation: Option<i32>,
+    pub input_profile: String,
+    pub working_space: String,
+    pub cache_identity: Option<DecodedImageCacheIdentity>,
+    pub pixel_format: Option<DecodedImagePixelFormat>,
+    pub message: String,
+}
+
+impl DecodedImageHandoff {
+    pub fn contains_image_pixels(&self) -> bool {
+        false
+    }
+}
+
 pub fn plan_product_raw_decode(source_path: impl AsRef<str>) -> ProductRawDecodePlan {
     let source_path = source_path.as_ref().to_string();
     let extension = Path::new(&source_path)
@@ -306,6 +369,54 @@ pub fn plan_product_raw_decode_from_probe(
         height: probe.height,
         orientation: probe.orientation,
         message: "Product RAW decode is supported for this fixture-backed Core Image class as a metadata-only plan.".to_string(),
+    }
+}
+
+pub fn plan_decoded_image_handoff_from_raw_probe(
+    fixture_class: impl AsRef<str>,
+    probe: &RawProbeResult,
+    cache_key: impl Into<String>,
+) -> DecodedImageHandoff {
+    let raw_plan = plan_product_raw_decode_from_probe(fixture_class, probe);
+    let status = decoded_handoff_status(raw_plan.status);
+    let ready = status == DecodedImageHandoffStatus::Ready;
+
+    DecodedImageHandoff {
+        source_path: raw_plan.source_path,
+        source_sha256: probe.source_sha256.clone(),
+        decoder_backend: DecodedImageDecoderBackend::CoreImageRaw,
+        status,
+        width: if ready { raw_plan.width } else { None },
+        height: if ready { raw_plan.height } else { None },
+        orientation: if ready { raw_plan.orientation } else { None },
+        input_profile: "unknown".to_string(),
+        working_space: "linear_display_p3".to_string(),
+        cache_identity: if ready {
+            Some(DecodedImageCacheIdentity::disposable(cache_key))
+        } else {
+            None
+        },
+        pixel_format: if ready {
+            Some(DecodedImagePixelFormat::Rgba16Float)
+        } else {
+            None
+        },
+        message: raw_plan.message,
+    }
+}
+
+fn decoded_handoff_status(status: ProductRawDecodeStatus) -> DecodedImageHandoffStatus {
+    match status {
+        ProductRawDecodeStatus::Supported => DecodedImageHandoffStatus::Ready,
+        ProductRawDecodeStatus::BlockedPendingEvidence => {
+            DecodedImageHandoffStatus::BlockedPendingEvidence
+        }
+        ProductRawDecodeStatus::BlockedCoreImageFailed => {
+            DecodedImageHandoffStatus::BlockedCoreImageFailed
+        }
+        ProductRawDecodeStatus::BlockedUnsupportedClass => {
+            DecodedImageHandoffStatus::BlockedUnsupportedClass
+        }
     }
 }
 
@@ -579,6 +690,52 @@ mod tests {
         assert_eq!(plan.width, Some(6960));
         assert_eq!(plan.height, Some(4640));
         assert_eq!(plan.orientation, None);
+    }
+
+    #[test]
+    fn decoded_image_handoff_records_supported_fixture_identity() {
+        let probe = successful_raw_probe("/tmp/sample.cr2", Some(5184), Some(3456));
+        let handoff =
+            super::plan_decoded_image_handoff_from_raw_probe("A", &probe, "previews/raw/photo-1");
+
+        assert_eq!(handoff.source_path, "/tmp/sample.cr2");
+        assert_eq!(handoff.source_sha256.as_deref(), Some("fixture-hash"));
+        assert_eq!(
+            handoff.decoder_backend,
+            super::DecodedImageDecoderBackend::CoreImageRaw
+        );
+        assert_eq!(handoff.status, super::DecodedImageHandoffStatus::Ready);
+        assert_eq!(handoff.width, Some(5184));
+        assert_eq!(handoff.height, Some(3456));
+        assert_eq!(handoff.orientation, None);
+        assert_eq!(handoff.input_profile, "unknown");
+        assert_eq!(handoff.working_space, "linear_display_p3");
+        assert_eq!(
+            handoff.pixel_format,
+            Some(super::DecodedImagePixelFormat::Rgba16Float)
+        );
+        let cache_identity = handoff.cache_identity.as_ref().expect("cache identity");
+        assert_eq!(cache_identity.cache_key, "previews/raw/photo-1");
+        assert!(cache_identity.disposable);
+        assert!(!handoff.contains_image_pixels());
+    }
+
+    #[test]
+    fn decoded_image_handoff_keeps_blocked_classes_without_cache_identity() {
+        let probe = successful_raw_probe("/tmp/sample.raw", Some(1200), Some(800));
+        let handoff =
+            super::plan_decoded_image_handoff_from_raw_probe("E", &probe, "previews/raw/photo-e");
+
+        assert_eq!(
+            handoff.status,
+            super::DecodedImageHandoffStatus::BlockedPendingEvidence
+        );
+        assert_eq!(handoff.source_sha256.as_deref(), Some("fixture-hash"));
+        assert_eq!(handoff.width, None);
+        assert_eq!(handoff.height, None);
+        assert_eq!(handoff.cache_identity, None);
+        assert_eq!(handoff.pixel_format, None);
+        assert!(!handoff.contains_image_pixels());
     }
 
     #[test]
