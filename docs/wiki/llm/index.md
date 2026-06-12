@@ -2,7 +2,7 @@
 title: LLM Routing Index
 status: active
 audience: agents
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/wiki/index.md
 ---
 
@@ -22,16 +22,23 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-The next planned product work is [Phase 12: Core Image RAW Decode Proof](../phases/phase-12-raw-proof.md).
+Phase 12 is complete. The next planned product work is Phase 13: Color Pipeline Proof.
 
-For Phase 12 work, read:
+Before implementing Phase 13 code, create the Phase 13 plan, phase brief, and task cards from [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-13-color-pipeline-proof).
+
+For Phase 13 planning work, read:
+
+- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-13-color-pipeline-proof)
+- [RAW Decoding](../topics/raw-decoding.md)
+- [Color Management](../topics/color-management.md)
+- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
+- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
+
+For Phase 12 historical context, read:
 
 - [Phase 12 RAW Proof Plan](../roadmaps/phase-12-raw-proof-plan.md)
 - [Phase 12 Brief](../phases/phase-12-raw-proof.md)
-- The matching task card under [Task Cards](../tasks/index.md)
 - [RAW Decoding](../topics/raw-decoding.md)
-- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
-- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
 Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md) unless the current phase brief or task card is missing required information.
 

@@ -1,6 +1,6 @@
 ---
 title: Phase 12 RAW Proof Plan
-status: active
+status: completed
 audience: all
 updated: 2026-06-12
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
@@ -18,6 +18,7 @@ This is a proof and evidence phase. It is not a broad RAW editor implementation 
 
 As of 2026-06-12:
 
+- Phase 12 completion gate is satisfied for fixture classes A-D.
 - Task 12.0 design gate is complete.
 - Task 12.1 feature-gated Core Image RAW probe is complete.
 - Task 12.2 fixture harness exists and has run locally for legal classes A-D.
@@ -27,6 +28,7 @@ As of 2026-06-12:
 - Task 12.5.2 through Task 12.5.4 are complete locally for raw.pixls.us candidates A-D.
 - Task 12.5.5 is complete: the support matrix records fixture-backed Core Image support for classes A-D.
 - Task 12.6 is complete: successful A-D probe evidence can map into metadata-only product RAW support plans.
+- Class E remains recorded as blocked pending source review.
 
 ## Goal
 

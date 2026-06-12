@@ -1,6 +1,6 @@
 ---
 title: Phase 12 RAW Proof Brief
-status: active
+status: completed
 audience: all
 updated: 2026-06-12
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
@@ -13,6 +13,12 @@ source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 Phase 12 proves Core Image RAW support on legal fixtures before SilicaRAW shows RAW pixels in the product UI.
 
 This phase is a proof phase, not a broad RAW editor implementation phase.
+
+## Current Result
+
+Phase 12 completion gate is satisfied as of 2026-06-12.
+
+Classes A-D have legal local fixture source review, ignored local fixture probe evidence, original-hash preservation evidence, support-matrix entries, and metadata-only product RAW support mapping. Class E remains blocked pending source review. No RAW pixels, UI RAW display, export expansion, cache generation, broad camera support claim, original mutation, or LibRaw dependency was added.
 
 ## Required Read Set
 

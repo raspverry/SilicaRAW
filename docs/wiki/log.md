@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | RAW proof phase completed
+
+- Phase 12 completion gate is satisfied for legal fixture classes A-D.
+- Class E remains blocked pending source review, and LibRaw remains deferred because no fixture-backed Core Image gap was recorded.
+- Next product roadmap area is Phase 13 color pipeline proof.
+
 ## [2026-06-12] phase-12 | Product RAW support mapping added
 
 - Completed Task 12.6 with an evidence-driven product RAW support mapping API.
