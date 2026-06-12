@@ -67,6 +67,35 @@ metadata
 extensions
 ```
 
+## Edit Graph `profile`
+
+The edit graph `profile` object is the authoritative color metadata contract for edit state.
+
+```txt
+profile.input_profile -> explicit input profile evidence, or "unknown" when unavailable
+profile.working_space -> working color space, currently "linear_display_p3"
+profile.camera_profile -> optional camera/profile identifier, null when unavailable
+profile.decoder_backend -> core_image_raw | libraw | embedded_preview | raster | null
+```
+
+Agents must not invent parser-owned or color-profile fields outside `profile`. Experimental data still belongs under `extensions`, but current profile state belongs in the schema-owned `profile` object.
+
+## Export Record Color Metadata
+
+The existing `exports.export_settings_json` field records export color metadata for local alpha proof work.
+
+Required color metadata keys for JPEG exports:
+
+```txt
+color_profile
+output_sha256
+icc_profile_embedded
+icc_profile_sha256
+profile_metadata_source
+```
+
+These fields are export evidence. They do not prove visual color correctness.
+
 ## Migration Policy
 
 ```txt

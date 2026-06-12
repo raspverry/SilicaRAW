@@ -89,7 +89,7 @@ Current planned order:
 13.4 probe harness [complete]
 13.5 support matrix [complete]
 13.6 ICC export proof
-13.7 schema-safe color metadata
+13.7 schema-safe color metadata [complete]
 13.8 explicit export color options
 ```
 
@@ -134,6 +134,25 @@ Manual visual review is ready but not executed:
 - [Color Export Manual QA Checklist](../../../checklists/COLOR_EXPORT_MANUAL_QA.md)
 
 User-facing Display P3 export remains blocked until Task 13.8 wires an explicit product option.
+
+## Phase 13.7 Color Metadata Contract
+
+Task 13.7 keeps color metadata in existing schema-owned fields:
+
+```txt
+edit_graph.profile.input_profile
+edit_graph.profile.working_space
+edit_graph.profile.decoder_backend
+exports.export_settings_json.color_profile
+exports.export_settings_json.output_sha256
+exports.export_settings_json.icc_profile_embedded
+exports.export_settings_json.icc_profile_sha256
+exports.export_settings_json.profile_metadata_source
+```
+
+Default edit graphs record `input_profile = "unknown"` and `decoder_backend = null`. Evidence-backed raster profile updates use `decoder_backend = "raster"`.
+
+No new edit graph schema fields were added.
 
 ## Color-Dependent Tags
 

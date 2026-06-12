@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-13 | Color metadata contract added
+
+- Completed Task 13.7 with schema-owned edit graph profile metadata helpers and validation.
+- Export records now preserve output SHA-256, ICC embedded state, ICC profile SHA-256, and profile metadata source in existing `export_settings_json`.
+- Kept unknown profile data explicit and avoided new hidden schema fields.
+
 ## [2026-06-12] phase-13 | ICC export proof added
 
 - Completed Task 13.6 with JPEG ICC embedding and inspection for default sRGB export and explicit Display P3 export API proof.

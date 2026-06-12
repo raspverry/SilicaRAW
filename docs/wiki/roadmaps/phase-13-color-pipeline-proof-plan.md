@@ -33,7 +33,8 @@ As of 2026-06-12:
 - Task 13.4 color probe harness is complete.
 - Task 13.5 color support matrix is complete.
 - Task 13.6 ICC export proof is complete.
-- Task 13.7 color metadata contract is next.
+- Task 13.7 color metadata contract is complete.
+- Task 13.8 explicit export color options is next.
 
 ## Goal
 
@@ -110,14 +111,14 @@ Create fixture-backed evidence for:
 ### Task 13.7: Color Metadata Contract
 
 - **Card:** [13.7 Color Metadata Contract](../tasks/13.7-color-metadata-contract.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** Existing edit graph/profile fields carry color metadata without inventing hidden schema fields.
 - **Validation:** `cargo test -p silica-edit -p silica-render -p silica-export`
 
 ### Task 13.8: Explicit Export Color Options
 
 - **Card:** [13.8 Explicit Export Color Options](../tasks/13.8-explicit-export-color-options.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** Export UI/API makes sRGB default and Display P3 explicit only after fixture-backed proof.
 - **Validation:** export UI smoke and color export tests.
 

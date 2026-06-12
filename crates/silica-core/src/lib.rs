@@ -1204,6 +1204,10 @@ pub fn export_photo_jpeg_srgb(
         "contrast": render_request.contrast,
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
+        "output_sha256": export_result.output_sha256,
+        "icc_profile_embedded": export_result.icc_profile_embedded,
+        "icc_profile_sha256": export_result.icc_profile_sha256,
+        "profile_metadata_source": "silica-export",
     })
     .to_string();
     let export_record = silica_storage::record_export(
@@ -3154,7 +3158,21 @@ mod tests {
                 .expect("read latest export")
                 .expect("latest export");
         assert_eq!(latest.id, exported.export_record_id);
-        assert!(latest.export_settings_json.contains("\"srgb\""));
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["color_profile"], "srgb");
+        assert_eq!(settings["icc_profile_embedded"], true);
+        assert_eq!(
+            settings["icc_profile_sha256"],
+            "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e"
+        );
+        assert_eq!(
+            settings["output_sha256"]
+                .as_str()
+                .expect("output hash string")
+                .len(),
+            64
+        );
 
         let flags = get_photo_flags(&created.root_path, &exported.photo_id)
             .expect("read flags")

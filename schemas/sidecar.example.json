@@ -29,10 +29,10 @@
     },
     "profile": {
       "name": "silica_standard",
-      "input_profile": "camera_default",
+      "input_profile": "unknown",
       "working_space": "linear_display_p3",
       "camera_profile": null,
-      "decoder_backend": "core_image_raw"
+      "decoder_backend": null
     },
     "basic": {
       "white_balance": "as_shot",

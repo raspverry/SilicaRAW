@@ -19,6 +19,12 @@ pub const EDIT_GRAPH_SCHEMA: &str = "silica.edit_graph";
 /// Stable edit graph schema version for v0.1.
 pub const EDIT_GRAPH_VERSION: i64 = 1;
 
+/// Explicit input profile value when no fixture-backed profile evidence exists.
+pub const INPUT_PROFILE_UNKNOWN: &str = "unknown";
+
+/// First working space selected by the color pipeline proof plan.
+pub const WORKING_SPACE_LINEAR_DISPLAY_P3: &str = "linear_display_p3";
+
 /// Source fields needed to build a default edit graph for a catalog photo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditGraphSource {
@@ -88,6 +94,32 @@ pub enum DecoderBackend {
     Libraw,
     EmbeddedPreview,
     Raster,
+}
+
+/// Evidence-backed color profile metadata for schema-owned edit graph fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorProfileMetadata {
+    pub input_profile: String,
+    pub working_space: String,
+    pub decoder_backend: Option<DecoderBackend>,
+}
+
+impl ColorProfileMetadata {
+    pub fn unknown() -> Self {
+        Self {
+            input_profile: INPUT_PROFILE_UNKNOWN.to_string(),
+            working_space: WORKING_SPACE_LINEAR_DISPLAY_P3.to_string(),
+            decoder_backend: None,
+        }
+    }
+
+    pub fn raster(input_profile: impl Into<String>) -> Self {
+        Self {
+            input_profile: input_profile.into(),
+            working_space: WORKING_SPACE_LINEAR_DISPLAY_P3.to_string(),
+            decoder_backend: Some(DecoderBackend::Raster),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -388,8 +420,8 @@ pub fn default_edit_graph(source: EditGraphSource, updated_at: impl Into<String>
         },
         profile: Profile {
             name: "silica_standard".to_string(),
-            input_profile: "camera_default".to_string(),
-            working_space: "linear_display_p3".to_string(),
+            input_profile: INPUT_PROFILE_UNKNOWN.to_string(),
+            working_space: WORKING_SPACE_LINEAR_DISPLAY_P3.to_string(),
             camera_profile: None,
             decoder_backend: None,
         },
@@ -500,6 +532,21 @@ pub fn apply_exposure_contrast(
     Ok(edited)
 }
 
+/// Return a graph with evidence-backed color profile metadata in schema-owned fields.
+pub fn apply_color_profile_metadata(
+    graph: &EditGraph,
+    metadata: ColorProfileMetadata,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.profile.input_profile = metadata.input_profile;
+    edited.profile.working_space = metadata.working_space;
+    edited.profile.decoder_backend = metadata.decoder_backend;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Validate JSON against the local alpha edit graph contract.
 pub fn validate_edit_graph_json(value: &Value) -> Result<(), EditGraphValidationError> {
     let graph: EditGraph = serde_json::from_value(value.clone())
@@ -523,6 +570,7 @@ pub fn validate_edit_graph(graph: &EditGraph) -> Result<(), EditGraphValidationE
     }
 
     validate_source(&graph.source)?;
+    validate_profile(&graph.profile)?;
     validate_basic(&graph.basic)?;
     validate_tone(&graph.tone)?;
     validate_color(&graph.color)?;
@@ -533,6 +581,39 @@ pub fn validate_edit_graph(graph: &EditGraph) -> Result<(), EditGraphValidationE
         validate_mask(index, mask)?;
     }
     validate_metadata(&graph.metadata)?;
+
+    Ok(())
+}
+
+fn validate_profile(profile: &Profile) -> Result<(), EditGraphValidationError> {
+    if profile.name.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            "profile.name",
+            "must not be empty",
+        ));
+    }
+    if profile.input_profile.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            "profile.input_profile",
+            "must not be empty",
+        ));
+    }
+    if profile.working_space.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            "profile.working_space",
+            "must not be empty",
+        ));
+    }
+    if profile
+        .camera_profile
+        .as_ref()
+        .is_some_and(|camera_profile| camera_profile.trim().is_empty())
+    {
+        return Err(EditGraphValidationError::new(
+            "profile.camera_profile",
+            "must not be empty when present",
+        ));
+    }
 
     Ok(())
 }
@@ -916,6 +997,12 @@ mod tests {
         assert_eq!(graph.basic.exposure.as_f64(), Some(0.0));
         assert_eq!(graph.basic.contrast.as_f64(), Some(0.0));
         assert_eq!(graph.source.photo_id, "photo-1");
+        assert_eq!(graph.profile.input_profile, super::INPUT_PROFILE_UNKNOWN);
+        assert_eq!(
+            graph.profile.working_space,
+            super::WORKING_SPACE_LINEAR_DISPLAY_P3
+        );
+        assert_eq!(graph.profile.decoder_backend, None);
         super::validate_edit_graph(&graph).expect("default edit graph validates");
 
         let edited = super::apply_exposure_contrast(&graph, 0.75, -12.0, "unix:3")
@@ -925,6 +1012,44 @@ mod tests {
         assert_eq!(edited.basic.contrast.as_f64(), Some(-12.0));
         assert_eq!(edited.updated_at, "unix:3");
         super::validate_edit_graph(&edited).expect("edited graph validates");
+    }
+
+    #[test]
+    fn applies_color_profile_metadata_to_schema_owned_fields() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_color_profile_metadata(
+            &graph,
+            super::ColorProfileMetadata::raster("srgb"),
+            "unix:3",
+        )
+        .expect("apply raster profile metadata");
+        let serialized = serde_json::to_value(&edited).expect("serialize graph");
+
+        assert_eq!(edited.profile.input_profile, "srgb");
+        assert_eq!(
+            edited.profile.working_space,
+            super::WORKING_SPACE_LINEAR_DISPLAY_P3
+        );
+        assert_eq!(
+            edited.profile.decoder_backend,
+            Some(super::DecoderBackend::Raster)
+        );
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(serialized["profile"]["input_profile"], json!("srgb"));
+        assert_eq!(serialized["profile"]["decoder_backend"], json!("raster"));
+        assert_eq!(serialized["extensions"], json!({}));
+        super::validate_edit_graph_json(&serialized).expect("profile metadata validates");
     }
 
     #[test]

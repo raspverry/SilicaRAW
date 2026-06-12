@@ -21,6 +21,7 @@ The edit graph is the authoritative portable structure for non-destructive edit 
 - Serialization must continue to round-trip `schemas/edit_graph.example.json`.
 - JSON validation must reject wrong schema/version values, closed-object unknown fields, invalid enum values, and out-of-range numeric values.
 - Unknown experimental data belongs under `extensions`.
+- Color profile state belongs in schema-owned `profile` fields, not hidden top-level or extension fields.
 
 ## Required Sections
 
@@ -36,6 +37,18 @@ The edit graph is the authoritative portable structure for non-destructive edit 
 - `metadata`
 - `extensions`
 
+## Color Profile Contract
+
+The profile object carries color metadata:
+
+```txt
+profile.input_profile -> explicit profile name, or "unknown" when unavailable
+profile.working_space -> "linear_display_p3" for the current pipeline
+profile.decoder_backend -> raster/core_image_raw/libraw/embedded_preview/null
+```
+
+Default edit graphs use `input_profile = "unknown"` and `decoder_backend = null`. Evidence-backed updates use `crates/silica-edit` profile helpers to write these schema-owned fields directly.
+
 ## Links
 
 - [Edit Graph Schema](../../../schemas/edit_graph.schema.json)
@@ -47,4 +60,4 @@ The edit graph is the authoritative portable structure for non-destructive edit 
 
 Do not invent an alternate edit graph. Do not place experimental top-level fields beside schema-owned fields; use `extensions`.
 
-Phase 5.3 adds the first exposure/contrast graph update path and commit boundary. Pixel edit application, full render integration, sidecar persistence, product UI controls, RAW decoding, Metal viewer work, MLX, MCP, and plugin behavior remain separate explicit tasks.
+Phase 5.3 adds the first exposure/contrast graph update path and commit boundary. Phase 13.7 adds the color metadata contract for schema-owned `profile` fields. Pixel edit application, full render integration, sidecar persistence, product UI controls, RAW decoding, Metal viewer work, MLX, MCP, and plugin behavior remain separate explicit tasks.
