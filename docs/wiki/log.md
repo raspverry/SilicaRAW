@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Native viewer lifecycle proof added
+
+- Completed Task 14.4 with feature-gated product module lifecycle proof state for reserved host geometry, drawable size, backing scale, install/uninstall lifecycle, render timing, and cleanup reason.
+- Added a neutral macOS smoke evidence path and `checklists/NATIVE_VIEWER_LIFECYCLE_QA.md`.
+- Kept final product image viewer installation, product texture allocation, RAW pixels, shader passes, and default feature-off app behavior out of scope.
+
 ## [2026-06-12] phase-14 | Reserved viewer layout handshake added
 
 - Completed Task 14.3 with reserved native viewer host markers for Loupe and Develop surfaces plus an inert feature-off geometry reporting API.

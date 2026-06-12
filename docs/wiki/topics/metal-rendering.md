@@ -62,6 +62,8 @@ Task 14.2 added the non-default `native-metal-viewer` feature and `native_metal_
 
 Task 14.3 added reserved viewer host markers for the Loupe and Develop viewer surfaces. The static UI exposes an inert feature-off `window.SilicaRAWViewerHost` geometry API that reports logical web coordinates, backing scale, drawable size, surface identity, and web-fallback state for the reserved host only.
 
+Task 14.4 added feature-gated product module lifecycle proof state for reserved host geometry, drawable size changes, Retina backing scale, neutral render timing, and cleanup. The recorded proof output is explicitly `neutral_clear_only=true`; it does not install the final product image viewer, allocate product textures, render RAW pixels, or change the default feature-off app path. Manual evidence is recorded in [Native Viewer Lifecycle QA Checklist](../../../checklists/NATIVE_VIEWER_LIFECYCLE_QA.md).
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.
@@ -103,7 +105,7 @@ Task 14.3 implements the first layout handshake. Task 14.1 only fixes the contra
 - Raw AppKit or Metal handles must not cross IPC into the web layer.
 - The default desktop build must not compile or run the product native viewer.
 
-Task 14.2 creates the feature-gated module shell. Task 14.4 proves resize, Retina scale, render timing, and lifecycle behavior.
+Task 14.2 creates the feature-gated module shell. Task 14.4 proves resize, Retina scale, render timing, and lifecycle evidence through neutral product-module proof state.
 
 ### Event Ownership Contract
 

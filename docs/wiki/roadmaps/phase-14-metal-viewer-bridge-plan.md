@@ -27,7 +27,8 @@ As of 2026-06-12:
 - Task 14.1 bridge contract is complete.
 - Task 14.2 feature-gated product module shell is complete.
 - Task 14.3 reserved viewer layout handshake is complete.
-- No lifecycle proof, texture lifecycle, or viewer QA checklist exists yet.
+- Task 14.4 resize, Retina, and lifecycle proof is complete.
+- No viewer input proof, texture lifecycle, or viewer QA checklist exists yet.
 
 ## Goal
 
@@ -96,14 +97,14 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.4: Resize, Retina, and Lifecycle Proof
 
 - **Card:** [14.4 Resize Retina Lifecycle Proof](../tasks/14.4-resize-retina-lifecycle-proof.md)
-- **Status:** next
-- **Output:** Product viewer module records resize, drawable size, backing scale, install/uninstall lifecycle, and render timing evidence.
+- **Status:** complete
+- **Output:** Product viewer module records resize, drawable size, backing scale, install/uninstall lifecycle, and render timing evidence through neutral feature-gated proof state.
 - **Validation:** `cargo test -p silica-desktop --features native-metal-viewer`, manual macOS runbook evidence
 
 ### Task 14.5: Viewer Input Ownership Proof
 
 - **Card:** [14.5 Viewer Input Ownership Proof](../tasks/14.5-viewer-input-ownership-proof.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** Native viewer owns only viewer-surface mouse/drag/scroll/magnify events while web UI controls retain normal interaction.
 - **Validation:** input smoke logs and manual QA checklist entries
 

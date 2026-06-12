@@ -1745,7 +1745,17 @@ fn main() {
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
 
     #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
-    let _native_viewer_contract = native_metal_viewer::module_contract();
+    {
+        let _native_viewer_contract = native_metal_viewer::module_contract();
+        if std::env::var_os("SILICA_NATIVE_VIEWER_LIFECYCLE_PROOF").is_some() {
+            match native_metal_viewer::lifecycle_smoke_evidence() {
+                Ok(evidence) => eprintln!("[SilicaRAW Native Viewer] {evidence}"),
+                Err(error) => {
+                    eprintln!("[SilicaRAW Native Viewer] lifecycle proof unavailable: {error}")
+                }
+            }
+        }
+    }
 
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
     let builder = builder.setup(metal_host_spike::install);
