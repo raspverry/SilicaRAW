@@ -39,6 +39,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local DMG Release Runbook](roadmaps/local-dmg-release-runbook.md): maintainer steps for signed local releases and current unsigned preview artifacts.
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
+- [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
 
 ### Phase Briefs
 

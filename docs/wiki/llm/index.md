@@ -26,6 +26,7 @@ The next planned product work is [Phase 12: Core Image RAW Decode Proof](../phas
 
 For Phase 12 work, read:
 
+- [Phase 12 RAW Proof Plan](../roadmaps/phase-12-raw-proof-plan.md)
 - [Phase 12 Brief](../phases/phase-12-raw-proof.md)
 - The matching task card under [Task Cards](../tasks/index.md)
 - [RAW Decoding](../topics/raw-decoding.md)

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | RAW proof plan page added
+
+- Added a public wiki Phase 12 RAW proof plan page.
+- Added Task 12.5 as the legal RAW fixture evidence gate before any product RAW support claim.
+- Linked the plan from the wiki index, Phase 12 brief, LLM routing index, task cards, and post-alpha roadmap.
+
 ## [2026-06-12] phase-12 | Product RAW decode contract added
 
 - Completed Task 12.4 product RAW decode API contract.

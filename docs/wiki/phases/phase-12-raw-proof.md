@@ -18,6 +18,7 @@ This phase is a proof phase, not a broad RAW editor implementation phase.
 
 For all Phase 12 tasks, read:
 
+- [Phase 12 RAW Proof Plan](../roadmaps/phase-12-raw-proof-plan.md)
 - [Phase 12 RAW Proof Design](../../superpowers/specs/2026-06-11-phase-12-raw-proof-design.md)
 - [Phase 12 RAW Proof Implementation Plan](../../superpowers/plans/2026-06-11-phase-12-raw-proof.md)
 - [LLM Routing Index](../llm/index.md)
@@ -41,6 +42,7 @@ When the task adds or changes dependencies, also read:
 2. [Task 12.2: RAW Fixture Probe Harness](../tasks/12.2-raw-fixture-probe-harness.md)
 3. [Task 12.3: Core Image Support Matrix and LibRaw Gate](../tasks/12.3-core-image-support-matrix.md)
 4. [Task 12.4: Product RAW Decode API Contract](../tasks/12.4-product-raw-decode-api-contract.md)
+5. [Task 12.5: Legal RAW Fixture Evidence](../tasks/12.5-legal-raw-fixture-evidence.md)
 
 ## Scope
 
@@ -62,7 +64,7 @@ When the task adds or changes dependencies, also read:
 
 Stop if:
 
-- No legal RAW fixtures are available for the probe task.
+- A legal RAW fixture source cannot be proven for evidence work.
 - Core Image bindings require an undocumented dependency.
 - A probe result cannot record source hash and original-preservation evidence.
 - A task would move product UI RAW display ahead of the support matrix.

@@ -19,6 +19,7 @@ Task cards are small, LLM-readable pages for the next atomic work items. Use the
 - [12.2: RAW Fixture Probe Harness](12.2-raw-fixture-probe-harness.md)
 - [12.3: Core Image Support Matrix and LibRaw Gate](12.3-core-image-support-matrix.md)
 - [12.4: Product RAW Decode API Contract](12.4-product-raw-decode-api-contract.md)
+- [12.5: Legal RAW Fixture Evidence](12.5-legal-raw-fixture-evidence.md)
 
 ## Notes for LLM Agents
 

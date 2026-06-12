@@ -333,6 +333,22 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Unsupported RAWs still surface clear blocked states.
 - **Validation:** `cargo test -p silica-decode -p silica-core`
 
+### Task 12.5: Legal RAW Fixture Evidence Gate
+
+- **Location:** `docs/wiki/topics/raw-decoding.md`, `docs/wiki/tasks/12.5-legal-raw-fixture-evidence.md`, ignored local fixture paths
+- **Description:** Review legal RAW fixture sources, create an ignored local fixture manifest, run the Core Image probe harness, and update the support matrix from evidence.
+- **Dependencies:** Task 12.2
+- **Acceptance Criteria:**
+  - Fixture media and local manifests are not committed.
+  - Every used fixture has source, license, privacy, SHA-256, and fixture class recorded.
+  - Probe results preserve original hashes and classify success or failure.
+  - Support matrix updates are evidence-backed.
+  - Product RAW support changes after successful evidence are separate atomic tasks.
+- **Validation:**
+  - `SILICARAW_RAW_FIXTURE_MANIFEST=... scripts/harness/check-raw-probe-fixtures.py`
+  - `python3 scripts/harness/check-md-links.py`
+  - `scripts/harness/check.sh`
+
 ## Phase 13: Color Pipeline Proof
 
 **Goal:** Prove the Core Image/ColorSync-compatible path before expanding export and preview claims.
