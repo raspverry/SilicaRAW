@@ -28,7 +28,8 @@ As of 2026-06-12:
 - Task 14.2 feature-gated product module shell is complete.
 - Task 14.3 reserved viewer layout handshake is complete.
 - Task 14.4 resize, Retina, and lifecycle proof is complete.
-- No viewer input proof, texture lifecycle, or viewer QA checklist exists yet.
+- Task 14.5 viewer input ownership proof is complete.
+- No render request boundary, texture lifecycle, or viewer QA checklist exists yet.
 
 ## Goal
 
@@ -104,14 +105,14 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.5: Viewer Input Ownership Proof
 
 - **Card:** [14.5 Viewer Input Ownership Proof](../tasks/14.5-viewer-input-ownership-proof.md)
-- **Status:** next
-- **Output:** Native viewer owns only viewer-surface mouse/drag/scroll/magnify events while web UI controls retain normal interaction.
+- **Status:** complete
+- **Output:** Native viewer input proof records mouse down, drag, scroll, and magnify as native-owned only inside the reserved viewer rectangle while outside samples remain web-owned.
 - **Validation:** input smoke logs and manual QA checklist entries
 
 ### Task 14.6: Render Request Boundary
 
 - **Card:** [14.6 Render Request Boundary](../tasks/14.6-render-request-boundary.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** `silica-render` and desktop bridge agree on a typed preview render request where latest request wins and no catalog state is written.
 - **Validation:** `cargo test -p silica-render -p silica-desktop --features native-metal-viewer`
 

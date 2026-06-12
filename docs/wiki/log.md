@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Native viewer input ownership proof added
+
+- Completed Task 14.5 with feature-gated input ownership proof state for mouse down, drag, scroll, magnify, native-owned viewer samples, and web-owned outside samples.
+- Added a neutral macOS input smoke evidence path and `checklists/NATIVE_VIEWER_INPUT_QA.md`.
+- Kept telemetry, analytics, persistent input logging, product image rendering, RAW pixels, and texture cache behavior out of scope.
+
 ## [2026-06-12] phase-14 | Native viewer lifecycle proof added
 
 - Completed Task 14.4 with feature-gated product module lifecycle proof state for reserved host geometry, drawable size, backing scale, install/uninstall lifecycle, render timing, and cleanup reason.

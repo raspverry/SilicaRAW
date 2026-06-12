@@ -64,6 +64,8 @@ Task 14.3 added reserved viewer host markers for the Loupe and Develop viewer su
 
 Task 14.4 added feature-gated product module lifecycle proof state for reserved host geometry, drawable size changes, Retina backing scale, neutral render timing, and cleanup. The recorded proof output is explicitly `neutral_clear_only=true`; it does not install the final product image viewer, allocate product textures, render RAW pixels, or change the default feature-off app path. Manual evidence is recorded in [Native Viewer Lifecycle QA Checklist](../../../checklists/NATIVE_VIEWER_LIFECYCLE_QA.md).
 
+Task 14.5 added feature-gated input ownership proof state. Mouse down, drag, scroll, and magnify samples are native-owned only inside the reserved viewer rectangle; outside samples remain web-owned. Manual evidence is recorded in [Native Viewer Input QA Checklist](../../../checklists/NATIVE_VIEWER_INPUT_QA.md), and the proof keeps telemetry and persistent input logging disabled.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.
@@ -114,7 +116,7 @@ Task 14.2 creates the feature-gated module shell. Task 14.4 proves resize, Retin
 - Native viewer input must not break sidebar selection, toolbar commands, inspector controls, export dialogs, text inputs, or keyboard shortcuts.
 - Native focus is viewer-local. It must not capture global shortcuts unless a future explicit viewer shortcut task defines that behavior.
 - Drag-and-drop import remains a web/shell workflow until a separate task changes it.
-- Phase 14.5 must record event evidence for mouse down, drag, scroll, magnify, focus changes, and web-control interaction after native viewer installation.
+- Task 14.5 records event ownership evidence for mouse down, drag, scroll, magnify, and web-control separation through neutral feature-gated proof state. Future native AppKit installation must preserve the same ownership boundary.
 
 ### Render Request Boundary
 

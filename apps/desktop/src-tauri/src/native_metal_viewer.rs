@@ -360,10 +360,285 @@ fn cleanup_reason_labels() -> [&'static str; 2] {
     ]
 }
 
+/// Bounds of the reserved viewer input surface in AppKit point space.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NativeViewerInputBounds {
+    surface: String,
+    x_points: f64,
+    y_points: f64,
+    width_points: f64,
+    height_points: f64,
+}
+
+impl NativeViewerInputBounds {
+    pub fn new(
+        surface: impl Into<String>,
+        x_points: f64,
+        y_points: f64,
+        width_points: f64,
+        height_points: f64,
+    ) -> Result<Self, NativeViewerLifecycleError> {
+        let surface = surface.into();
+        if surface != "loupe" && surface != "develop" {
+            return Err(NativeViewerLifecycleError::new(format!(
+                "unsupported native viewer input surface: {surface}"
+            )));
+        }
+        for (name, value) in [
+            ("x", x_points),
+            ("y", y_points),
+            ("width", width_points),
+            ("height", height_points),
+        ] {
+            if !value.is_finite() {
+                return Err(NativeViewerLifecycleError::new(format!(
+                    "invalid native viewer input {name}: {value}"
+                )));
+            }
+        }
+        if width_points <= 0.0 || height_points <= 0.0 {
+            return Err(NativeViewerLifecycleError::new(
+                "native viewer input bounds must have positive size",
+            ));
+        }
+
+        Ok(Self {
+            surface,
+            x_points,
+            y_points,
+            width_points,
+            height_points,
+        })
+    }
+
+    fn surface(&self) -> &str {
+        &self.surface
+    }
+
+    fn contains(&self, event: &NativeViewerInputEvent) -> bool {
+        event.x_points >= self.x_points
+            && event.y_points >= self.y_points
+            && event.x_points <= self.x_points + self.width_points
+            && event.y_points <= self.y_points + self.height_points
+    }
+}
+
+/// Input event kinds covered by the Phase 14.5 proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeViewerInputKind {
+    MouseDown,
+    MouseDrag,
+    Scroll,
+    Magnify,
+}
+
+/// Ownership decision for one input event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeViewerInputOwnership {
+    NativeViewer,
+    WebUi,
+}
+
+/// Input event sample for feature-gated ownership proof.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NativeViewerInputEvent {
+    kind: NativeViewerInputKind,
+    x_points: f64,
+    y_points: f64,
+    delta_x_points: f64,
+    delta_y_points: f64,
+    magnification: f64,
+}
+
+impl NativeViewerInputEvent {
+    pub fn mouse_down(x_points: f64, y_points: f64) -> Self {
+        Self {
+            kind: NativeViewerInputKind::MouseDown,
+            x_points,
+            y_points,
+            delta_x_points: 0.0,
+            delta_y_points: 0.0,
+            magnification: 0.0,
+        }
+    }
+
+    pub fn mouse_drag(
+        x_points: f64,
+        y_points: f64,
+        delta_x_points: f64,
+        delta_y_points: f64,
+    ) -> Self {
+        Self {
+            kind: NativeViewerInputKind::MouseDrag,
+            x_points,
+            y_points,
+            delta_x_points,
+            delta_y_points,
+            magnification: 0.0,
+        }
+    }
+
+    pub fn scroll(x_points: f64, y_points: f64, delta_x_points: f64, delta_y_points: f64) -> Self {
+        Self {
+            kind: NativeViewerInputKind::Scroll,
+            x_points,
+            y_points,
+            delta_x_points,
+            delta_y_points,
+            magnification: 0.0,
+        }
+    }
+
+    pub fn magnify(x_points: f64, y_points: f64, magnification: f64) -> Self {
+        Self {
+            kind: NativeViewerInputKind::Magnify,
+            x_points,
+            y_points,
+            delta_x_points: 0.0,
+            delta_y_points: 0.0,
+            magnification,
+        }
+    }
+
+    fn validate(&self) -> Result<(), NativeViewerLifecycleError> {
+        for (name, value) in [
+            ("x", self.x_points),
+            ("y", self.y_points),
+            ("delta_x", self.delta_x_points),
+            ("delta_y", self.delta_y_points),
+            ("magnification", self.magnification),
+        ] {
+            if !value.is_finite() {
+                return Err(NativeViewerLifecycleError::new(format!(
+                    "invalid native viewer input {name}: {value}"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Ownership record returned by the input proof recorder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeViewerInputRecord {
+    pub ownership: NativeViewerInputOwnership,
+}
+
+/// Feature-gated input ownership proof for the product native viewer bridge.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NativeViewerInputProof {
+    bounds: NativeViewerInputBounds,
+    native_events: u64,
+    web_events: u64,
+    mouse_down_seen: bool,
+    mouse_drag_seen: bool,
+    scroll_seen: bool,
+    magnify_seen: bool,
+    web_controls_external: bool,
+    remote_reporting_enabled: bool,
+    persistent_input_log_enabled: bool,
+}
+
+impl NativeViewerInputProof {
+    pub fn new(bounds: NativeViewerInputBounds) -> Self {
+        Self {
+            bounds,
+            native_events: 0,
+            web_events: 0,
+            mouse_down_seen: false,
+            mouse_drag_seen: false,
+            scroll_seen: false,
+            magnify_seen: false,
+            web_controls_external: true,
+            remote_reporting_enabled: false,
+            persistent_input_log_enabled: false,
+        }
+    }
+
+    pub fn record_event(
+        &mut self,
+        event: NativeViewerInputEvent,
+    ) -> Result<NativeViewerInputRecord, NativeViewerLifecycleError> {
+        event.validate()?;
+        let ownership = if self.bounds.contains(&event) {
+            self.native_events += 1;
+            match event.kind {
+                NativeViewerInputKind::MouseDown => self.mouse_down_seen = true,
+                NativeViewerInputKind::MouseDrag => self.mouse_drag_seen = true,
+                NativeViewerInputKind::Scroll => self.scroll_seen = true,
+                NativeViewerInputKind::Magnify => self.magnify_seen = true,
+            }
+            NativeViewerInputOwnership::NativeViewer
+        } else {
+            self.web_events += 1;
+            NativeViewerInputOwnership::WebUi
+        };
+
+        Ok(NativeViewerInputRecord { ownership })
+    }
+
+    pub fn native_event_count(&self) -> u64 {
+        self.native_events
+    }
+
+    pub fn web_event_count(&self) -> u64 {
+        self.web_events
+    }
+
+    pub fn web_controls_remain_external(&self) -> bool {
+        self.web_controls_external
+    }
+
+    pub fn remote_reporting_enabled(&self) -> bool {
+        self.remote_reporting_enabled
+    }
+
+    pub fn persistent_input_log_enabled(&self) -> bool {
+        self.persistent_input_log_enabled
+    }
+
+    pub fn evidence_summary(&self) -> String {
+        format!(
+            "surface={} native_events={} web_events={} mouse_down={} mouse_drag={} scroll={} magnify={} web_controls_external={} remote_reporting={} persistent_input_log={}",
+            self.bounds.surface(),
+            self.native_events,
+            self.web_events,
+            self.mouse_down_seen,
+            self.mouse_drag_seen,
+            self.scroll_seen,
+            self.magnify_seen,
+            self.web_controls_external,
+            self.remote_reporting_enabled,
+            self.persistent_input_log_enabled
+        )
+    }
+}
+
+/// Returns neutral, reviewable input ownership evidence for manual smoke runs.
+pub fn input_smoke_evidence() -> Result<String, NativeViewerLifecycleError> {
+    let bounds = NativeViewerInputBounds::new("develop", 100.0, 80.0, 800.0, 450.0)?;
+    let mut proof = NativeViewerInputProof::new(bounds);
+
+    proof.record_event(NativeViewerInputEvent::mouse_down(120.0, 96.0))?;
+    proof.record_event(NativeViewerInputEvent::mouse_drag(200.0, 180.0, 8.0, -2.0))?;
+    proof.record_event(NativeViewerInputEvent::scroll(320.0, 240.0, 0.0, -12.5))?;
+    proof.record_event(NativeViewerInputEvent::magnify(420.0, 280.0, 0.08))?;
+    proof.record_event(NativeViewerInputEvent::mouse_down(24.0, 36.0))?;
+
+    debug_assert_eq!(proof.native_event_count(), 4);
+    debug_assert_eq!(proof.web_event_count(), 1);
+    debug_assert!(proof.web_controls_remain_external());
+    debug_assert!(!proof.remote_reporting_enabled());
+    debug_assert!(!proof.persistent_input_log_enabled());
+
+    Ok(proof.evidence_summary())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        DrawableSize, NativeViewerCleanupReason, NativeViewerHostGeometry,
+        DrawableSize, NativeViewerCleanupReason, NativeViewerHostGeometry, NativeViewerInputBounds,
+        NativeViewerInputEvent, NativeViewerInputOwnership, NativeViewerInputProof,
         NativeViewerLifecycleProof, NativeViewerLifecycleState,
     };
     use std::time::Duration;
@@ -434,5 +709,82 @@ mod tests {
         assert!(evidence.contains("frames=1"));
         assert!(evidence.contains("cleanup_supported=app-closed,window-closed"));
         assert!(evidence.contains("neutral_clear_only=true"));
+    }
+
+    #[test]
+    fn input_ownership_proof_records_viewer_events_without_claiming_web_controls() {
+        let bounds = NativeViewerInputBounds::new("develop", 100.0, 80.0, 800.0, 450.0).unwrap();
+        let mut proof = NativeViewerInputProof::new(bounds);
+
+        assert_eq!(
+            proof
+                .record_event(NativeViewerInputEvent::mouse_down(120.0, 96.0))
+                .unwrap()
+                .ownership,
+            NativeViewerInputOwnership::NativeViewer
+        );
+        assert_eq!(
+            proof
+                .record_event(NativeViewerInputEvent::mouse_drag(200.0, 180.0, 8.0, -2.0))
+                .unwrap()
+                .ownership,
+            NativeViewerInputOwnership::NativeViewer
+        );
+        assert_eq!(
+            proof
+                .record_event(NativeViewerInputEvent::scroll(320.0, 240.0, 0.0, -12.5))
+                .unwrap()
+                .ownership,
+            NativeViewerInputOwnership::NativeViewer
+        );
+        assert_eq!(
+            proof
+                .record_event(NativeViewerInputEvent::magnify(420.0, 280.0, 0.08))
+                .unwrap()
+                .ownership,
+            NativeViewerInputOwnership::NativeViewer
+        );
+        assert_eq!(
+            proof
+                .record_event(NativeViewerInputEvent::mouse_down(24.0, 36.0))
+                .unwrap()
+                .ownership,
+            NativeViewerInputOwnership::WebUi
+        );
+
+        assert_eq!(proof.native_event_count(), 4);
+        assert_eq!(proof.web_event_count(), 1);
+        assert!(proof.web_controls_remain_external());
+        assert!(!proof.remote_reporting_enabled());
+        assert!(!proof.persistent_input_log_enabled());
+
+        let evidence = proof.evidence_summary();
+        assert!(evidence.contains("surface=develop"));
+        assert!(evidence.contains("native_events=4"));
+        assert!(evidence.contains("web_events=1"));
+        assert!(evidence.contains("mouse_down=true"));
+        assert!(evidence.contains("mouse_drag=true"));
+        assert!(evidence.contains("scroll=true"));
+        assert!(evidence.contains("magnify=true"));
+        assert!(evidence.contains("web_controls_external=true"));
+        assert!(evidence.contains("remote_reporting=false"));
+        assert!(evidence.contains("persistent_input_log=false"));
+    }
+
+    #[test]
+    fn input_smoke_evidence_is_manual_review_ready() {
+        let evidence = super::input_smoke_evidence().unwrap();
+        println!("[SilicaRAW Native Viewer] {evidence}");
+
+        assert!(evidence.contains("surface=develop"));
+        assert!(evidence.contains("native_events=4"));
+        assert!(evidence.contains("web_events=1"));
+        assert!(evidence.contains("mouse_down=true"));
+        assert!(evidence.contains("mouse_drag=true"));
+        assert!(evidence.contains("scroll=true"));
+        assert!(evidence.contains("magnify=true"));
+        assert!(evidence.contains("web_controls_external=true"));
+        assert!(evidence.contains("remote_reporting=false"));
+        assert!(evidence.contains("persistent_input_log=false"));
     }
 }

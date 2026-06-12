@@ -1755,6 +1755,14 @@ fn main() {
                 }
             }
         }
+        if std::env::var_os("SILICA_NATIVE_VIEWER_INPUT_PROOF").is_some() {
+            match native_metal_viewer::input_smoke_evidence() {
+                Ok(evidence) => eprintln!("[SilicaRAW Native Viewer] {evidence}"),
+                Err(error) => {
+                    eprintln!("[SilicaRAW Native Viewer] input proof unavailable: {error}")
+                }
+            }
+        }
     }
 
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
