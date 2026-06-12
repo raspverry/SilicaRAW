@@ -86,7 +86,7 @@ Expected: one docs-only commit.
 - Modify: `crates/silica-decode/Cargo.toml`
 - Modify: `docs/DEPENDENCIES.md`
 
-- [ ] **Step 1: Verify candidate dependency metadata**
+- [x] **Step 1: Verify candidate dependency metadata**
 
 Run:
 
@@ -98,7 +98,7 @@ cargo info sha2@0.10.9
 
 Expected: versions and licenses match the entries planned for `docs/DEPENDENCIES.md`.
 
-- [ ] **Step 2: Add non-default feature and optional macOS dependencies**
+- [x] **Step 2: Add non-default feature and optional macOS dependencies**
 
 Update `crates/silica-decode/Cargo.toml` with this shape after confirming `cargo info` still reports the same versions:
 
@@ -125,7 +125,7 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = ["N
 
 If this snippet does not compile, keep the same dependency family but reduce features to the smallest set that compiles and update `docs/DEPENDENCIES.md` with the verified set.
 
-- [ ] **Step 3: Document dependencies**
+- [x] **Step 3: Document dependencies**
 
 Add entries to `docs/DEPENDENCIES.md` for direct `silica-decode` usage of:
 
@@ -163,7 +163,7 @@ Verification source: cargo info sha2@0.10.9
 
 Also add or update entries for `objc2`, `objc2-foundation`, `objc2-core-graphics`, and any other direct `silica-decode` dependency added in this task.
 
-- [ ] **Step 4: Run dependency checks**
+- [x] **Step 4: Run dependency checks**
 
 Run:
 
@@ -174,7 +174,7 @@ cargo test -p silica-decode --features core-image-raw-probe
 
 Expected: dependency docs pass and the feature build still passes because no code path uses the optional dependencies yet.
 
-- [ ] **Step 5: Commit Task 12.1.1**
+- [x] **Step 5: Commit Task 12.1.1**
 
 Run:
 

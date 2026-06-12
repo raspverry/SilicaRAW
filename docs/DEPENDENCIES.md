@@ -200,7 +200,7 @@ Alternatives considered: Swift/AppKit spike code, raw Objective-C FFI, no native
 Risk notes: Keep isolated behind a non-default feature. Do not spread Objective-C runtime calls into product code without a follow-up bridge design.
 Binary size impact: No default app impact while the feature is disabled. Feature builds link native framework bridge code for the spike.
 Security notes: Uses local macOS runtime APIs only. Avoid exposing these handles to webview IPC or plugins.
-Verification source: `cargo info objc2` for 0.6.4 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+Verification source: `cargo info objc2@0.6.4 --verbose`; repository license and docs at https://github.com/madsmtm/objc2.
 ```
 
 ### AppKit Bindings
@@ -211,7 +211,7 @@ Version: 0.3.2
 Purpose: AppKit NSWindow, NSView, NSEvent, and autoresizing APIs for Spike 001.
 License: Zlib OR Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/madsmtm/objc2
-Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature; crates/silica-decode behind the `core-image-raw-probe` feature.
 Why needed: Required to access the Tauri window content view, attach a native MTKView, and log mouse/trackpad event routing.
 Alternatives considered: Swift/AppKit shim, raw Objective-C message sends only, Tauri webview-only proof.
 Risk notes: Feature-gated proof only. Event mapping from this spike does not finalize the product viewer architecture.
@@ -234,7 +234,7 @@ Alternatives considered: Raw CoreGraphics structs and raw Objective-C FFI.
 Risk notes: Keep scoped to platform bridge code. Do not introduce broader Foundation usage until a native bridge design is accepted.
 Binary size impact: No default app impact while the feature is disabled. Spike builds use macOS system frameworks.
 Security notes: No file, network, or user data access is introduced by this dependency.
-Verification source: `cargo info objc2-foundation` for 0.3.2 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+Verification source: `cargo info objc2-foundation@0.3.2 --verbose`; repository license and docs at https://github.com/madsmtm/objc2.
 ```
 
 ### CoreGraphics Bindings
@@ -245,13 +245,13 @@ Version: 0.3.2
 Purpose: CoreGraphics framework linkage for Metal device creation during Spike 001.
 License: Zlib OR Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/madsmtm/objc2
-Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature; crates/silica-decode behind the `core-image-raw-probe` feature.
 Why needed: `objc2-metal` documents that `MTLCreateSystemDefaultDevice` requires CoreGraphics linkage.
 Alternatives considered: Manual `#[link(name = "CoreGraphics", kind = "framework")]` declaration.
 Risk notes: Linkage helper only for the spike; keep feature-gated.
 Binary size impact: No default app impact while the feature is disabled. CoreGraphics is a macOS system framework.
 Security notes: No image capture or display enumeration behavior is added by this use.
-Verification source: `cargo info objc2-core-graphics` for 0.3.2 metadata; `objc2-metal` crate note for `MTLCreateSystemDefaultDevice`.
+Verification source: `cargo info objc2-core-graphics@0.3.2 --verbose`; `objc2-metal` crate note for `MTLCreateSystemDefaultDevice`.
 ```
 
 ### Metal Bindings
@@ -392,6 +392,36 @@ Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase
 ### RAW Decode — Core Image
 
 ```txt
+Name: objc2-core-image
+Version: 0.3.2
+Purpose: Feature-gated Core Image RAW probe bindings for Task 12.1.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature.
+Why needed: Access Core Image RAW probe APIs without adding LibRaw.
+Alternatives considered: raw Objective-C FFI, Swift shim, LibRaw, no probe.
+Risk notes: Non-default macOS proof only; no product RAW pixels. Enables `objc2-image-io` transitively for Core Image URL/image source support.
+Binary size impact: No default build impact while feature is disabled. Feature builds link Core Image, already present on macOS.
+Security notes: Reads local fixture paths only; must not mutate originals.
+Verification source: `cargo info objc2-core-image@0.3.2 --verbose`.
+```
+
+```txt
+Name: sha2
+Version: 0.10.9
+Purpose: Compute SHA-256 source hashes for feature-gated RAW fixture probe evidence.
+License: MIT OR Apache-2.0
+Repository/Homepage: https://github.com/RustCrypto/hashes
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature.
+Why needed: Task 12.2 evidence must verify source hashes and original-file preservation.
+Alternatives considered: Python-only hash verification, existing partial FNV-style test hash, platform-specific hashing APIs.
+Risk notes: Non-default probe feature only; do not use partial hashes for fixture evidence.
+Binary size impact: No default build impact while feature is disabled. Pure Rust hashing code is linked only into feature builds.
+Security notes: Reads local fixture files only and does not mutate originals.
+Verification source: `cargo info sha2@0.10.9`.
+```
+
+```txt
 Name: Core Image RAW backend
 Version: Apple platform framework
 Purpose: macOS-native RAW decode path
@@ -404,7 +434,7 @@ Risk notes: Supported formats depend on Apple. Less low-level control.
 Binary size impact: platform framework
 Security notes: Decode failures must be non-fatal.
 Verification source: Apple Developer documentation.
-Status after Spike 002: selected as first implementation target, but no Rust/Core Image binding has been added yet.
+Status after Spike 002: selected as first implementation target. Task 12.1 adds a non-default `core-image-raw-probe` binding path for proof work only; product RAW pixels remain out of scope.
 ```
 
 ### RAW Decode — LibRaw

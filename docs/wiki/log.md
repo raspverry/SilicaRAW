@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | Core Image RAW probe feature gated
+
+- Completed Task 12.1.1 Core Image dependency and feature gate.
+- Added the non-default `core-image-raw-probe` feature to `silica-decode`.
+- Documented direct Core Image binding and SHA-256 dependencies without adding product RAW pixels or LibRaw.
+
 ## [2026-06-11] phase-12 | RAW proof plan added
 
 - Added the Phase 12 RAW proof design gate and implementation plan.

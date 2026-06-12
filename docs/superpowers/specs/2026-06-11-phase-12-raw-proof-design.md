@@ -227,6 +227,7 @@ The product API must not:
 - Direct dependency additions or changes are documented.
 - Source hashing dependencies are documented if Rust computes SHA-256.
 - **Validation:** `cargo test -p silica-decode --features core-image-raw-probe`
+- **Status:** Completed on 2026-06-12. Added the non-default `core-image-raw-probe` feature to `silica-decode`, documented direct Core Image/SHA-256 dependencies, and verified default plus feature builds without adding product RAW pixels.
 
 ### Task 12.1.2: Probe Type Contract
 
