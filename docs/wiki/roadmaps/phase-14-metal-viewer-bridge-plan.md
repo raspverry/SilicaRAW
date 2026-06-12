@@ -24,6 +24,7 @@ As of 2026-06-12:
 - The existing `metal_host_spike.rs` is proof code only and must not become the product viewer by rename.
 - Phase 12 RAW proof and Phase 13 color proof are complete enough for Metal bridge planning.
 - Task 14.0 design gate is complete.
+- Task 14.1 bridge contract is complete.
 - No product native viewer module, texture lifecycle, or viewer QA checklist exists yet.
 
 ## Goal
@@ -72,14 +73,14 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.1: AppKit/Metal Viewer Bridge Contract
 
 - **Card:** [14.1 AppKit/Metal Viewer Bridge Contract](../tasks/14.1-appkit-metal-viewer-bridge-contract.md)
-- **Status:** next
+- **Status:** complete
 - **Output:** [Metal Rendering](../topics/metal-rendering.md) records reserved layout, AppKit lifecycle ownership, event ownership, render request boundaries, and Path B stop gates.
 - **Validation:** `python3 scripts/harness/check-md-links.py`
 
 ### Task 14.2: Native Viewer Feature Gate and Module Shell
 
 - **Card:** [14.2 Native Viewer Feature Gate and Module Shell](../tasks/14.2-native-viewer-feature-gate.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** A macOS-only `native-metal-viewer` feature and product module skeleton exist separately from `metal_host_spike.rs`.
 - **Validation:** `cargo check -p silica-desktop`, `cargo check -p silica-desktop --features native-metal-viewer`
 

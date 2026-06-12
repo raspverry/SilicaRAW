@@ -14,8 +14,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 
 ## Architecture
 
-- What exact bridge boundary should implement Spike 001 Path B for the native AppKit/Metal viewer?
-- Which physical mouse and trackpad checklist will graduate the viewer bridge from Path B to implementation-ready?
+- Which physical mouse and trackpad checklist will graduate the viewer bridge from Path B to implementation-ready in Task 14.8?
 - What architecture guardrail checks should be added after the monorepo foundation?
 
 ## RAW and Color
@@ -51,6 +50,7 @@ This page tracks questions that should be answered by maintainers, spikes, tests
 - Phase 4.2 added local library create/open through Core, Storage, and the Tauri shell on 2026-06-08.
 - Phase 4.3 added non-recursive folder import scanning and unsupported-file catalog records on 2026-06-08.
 - ADR 0008 selected MIT for SilicaRAW source code and project documentation on 2026-06-11.
+- Task 14.1 defined the Spike 001 Path B product bridge boundary on 2026-06-12: Tauri/web owns application UI and the logical viewer host rectangle; the feature-gated product native viewer module owns AppKit/Metal lifecycle only inside that rectangle; `silica-render` owns typed render requests; `silica-core` owns catalog/edit coordination.
 
 ## Links
 

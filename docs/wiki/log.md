@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | AppKit Metal viewer bridge contract added
+
+- Completed Task 14.1 with the product bridge contract for reserved viewer layout, AppKit/Metal lifecycle, event ownership, render request boundaries, disposable texture boundaries, and Path B stop gates.
+- Preserved the rule that `metal_host_spike.rs` remains proof code and `native-metal-viewer` product work must be feature-gated.
+- Narrowed the open architecture question for Task 14.8 physical mouse and trackpad checklist evidence.
+
 ## [2026-06-12] roadmap | Post-alpha master execution plan added
 
 - Added a Phase 14 through v1.0 master execution plan so maintainers and agents do not recreate phase-wide plans before each phase.
