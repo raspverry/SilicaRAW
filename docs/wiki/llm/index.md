@@ -2,7 +2,7 @@
 title: LLM Routing Index
 status: active
 audience: agents
-updated: 2026-06-12
+updated: 2026-06-13
 source_of_truth: docs/wiki/index.md
 ---
 
@@ -31,7 +31,7 @@ For Phase 17 planning or implementation, read:
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-17-develop-p0-expansion)
 - [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md)
-- [Task 17.1.1 White Balance Temperature Tint Mutators](../tasks/17.1.1-white-balance-temperature-tint-mutators.md)
+- [Task 17.1.2 Tone Recovery Mutators](../tasks/17.1.2-tone-recovery-mutators.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)

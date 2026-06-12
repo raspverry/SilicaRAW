@@ -2,7 +2,7 @@
 title: Roadmap Overview
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-06-13
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -79,7 +79,7 @@ The current implementation order starts with:
 - Task 15.6, RAW export manual color QA, is complete.
 - Phase 15 is complete.
 - Phase 16 is complete: action trust, semantics, edit history, undo/redo, Develop history panel data, append-only action log, and sidecar status after history commits are implemented.
-- Phase 17 task cards now exist. Next roadmap step is Task 17.1.1, White Balance, Temperature, and Tint Mutators.
+- Task 17.1.1, White Balance, Temperature, and Tint Mutators, is complete. Next roadmap step is Task 17.1.2, Tone Recovery Mutators.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

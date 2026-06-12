@@ -532,6 +532,23 @@ pub fn apply_exposure_contrast(
     Ok(edited)
 }
 
+/// Return a draft graph with white balance, temperature, and tint adjusted.
+pub fn apply_white_balance_temperature_tint(
+    graph: &EditGraph,
+    white_balance: WhiteBalance,
+    temperature: f64,
+    tint: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.white_balance = white_balance;
+    edited.basic.temperature = number_from_f64("basic.temperature", temperature)?;
+    edited.basic.tint = number_from_f64("basic.tint", tint)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Return a graph with evidence-backed color profile metadata in schema-owned fields.
 pub fn apply_color_profile_metadata(
     graph: &EditGraph,
@@ -1015,6 +1032,48 @@ mod tests {
     }
 
     #[test]
+    fn applies_white_balance_temperature_tint_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Cloudy,
+            6400.0,
+            12.5,
+            "unix:3",
+        )
+        .expect("apply white balance family");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.basic.white_balance, super::WhiteBalance::Cloudy);
+        assert_eq!(edited.basic.temperature.as_f64(), Some(6400.0));
+        assert_eq!(edited.basic.tint.as_f64(), Some(12.5));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(
+            round_tripped.basic.white_balance,
+            super::WhiteBalance::Cloudy
+        );
+        assert_eq!(round_tripped.basic.temperature.as_f64(), Some(6400.0));
+        assert_eq!(round_tripped.basic.tint.as_f64(), Some(12.5));
+        assert_eq!(serialized["basic"]["white_balance"], json!("cloudy"));
+        assert_eq!(serialized["basic"]["temperature"].as_f64(), Some(6400.0));
+        assert_eq!(serialized["basic"]["tint"].as_f64(), Some(12.5));
+        super::validate_edit_graph_json(&serialized).expect("white balance graph validates");
+    }
+
+    #[test]
     fn applies_color_profile_metadata_to_schema_owned_fields() {
         let graph = super::default_edit_graph(
             super::EditGraphSource {
@@ -1068,5 +1127,40 @@ mod tests {
 
         assert!(super::apply_exposure_contrast(&graph, 8.0, 0.0, "unix:3").is_err());
         assert!(super::apply_exposure_contrast(&graph, 0.0, 180.0, "unix:3").is_err());
+    }
+
+    #[test]
+    fn rejects_out_of_range_white_balance_temperature_tint_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let cold_error = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Custom,
+            999.0,
+            0.0,
+            "unix:3",
+        )
+        .expect_err("temperature below schema range");
+        let tint_error = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Custom,
+            5200.0,
+            151.0,
+            "unix:3",
+        )
+        .expect_err("tint above schema range");
+
+        assert!(cold_error.to_string().contains("basic.temperature"));
+        assert!(tint_error.to_string().contains("basic.tint"));
     }
 }

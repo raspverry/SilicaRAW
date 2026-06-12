@@ -2,7 +2,7 @@
 title: Post-Alpha Master Execution Plan
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-06-13
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -31,7 +31,7 @@ Allowed reasons to create a new phase-specific plan:
 
 ## Current Position
 
-As of 2026-06-12:
+As of 2026-06-13:
 
 - Phase 12 RAW proof is complete for fixture-backed Core Image support mapping.
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
@@ -54,8 +54,8 @@ As of 2026-06-12:
 - Task 16.5 Append-Only Action Log is complete.
 - Task 16.6 Sidecar Sync Status After History Commits is complete.
 - Phase 16 is complete.
-- Phase 17 task cards now exist.
-- Next task: [17.1.1 White Balance Temperature Tint Mutators](../tasks/17.1.1-white-balance-temperature-tint-mutators.md).
+- Task 17.1.1 White Balance Temperature Tint Mutators is complete.
+- Next task: [17.1.2 Tone Recovery Mutators](../tasks/17.1.2-tone-recovery-mutators.md).
 
 ## Wave Map
 
@@ -386,7 +386,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 17.1.1 from the existing task card.
+1. Execute Task 17.1.2 from the existing task card.
 2. Continue through Phase 17 in order.
 
 ## Links

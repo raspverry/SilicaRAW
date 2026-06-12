@@ -26,7 +26,7 @@ Phase 17 expands basic controls beyond exposure/contrast. Work must stay vertica
 
 | Task | Name | Gate |
 | --- | --- | --- |
-| 17.1.1 | White Balance Mutators | Edit graph validates temperature/tint changes and round-trips schema |
+| 17.1.1 | White Balance Mutators | Complete: edit graph validates temperature/tint changes and round-trips schema |
 | 17.1.2 | Tone Recovery Mutators | Edit graph validates highlights/shadows/whites/blacks and round-trips schema |
 | 17.1.3 | Color Presence Mutators | Edit graph validates vibrance/saturation and round-trips schema |
 | 17.2.1 | White Balance Preview/Commit/Export Parity | WB draft/commit/export use the same validated edit state |
