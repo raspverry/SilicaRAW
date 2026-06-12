@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-12 | Product RAW decode contract added
+
+- Completed Task 12.4 product RAW decode API contract.
+- RAW candidates now return an explicit blocked-pending-evidence plan, and non-RAW candidates return an unsupported-class plan.
+- No RAW pixels, UI display, export path, cache generation, or color correctness claim was added.
+
 ## [2026-06-12] phase-12 | Core Image support matrix recorded
 
 - Completed Task 12.3 with every RAW fixture class marked `blocked_pending_evidence`.

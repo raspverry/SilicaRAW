@@ -153,6 +153,20 @@ No legal RAW fixture probe evidence is available yet. The matrix records blocked
 
 LibRaw remains deferred. No fixture-backed Core Image gap has been recorded, and no decoder dependency should be added from this matrix.
 
+## Phase 12.4 Product RAW Decode API Contract
+
+`silica-decode` and `silica-core` now expose a product RAW decode planning contract.
+
+Current behavior:
+
+```txt
+RAW candidate -> BlockedPendingEvidence
+non-RAW candidate -> BlockedUnsupportedClass
+Supported -> unreachable until fixture evidence changes the matrix
+```
+
+The API returns backend, status, optional dimensions, optional orientation, and a UI-suitable message. It does not return decoded pixels and does not trigger rendering, cache writes, export, or original-file mutation.
+
 ## Links
 
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)

@@ -37,6 +37,12 @@ pub use silica_storage::PhotoMetadataFieldState;
 pub use silica_storage::SidecarWriteResult;
 pub use silica_storage::ValidatedSidecar;
 
+pub fn plan_product_raw_decode(
+    source_path: impl AsRef<str>,
+) -> silica_decode::ProductRawDecodePlan {
+    silica_decode::plan_product_raw_decode(source_path)
+}
+
 const LOCAL_ALPHA_JPEG_QUALITY: u8 = 90;
 const LOCAL_ALPHA_THUMBNAIL_QUALITY: u8 = 82;
 const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
@@ -1902,6 +1908,21 @@ mod tests {
     #[test]
     fn exposes_crate_name() {
         assert_eq!(CRATE_NAME, "silica-core");
+    }
+
+    #[test]
+    fn product_raw_decode_plan_wraps_decode_contract_without_side_effects() {
+        let plan = plan_product_raw_decode("/tmp/sample.dng");
+
+        assert_eq!(plan.source_path, "/tmp/sample.dng");
+        assert_eq!(
+            plan.status,
+            silica_decode::ProductRawDecodeStatus::BlockedPendingEvidence
+        );
+        assert_ne!(
+            plan.status,
+            silica_decode::ProductRawDecodeStatus::Supported
+        );
     }
 
     #[test]

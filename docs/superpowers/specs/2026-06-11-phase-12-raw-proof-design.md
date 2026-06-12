@@ -310,6 +310,7 @@ The product API must not:
   - Unsupported RAWs remain blocked.
   - Render/catalog layers do not own decoder policy.
 - **Validation:** `cargo test -p silica-decode -p silica-core`
+- **Status:** Completed on 2026-06-12. Added product RAW decode plan types and a thin core wrapper. Because Task 12.3 recorded no supported fixture classes, product RAW decode returns blocked states only and does not expose pixels.
 
 ### Task 12.4.2: API Boundary Smoke
 

@@ -597,7 +597,7 @@ git commit -m "docs(raw): record core image support matrix"
 - Modify: `docs/wiki/tasks/12.4-product-raw-decode-api-contract.md`
 - Modify: `docs/wiki/log.md`
 
-- [ ] **Step 1: Add decode API contract types in silica-decode**
+- [x] **Step 1: Add decode API contract types in silica-decode**
 
 Add:
 
@@ -622,7 +622,7 @@ pub struct ProductRawDecodePlan {
 }
 ```
 
-- [ ] **Step 2: Add core wrapper**
+- [x] **Step 2: Add core wrapper**
 
 Add a thin `silica-core` function:
 
@@ -636,7 +636,7 @@ pub fn plan_product_raw_decode(
 
 The wrapper must not read storage, create cache, or render pixels in this task.
 
-- [ ] **Step 3: Add tests**
+- [x] **Step 3: Add tests**
 
 Add tests proving:
 
@@ -647,7 +647,7 @@ assert_ne!(plan.status, silica_decode::ProductRawDecodeStatus::Supported);
 
 until Task 12.3 evidence maps a fixture class to supported.
 
-- [ ] **Step 4: Run validation**
+- [x] **Step 4: Run validation**
 
 Run:
 
@@ -658,7 +658,7 @@ scripts/harness/check.sh
 
 Expected: pass.
 
-- [ ] **Step 5: Commit Task 12.4**
+- [x] **Step 5: Commit Task 12.4**
 
 Run:
 
@@ -671,14 +671,14 @@ git commit -m "feat(raw): add product decode contract"
 
 Before declaring Phase 12 complete:
 
-- [ ] `core-image-raw-probe` is non-default.
-- [ ] Default `scripts/harness/check.sh` passes.
-- [ ] Direct dependencies added to `silica-decode` are documented.
-- [ ] Legal fixture evidence exists for any support claim.
-- [ ] Original hash preservation is checked during fixture probes.
-- [ ] LibRaw is still deferred or backed by a concrete ADR.
-- [ ] No UI RAW pixels are wired.
-- [ ] No color correctness claim is made.
+- [x] `core-image-raw-probe` is non-default.
+- [x] Default `scripts/harness/check.sh` passes.
+- [x] Direct dependencies added to `silica-decode` are documented.
+- [x] Legal fixture evidence exists for any support claim. No support claim is made in Phase 12 while fixture evidence is unavailable.
+- [x] Original hash preservation is checked during fixture probes by the harness. No legal fixture probe has run yet because no legal local RAW fixture manifest is available.
+- [x] LibRaw is still deferred or backed by a concrete ADR.
+- [x] No UI RAW pixels are wired.
+- [x] No color correctness claim is made.
 
 ## Execution Notes
 

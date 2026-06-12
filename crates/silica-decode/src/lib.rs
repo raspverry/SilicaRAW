@@ -189,6 +189,56 @@ pub fn probe_raw_fixture_manifest(
     raw_probe_fixture::probe_raw_fixture_manifest(manifest_path.as_ref())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProductRawDecodeStatus {
+    Supported,
+    BlockedPendingEvidence,
+    BlockedCoreImageFailed,
+    BlockedUnsupportedClass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductRawDecodePlan {
+    pub source_path: String,
+    pub backend: RawProbeBackend,
+    pub status: ProductRawDecodeStatus,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub orientation: Option<i32>,
+    pub message: String,
+}
+
+pub fn plan_product_raw_decode(source_path: impl AsRef<str>) -> ProductRawDecodePlan {
+    let source_path = source_path.as_ref().to_string();
+    let extension = Path::new(&source_path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("");
+
+    if !is_raw_candidate_extension(extension) {
+        return ProductRawDecodePlan {
+            source_path,
+            backend: RawProbeBackend::CoreImageRaw,
+            status: ProductRawDecodeStatus::BlockedUnsupportedClass,
+            width: None,
+            height: None,
+            orientation: None,
+            message: "Product RAW decode is blocked because the source is not a RAW candidate."
+                .to_string(),
+        };
+    }
+
+    ProductRawDecodePlan {
+        source_path,
+        backend: RawProbeBackend::CoreImageRaw,
+        status: ProductRawDecodeStatus::BlockedPendingEvidence,
+        width: None,
+        height: None,
+        orientation: None,
+        message: "Product RAW decode is blocked until legal fixture probe evidence marks this class as supported.".to_string(),
+    }
+}
+
 /// Build the local alpha preview decode plan for a catalog photo path.
 pub fn plan_preview_decode(source_path: impl AsRef<str>, unsupported: bool) -> PreviewDecodePlan {
     let source_path = source_path.as_ref().to_string();
@@ -227,6 +277,14 @@ fn is_raster_preview_extension(extension: &str) -> bool {
     ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
         .iter()
         .any(|supported| extension.eq_ignore_ascii_case(supported))
+}
+
+fn is_raw_candidate_extension(extension: &str) -> bool {
+    [
+        "arw", "cr2", "cr3", "dng", "nef", "orf", "raf", "rw2", "raw",
+    ]
+    .iter()
+    .any(|supported| extension.eq_ignore_ascii_case(supported))
 }
 
 #[cfg(test)]
@@ -418,5 +476,34 @@ mod tests {
                 "{case} returned {error:?}"
             );
         }
+    }
+
+    #[test]
+    fn product_raw_decode_plan_blocks_until_fixture_evidence_exists() {
+        let plan = super::plan_product_raw_decode("/tmp/sample.dng");
+
+        assert_eq!(plan.source_path, "/tmp/sample.dng");
+        assert_eq!(plan.backend, super::RawProbeBackend::CoreImageRaw);
+        assert_ne!(plan.status, super::ProductRawDecodeStatus::Supported);
+        assert_eq!(
+            plan.status,
+            super::ProductRawDecodeStatus::BlockedPendingEvidence
+        );
+        assert_eq!(plan.width, None);
+        assert_eq!(plan.height, None);
+        assert_eq!(plan.orientation, None);
+    }
+
+    #[test]
+    fn product_raw_decode_plan_blocks_non_raw_candidates_as_unsupported_class() {
+        let plan = super::plan_product_raw_decode("/tmp/sample.txt");
+
+        assert_eq!(
+            plan.status,
+            super::ProductRawDecodeStatus::BlockedUnsupportedClass
+        );
+        assert_eq!(plan.width, None);
+        assert_eq!(plan.height, None);
+        assert_eq!(plan.orientation, None);
     }
 }
