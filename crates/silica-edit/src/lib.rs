@@ -568,6 +568,21 @@ pub fn apply_tone_recovery(
     Ok(edited)
 }
 
+/// Return a draft graph with color presence controls adjusted.
+pub fn apply_color_presence(
+    graph: &EditGraph,
+    vibrance: f64,
+    saturation: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.vibrance = number_from_f64("basic.vibrance", vibrance)?;
+    edited.basic.saturation = number_from_f64("basic.saturation", saturation)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Return a graph with evidence-backed color profile metadata in schema-owned fields.
 pub fn apply_color_profile_metadata(
     graph: &EditGraph,
@@ -1129,6 +1144,36 @@ mod tests {
     }
 
     #[test]
+    fn applies_color_presence_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_color_presence(&graph, 24.0, -8.5, "unix:3")
+            .expect("apply color presence");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.basic.vibrance.as_f64(), Some(24.0));
+        assert_eq!(edited.basic.saturation.as_f64(), Some(-8.5));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.basic.vibrance.as_f64(), Some(24.0));
+        assert_eq!(round_tripped.basic.saturation.as_f64(), Some(-8.5));
+        assert_eq!(serialized["basic"]["vibrance"].as_f64(), Some(24.0));
+        assert_eq!(serialized["basic"]["saturation"].as_f64(), Some(-8.5));
+        super::validate_edit_graph_json(&serialized).expect("color presence graph validates");
+    }
+
+    #[test]
     fn applies_color_profile_metadata_to_schema_owned_fields() {
         let graph = super::default_edit_graph(
             super::EditGraphSource {
@@ -1240,5 +1285,28 @@ mod tests {
 
         assert!(highlights_error.to_string().contains("basic.highlights"));
         assert!(blacks_error.to_string().contains("basic.blacks"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_color_presence_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let vibrance_error = super::apply_color_presence(&graph, 101.0, 0.0, "unix:3")
+            .expect_err("vibrance above schema range");
+        let saturation_error = super::apply_color_presence(&graph, 0.0, -101.0, "unix:3")
+            .expect_err("saturation below schema range");
+
+        assert!(vibrance_error.to_string().contains("basic.vibrance"));
+        assert!(saturation_error.to_string().contains("basic.saturation"));
     }
 }
