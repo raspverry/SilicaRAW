@@ -2889,6 +2889,7 @@ dependencies = [
  "objc2-quartz-core",
  "serde",
  "silica-core",
+ "silica-render",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

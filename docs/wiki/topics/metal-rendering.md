@@ -66,6 +66,8 @@ Task 14.4 added feature-gated product module lifecycle proof state for reserved 
 
 Task 14.5 added feature-gated input ownership proof state. Mouse down, drag, scroll, and magnify samples are native-owned only inside the reserved viewer rectangle; outside samples remain web-owned. Manual evidence is recorded in [Native Viewer Input QA Checklist](../../../checklists/NATIVE_VIEWER_INPUT_QA.md), and the proof keeps telemetry and persistent input logging disabled.
 
+Task 14.6 added the first typed viewer preview render request boundary in `silica-render` and a feature-gated desktop bridge scheduler. Requests carry request identity, viewport, source identity, edit revision, and optional future texture identity without image bytes. Scheduling is latest-request-wins and does not write catalog state.
+
 ## Product Bridge Contract
 
 Task 14.1 defines the product AppKit/Metal viewer bridge contract. This contract continues Spike 001 Path B: Tauri remains the shell and control layer, but the viewer is isolated behind a product native module and a reserved layout handshake.
@@ -126,7 +128,7 @@ Future render requests must be typed, request-scoped, and disposable. They must 
 
 Render requests must not write catalog state, sidecars, original files, or export outputs. Edit commits remain Core/catalog work. Exports remain export-pipeline work.
 
-Task 14.6 defines the typed render request shape.
+Task 14.6 defines the typed render request shape and desktop bridge scheduler. Future Phase 15 work may attach real decoded texture inputs, but the Phase 14 contract carries identity only and no image bytes.
 
 ### Disposable Texture Lifecycle Contract
 

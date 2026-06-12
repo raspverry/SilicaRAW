@@ -1763,6 +1763,10 @@ fn main() {
                 }
             }
         }
+        if std::env::var_os("SILICA_NATIVE_VIEWER_RENDER_REQUEST_PROOF").is_some() {
+            let evidence = native_metal_viewer::render_request_smoke_evidence();
+            eprintln!("[SilicaRAW Native Viewer] {evidence}");
+        }
     }
 
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]

@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-native-metal-viewer = []
+native-metal-viewer = ["dep:silica-render"]
 metal-host-spike = [
   "dep:objc2",
   "dep:objc2-app-kit",
@@ -30,6 +30,7 @@ tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
 silica-core = { path = "../../../crates/silica-core" }
+silica-render = { path = "../../../crates/silica-render", optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-dialog = { version = "2.7.1", default-features = false }

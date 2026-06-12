@@ -634,12 +634,95 @@ pub fn input_smoke_evidence() -> Result<String, NativeViewerLifecycleError> {
     Ok(proof.evidence_summary())
 }
 
+/// Feature-gated bridge between typed render requests and the native viewer scheduler.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct NativeViewerRenderBridge {
+    scheduler: silica_render::ViewerPreviewRenderScheduler,
+    catalog_write_requested: bool,
+}
+
+impl NativeViewerRenderBridge {
+    pub fn schedule_render_request(
+        &mut self,
+        request: silica_render::ViewerPreviewRenderRequest,
+    ) -> silica_render::ViewerPreviewScheduleResult {
+        debug_assert!(!request.writes_catalog_state());
+        self.catalog_write_requested = false;
+        self.scheduler.schedule(request)
+    }
+
+    pub fn latest_request_id(&self) -> Option<silica_render::ViewerPreviewRenderRequestId> {
+        self.scheduler.latest_request_id()
+    }
+
+    pub fn latest_request(&self) -> Option<&silica_render::ViewerPreviewRenderRequest> {
+        self.scheduler.latest_request()
+    }
+
+    pub fn catalog_write_requested(&self) -> bool {
+        self.catalog_write_requested
+    }
+}
+
+/// Returns neutral, reviewable render-request boundary evidence for manual smoke runs.
+pub fn render_request_smoke_evidence() -> String {
+    let first = silica_render::ViewerPreviewRenderRequest::new(
+        silica_render::ViewerPreviewRenderRequestId(11),
+        "photo-11",
+        "/tmp/source.raw",
+        silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+        silica_render::ViewerPreviewInput::no_pixels_yet(silica_render::PreviewRenderStatus::Ready),
+        1,
+    );
+    let second = silica_render::ViewerPreviewRenderRequest::new(
+        silica_render::ViewerPreviewRenderRequestId(12),
+        "photo-11",
+        "/tmp/source.raw",
+        silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+        silica_render::ViewerPreviewInput::future_texture(
+            "decode-cache/photo-11/request-12",
+            4032,
+            3024,
+            silica_render::ViewerPreviewPixelFormat::Bgra8Unorm,
+        ),
+        2,
+    );
+    let mut bridge = NativeViewerRenderBridge::default();
+    let _first_result = bridge.schedule_render_request(first);
+    let second_result = bridge.schedule_render_request(second);
+    let latest_request = bridge
+        .latest_request()
+        .expect("render request smoke must schedule a latest request");
+    let latest_request_id = bridge
+        .latest_request_id()
+        .expect("render request smoke must record latest request");
+    let latest_wins = latest_request_id == second_result.accepted_request_id;
+    let replaced_request_id = second_result
+        .replaced_request_id
+        .map(|request_id| request_id.0)
+        .unwrap_or_default();
+    let future_texture_identity = matches!(
+        latest_request.input,
+        silica_render::ViewerPreviewInput::FutureTexture { .. }
+    );
+
+    format!(
+        "latest_request={} replaced_request={} latest_wins={} catalog_write_requested={} contains_image_pixels={} future_texture_identity={}",
+        latest_request_id.0,
+        replaced_request_id,
+        latest_wins,
+        bridge.catalog_write_requested(),
+        latest_request.contains_image_pixels(),
+        future_texture_identity
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         DrawableSize, NativeViewerCleanupReason, NativeViewerHostGeometry, NativeViewerInputBounds,
         NativeViewerInputEvent, NativeViewerInputOwnership, NativeViewerInputProof,
-        NativeViewerLifecycleProof, NativeViewerLifecycleState,
+        NativeViewerLifecycleProof, NativeViewerLifecycleState, NativeViewerRenderBridge,
     };
     use std::time::Duration;
 
@@ -786,5 +869,69 @@ mod tests {
         assert!(evidence.contains("web_controls_external=true"));
         assert!(evidence.contains("remote_reporting=false"));
         assert!(evidence.contains("persistent_input_log=false"));
+    }
+
+    #[test]
+    fn render_bridge_schedules_latest_request_without_catalog_writes() {
+        let first = silica_render::ViewerPreviewRenderRequest::new(
+            silica_render::ViewerPreviewRenderRequestId(11),
+            "photo-11",
+            "/tmp/source.raw",
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewInput::no_pixels_yet(
+                silica_render::PreviewRenderStatus::Ready,
+            ),
+            1,
+        );
+        let second = silica_render::ViewerPreviewRenderRequest::new(
+            silica_render::ViewerPreviewRenderRequestId(12),
+            "photo-11",
+            "/tmp/source.raw",
+            silica_render::ViewerPreviewViewport::new(1200, 675, 1.5),
+            silica_render::ViewerPreviewInput::future_texture(
+                "decode-cache/photo-11/request-12",
+                4032,
+                3024,
+                silica_render::ViewerPreviewPixelFormat::Bgra8Unorm,
+            ),
+            2,
+        );
+        let mut bridge = NativeViewerRenderBridge::default();
+
+        let first_result = bridge.schedule_render_request(first);
+        assert_eq!(
+            first_result.accepted_request_id,
+            silica_render::ViewerPreviewRenderRequestId(11)
+        );
+        assert_eq!(first_result.replaced_request_id, None);
+
+        let second_result = bridge.schedule_render_request(second);
+        assert_eq!(
+            second_result.accepted_request_id,
+            silica_render::ViewerPreviewRenderRequestId(12)
+        );
+        assert_eq!(
+            second_result.replaced_request_id,
+            Some(silica_render::ViewerPreviewRenderRequestId(11))
+        );
+        assert_eq!(
+            bridge.latest_request_id(),
+            Some(silica_render::ViewerPreviewRenderRequestId(12))
+        );
+        assert!(!bridge.catalog_write_requested());
+        assert!(!bridge.latest_request().unwrap().contains_image_pixels());
+    }
+
+    #[test]
+    fn render_request_smoke_evidence_is_reviewable() {
+        let evidence = super::render_request_smoke_evidence();
+        println!("[SilicaRAW Native Viewer] {evidence}");
+
+        assert!(evidence.contains("latest_request=12"));
+        assert!(evidence.contains("replaced_request=11"));
+        assert!(evidence.contains("latest_wins=true"));
+        assert!(evidence.contains("catalog_write_requested=false"));
+        assert!(evidence.contains("contains_image_pixels=false"));
+        assert!(evidence.contains("future_texture_identity=true"));
     }
 }

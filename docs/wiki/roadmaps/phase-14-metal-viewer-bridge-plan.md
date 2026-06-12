@@ -29,7 +29,8 @@ As of 2026-06-12:
 - Task 14.3 reserved viewer layout handshake is complete.
 - Task 14.4 resize, Retina, and lifecycle proof is complete.
 - Task 14.5 viewer input ownership proof is complete.
-- No render request boundary, texture lifecycle, or viewer QA checklist exists yet.
+- Task 14.6 render request boundary is complete.
+- No texture lifecycle or viewer QA checklist exists yet.
 
 ## Goal
 
@@ -112,14 +113,14 @@ If these docs conflict with Spike 001 assumptions, stop and update the bridge co
 ### Task 14.6: Render Request Boundary
 
 - **Card:** [14.6 Render Request Boundary](../tasks/14.6-render-request-boundary.md)
-- **Status:** next
-- **Output:** `silica-render` and desktop bridge agree on a typed preview render request where latest request wins and no catalog state is written.
+- **Status:** complete
+- **Output:** `silica-render` and desktop bridge agree on a typed preview render request where latest request wins, future texture identity can be carried without image bytes, and no catalog state is written.
 - **Validation:** `cargo test -p silica-render -p silica-desktop --features native-metal-viewer`
 
 ### Task 14.7: Disposable Texture Lifecycle Boundary
 
 - **Card:** [14.7 Disposable Texture Lifecycle Boundary](../tasks/14.7-disposable-texture-lifecycle-boundary.md)
-- **Status:** planned
+- **Status:** next
 - **Output:** The native viewer has a minimal disposable texture/cache lifecycle contract ready for Phase 15 image pixels.
 - **Validation:** lifecycle tests and cache cleanup checks
 

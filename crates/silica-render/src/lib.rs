@@ -116,6 +116,150 @@ pub struct JpegSrgbExportRenderRequest {
     pub message: String,
 }
 
+/// Stable identity for one viewer preview render request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ViewerPreviewRenderRequestId(pub u64);
+
+/// Drawable viewport for a viewer preview request.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ViewerPreviewViewport {
+    pub width_px: u32,
+    pub height_px: u32,
+    pub backing_scale_factor: f64,
+}
+
+impl ViewerPreviewViewport {
+    pub fn new(width_px: u32, height_px: u32, backing_scale_factor: f64) -> Self {
+        Self {
+            width_px,
+            height_px,
+            backing_scale_factor,
+        }
+    }
+}
+
+/// Future Metal texture pixel format identity. No pixel bytes are carried here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewerPreviewPixelFormat {
+    Bgra8Unorm,
+}
+
+/// Input identity for a viewer preview request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ViewerPreviewInput {
+    NoPixelsYet {
+        readiness: PreviewRenderStatus,
+    },
+    FutureTexture {
+        texture_key: String,
+        width_px: u32,
+        height_px: u32,
+        pixel_format: ViewerPreviewPixelFormat,
+    },
+}
+
+impl ViewerPreviewInput {
+    pub fn no_pixels_yet(readiness: PreviewRenderStatus) -> Self {
+        Self::NoPixelsYet { readiness }
+    }
+
+    pub fn future_texture(
+        texture_key: impl Into<String>,
+        width_px: u32,
+        height_px: u32,
+        pixel_format: ViewerPreviewPixelFormat,
+    ) -> Self {
+        Self::FutureTexture {
+            texture_key: texture_key.into(),
+            width_px,
+            height_px,
+            pixel_format,
+        }
+    }
+
+    fn contains_image_pixels(&self) -> bool {
+        false
+    }
+}
+
+/// Typed render request boundary between `silica-render` and the native viewer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewerPreviewRenderRequest {
+    pub request_id: ViewerPreviewRenderRequestId,
+    pub photo_id: String,
+    pub source_path: String,
+    pub viewport: ViewerPreviewViewport,
+    pub input: ViewerPreviewInput,
+    pub edit_graph_revision: u64,
+}
+
+impl ViewerPreviewRenderRequest {
+    pub fn new(
+        request_id: ViewerPreviewRenderRequestId,
+        photo_id: impl Into<String>,
+        source_path: impl Into<String>,
+        viewport: ViewerPreviewViewport,
+        input: ViewerPreviewInput,
+        edit_graph_revision: u64,
+    ) -> Self {
+        Self {
+            request_id,
+            photo_id: photo_id.into(),
+            source_path: source_path.into(),
+            viewport,
+            input,
+            edit_graph_revision,
+        }
+    }
+
+    pub fn writes_catalog_state(&self) -> bool {
+        false
+    }
+
+    pub fn contains_image_pixels(&self) -> bool {
+        self.input.contains_image_pixels()
+    }
+}
+
+/// Scheduling result for latest-request-wins viewer preview behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ViewerPreviewScheduleResult {
+    pub accepted_request_id: ViewerPreviewRenderRequestId,
+    pub replaced_request_id: Option<ViewerPreviewRenderRequestId>,
+}
+
+/// Minimal scheduler contract for interactive viewer preview requests.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ViewerPreviewRenderScheduler {
+    latest_request: Option<ViewerPreviewRenderRequest>,
+}
+
+impl ViewerPreviewRenderScheduler {
+    pub fn schedule(&mut self, request: ViewerPreviewRenderRequest) -> ViewerPreviewScheduleResult {
+        let replaced_request_id = self
+            .latest_request
+            .as_ref()
+            .map(|request| request.request_id);
+        let accepted_request_id = request.request_id;
+        self.latest_request = Some(request);
+
+        ViewerPreviewScheduleResult {
+            accepted_request_id,
+            replaced_request_id,
+        }
+    }
+
+    pub fn latest_request_id(&self) -> Option<ViewerPreviewRenderRequestId> {
+        self.latest_request
+            .as_ref()
+            .map(|request| request.request_id)
+    }
+
+    pub fn latest_request(&self) -> Option<&ViewerPreviewRenderRequest> {
+        self.latest_request.as_ref()
+    }
+}
+
 #[cfg(feature = "color-probe")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColorProbeRequest {
@@ -552,6 +696,88 @@ mod tests {
             super::ExportColorBehavior::SrgbDefaultDisplayP3Supported
         );
         assert!(request.message.contains("JPEG sRGB export"));
+    }
+
+    #[test]
+    fn viewer_render_request_is_read_only_and_can_carry_future_texture_identity() {
+        let request = super::ViewerPreviewRenderRequest::new(
+            super::ViewerPreviewRenderRequestId(7),
+            "photo-7",
+            "/tmp/source.raw",
+            super::ViewerPreviewViewport::new(1200, 675, 1.5),
+            super::ViewerPreviewInput::future_texture(
+                "decode-cache/photo-7/request-7",
+                4032,
+                3024,
+                super::ViewerPreviewPixelFormat::Bgra8Unorm,
+            ),
+            3,
+        );
+
+        assert_eq!(request.request_id, super::ViewerPreviewRenderRequestId(7));
+        assert_eq!(request.photo_id, "photo-7");
+        assert_eq!(request.viewport.width_px, 1200);
+        assert_eq!(request.viewport.height_px, 675);
+        assert_eq!(request.viewport.backing_scale_factor, 1.5);
+        assert!(!request.writes_catalog_state());
+        assert!(!request.contains_image_pixels());
+        assert_eq!(request.edit_graph_revision, 3);
+        assert!(matches!(
+            request.input,
+            super::ViewerPreviewInput::FutureTexture {
+                width_px: 4032,
+                height_px: 3024,
+                pixel_format: super::ViewerPreviewPixelFormat::Bgra8Unorm,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn viewer_render_scheduler_records_latest_request_wins() {
+        let first = super::ViewerPreviewRenderRequest::new(
+            super::ViewerPreviewRenderRequestId(1),
+            "photo-1",
+            "/tmp/source.jpg",
+            super::ViewerPreviewViewport::new(1000, 600, 2.0),
+            super::ViewerPreviewInput::no_pixels_yet(super::PreviewRenderStatus::Ready),
+            1,
+        );
+        let second = super::ViewerPreviewRenderRequest::new(
+            super::ViewerPreviewRenderRequestId(2),
+            "photo-1",
+            "/tmp/source.jpg",
+            super::ViewerPreviewViewport::new(1000, 600, 2.0),
+            super::ViewerPreviewInput::no_pixels_yet(super::PreviewRenderStatus::Ready),
+            2,
+        );
+        let mut scheduler = super::ViewerPreviewRenderScheduler::default();
+
+        let first_result = scheduler.schedule(first);
+        assert_eq!(
+            first_result.accepted_request_id,
+            super::ViewerPreviewRenderRequestId(1)
+        );
+        assert_eq!(first_result.replaced_request_id, None);
+        assert_eq!(
+            scheduler.latest_request_id(),
+            Some(super::ViewerPreviewRenderRequestId(1))
+        );
+
+        let second_result = scheduler.schedule(second);
+        assert_eq!(
+            second_result.accepted_request_id,
+            super::ViewerPreviewRenderRequestId(2)
+        );
+        assert_eq!(
+            second_result.replaced_request_id,
+            Some(super::ViewerPreviewRenderRequestId(1))
+        );
+        assert_eq!(
+            scheduler.latest_request_id(),
+            Some(super::ViewerPreviewRenderRequestId(2))
+        );
+        assert!(!scheduler.latest_request().unwrap().writes_catalog_state());
     }
 
     #[cfg(all(feature = "color-probe", target_os = "macos"))]

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-14 | Render request boundary added
+
+- Completed Task 14.6 with typed `silica-render` viewer preview requests, viewport, future texture identity, and latest-request-wins scheduler behavior.
+- Added a feature-gated desktop native viewer render bridge that schedules requests without catalog writes and records neutral evidence.
+- Kept RAW decoding, color transform output, shader passes, image pixel upload, and product texture allocation out of scope.
+
 ## [2026-06-12] phase-14 | Native viewer input ownership proof added
 
 - Completed Task 14.5 with feature-gated input ownership proof state for mouse down, drag, scroll, magnify, native-owned viewer samples, and web-owned outside samples.
