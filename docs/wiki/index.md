@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -28,7 +28,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ### LLM Routing
 
 - [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
-- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work.
+- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including the Phase 12 design gate.
 
 ### Overview
 

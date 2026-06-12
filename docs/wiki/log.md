@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: none
 ---
 
@@ -13,6 +13,18 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-12] wiki | Phase 12 design gate task card added
+
+- Added Task 12.0 as a wiki task card so Phase 12 routing starts at the design gate.
+- Linked the Phase 12 brief and task index to the new card.
+- Kept the full implementation details in the existing design and plan docs.
+
+## [2026-06-12] phase-12 | RAW probe contract added
+
+- Completed Task 12.1.2 probe type contract.
+- `silica-decode` now exposes proof-only RAW probe request/result/status/error types and an unsupported fallback route.
+- Existing preview readiness remains unchanged; product RAW pixels are still out of scope.
 
 ## [2026-06-12] phase-12 | Core Image RAW probe feature gated
 

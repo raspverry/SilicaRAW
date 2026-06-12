@@ -2,7 +2,7 @@
 title: Task Cards
 status: active
 audience: agents
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -14,6 +14,7 @@ Task cards are small, LLM-readable pages for the next atomic work items. Use the
 
 ## Phase 12
 
+- [12.0: Phase 12 Design Gate](12.0-phase-12-design-gate.md)
 - [12.1: Feature-Gated Core Image RAW Probe](12.1-core-image-raw-probe.md)
 - [12.2: RAW Fixture Probe Harness](12.2-raw-fixture-probe-harness.md)
 - [12.3: Core Image Support Matrix and LibRaw Gate](12.3-core-image-support-matrix.md)

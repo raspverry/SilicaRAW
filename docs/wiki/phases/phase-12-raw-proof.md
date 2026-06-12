@@ -2,7 +2,7 @@
 title: Phase 12 RAW Proof Brief
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -36,7 +36,7 @@ When the task adds or changes dependencies, also read:
 
 ## Task Order
 
-0. [Task 12.0.1: Phase 12 Design Gate](../../superpowers/specs/2026-06-11-phase-12-raw-proof-design.md)
+0. [Task 12.0: Phase 12 Design Gate](../tasks/12.0-phase-12-design-gate.md)
 1. [Task 12.1: Feature-Gated Core Image RAW Probe](../tasks/12.1-core-image-raw-probe.md)
 2. [Task 12.2: RAW Fixture Probe Harness](../tasks/12.2-raw-fixture-probe-harness.md)
 3. [Task 12.3: Core Image Support Matrix and LibRaw Gate](../tasks/12.3-core-image-support-matrix.md)
