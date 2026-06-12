@@ -37,7 +37,8 @@ As of 2026-06-12:
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
 - Phase 14 is complete.
 - Task 14.0 through Task 14.8 are complete.
-- Next step: create Phase 15 task cards from the Phase 15 split before implementation.
+- Phase 15 task cards exist.
+- Next task: [15.0 Vertical Slice Evidence Gate](../tasks/15.0-vertical-slice-evidence-gate.md).
 
 ## Wave Map
 
@@ -367,16 +368,16 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Create Phase 15 task cards from the Phase 15 split in this master plan.
-2. Execute Phase 15 cards in order.
-3. Repeat: create only the missing task cards from this master plan, then implement them atomically.
-5. Repeat: create only the missing task cards from this master plan, then implement them atomically.
+1. Execute Task 15.0 from the existing task card.
+2. Continue through Task 15.6 in order.
+3. After Phase 15 completes, create only the missing next-phase task cards from this master plan, then implement them atomically.
 
 ## Links
 
 - [Post-Alpha Product Roadmap](post-alpha-product-roadmap.md)
 - [Phase 14 Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md)
 - [Phase 14 Product Metal Viewer Bridge Brief](../phases/phase-14-product-metal-viewer-bridge.md)
+- [Phase 15 RAW Color Metal Vertical Slice Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
 - [Task Cards](../tasks/index.md)
 - [Roadmap Overview](../overview/roadmap.md)
 - [RAW Decoding](../topics/raw-decoding.md)

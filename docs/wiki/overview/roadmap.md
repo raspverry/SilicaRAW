@@ -69,7 +69,8 @@ The current implementation order starts with:
 - Phase 11 is complete: app session, real recents, relaunch restore, layout persistence, paged grid queries, grid interaction behavior, stored metadata display/filtering, structured import issues, opt-in recursive import, and connected runtime smoke.
 - Phase 12 RAW proof and Phase 13 color proof are complete.
 - Phase 14 product Metal viewer bridge proof is complete.
-- Next roadmap step is creating Phase 15 task cards from the master execution plan before starting the RAW/color/Metal vertical slice.
+- Phase 15 task cards now route the RAW/color/Metal vertical slice.
+- Next roadmap step is Task 15.0, the vertical slice evidence gate.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
@@ -93,6 +94,7 @@ The current implementation order starts with:
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)
 - [Phase 13 Color Pipeline Proof Brief](../phases/phase-13-color-pipeline-proof.md)
 - [Phase 14 Product Metal Viewer Bridge Brief](../phases/phase-14-product-metal-viewer-bridge.md)
+- [Phase 15 RAW Color Metal Vertical Slice Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
 - [Public Trust](../topics/public-trust.md)
 
 ## Notes for LLM Agents

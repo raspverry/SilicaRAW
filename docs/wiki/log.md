@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-15 | RAW color Metal vertical slice task cards added
+
+- Added the Phase 15 RAW Color Metal Vertical Slice brief and task cards 15.0 through 15.6.
+- Routed Phase 15 through the master execution plan split: evidence gate, decoded image handoff, RAW preview artifact, Metal preview display, exposure/contrast draft path, RAW-derived JPEG sRGB export, and manual color QA.
+- Kept broad RAW support, broad color correctness, product texture allocation beyond scoped tasks, MLX/MCP/plugin scope, and original-file mutation out of Phase 15 planning.
+
 ## [2026-06-12] phase-14 | Viewer QA harness and checklist added
 
 - Completed Task 14.8 with `checklists/NATIVE_VIEWER_QA.md` and `scripts/harness/check-native-viewer-qa.py`.

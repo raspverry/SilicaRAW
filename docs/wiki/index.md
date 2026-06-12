@@ -29,7 +29,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ### LLM Routing
 
 - [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
-- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including the Phase 14 design gate.
+- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including Phase 15.
 
 ### Overview
 
@@ -51,6 +51,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Phase 12 RAW Proof Brief](phases/phase-12-raw-proof.md): completed RAW proof scope and task order.
 - [Phase 13 Color Pipeline Proof Brief](phases/phase-13-color-pipeline-proof.md): completed color proof scope and task order.
 - [Phase 14 Product Metal Viewer Bridge Brief](phases/phase-14-product-metal-viewer-bridge.md): current native viewer bridge scope and task order.
+- [Phase 15 RAW Color Metal Vertical Slice Brief](phases/phase-15-raw-color-metal-vertical-slice.md): current RAW/color/Metal vertical slice scope and task order.
 
 ### Decisions
 

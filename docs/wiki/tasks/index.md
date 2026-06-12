@@ -48,6 +48,16 @@ For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](.
 - [14.7: Disposable Texture Lifecycle Boundary](14.7-disposable-texture-lifecycle-boundary.md)
 - [14.8: Viewer QA Harness and Checklist](14.8-viewer-qa-harness.md)
 
+## Phase 15
+
+- [15.0: Vertical Slice Evidence Gate](15.0-vertical-slice-evidence-gate.md)
+- [15.1: Decoded Image Handoff Contract](15.1-decoded-image-handoff-contract.md)
+- [15.2: RAW Decode to Preview Artifact](15.2-raw-decode-preview-artifact.md)
+- [15.3: Metal Preview Display](15.3-metal-preview-display.md)
+- [15.4: Exposure/Contrast Metal Draft Path](15.4-exposure-contrast-metal-draft-path.md)
+- [15.5: RAW-Derived JPEG sRGB Export](15.5-raw-derived-jpeg-srgb-export.md)
+- [15.6: RAW Export Manual Color QA](15.6-raw-export-manual-color-qa.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.

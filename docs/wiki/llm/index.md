@@ -22,21 +22,29 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 13 is complete. The current planned product area is Phase 14: Product Metal Viewer Bridge.
+Phase 14 is complete. The current planned product area is Phase 15: RAW, Color, and Metal Vertical Slice.
 
 For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
 
-For Phase 14 work, read:
+For Phase 15 work, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Phase 14 Product Metal Viewer Bridge Plan](../roadmaps/phase-14-metal-viewer-bridge-plan.md)
-- [Phase 14 Brief](../phases/phase-14-product-metal-viewer-bridge.md)
+- [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
 - The matching task card under [Task Cards](../tasks/index.md)
+- [RAW Decoding](../topics/raw-decoding.md)
+- [Color Management](../topics/color-management.md)
 - [Metal Rendering](../topics/metal-rendering.md)
-- [Spike 001 Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
+- [Data Safety](../topics/data-safety.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Metal Render Pipeline Specification](../../08_Metal_Render_Pipeline_Specification.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
+
+For Phase 14 historical native viewer bridge context, read:
+
+- [Phase 14 Product Metal Viewer Bridge Plan](../roadmaps/phase-14-metal-viewer-bridge-plan.md)
+- [Phase 14 Brief](../phases/phase-14-product-metal-viewer-bridge.md)
+- [Metal Rendering](../topics/metal-rendering.md)
+- [Spike 001 Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
 
 For Phase 13 historical color-proof context, read:
 
