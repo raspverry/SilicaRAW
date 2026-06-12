@@ -133,6 +133,21 @@ action_log
 
 Task 16.0 does not change schemas or migrations. Task 16.1 owns the typed action semantics contract before persistence and command implementation.
 
+Task 16.1 action payload contract:
+
+```txt
+schema: silica.action
+version: 1
+class: undoable | logged_only | non_reversible | blocked
+kind: edit_commit | flag_change | export | import_reference | sidecar_write | backup | restore_attempt | cache_clear
+photo_id or subject
+before and after for undoable actions
+side_effect and evidence_ref for logged-only actions
+created_by: core
+```
+
+Undoable `before` and `after` values must be catalog state snapshots. They must not rely on export files, cache bytes, sidecar files, original files, or live decoder output to restore state.
+
 ## Migration Policy
 
 ```txt

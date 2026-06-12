@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-12] phase-16 | Action semantics contract recorded
+
+- Completed Task 16.1 with `silica.action` payload version 1 semantics.
+- Defined per-photo edit and flag checkpoint units, redo invalidation, disabled undo/redo states, and logged-only action behavior.
+- Reconfirmed slider drafts create no history entries and undo never deletes exports, restores cache bytes, reverses sidecars silently, or mutates originals.
+
 ## [2026-06-12] phase-16 | Action trust design gate recorded
 
 - Completed Task 16.0 with an Action Trust topic for undoable, redoable, logged-only, non-reversible, and blocked action classes.

@@ -65,6 +65,72 @@ External file effects are not inside undo/redo transactions. Export files, sidec
 | Original photo mutation | Blocked | No undo class may touch, rewrite, move, or delete original referenced files. |
 | Extension, plugin, or MCP mutation | Blocked until permission/action-log phases | Future mutations must enter through Core APIs and append-only action logging, never direct DB or file writes. |
 
+## Action Semantics Contract
+
+Task 16.1 defines the first action payload contract. Runtime tasks may add storage columns for query performance, but the semantic payload must stay typed and versioned.
+
+Every undoable action checkpoint records:
+
+```txt
+schema: silica.action
+version: 1
+class: undoable
+kind: edit_commit | flag_change
+photo_id
+label
+before
+after
+created_by: core
+```
+
+`before` and `after` must be explicit enough to restore catalog state without reading external files. For edit commits, they reference schema-valid edit graph snapshots. For culling state, they contain rating, picked, rejected, and color_label values.
+
+Logged-only action payloads record:
+
+```txt
+schema: silica.action
+version: 1
+class: logged_only
+kind: export | import_reference | sidecar_write | backup | restore_attempt | cache_clear
+subject
+side_effect
+evidence_ref
+created_by: core
+```
+
+Logged-only entries prove what happened; they do not enter the undo/redo stack.
+
+### Checkpoint Unit
+
+One checkpoint is the smallest user-meaningful committed action:
+
+- one release/commit of exposure and contrast together after a Develop slider gesture;
+- one rating update;
+- one picked update;
+- one rejected update;
+- one color label update.
+
+Draft slider movement is not a checkpoint. It may render previews but writes no `edit_states`, `edit_history`, sidecar, export, or action-log row.
+
+### Undo and Redo Rules
+
+Undo selects the latest applied undoable checkpoint for the active photo and restores its `before` state in one catalog transaction.
+
+Redo selects the earliest undone checkpoint still valid for the active photo and reapplies its `after` state in one catalog transaction.
+
+A new undoable checkpoint after undo invalidates redo checkpoints for the same photo that were ahead of the restored state. Logged-only entries do not invalidate redo, but they also cannot be undone.
+
+Undo/redo disabled states must be explicit:
+
+- no library open;
+- no active photo;
+- no matching applied checkpoint for undo;
+- no matching undone checkpoint for redo;
+- checkpoint payload fails validation;
+- checkpoint would touch an original, export output, sidecar conflict, or cache bytes.
+
+Disabled undo/redo is a normal product state, not an error.
+
 ## Schema Boundary
 
 Existing catalog tables already reserve the first Phase 16 surfaces:

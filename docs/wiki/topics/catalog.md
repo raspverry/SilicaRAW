@@ -28,6 +28,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 10.5.3 adds staged restore from backup artifacts with rollback copies for existing target libraries.
 - Task 11.5.2 adds catalog schema version 3 for paged-query support: normalized `photos.file_type` values and query indexes for accepted sort/filter fields.
 - Task 16.0 records the [Action Trust](action-trust.md) taxonomy before undo/history runtime work: edit commits and flag changes are undoable catalog transactions, while export, cache clear, sidecar write, and import-by-reference behavior stay outside Develop undo.
+- Task 16.1 records the undo/history action semantics contract: `silica.action` payload version 1, per-photo checkpoint units, redo invalidation after new undoable changes, and explicit disabled undo/redo states.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 

@@ -30,7 +30,7 @@ For Phase 16 planning or implementation, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Phase 16 Brief](../phases/phase-16-undo-history-action-trust.md)
-- [Task 16.0 Phase 16 Design Gate](../tasks/16.0-phase-16-design-gate.md)
+- [Task 16.2 Edit History Persistence](../tasks/16.2-edit-history-persistence.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)

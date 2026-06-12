@@ -47,7 +47,8 @@ As of 2026-06-12:
 - Task 15.6 RAW export manual color QA is complete.
 - Phase 15 is complete.
 - Task 16.0 Phase 16 design gate is complete.
-- Next task: [16.1 Undo, History, and Action Semantics Contract](../tasks/16.1-undo-history-action-semantics-contract.md).
+- Task 16.1 Undo, History, and Action Semantics Contract is complete.
+- Next task: [16.2 Edit History Persistence](../tasks/16.2-edit-history-persistence.md).
 
 ## Wave Map
 
@@ -378,7 +379,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 16.1 from the existing task card.
+1. Execute Task 16.2 from the existing task card.
 2. Continue through Phase 16 in order.
 
 ## Links
