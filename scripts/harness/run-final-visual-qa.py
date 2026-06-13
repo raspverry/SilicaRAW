@@ -672,6 +672,12 @@ def state_script(state):
     document.querySelector("#developExposureValue").value = "0.40";
     document.querySelector("#developContrastSlider").value = "12";
     document.querySelector("#developContrastValue").value = "12";
+    document.querySelector("#developToneCurveMidpointSlider").value = "0.62";
+    document.querySelector("#developToneCurveMidpointValue").value = "0.62";
+    document.querySelector("#developToneCurveSupportStatus").value = "Point RGB";
+    document.querySelector("#developToneCurveSupportStatus").textContent = "Point RGB";
+    document.querySelector("#developToneCurvePanel").dataset.toneCurveState = "enabled";
+    document.querySelector("#developToneCurveLine").setAttribute("points", "0,100 50,38 100,0");
     document.querySelector("#developEditState").textContent = "Clean";
     document.querySelector("#developBeforeView").disabled = false;
     document.querySelector("#developAfterView").disabled = false;
@@ -707,6 +713,9 @@ def state_script(state):
       "#developVibranceValue",
       "#developSaturationSlider",
       "#developSaturationValue",
+      "#developToneCurveMidpointSlider",
+      "#developToneCurveMidpointValue",
+      "#developToneCurveReset",
       "#developResetBasic",
       "#developCommitEdit",
       "#developRevertEdit",
@@ -799,6 +808,15 @@ def metric_script(surface):
       afterDisabled: disabled("#developAfterView"),
       activePresetButtons: presetButtons.filter((button) => button.getAttribute("aria-pressed") === "true").length,
       disabledPresetButtons: presetButtons.filter((button) => button.disabled).length,
+      toneCurveVisible: Boolean(box("#developToneCurvePanel")),
+      toneCurveMidpoint: document.querySelector("#developToneCurveMidpointSlider")?.value || "",
+      toneCurveStatus: text("#developToneCurveSupportStatus"),
+      toneCurveUnsupportedDisabled: [
+        "#developToneCurveChannelRed",
+        "#developToneCurveChannelGreen",
+        "#developToneCurveChannelBlue",
+        "#developToneCurveParametric",
+      ].every((selector) => disabled(selector)),
     }},
   }};
 }})()
@@ -862,6 +880,12 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: before/after controls disabled")
                     if develop_state["activePresetButtons"] != 1 or develop_state["disabledPresetButtons"] != 0:
                         failures.append(f"{viewport_name} {surface_name}: basic preset controls not active")
+                    if not develop_state["toneCurveVisible"] or develop_state["toneCurveMidpoint"] != "0.62":
+                        failures.append(f"{viewport_name} {surface_name}: tone curve panel state not visible")
+                    if develop_state["toneCurveStatus"] != "Point RGB":
+                        failures.append(f"{viewport_name} {surface_name}: tone curve support status wrong")
+                    if not develop_state["toneCurveUnsupportedDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: unsupported tone curve controls enabled")
     return results, failures
 
 

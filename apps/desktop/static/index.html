@@ -393,6 +393,39 @@
               <button id="developContrastReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-tone-curve-panel" id="developToneCurvePanel" data-tone-curve-state="enabled">
+            <div class="sr-tone-curve-title-row">
+              <div class="sr-panel-heading">Tone Curve</div>
+              <output id="developToneCurveSupportStatus" aria-live="polite">Point RGB</output>
+            </div>
+            <div class="sr-tone-curve-graph" aria-hidden="true">
+              <svg viewBox="0 0 100 100" focusable="false">
+                <line class="sr-tone-curve-grid-line" x1="0" y1="75" x2="100" y2="75"></line>
+                <line class="sr-tone-curve-grid-line" x1="0" y1="50" x2="100" y2="50"></line>
+                <line class="sr-tone-curve-grid-line" x1="0" y1="25" x2="100" y2="25"></line>
+                <line class="sr-tone-curve-grid-line" x1="25" y1="0" x2="25" y2="100"></line>
+                <line class="sr-tone-curve-grid-line" x1="50" y1="0" x2="50" y2="100"></line>
+                <line class="sr-tone-curve-grid-line" x1="75" y1="0" x2="75" y2="100"></line>
+                <polyline id="developToneCurveLine" class="sr-tone-curve-line" points="0,100 50,50 100,0"></polyline>
+              </svg>
+            </div>
+            <div class="sr-adjustment-slider" data-adjustment="tone-curve-midpoint">
+              <div class="sr-adjustment-header">
+                <label for="developToneCurveMidpointSlider">RGB Midpoint</label>
+                <input id="developToneCurveMidpointValue" type="number" min="0" max="1" step="0.01" value="0.50" aria-label="RGB midpoint value">
+              </div>
+              <div class="sr-adjustment-control">
+                <input id="developToneCurveMidpointSlider" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="RGB midpoint">
+                <button id="developToneCurveReset" type="button">Reset</button>
+              </div>
+            </div>
+            <div class="sr-tone-curve-disabled-row" role="group" aria-label="Unsupported tone curve controls" hidden>
+              <button id="developToneCurveChannelRed" type="button" disabled>Red</button>
+              <button id="developToneCurveChannelGreen" type="button" disabled>Green</button>
+              <button id="developToneCurveChannelBlue" type="button" disabled>Blue</button>
+              <button id="developToneCurveParametric" type="button" disabled>Parametric</button>
+            </div>
+          </div>
           <div class="sr-adjustment-slider" data-adjustment="white-balance">
             <div class="sr-adjustment-header">
               <label for="developWhiteBalanceMode">White Balance</label>
@@ -737,6 +770,16 @@
       const developSaturationSlider = document.querySelector("#developSaturationSlider");
       const developSaturationValue = document.querySelector("#developSaturationValue");
       const developSaturationReset = document.querySelector("#developSaturationReset");
+      const developToneCurvePanel = document.querySelector("#developToneCurvePanel");
+      const developToneCurveLine = document.querySelector("#developToneCurveLine");
+      const developToneCurveMidpointSlider = document.querySelector("#developToneCurveMidpointSlider");
+      const developToneCurveMidpointValue = document.querySelector("#developToneCurveMidpointValue");
+      const developToneCurveReset = document.querySelector("#developToneCurveReset");
+      const developToneCurveSupportStatus = document.querySelector("#developToneCurveSupportStatus");
+      const developToneCurveChannelRed = document.querySelector("#developToneCurveChannelRed");
+      const developToneCurveChannelGreen = document.querySelector("#developToneCurveChannelGreen");
+      const developToneCurveChannelBlue = document.querySelector("#developToneCurveChannelBlue");
+      const developToneCurveParametric = document.querySelector("#developToneCurveParametric");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developResetBasic = document.querySelector("#developResetBasic");
@@ -1700,6 +1743,70 @@
         return String(Math.round(clamp(value, -100, 100)));
       }
 
+      function formatToneCurvePoint(value) {
+        return clamp(value, 0, 1).toFixed(2);
+      }
+
+      function toneCurvePoint(value) {
+        return Number(formatToneCurvePoint(value));
+      }
+
+      function toneCurvePointsFromMidpoint(value) {
+        const midpoint = toneCurvePoint(value);
+        return midpoint === 0.5
+          ? []
+          : [
+            { x: 0, y: 0 },
+            { x: 0.5, y: midpoint },
+            { x: 1, y: 1 },
+          ];
+      }
+
+      function toneCurveYAtX(points, x) {
+        if (!Array.isArray(points) || points.length === 0) {
+          return 0.5;
+        }
+        const sorted = points
+          .map((point) => ({ x: Number(point?.x), y: Number(point?.y) }))
+          .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+          .sort((left, right) => left.x - right.x);
+        if (sorted.length === 0) {
+          return 0.5;
+        }
+        if (x <= sorted[0].x) {
+          return toneCurvePoint(sorted[0].y);
+        }
+        for (let index = 1; index < sorted.length; index += 1) {
+          const start = sorted[index - 1];
+          const end = sorted[index];
+          if (x <= end.x) {
+            const span = end.x - start.x;
+            if (span <= Number.EPSILON) {
+              return toneCurvePoint(end.y);
+            }
+            const t = clamp((x - start.x) / span, 0, 1);
+            return toneCurvePoint(start.y + (end.y - start.y) * t);
+          }
+        }
+        return toneCurvePoint(sorted[sorted.length - 1].y);
+      }
+
+      function toneCurveMidpointFromEditState(toneCurve) {
+        if (!toneCurve || toneCurve.curveMode === "none") {
+          return 0.5;
+        }
+        return toneCurveYAtX(toneCurve.rgbCurve, 0.5);
+      }
+
+      function toneCurvePayload(state) {
+        return {
+          rgbCurve: toneCurvePointsFromMidpoint(state.draftToneCurveMidpoint),
+          redCurve: [],
+          greenCurve: [],
+          blueCurve: [],
+        };
+      }
+
       function normalizeWhiteBalance(value) {
         const supported = new Set(["as_shot", "auto", "daylight", "cloudy", "shade", "tungsten", "fluorescent", "flash", "custom"]);
         return supported.has(value) ? value : "as_shot";
@@ -1780,6 +1887,7 @@
             draftBlacks: 0,
             draftVibrance: 0,
             draftSaturation: 0,
+            draftToneCurveMidpoint: 0.5,
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
@@ -1791,6 +1899,7 @@
             committedBlacks: 0,
             committedVibrance: 0,
             committedSaturation: 0,
+            committedToneCurveMidpoint: 0.5,
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -1800,6 +1909,14 @@
 
       function isDevelopable(photo) {
         return Boolean(photo && !photo.missing && !photo.unsupported);
+      }
+
+      function renderToneCurveControlState(state) {
+        const midpoint = toneCurvePoint(state?.draftToneCurveMidpoint ?? 0.5);
+        developToneCurveLine.setAttribute("points", `0,100 50,${100 - midpoint * 100} 100,0`);
+        developToneCurvePanel.dataset.toneCurveState = isDevelopable(selectedPhoto()) ? "enabled" : "blocked";
+        developToneCurveSupportStatus.value = "Point RGB";
+        developToneCurveSupportStatus.textContent = "Point RGB";
       }
 
       function syncAdjustmentControls(state) {
@@ -1824,6 +1941,9 @@
         developVibranceValue.value = formatSignedHundred(state.draftVibrance);
         developSaturationSlider.value = formatSignedHundred(state.draftSaturation);
         developSaturationValue.value = formatSignedHundred(state.draftSaturation);
+        developToneCurveMidpointSlider.value = formatToneCurvePoint(state.draftToneCurveMidpoint);
+        developToneCurveMidpointValue.value = formatToneCurvePoint(state.draftToneCurveMidpoint);
+        renderToneCurveControlState(state);
       }
 
       function updateDevelopDirtyState(state) {
@@ -1841,6 +1961,7 @@
             || Number(state.draftBlacks) !== Number(state.committedBlacks)
             || Number(state.draftVibrance) !== Number(state.committedVibrance)
             || Number(state.draftSaturation) !== Number(state.committedSaturation)
+            || Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -1865,6 +1986,7 @@
         state.committedBlacks = editStateNumber(editState?.blacks, 0);
         state.committedVibrance = editStateNumber(editState?.vibrance, 0);
         state.committedSaturation = editStateNumber(editState?.saturation, 0);
+        state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -1876,6 +1998,7 @@
         state.draftBlacks = state.committedBlacks;
         state.draftVibrance = state.committedVibrance;
         state.draftSaturation = state.committedSaturation;
+        state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -2143,7 +2266,7 @@
         if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.vibrance ?? ""}:${preview.saturation ?? ""}:${preview.developPreviewBytes.length}`;
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.vibrance ?? ""}:${preview.saturation ?? ""}:${preview.toneCurveMidpoint ?? ""}:${preview.developPreviewBytes.length}`;
         if (developObjectUrls.has(cacheKey)) {
           return developObjectUrls.get(cacheKey);
         }
@@ -2784,12 +2907,17 @@
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}.`;
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}, curve ${formatToneCurvePoint(state.draftToneCurveMidpoint)}.`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
-          return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
+          return {
+            status: "Ready",
+            toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
+            message: `Draft preview updated locally. ${summary}`,
+          };
         }
         return {
           status: "BlockedByDecode",
+          toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
           message: `Edit graph draft is valid, but RAW preview pixels are blocked until decode is implemented. ${summary}`,
         };
       }
@@ -2959,6 +3087,7 @@
             blacks: response.data.blacks,
             vibrance: response.data.vibrance,
             saturation: response.data.saturation,
+            toneCurve: response.data.toneCurve,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -3017,6 +3146,12 @@
                   vibrance: state.draftVibrance,
                   saturation: state.draftSaturation,
                 })
+                : family === "toneCurve"
+                  ? await invoke("preview_tone_curve_edit", {
+                    libraryPath: activeLibraryPath,
+                    photoId: photo.photoId,
+                    ...toneCurvePayload(state),
+                  })
               : await invoke("preview_exposure_contrast_edit", {
               libraryPath: activeLibraryPath,
               photoId: photo.photoId,
@@ -3052,6 +3187,7 @@
             blacks: response.data.blacks,
             vibrance: response.data.vibrance,
             saturation: response.data.saturation,
+            toneCurveMidpoint: toneCurveMidpointFromEditState(response.data.toneCurve),
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -3079,10 +3215,11 @@
           || Number(state.draftBlacks) !== Number(state.committedBlacks);
         const colorPresenceDirty = Number(state.draftVibrance) !== Number(state.committedVibrance)
           || Number(state.draftSaturation) !== Number(state.committedSaturation);
+        const toneCurveDirty = Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint);
         const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
           || Number(state.draftContrast) !== Number(state.committedContrast);
 
-        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !exposureContrastDirty) {
+        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !toneCurveDirty && !exposureContrastDirty) {
           updateDevelopDirtyState(state);
           setStatus("No Develop draft changes to commit.");
           return;
@@ -3100,6 +3237,7 @@
           state.committedBlacks = state.draftBlacks;
           state.committedVibrance = state.draftVibrance;
           state.committedSaturation = state.draftSaturation;
+          state.committedToneCurveMidpoint = state.draftToneCurveMidpoint;
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -3133,6 +3271,12 @@
                 vibrance: state.draftVibrance,
                 saturation: state.draftSaturation,
               })
+            : toneCurveDirty
+              ? await invoke("commit_tone_curve_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                ...toneCurvePayload(state),
+              })
             : await invoke("commit_exposure_contrast_edit", {
               libraryPath: activeLibraryPath,
               photoId: photo.photoId,
@@ -3158,6 +3302,7 @@
           state.committedBlacks = editStateNumber(response.data.blacks, state.draftBlacks);
           state.committedVibrance = editStateNumber(response.data.vibrance, state.draftVibrance);
           state.committedSaturation = editStateNumber(response.data.saturation, state.draftSaturation);
+          state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(response.data.toneCurve);
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
             state.draftTemperature = state.committedTemperature;
@@ -3170,6 +3315,8 @@
           } else if (colorPresenceDirty) {
             state.draftVibrance = state.committedVibrance;
             state.draftSaturation = state.committedSaturation;
+          } else if (toneCurveDirty) {
+            state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
           } else {
             state.draftExposure = state.committedExposure;
             state.draftContrast = state.committedContrast;
@@ -3181,24 +3328,37 @@
           await loadDevelopHistory();
           await loadPhotoHistogram();
           const remainingFamilies = [];
-          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || exposureContrastDirty)) {
+          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || toneCurveDirty || exposureContrastDirty)) {
             if (toneRecoveryDirty) {
               remainingFamilies.push("tone recovery");
             }
             if (colorPresenceDirty) {
               remainingFamilies.push("color presence");
             }
+            if (toneCurveDirty) {
+              remainingFamilies.push("tone curve");
+            }
             if (exposureContrastDirty) {
               remainingFamilies.push("exposure/contrast");
             }
-          } else if (toneRecoveryDirty && (colorPresenceDirty || exposureContrastDirty)) {
+          } else if (toneRecoveryDirty && (colorPresenceDirty || toneCurveDirty || exposureContrastDirty)) {
             if (colorPresenceDirty) {
               remainingFamilies.push("color presence");
             }
+            if (toneCurveDirty) {
+              remainingFamilies.push("tone curve");
+            }
             if (exposureContrastDirty) {
               remainingFamilies.push("exposure/contrast");
             }
-          } else if (colorPresenceDirty && exposureContrastDirty) {
+          } else if (colorPresenceDirty && (toneCurveDirty || exposureContrastDirty)) {
+            if (toneCurveDirty) {
+              remainingFamilies.push("tone curve");
+            }
+            if (exposureContrastDirty) {
+              remainingFamilies.push("exposure/contrast");
+            }
+          } else if (toneCurveDirty && exposureContrastDirty) {
             remainingFamilies.push("exposure/contrast");
           }
           setStatus(remainingFamilies.length
@@ -3228,6 +3388,7 @@
         state.draftBlacks = state.committedBlacks;
         state.draftVibrance = state.committedVibrance;
         state.draftSaturation = state.committedSaturation;
+        state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -3272,6 +3433,9 @@
         } else if (kind === "saturation") {
           state.draftSaturation = Number(formatSignedHundred(value));
           previewDevelopEdit("colorPresence");
+        } else if (kind === "toneCurveMidpoint") {
+          state.draftToneCurveMidpoint = toneCurvePoint(value);
+          previewDevelopEdit("toneCurve");
         }
       }
 
@@ -3280,6 +3444,8 @@
           updateDevelopAdjustment(kind, "as_shot");
         } else if (kind === "temperature") {
           updateDevelopAdjustment(kind, 5200);
+        } else if (kind === "toneCurveMidpoint") {
+          updateDevelopAdjustment(kind, 0.5);
         } else {
           updateDevelopAdjustment(kind, 0);
         }
@@ -3297,6 +3463,7 @@
         state.committedBlacks = editStateNumber(editState?.blacks, 0);
         state.committedVibrance = editStateNumber(editState?.vibrance, 0);
         state.committedSaturation = editStateNumber(editState?.saturation, 0);
+        state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -3308,6 +3475,7 @@
         state.draftBlacks = state.committedBlacks;
         state.draftVibrance = state.committedVibrance;
         state.draftSaturation = state.committedSaturation;
+        state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
       }
@@ -3398,6 +3566,8 @@
           ? event.shiftKey ? 0.25 : 0.01
           : kind === "temperature"
             ? event.shiftKey ? 500 : 50
+            : kind === "toneCurveMidpoint"
+              ? event.shiftKey ? 0.05 : 0.01
             : event.shiftKey ? 10 : 1;
         const current = kind === "exposure"
           ? state.draftExposure
@@ -3417,7 +3587,9 @@
                         ? state.draftVibrance
                         : kind === "saturation"
                           ? state.draftSaturation
-                      : state.draftContrast;
+                          : kind === "toneCurveMidpoint"
+                            ? state.draftToneCurveMidpoint
+                            : state.draftContrast;
         updateDevelopAdjustment(kind, current + direction * step);
       }
 
@@ -3756,12 +3928,24 @@
           developSaturationSlider,
           developSaturationValue,
           developSaturationReset,
+          developToneCurveMidpointSlider,
+          developToneCurveMidpointValue,
+          developToneCurveReset,
           developCommitEdit,
           developRevertEdit,
           developResetBasic,
         ].forEach((control) => {
           control.disabled = developDisabled;
         });
+        [
+          developToneCurveChannelRed,
+          developToneCurveChannelGreen,
+          developToneCurveChannelBlue,
+          developToneCurveParametric,
+        ].forEach((control) => {
+          control.disabled = true;
+        });
+        renderToneCurveControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         basicPresetButtons.forEach((button) => {
           button.disabled = developDisabled;
         });
@@ -4011,6 +4195,16 @@
       });
       developSaturationValue.addEventListener("dblclick", () => resetDevelopAdjustment("saturation"));
       developSaturationReset.addEventListener("click", () => resetDevelopAdjustment("saturation"));
+      developToneCurveMidpointSlider.addEventListener("input", () => updateDevelopAdjustment("toneCurveMidpoint", developToneCurveMidpointSlider.value));
+      developToneCurveMidpointSlider.addEventListener("dblclick", () => resetDevelopAdjustment("toneCurveMidpoint"));
+      developToneCurveMidpointSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("toneCurveMidpoint", event));
+      developToneCurveMidpointValue.addEventListener("input", () => {
+        if (!["", "."].includes(developToneCurveMidpointValue.value)) {
+          updateDevelopAdjustment("toneCurveMidpoint", developToneCurveMidpointValue.value);
+        }
+      });
+      developToneCurveMidpointValue.addEventListener("dblclick", () => resetDevelopAdjustment("toneCurveMidpoint"));
+      developToneCurveReset.addEventListener("click", () => resetDevelopAdjustment("toneCurveMidpoint"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       developResetBasic.addEventListener("click", resetP0BasicControls);

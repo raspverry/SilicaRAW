@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Tone curve panel UI completed
+
+- Completed Task 18.1.3 with a compact Develop Tone Curve panel for the supported RGB point midpoint control.
+- Routed preview and commit through existing desktop/core tone curve commands and kept channel/parametric controls hidden and disabled.
+- Extended static UI, workflow smoke, and final visual QA checks and routed Phase 18 to Task 18.2.1.
+
 ## [2026-06-13] phase-18 | Tone curve runtime parity added
 
 - Completed Task 18.1.2 with point tone curve preview, commit, desktop command, and JPEG export parity.

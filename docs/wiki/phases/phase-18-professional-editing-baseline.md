@@ -29,7 +29,7 @@ Phase 18 turns the schema-owned `tone`, `color`, `detail`, `lens`, and `geometry
 | --- | --- | --- |
 | 18.1.1 | Tone Curve Mutators | Complete: edit graph validates RGB/channel curve changes and round-trips schema |
 | 18.1.2 | Tone Curve Preview/Commit/Export Parity | Complete: supported JPEG/JPG preview/export paths use point tone curve semantics |
-| 18.1.3 | Tone Curve Panel UI and QA | Develop panel exposes tone curve controls without visual overlap or false support states |
+| 18.1.3 | Tone Curve Panel UI and QA | Complete: Develop panel exposes supported RGB point curve control without overlap |
 | 18.2.1 | HSL Color Mixer Mutators | Per-channel hue/saturation/luminance changes validate and round-trip |
 | 18.2.2 | HSL Preview/Commit/Export Parity | Supported preview/export paths use committed HSL state |
 | 18.2.3 | HSL Panel UI and QA | Compact color mixer UI follows existing Develop patterns |
