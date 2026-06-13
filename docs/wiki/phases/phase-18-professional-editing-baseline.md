@@ -27,7 +27,7 @@ Phase 18 turns the schema-owned `tone`, `color`, `detail`, `lens`, and `geometry
 
 | Task | Name | Gate |
 | --- | --- | --- |
-| 18.1.1 | Tone Curve Mutators | Edit graph validates RGB/channel curve changes and round-trips schema |
+| 18.1.1 | Tone Curve Mutators | Complete: edit graph validates RGB/channel curve changes and round-trips schema |
 | 18.1.2 | Tone Curve Preview/Commit/Export Parity | Supported preview/export paths use the committed tone curve semantics |
 | 18.1.3 | Tone Curve Panel UI and QA | Develop panel exposes tone curve controls without visual overlap or false support states |
 | 18.2.1 | HSL Color Mixer Mutators | Per-channel hue/saturation/luminance changes validate and round-trip |

@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 18 task cards exist. Current next task is [Task 18.1.1 Tone Curve Mutators](../tasks/18.1.1-tone-curve-mutators.md).
+- Phase 18 task cards exist. Task 18.1.1 is complete. Current next task is [Task 18.1.2 Tone Curve Preview, Commit, and Export Parity](../tasks/18.1.2-tone-curve-preview-commit-export-parity.md).
 
 ## Wave Map
 
@@ -387,7 +387,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Start [Task 18.1.1 Tone Curve Mutators](../tasks/18.1.1-tone-curve-mutators.md).
+1. Start [Task 18.1.2 Tone Curve Preview, Commit, and Export Parity](../tasks/18.1.2-tone-curve-preview-commit-export-parity.md).
 2. Continue Phase 18 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links

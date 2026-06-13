@@ -576,6 +576,34 @@ pub fn apply_tone_recovery(
     Ok(edited)
 }
 
+/// Return a draft graph with point tone curves adjusted.
+pub fn apply_tone_curve(
+    graph: &EditGraph,
+    curve_mode: CurveMode,
+    rgb_curve: &[(f64, f64)],
+    red_curve: &[(f64, f64)],
+    green_curve: &[(f64, f64)],
+    blue_curve: &[(f64, f64)],
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    if curve_mode == CurveMode::Parametric {
+        return Err(EditGraphValidationError::new(
+            "tone.curve_mode",
+            "parametric curves have no schema-owned parameters yet",
+        ));
+    }
+
+    let mut edited = graph.clone();
+    edited.tone.curve_mode = curve_mode;
+    edited.tone.rgb_curve = curve_points_from_pairs("tone.rgb_curve", rgb_curve)?;
+    edited.tone.red_curve = curve_points_from_pairs("tone.red_curve", red_curve)?;
+    edited.tone.green_curve = curve_points_from_pairs("tone.green_curve", green_curve)?;
+    edited.tone.blue_curve = curve_points_from_pairs("tone.blue_curve", blue_curve)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Return a draft graph with color presence controls adjusted.
 pub fn apply_color_presence(
     graph: &EditGraph,
@@ -774,17 +802,90 @@ fn validate_basic(basic: &BasicAdjustments) -> Result<(), EditGraphValidationErr
 }
 
 fn validate_tone(tone: &ToneAdjustments) -> Result<(), EditGraphValidationError> {
+    if tone.curve_mode == CurveMode::None
+        && (!tone.rgb_curve.is_empty()
+            || !tone.red_curve.is_empty()
+            || !tone.green_curve.is_empty()
+            || !tone.blue_curve.is_empty())
+    {
+        return Err(EditGraphValidationError::new(
+            "tone.curve_mode",
+            "none mode must not carry curve points",
+        ));
+    }
+
     for (name, curve) in [
         ("tone.rgb_curve", &tone.rgb_curve),
         ("tone.red_curve", &tone.red_curve),
         ("tone.green_curve", &tone.green_curve),
         ("tone.blue_curve", &tone.blue_curve),
     ] {
-        for (index, point) in curve.iter().enumerate() {
-            validate_range(format!("{name}.{index}.x"), &point.x, 0.0, 1.0)?;
-            validate_range(format!("{name}.{index}.y"), &point.y, 0.0, 1.0)?;
-        }
+        validate_curve_points(name, curve)?;
     }
+    Ok(())
+}
+
+fn curve_points_from_pairs(
+    path: &str,
+    points: &[(f64, f64)],
+) -> Result<Vec<CurvePoint>, EditGraphValidationError> {
+    points
+        .iter()
+        .enumerate()
+        .map(|(index, (x, y))| {
+            Ok(CurvePoint {
+                x: number_from_f64(&format!("{path}.{index}.x"), *x)?,
+                y: number_from_f64(&format!("{path}.{index}.y"), *y)?,
+            })
+        })
+        .collect()
+}
+
+fn validate_curve_points(
+    path: &str,
+    points: &[CurvePoint],
+) -> Result<(), EditGraphValidationError> {
+    if points.is_empty() {
+        return Ok(());
+    }
+    if points.len() < 2 {
+        return Err(EditGraphValidationError::new(
+            path,
+            "non-empty curves must include endpoints",
+        ));
+    }
+
+    let mut previous_x = None;
+    for (index, point) in points.iter().enumerate() {
+        let point_path = format!("{path}.{index}");
+        validate_range(format!("{point_path}.x"), &point.x, 0.0, 1.0)?;
+        validate_range(format!("{point_path}.y"), &point.y, 0.0, 1.0)?;
+        let x = number_as_f64(&format!("{point_path}.x"), &point.x)?;
+        if let Some(previous_x) = previous_x {
+            if x <= previous_x {
+                return Err(EditGraphValidationError::new(
+                    format!("{point_path}.x"),
+                    "x values must be strictly increasing",
+                ));
+            }
+        }
+        previous_x = Some(x);
+    }
+
+    let first = points.first().expect("non-empty curve checked");
+    let last = points.last().expect("non-empty curve checked");
+    let first_x = number_as_f64(&format!("{path}.0.x"), &first.x)?;
+    let first_y = number_as_f64(&format!("{path}.0.y"), &first.y)?;
+    let last_index = points.len() - 1;
+    let last_x = number_as_f64(&format!("{path}.{last_index}.x"), &last.x)?;
+    let last_y = number_as_f64(&format!("{path}.{last_index}.y"), &last.y)?;
+    if first_x != 0.0 || first_y != 0.0 || last_x != 1.0 || last_y != 1.0 {
+        return Err(EditGraphValidationError::new(
+            path,
+            "non-empty curves must start at (0, 0) and end at (1, 1)",
+        ));
+    }
+
     Ok(())
 }
 
@@ -1214,6 +1315,112 @@ mod tests {
         assert_eq!(serialized["basic"]["whites"].as_f64(), Some(10.0));
         assert_eq!(serialized["basic"]["blacks"].as_f64(), Some(-12.5));
         super::validate_edit_graph_json(&serialized).expect("tone recovery graph validates");
+    }
+
+    #[test]
+    fn applies_tone_curve_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.35, 0.28), (0.72, 0.81), (1.0, 1.0)],
+            &[(0.0, 0.0), (0.5, 0.48), (1.0, 1.0)],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect("apply tone curve");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.tone.curve_mode, super::CurveMode::Point);
+        assert_eq!(edited.tone.rgb_curve.len(), 4);
+        assert_eq!(edited.tone.red_curve.len(), 3);
+        assert!(edited.tone.green_curve.is_empty());
+        assert!(edited.tone.blue_curve.is_empty());
+        assert_eq!(edited.tone.rgb_curve[1].x.as_f64(), Some(0.35));
+        assert_eq!(edited.tone.rgb_curve[1].y.as_f64(), Some(0.28));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.tone.curve_mode, super::CurveMode::Point);
+        assert_eq!(serialized["tone"]["curve_mode"], json!("point"));
+        assert_eq!(serialized["tone"]["rgb_curve"][2]["x"].as_f64(), Some(0.72));
+        assert_eq!(serialized["tone"]["rgb_curve"][2]["y"].as_f64(), Some(0.81));
+        super::validate_edit_graph_json(&serialized).expect("tone curve graph validates");
+    }
+
+    #[test]
+    fn rejects_invalid_tone_curve_points() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let missing_endpoint_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.1, 0.0), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("missing curve origin");
+        let duplicate_x_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.5, 0.4), (0.5, 0.6), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("duplicate x coordinate");
+        let descending_x_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.8, 0.7), (0.6, 0.65), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("descending x coordinate");
+        let parametric_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Parametric,
+            &[],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("parametric curve has no schema-owned parameters yet");
+
+        assert!(missing_endpoint_error
+            .to_string()
+            .contains("tone.rgb_curve"));
+        assert!(duplicate_x_error.to_string().contains("tone.rgb_curve"));
+        assert!(descending_x_error.to_string().contains("tone.rgb_curve"));
+        assert!(parametric_error.to_string().contains("tone.curve_mode"));
     }
 
     #[test]

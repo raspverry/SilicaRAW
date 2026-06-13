@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Tone curve mutator added
+
+- Completed Task 18.1.1 with a graph-only tone curve mutator.
+- Added validation for non-empty curve endpoints and strictly increasing `x` values.
+- Rejected parametric tone curve mutation until schema-owned parameters exist and routed Phase 18 to Task 18.1.2.
+
 ## [2026-06-13] phase-18 | Professional editing task cards added
 
 - Added the Phase 18 Professional Editing Baseline brief.
