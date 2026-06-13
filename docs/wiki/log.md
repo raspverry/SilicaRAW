@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Professional editing task cards added
+
+- Added the Phase 18 Professional Editing Baseline brief.
+- Split Phase 18 into atomic graph, runtime parity, UI/QA, and batch-sync task cards.
+- Routed the LLM index and master execution plan to Task 18.1.1.
+
 ## [2026-06-13] phase-17 | Develop P0 visual QA completed
 
 - Completed Task 17.5 with 36 final visual QA screenshots across 12 surfaces and three desktop widths.

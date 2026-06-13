@@ -80,6 +80,24 @@ For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](.
 - [17.4: Reset, Before/After, and Basic Presets](17.4-reset-before-after-basic-presets.md)
 - [17.5: Develop P0 Visual QA](17.5-develop-p0-visual-qa.md)
 
+## Phase 18
+
+- [18.1.1: Tone Curve Mutators](18.1.1-tone-curve-mutators.md)
+- [18.1.2: Tone Curve Preview, Commit, and Export Parity](18.1.2-tone-curve-preview-commit-export-parity.md)
+- [18.1.3: Tone Curve Panel UI and QA](18.1.3-tone-curve-panel-ui-qa.md)
+- [18.2.1: HSL Color Mixer Mutators](18.2.1-hsl-color-mixer-mutators.md)
+- [18.2.2: HSL Preview, Commit, and Export Parity](18.2.2-hsl-preview-commit-export-parity.md)
+- [18.2.3: HSL Panel UI and QA](18.2.3-hsl-panel-ui-qa.md)
+- [18.3.1: Detail Mutators](18.3.1-detail-mutators.md)
+- [18.3.2: Detail Preview and Export Boundary](18.3.2-detail-preview-export-boundary.md)
+- [18.3.3: Detail Panel UI and QA](18.3.3-detail-panel-ui-qa.md)
+- [18.4.1: Lens and Geometry Mutators](18.4.1-lens-geometry-mutators.md)
+- [18.4.2: Geometry Preview and Export Parity](18.4.2-geometry-preview-export-parity.md)
+- [18.4.3: Lens Geometry Panel UI and QA](18.4.3-lens-geometry-panel-ui-qa.md)
+- [18.5.1: Edit Clipboard Contract](18.5.1-edit-clipboard-contract.md)
+- [18.5.2: Batch Sync History](18.5.2-batch-sync-history.md)
+- [18.5.3: Copy Paste Batch UI and QA](18.5.3-copy-paste-batch-ui-qa.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.
