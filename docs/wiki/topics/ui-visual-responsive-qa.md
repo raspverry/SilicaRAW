@@ -2,7 +2,7 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-13
 source_of_truth: docs/wiki/topics/ui-mvp-baseline.md
 ---
 
@@ -32,6 +32,33 @@ Task 17.3 replaces the inspector's fake histogram placeholder with command-backe
 
 Task 17.4 makes the existing left Develop preset rows active, keeps Reset All inside the Develop inspector action area, and keeps Before/After in the preview toolbar as a two-state view-only control. These controls must use existing dark editor tokens and must not add horizontal preset strips or duplicate preset badges that crowd the current workbench.
 
+## Phase 17 Develop P0 Visual QA Refresh
+
+Task 17.5 reruns final visual QA after the full P0 Develop control set, real histogram display, reset, Before/After, and basic presets are present.
+
+Current QA command:
+
+```bash
+python3 scripts/harness/run-final-visual-qa.py
+```
+
+The current runner starts a local static server, generates legal synthetic JPEG/JPG fixtures, drives the UI through direct Chrome DevTools Protocol commands, captures screenshots under `.tmp/final-visual-responsive-qa/screenshots`, and writes DOM metrics to `.tmp/final-visual-responsive-qa/visual-qa-results.json`. It prefers `SILICARAW_CHROME`, then system Chrome, then local Chrome for Testing. No extra project dependency is required.
+
+Phase 17 checked 12 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 36 screenshots with zero horizontal overflow, zero toolbar overlap, zero clipped controls, and zero Develop state failures.
+
+Develop-specific checks now verify:
+
+- Selected-photo state is visible in the Develop header.
+- Histogram status does not report an empty selection when a visual QA photo is selected.
+- Before/After controls are available in the selected-photo Develop state.
+- Exactly one basic preset is active and no preset rows are disabled.
+
+Visual fixes from this pass:
+
+- Made the final visual QA runner independent of the blocked `agent-browser screenshot` path by using direct Chrome CDP.
+- Updated Develop visual fixture state so histogram, Before/After, and basic preset controls match the selected-photo screen.
+- Added a small histogram status badge so text remains readable over histogram bars.
+
 ## Final Phase 5.6.12 Refresh
 
 Final QA command:
@@ -40,7 +67,7 @@ Final QA command:
 python3 scripts/harness/run-final-visual-qa.py
 ```
 
-The script starts a local static server from the repository root, generates legal synthetic JPEG/JPG fixtures, uses Agent Browser to drive UI states, captures screenshots under `.tmp/final-visual-responsive-qa/screenshots`, and writes DOM metrics to `.tmp/final-visual-responsive-qa/visual-qa-results.json`.
+The script starts a local static server from the repository root, generates legal synthetic JPEG/JPG fixtures, captures screenshots under `.tmp/final-visual-responsive-qa/screenshots`, and writes DOM metrics to `.tmp/final-visual-responsive-qa/visual-qa-results.json`.
 
 Final checked surfaces:
 

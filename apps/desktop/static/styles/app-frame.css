@@ -1957,6 +1957,13 @@ progress::-webkit-progress-value {
   right: var(--sr-space-md);
   bottom: var(--sr-space-xs);
   left: var(--sr-space-md);
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - (var(--sr-space-md) * 2));
+  padding: 2px var(--sr-space-xs);
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-xs);
+  background: var(--sr-bg-secondary);
   overflow: hidden;
   color: var(--sr-text-secondary);
   font-size: 0.72rem;

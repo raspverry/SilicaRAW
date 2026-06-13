@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 import argparse
+import base64
 import json
+import os
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import time
 import urllib.request
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,7 +20,6 @@ ARTIFACTS = ROOT / ".tmp/final-visual-responsive-qa"
 FIXTURES = ARTIFACTS / "fixtures"
 SCREENSHOTS = ARTIFACTS / "screenshots"
 RESULTS = ARTIFACTS / "visual-qa-results.json"
-SESSION = "silicaraw-final-visual-qa"
 
 VIEWPORTS = [
     ("compact-1280", 1280, 800),
@@ -72,13 +76,298 @@ def wait_for_server(url):
     raise RuntimeError(f"server did not become ready: {url}")
 
 
-def agent(*args):
-    return run(["agent-browser", "--session", SESSION, *args])
+def read_json(url):
+    with urllib.request.urlopen(url, timeout=1) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
-def eval_json(script):
-    output = agent("eval", script)
-    return json.loads(output)
+def find_chrome_executable():
+    candidates = []
+    env_path = os.environ.get("SILICARAW_CHROME")
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+    candidates.extend(
+        [
+            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+        ]
+    )
+    candidates.extend(
+        sorted(
+            Path.home().glob(
+                ".agent-browser/browsers/chrome-*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+            ),
+            reverse=True,
+        )
+    )
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    raise RuntimeError(
+        "final visual QA requires Chrome. Set SILICARAW_CHROME to a Chromium-compatible executable."
+    )
+
+
+class WebSocketCdpClient:
+    def __init__(self, websocket_url):
+        parsed = urlparse(websocket_url)
+        if parsed.scheme != "ws":
+            raise RuntimeError(f"unsupported CDP websocket URL: {websocket_url}")
+        self._socket = socket.create_connection((parsed.hostname, parsed.port), timeout=10)
+        key = base64.b64encode(os.urandom(16)).decode("ascii")
+        path = parsed.path
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        request = (
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {parsed.hostname}:{parsed.port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n"
+            "\r\n"
+        )
+        self._socket.sendall(request.encode("ascii"))
+        response = self._read_until(b"\r\n\r\n").decode("iso-8859-1")
+        if " 101 " not in response.split("\r\n", 1)[0]:
+            raise RuntimeError(f"CDP websocket upgrade failed: {response}")
+
+    def close(self):
+        try:
+            self._send_frame(b"", opcode=0x8)
+        except OSError:
+            pass
+        try:
+            self._socket.close()
+        except OSError:
+            pass
+
+    def send_json(self, payload):
+        self._send_frame(json.dumps(payload).encode("utf-8"), opcode=0x1)
+
+    def recv_json(self):
+        while True:
+            message = self._recv_message()
+            if message is None:
+                continue
+            return json.loads(message)
+
+    def _read_until(self, marker):
+        data = bytearray()
+        while marker not in data:
+            chunk = self._socket.recv(4096)
+            if not chunk:
+                raise RuntimeError("CDP websocket closed during handshake")
+            data.extend(chunk)
+        return bytes(data)
+
+    def _read_exact(self, size):
+        data = bytearray()
+        while len(data) < size:
+            chunk = self._socket.recv(size - len(data))
+            if not chunk:
+                raise RuntimeError("CDP websocket closed")
+            data.extend(chunk)
+        return bytes(data)
+
+    def _send_frame(self, payload, opcode):
+        first = 0x80 | opcode
+        length = len(payload)
+        if length < 126:
+            header = struct.pack("!BB", first, 0x80 | length)
+        elif length < 65536:
+            header = struct.pack("!BBH", first, 0x80 | 126, length)
+        else:
+            header = struct.pack("!BBQ", first, 0x80 | 127, length)
+        mask = os.urandom(4)
+        masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+        self._socket.sendall(header + mask + masked)
+
+    def _recv_message(self):
+        payloads = []
+        opcode = None
+        while True:
+            first, second = self._read_exact(2)
+            fin = bool(first & 0x80)
+            frame_opcode = first & 0x0F
+            masked = bool(second & 0x80)
+            length = second & 0x7F
+            if length == 126:
+                length = struct.unpack("!H", self._read_exact(2))[0]
+            elif length == 127:
+                length = struct.unpack("!Q", self._read_exact(8))[0]
+            mask = self._read_exact(4) if masked else None
+            payload = self._read_exact(length) if length else b""
+            if mask:
+                payload = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+
+            if frame_opcode == 0x8:
+                raise RuntimeError("CDP websocket closed")
+            if frame_opcode == 0x9:
+                self._send_frame(payload, opcode=0xA)
+                return None
+            if frame_opcode == 0xA:
+                return None
+            if frame_opcode in (0x1, 0x2):
+                opcode = frame_opcode
+                payloads = [payload]
+            elif frame_opcode == 0x0:
+                payloads.append(payload)
+            if fin:
+                message = b"".join(payloads)
+                if opcode == 0x1:
+                    return message.decode("utf-8")
+                return message
+
+
+class ChromeCdpSession:
+    def __init__(self):
+        self.client = None
+        self.process = None
+        self.profile = None
+        chrome = find_chrome_executable()
+        self.port = find_port()
+        self.profile = TemporaryDirectory(prefix="silicaraw-visual-qa-chrome-")
+        try:
+            self.process = subprocess.Popen(
+                [
+                    str(chrome),
+                    "--headless=new",
+                    f"--remote-debugging-port={self.port}",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-background-networking",
+                    "--disable-component-update",
+                    "--disable-default-apps",
+                    "--disable-features=Translate",
+                    "--hide-scrollbars",
+                    "--enable-unsafe-swiftshader",
+                    f"--user-data-dir={self.profile.name}",
+                    "--window-size=1280,800",
+                    "about:blank",
+                ],
+                cwd=ROOT,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True,
+            )
+            websocket_url = self._wait_for_page()
+            self.client = WebSocketCdpClient(websocket_url)
+            self._next_id = 1
+            self.command("Page.enable")
+            self.command("Runtime.enable")
+            self.command(
+                "Emulation.setEmulatedMedia",
+                {"features": [{"name": "prefers-color-scheme", "value": "dark"}]},
+            )
+        except Exception:
+            self.close()
+            raise
+
+    def close(self):
+        if self.client is not None:
+            try:
+                self.client.close()
+            except Exception:
+                pass
+            self.client = None
+        if self.process is not None and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=5)
+        self.process = None
+        if self.profile is not None:
+            self.profile.cleanup()
+            self.profile = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc, _traceback):
+        self.close()
+
+    def command(self, method, params=None):
+        message_id = self._next_id
+        self._next_id += 1
+        payload = {"id": message_id, "method": method}
+        if params is not None:
+            payload["params"] = params
+        self.client.send_json(payload)
+        while True:
+            message = self.client.recv_json()
+            if message.get("id") != message_id:
+                continue
+            if "error" in message:
+                raise RuntimeError(f"CDP {method} failed: {message['error']}")
+            return message.get("result", {})
+
+    def evaluate(self, script):
+        result = self.command(
+            "Runtime.evaluate",
+            {
+                "expression": script,
+                "awaitPromise": True,
+                "returnByValue": True,
+                "userGesture": True,
+            },
+        )
+        if "exceptionDetails" in result:
+            raise RuntimeError(f"CDP Runtime.evaluate failed: {result['exceptionDetails']}")
+        return result.get("result", {}).get("value")
+
+    def open(self, url):
+        self.command("Page.navigate", {"url": url})
+        self.wait_for_ready()
+
+    def screenshot(self, path):
+        result = self.command(
+            "Page.captureScreenshot",
+            {"format": "png", "fromSurface": True, "captureBeyondViewport": False},
+        )
+        path.write_bytes(base64.b64decode(result["data"]))
+
+    def set_viewport(self, width, height):
+        self.command(
+            "Emulation.setDeviceMetricsOverride",
+            {
+                "width": width,
+                "height": height,
+                "deviceScaleFactor": 1,
+                "mobile": False,
+                "screenWidth": width,
+                "screenHeight": height,
+            },
+        )
+
+    def wait(self, milliseconds):
+        time.sleep(milliseconds / 1000)
+
+    def wait_for_ready(self):
+        for _ in range(80):
+            try:
+                if self.evaluate("document.readyState") == "complete":
+                    return
+            except RuntimeError:
+                pass
+            time.sleep(0.1)
+        raise RuntimeError("Chrome page did not finish loading")
+
+    def _wait_for_page(self):
+        url = f"http://127.0.0.1:{self.port}/json/list"
+        for _ in range(100):
+            if self.process.poll() is not None:
+                raise RuntimeError("Chrome exited before CDP became available")
+            try:
+                for target in read_json(url):
+                    if target.get("type") == "page" and target.get("webSocketDebuggerUrl"):
+                        return target["webSocketDebuggerUrl"]
+            except Exception:
+                pass
+            time.sleep(0.1)
+        raise RuntimeError("Chrome CDP page target did not become ready")
 
 
 def generate_fixtures():
@@ -222,6 +511,28 @@ def state_script(state):
     document.querySelector("#rejectSelectedPhoto").setAttribute("aria-pressed", "false");
   }}
 
+  function setHistogramState(withPhotos) {{
+    const histogram = document.querySelector("#photoHistogram");
+    const bars = document.querySelector("#photoHistogramBars");
+    const status = document.querySelector("#photoHistogramStatus");
+    bars.replaceChildren();
+    if (!withPhotos) {{
+      histogram.dataset.histogramState = "empty";
+      status.value = "No histogram";
+      status.textContent = "No histogram";
+      return;
+    }}
+    histogram.dataset.histogramState = "ready";
+    status.value = "Luminance histogram ready.";
+    status.textContent = status.value;
+    [18, 34, 62, 89, 76, 54, 43, 68, 91, 73, 48, 31, 24, 39, 58, 82, 96, 84, 61, 37, 22, 28, 46, 64, 79, 71, 53, 41, 35, 29, 20, 14].forEach((height) => {{
+      const bar = document.createElement("span");
+      bar.className = "sr-histogram-bar";
+      bar.style.height = `${{height}}%`;
+      bars.append(bar);
+    }});
+  }}
+
   function populateFilmstrip(selector) {{
     const filmstrip = document.querySelector(selector);
     filmstrip.replaceChildren(...photos.slice(0, 5).map((photo, index) => {{
@@ -253,6 +564,7 @@ def state_script(state):
     gridShell.hidden = false;
     exportDialog.hidden = true;
     populateGrid(withPhotos);
+    setHistogramState(withPhotos);
     populateFilmstrip("#loupeFilmstrip");
     populateFilmstrip("#developFilmstrip");
     document.querySelector("#appStatus").value = withPhotos ? "Library grid loaded." : "Open library with no imported photos.";
@@ -361,6 +673,47 @@ def state_script(state):
     document.querySelector("#developContrastSlider").value = "12";
     document.querySelector("#developContrastValue").value = "12";
     document.querySelector("#developEditState").textContent = "Clean";
+    document.querySelector("#developBeforeView").disabled = false;
+    document.querySelector("#developAfterView").disabled = false;
+    document.querySelector("#developBeforeView").classList.remove("is-active");
+    document.querySelector("#developAfterView").classList.add("is-active");
+    document.querySelector("#developBeforeView").setAttribute("aria-pressed", "false");
+    document.querySelector("#developAfterView").setAttribute("aria-pressed", "true");
+    document.querySelector("#developPreviewSurface").dataset.beforeAfterMode = "after";
+    document.querySelectorAll("[data-basic-preset]").forEach((button) => {{
+      button.disabled = false;
+    }});
+    [
+      "#developExposureSlider",
+      "#developExposureValue",
+      "#developExposureReset",
+      "#developContrastSlider",
+      "#developContrastValue",
+      "#developContrastReset",
+      "#developWhiteBalanceMode",
+      "#developTemperatureSlider",
+      "#developTemperatureValue",
+      "#developTintSlider",
+      "#developTintValue",
+      "#developHighlightsSlider",
+      "#developHighlightsValue",
+      "#developShadowsSlider",
+      "#developShadowsValue",
+      "#developWhitesSlider",
+      "#developWhitesValue",
+      "#developBlacksSlider",
+      "#developBlacksValue",
+      "#developVibranceSlider",
+      "#developVibranceValue",
+      "#developSaturationSlider",
+      "#developSaturationValue",
+      "#developResetBasic",
+      "#developCommitEdit",
+      "#developRevertEdit",
+    ].forEach((selector) => {{
+      const control = document.querySelector(selector);
+      if (control) control.disabled = false;
+    }});
     developSurface.dataset.previewStatus = "ready";
     developSurface.dataset.hasPreviewImage = "true";
     developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
@@ -404,6 +757,8 @@ def metric_script(surface):
     const rect = element.getBoundingClientRect();
     return {{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }};
   }};
+  const text = (selector) => (document.querySelector(selector)?.textContent || "").trim();
+  const disabled = (selector) => Boolean(document.querySelector(selector)?.disabled);
   const mode = box("#modeNavigation");
   const actions = box(".sr-toolbar-actions");
   const toolbarOverlap = Boolean(mode && actions && mode.right > actions.left && mode.left < actions.right);
@@ -417,6 +772,7 @@ def metric_script(surface):
     .slice(0, 12);
   const dialog = box("#exportDialog");
   const app = document.querySelector("#appFrame");
+  const presetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
   return {{
     surface: {json.dumps(surface)},
     viewport: {{ width: innerWidth, height: innerHeight }},
@@ -436,6 +792,14 @@ def metric_script(surface):
     filmstripVisible: app.dataset.filmstripVisible,
     sidebarVisible: Boolean(box("#leftSidebar")),
     inspectorVisible: Boolean(box("#rightInspector")),
+    developState: {{
+      photoName: text("#developPhotoName"),
+      histogramStatus: text("#photoHistogramStatus"),
+      beforeDisabled: disabled("#developBeforeView"),
+      afterDisabled: disabled("#developAfterView"),
+      activePresetButtons: presetButtons.filter((button) => button.getAttribute("aria-pressed") === "true").length,
+      disabledPresetButtons: presetButtons.filter((button) => button.disabled).length,
+    }},
   }};
 }})()
 """
@@ -444,50 +808,60 @@ def metric_script(surface):
 def capture(url):
     failures = []
     results = []
-    agent("close", "--all")
-    for viewport_name, width, height in VIEWPORTS:
-        agent("set", "viewport", str(width), str(height))
-        agent("open", url)
-        agent("wait", "500")
-        for surface_name, state in SURFACES:
-            agent("eval", state_script(state))
-            agent("wait", "150")
-            metrics = eval_json(metric_script(surface_name))
-            screenshot_path = SCREENSHOTS / f"{viewport_name}-{surface_name}.png"
-            agent("screenshot", str(screenshot_path))
-            metrics["screenshot"] = str(screenshot_path.relative_to(ROOT))
-            results.append(metrics)
+    with ChromeCdpSession() as browser:
+        for viewport_name, width, height in VIEWPORTS:
+            browser.set_viewport(width, height)
+            browser.open(url)
+            browser.wait(500)
+            for surface_name, state in SURFACES:
+                browser.evaluate(state_script(state))
+                browser.wait(150)
+                metrics = browser.evaluate(metric_script(surface_name))
+                screenshot_path = SCREENSHOTS / f"{viewport_name}-{surface_name}.png"
+                browser.screenshot(screenshot_path)
+                metrics["screenshot"] = str(screenshot_path.relative_to(ROOT))
+                results.append(metrics)
 
-            if metrics["horizontalOverflow"]:
-                failures.append(f"{viewport_name} {surface_name}: horizontal overflow")
-            if metrics["toolbarOverlap"]:
-                failures.append(f"{viewport_name} {surface_name}: toolbar mode/actions overlap")
-            if metrics["controlClipping"]:
-                failures.append(
-                    f"{viewport_name} {surface_name}: clipped controls {', '.join(metrics['controlClipping'])}"
-                )
-            if not metrics["exportDialogWithinViewport"]:
-                failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
-            if state == "import-review" and (
-                not metrics["importIssueReviewVisible"] or metrics["visibleImportIssueRows"] < 3
-            ):
-                failures.append(f"{viewport_name} {surface_name}: import issue review not visible")
-            if state == "layout-sidebar-collapsed" and (
-                metrics["sidebarCollapsed"] != "true" or metrics["sidebarVisible"]
-            ):
-                failures.append(f"{viewport_name} {surface_name}: sidebar collapse state not applied")
-            if state == "layout-inspector-collapsed" and (
-                metrics["inspectorCollapsed"] != "true" or metrics["inspectorVisible"]
-            ):
-                failures.append(f"{viewport_name} {surface_name}: inspector collapse state not applied")
-            if state == "layout-reset" and (
-                metrics["sidebarCollapsed"] != "false"
-                or metrics["inspectorCollapsed"] != "false"
-                or metrics["filmstripVisible"] != "true"
-                or not metrics["sidebarVisible"]
-                or not metrics["inspectorVisible"]
-            ):
-                failures.append(f"{viewport_name} {surface_name}: layout reset state not applied")
+                if metrics["horizontalOverflow"]:
+                    failures.append(f"{viewport_name} {surface_name}: horizontal overflow")
+                if metrics["toolbarOverlap"]:
+                    failures.append(f"{viewport_name} {surface_name}: toolbar mode/actions overlap")
+                if metrics["controlClipping"]:
+                    failures.append(
+                        f"{viewport_name} {surface_name}: clipped controls {', '.join(metrics['controlClipping'])}"
+                    )
+                if not metrics["exportDialogWithinViewport"]:
+                    failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
+                if state == "import-review" and (
+                    not metrics["importIssueReviewVisible"] or metrics["visibleImportIssueRows"] < 3
+                ):
+                    failures.append(f"{viewport_name} {surface_name}: import issue review not visible")
+                if state == "layout-sidebar-collapsed" and (
+                    metrics["sidebarCollapsed"] != "true" or metrics["sidebarVisible"]
+                ):
+                    failures.append(f"{viewport_name} {surface_name}: sidebar collapse state not applied")
+                if state == "layout-inspector-collapsed" and (
+                    metrics["inspectorCollapsed"] != "true" or metrics["inspectorVisible"]
+                ):
+                    failures.append(f"{viewport_name} {surface_name}: inspector collapse state not applied")
+                if state == "layout-reset" and (
+                    metrics["sidebarCollapsed"] != "false"
+                    or metrics["inspectorCollapsed"] != "false"
+                    or metrics["filmstripVisible"] != "true"
+                    or not metrics["sidebarVisible"]
+                    or not metrics["inspectorVisible"]
+                ):
+                    failures.append(f"{viewport_name} {surface_name}: layout reset state not applied")
+                if state == "develop":
+                    develop_state = metrics["developState"]
+                    if develop_state["photoName"] != "synthetic-gradient.jpg":
+                        failures.append(f"{viewport_name} {surface_name}: develop photo selection not visible")
+                    if develop_state["histogramStatus"] == "No photo selected.":
+                        failures.append(f"{viewport_name} {surface_name}: histogram still reports no selection")
+                    if develop_state["beforeDisabled"] or develop_state["afterDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: before/after controls disabled")
+                    if develop_state["activePresetButtons"] != 1 or develop_state["disabledPresetButtons"] != 0:
+                        failures.append(f"{viewport_name} {surface_name}: basic preset controls not active")
     return results, failures
 
 
@@ -499,9 +873,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if shutil.which("agent-browser") is None:
-        print("final visual QA requires agent-browser on PATH", file=sys.stderr)
-        return 1
 
     if ARTIFACTS.exists() and not args.keep_artifacts:
         shutil.rmtree(ARTIFACTS)
@@ -521,10 +892,6 @@ def main():
         wait_for_server(url)
         results, failures = capture(url)
     finally:
-        try:
-            agent("close", "--all")
-        except Exception:
-            pass
         server.terminate()
         try:
             server.wait(timeout=5)

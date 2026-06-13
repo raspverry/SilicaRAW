@@ -22,21 +22,24 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 14, Phase 15, and Phase 16 are complete. The current planned product area is Phase 17: Develop P0 Expansion.
+Phase 14, Phase 15, Phase 16, and Phase 17 are complete. The current planned product area is Phase 18: Professional Editing Baseline.
 
 For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
 
-For Phase 17 planning or implementation, read:
+For Phase 18 task-card creation or implementation, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-17-develop-p0-expansion)
-- [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md)
-- [Task 17.5 Develop P0 Visual QA](../tasks/17.5-develop-p0-visual-qa.md)
+- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-18-professional-editing-baseline)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Edit Graph](../topics/edit-graph.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
+
+For Phase 17 historical Develop P0 context, read:
+
+- [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md)
+- [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md)
 
 For Phase 15 historical RAW/color/Metal context, read:
 
@@ -78,6 +81,7 @@ Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product
 - Phase 10 evidence, recovery, and public trust gates are complete. Read the full Phase 10 spec only when changing fixtures, backup/restore, public trust files, or recovery policy.
 - Phase 15 is complete. For context, read [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md) and [Phase 15 RAW Export Manual Color QA](../../../checklists/PHASE_15_RAW_EXPORT_MANUAL_QA.md) instead of replaying Phase 15 task cards.
 - Phase 16 is complete. For context, read [Phase 16 Brief](../phases/phase-16-undo-history-action-trust.md) and [Action Trust](../topics/action-trust.md) instead of replaying Phase 16 task cards.
+- Phase 17 is complete. For context, read [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md) and [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) instead of replaying Phase 17 task cards.
 
 ## Read Avoidance Rules
 

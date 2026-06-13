@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-17 | Develop P0 visual QA completed
+
+- Completed Task 17.5 with 36 final visual QA screenshots across 12 surfaces and three desktop widths.
+- Replaced the blocked `agent-browser screenshot` path with a dependency-free Chrome DevTools Protocol runner.
+- Added Develop visual checks for selected-photo state, histogram state, Before/After availability, and active basic presets; Phase 17 is now complete.
+
 ## [2026-06-13] phase-17 | Reset before-after presets added
 
 - Completed Task 17.4 with validated P0 Basic reset and built-in preset graph helpers.

@@ -1,6 +1,6 @@
 ---
 title: Phase 17 Develop P0 Expansion
-status: active
+status: complete
 audience: all
 updated: 2026-06-13
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
@@ -34,7 +34,7 @@ Phase 17 expands basic controls beyond exposure/contrast. Work must stay vertica
 | 17.2.3 | Color Presence Preview/Commit/Export Parity | Complete: vibrance/saturation draft/commit/export use the same validated edit state |
 | 17.3 | Real Histogram Cache and Display | Complete: histogram cache is disposable and honest about unsupported/missing states |
 | 17.4 | Reset, Before/After, and Basic Presets | Complete: reset/preset changes are undoable; before/after is view-only |
-| 17.5 | Develop P0 Visual QA | P0 Develop UI fits current visual QA widths without overlap |
+| 17.5 | Develop P0 Visual QA | Complete: P0 Develop UI fits current visual QA widths without overlap |
 
 ## Non-Goals
 

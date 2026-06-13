@@ -54,8 +54,9 @@ As of 2026-06-13:
 - Task 16.5 Append-Only Action Log is complete.
 - Task 16.6 Sidecar Sync Status After History Commits is complete.
 - Phase 16 is complete.
-- Tasks 17.1.1 through 17.4 are complete.
-- Next task: [17.5 Develop P0 Visual QA](../tasks/17.5-develop-p0-visual-qa.md).
+- Tasks 17.1.1 through 17.5 are complete.
+- Phase 17 is complete.
+- Next task: create Phase 18 task cards from [Phase 18: Professional Editing Baseline](post-alpha-product-roadmap.md#phase-18-professional-editing-baseline), starting with Task 18.1 Tone Curve Panel.
 
 ## Wave Map
 
@@ -386,8 +387,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Execute Task 17.5 from the existing task card.
-2. Continue through Phase 17 in order.
+1. Create the Phase 18 brief and atomic task cards from the product roadmap.
+2. Start with Task 18.1 Tone Curve Panel after the task card exists.
 
 ## Links
 
