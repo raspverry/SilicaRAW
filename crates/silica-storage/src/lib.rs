@@ -484,6 +484,21 @@ pub struct HistoryCommandResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditGraphCommitResult {
+    pub commits: Vec<BatchEditGraphCommit>,
+    pub skipped_photo_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditGraphCommit {
+    pub photo_id: String,
+    pub edit_state_id: String,
+    pub history_id: String,
+    pub sequence: i64,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoHistoryPanel {
     pub photo_id: String,
     pub items: Vec<PhotoHistoryItem>,
@@ -537,6 +552,13 @@ struct HistoryActionRow {
     id: String,
     action_kind: String,
     action_json: String,
+}
+
+struct PreparedBatchEditGraphCommit {
+    photo_id: String,
+    before_graph: silica_edit::EditGraph,
+    graph: silica_edit::EditGraph,
+    label: String,
 }
 
 /// Errors returned by local library create/open operations.
@@ -1737,6 +1759,58 @@ pub fn load_active_edit_graph_or_default(
     Ok(source.map(|source| silica_edit::default_edit_graph(source, current_timestamp_string())))
 }
 
+fn load_active_edit_graph_or_default_from_transaction(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+    updated_at: &str,
+) -> Result<Option<silica_edit::EditGraph>, LibraryStorageError> {
+    let active = transaction
+        .query_row(
+            r#"
+            SELECT edit_graph_json
+            FROM edit_states
+            WHERE photo_id = ?1 AND active = 1
+            ORDER BY updated_at DESC
+            LIMIT 1
+            "#,
+            params![photo_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .map(|json| {
+            let graph: silica_edit::EditGraph = serde_json::from_str(&json)?;
+            silica_edit::validate_edit_graph(&graph)?;
+            Ok::<silica_edit::EditGraph, LibraryStorageError>(graph)
+        })
+        .transpose()?;
+    if active.is_some() {
+        return Ok(active);
+    }
+
+    let source = transaction
+        .query_row(
+            r#"
+            SELECT id, path, file_size, modified_at, partial_hash, full_hash
+            FROM photos
+            WHERE id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok(silica_edit::EditGraphSource {
+                    photo_id: row.get(0)?,
+                    path: row.get(1)?,
+                    file_size: row.get(2)?,
+                    modified_at: row.get(3)?,
+                    partial_hash: row.get(4)?,
+                    full_hash: row.get(5)?,
+                })
+            },
+        )
+        .optional()?;
+
+    Ok(source.map(|source| silica_edit::default_edit_graph(source, updated_at)))
+}
+
 fn load_sidecar_photo_row(
     connection: &Connection,
     photo_id: &str,
@@ -2873,6 +2947,190 @@ pub fn commit_edit_graph(
     transaction.commit()?;
 
     Ok(graph)
+}
+
+/// Persist multiple active edit graphs as one all-or-none batch transaction.
+pub fn commit_edit_graph_batch(
+    library_root_path: impl AsRef<Path>,
+    graphs: Vec<silica_edit::EditGraph>,
+) -> Result<BatchEditGraphCommitResult, LibraryStorageError> {
+    if graphs.is_empty() {
+        return Err(LibraryStorageError::HistoryValidation(
+            "batch edit graph commit requires at least one graph".to_string(),
+        ));
+    }
+
+    let library = open_local_library(library_root_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let transaction = connection.transaction()?;
+    let mut seen_photo_ids = Vec::new();
+    let mut skipped_photo_ids = Vec::new();
+    let mut prepared = Vec::new();
+
+    for graph in graphs {
+        silica_edit::validate_edit_graph(&graph)?;
+        let photo_id = graph.source.photo_id.clone();
+        if seen_photo_ids.iter().any(|seen| seen == &photo_id) {
+            return Err(LibraryStorageError::HistoryValidation(format!(
+                "duplicate batch target photo id: {photo_id}"
+            )));
+        }
+        seen_photo_ids.push(photo_id.clone());
+
+        let before_graph = load_active_edit_graph_or_default_from_transaction(
+            &transaction,
+            &photo_id,
+            &current_timestamp_string(),
+        )?
+        .ok_or_else(|| LibraryStorageError::MissingPhoto(photo_id.clone()))?;
+
+        validate_batch_edit_graph_identity(&before_graph, &graph)?;
+        if edit_graph_content_equal_ignoring_updated_at(&before_graph, &graph) {
+            skipped_photo_ids.push(photo_id);
+            continue;
+        }
+
+        let label = edit_graph_history_label(Some(&before_graph), &graph).to_string();
+        prepared.push(PreparedBatchEditGraphCommit {
+            photo_id,
+            before_graph,
+            graph,
+            label,
+        });
+    }
+
+    if prepared.is_empty() {
+        transaction.commit()?;
+        return Ok(BatchEditGraphCommitResult {
+            commits: Vec::new(),
+            skipped_photo_ids,
+        });
+    }
+
+    let mut commits = Vec::new();
+    for item in prepared {
+        invalidate_redo_history(&transaction, &item.photo_id)?;
+        let sequence = next_history_sequence(&transaction, &item.photo_id)?;
+        let edit_state_id = stable_catalog_id(
+            "edit-state",
+            &format!(
+                "{}\nbatch_edit_commit\n{}\n{}",
+                item.photo_id, sequence, item.graph.updated_at
+            ),
+        );
+        let history_id = stable_catalog_id("edit-history", &edit_state_id);
+        let edit_graph_json = serde_json::to_string(&item.graph)?;
+        let action_json = serde_json::to_string(&serde_json::json!({
+            "schema": ACTION_SCHEMA,
+            "version": ACTION_VERSION,
+            "class": "undoable",
+            "kind": "edit_commit",
+            "photo_id": item.photo_id.clone(),
+            "label": item.label,
+            "before": {
+                "edit_graph": &item.before_graph,
+            },
+            "after": {
+                "edit_graph": &item.graph,
+            },
+            "created_by": "core",
+        }))?;
+
+        transaction.execute(
+            "UPDATE edit_states SET active = 0 WHERE photo_id = ?1",
+            params![item.photo_id],
+        )?;
+        transaction.execute(
+            r#"
+            INSERT INTO edit_states(id, photo_id, active, edit_graph_json, updated_at)
+            VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP)
+            "#,
+            params![edit_state_id, item.photo_id, edit_graph_json],
+        )?;
+        transaction.execute(
+            r#"
+            INSERT INTO edit_history(
+              id,
+              photo_id,
+              edit_state_id,
+              action_json,
+              sequence,
+              action_class,
+              action_kind,
+              history_state
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, 'undoable', 'edit_commit', 'applied')
+            "#,
+            params![
+                history_id,
+                item.photo_id,
+                edit_state_id,
+                action_json,
+                sequence
+            ],
+        )?;
+        transaction.execute(
+            r#"
+            UPDATE photo_flags
+            SET edited = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE photo_id = ?1
+            "#,
+            params![item.photo_id],
+        )?;
+        mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, &item.photo_id)?;
+        commits.push(BatchEditGraphCommit {
+            photo_id: item.photo_id,
+            edit_state_id,
+            history_id,
+            sequence,
+            label: item.label,
+        });
+    }
+    transaction.commit()?;
+
+    Ok(BatchEditGraphCommitResult {
+        commits,
+        skipped_photo_ids,
+    })
+}
+
+fn validate_batch_edit_graph_identity(
+    before_graph: &silica_edit::EditGraph,
+    after_graph: &silica_edit::EditGraph,
+) -> Result<(), LibraryStorageError> {
+    if after_graph.source != before_graph.source {
+        return Err(LibraryStorageError::HistoryValidation(format!(
+            "batch edit graph source identity mismatch for photo {}",
+            after_graph.source.photo_id
+        )));
+    }
+    if after_graph.profile != before_graph.profile {
+        return Err(LibraryStorageError::HistoryValidation(format!(
+            "batch edit graph profile identity mismatch for photo {}",
+            after_graph.source.photo_id
+        )));
+    }
+    if after_graph.metadata != before_graph.metadata
+        || after_graph.masks != before_graph.masks
+        || after_graph.extensions != before_graph.extensions
+    {
+        return Err(LibraryStorageError::HistoryValidation(format!(
+            "batch edit graph non-edit identity mismatch for photo {}",
+            after_graph.source.photo_id
+        )));
+    }
+    Ok(())
+}
+
+fn edit_graph_content_equal_ignoring_updated_at(
+    before_graph: &silica_edit::EditGraph,
+    after_graph: &silica_edit::EditGraph,
+) -> bool {
+    let mut normalized_before = before_graph.clone();
+    let mut normalized_after = after_graph.clone();
+    normalized_before.updated_at.clear();
+    normalized_after.updated_at.clear();
+    normalized_before == normalized_after
 }
 
 fn edit_graph_history_label(
@@ -7566,6 +7824,141 @@ mod tests {
                 .collect()
         };
         assert_eq!(sequences, vec![1, 2]);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn batch_commit_edit_graph_writes_one_history_row_per_photo() {
+        let workspace = unique_library_root("batch-edit-state");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let first_file = import_root.join("first.jpg");
+        let second_file = import_root.join("second.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&first_file, b"first jpeg placeholder").expect("write first");
+        std::fs::write(&second_file, b"second jpeg placeholder").expect("write second");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_ids: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT id FROM photos ORDER BY file_name ASC")
+                .expect("prepare photo query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query photo ids")
+                .map(|row| row.expect("photo id"))
+                .collect()
+        };
+        assert_eq!(photo_ids.len(), 2);
+        assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
+        drop(connection);
+
+        let sidecar = write_photo_sidecar(&library.root_path, &photo_ids[0], "0.1.0-alpha.1")
+            .expect("write sidecar before batch");
+        let sidecar_bytes = std::fs::read(&sidecar.sidecar_path).expect("read sidecar bytes");
+
+        let first_draft = load_active_edit_graph_or_default(&library.root_path, &photo_ids[0])
+            .expect("load first draft")
+            .expect("first draft");
+        let second_draft = load_active_edit_graph_or_default(&library.root_path, &photo_ids[1])
+            .expect("load second draft")
+            .expect("second draft");
+        let first_edit = silica_edit::apply_exposure_contrast(&first_draft, 0.75, 12.0, "unix:30")
+            .expect("apply first edit");
+        let second_edit =
+            silica_edit::apply_tone_recovery(&second_draft, -20.0, 15.0, 8.0, -10.0, "unix:31")
+                .expect("apply second edit");
+
+        let result = commit_edit_graph_batch(&library.root_path, vec![first_edit, second_edit])
+            .expect("batch commit edit graphs");
+
+        assert_eq!(result.commits.len(), 2);
+        assert_eq!(result.commits[0].photo_id, photo_ids[0]);
+        assert_eq!(result.commits[0].sequence, 1);
+        assert_eq!(result.commits[1].photo_id, photo_ids[1]);
+        assert_eq!(result.commits[1].sequence, 1);
+
+        let first_persisted = load_active_edit_graph(&library.root_path, &photo_ids[0])
+            .expect("load first active")
+            .expect("first active");
+        let second_persisted = load_active_edit_graph(&library.root_path, &photo_ids[1])
+            .expect("load second active")
+            .expect("second active");
+        assert_eq!(first_persisted.basic.exposure.as_f64(), Some(0.75));
+        assert_eq!(second_persisted.basic.highlights.as_f64(), Some(-20.0));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog after batch");
+        assert_eq!(count_edit_states(&connection), 2);
+        assert_eq!(count_edit_history(&connection), 2);
+        let sidecar_state: String = connection
+            .query_row(
+                "SELECT conflict_state FROM sidecar_status WHERE photo_id = ?1",
+                params![photo_ids[0]],
+                |row| row.get(0),
+            )
+            .expect("sidecar state");
+        assert_eq!(sidecar_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&sidecar.sidecar_path).expect("read sidecar after batch"),
+            sidecar_bytes,
+            "batch sync must not rewrite sidecar bytes"
+        );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn batch_commit_edit_graph_preflight_failure_writes_no_history() {
+        let workspace = unique_library_root("batch-edit-preflight");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft");
+        let valid_edit =
+            silica_edit::apply_exposure_contrast(&draft, 0.25, 6.0, "unix:30").expect("edit");
+        let missing_edit = silica_edit::default_edit_graph(
+            silica_edit::EditGraphSource {
+                photo_id: "missing-photo".to_string(),
+                path: "/tmp/missing.jpg".to_string(),
+                file_size: 12,
+                modified_at: Some("unix:1".to_string()),
+                partial_hash: Some("missing".to_string()),
+                full_hash: None,
+            },
+            "unix:31",
+        );
+
+        let error = commit_edit_graph_batch(&library.root_path, vec![valid_edit, missing_edit])
+            .expect_err("missing target must fail preflight");
+        assert!(error.to_string().contains("missing catalog photo"));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog after failure");
+        assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
 
         remove_library_root(&workspace);
     }

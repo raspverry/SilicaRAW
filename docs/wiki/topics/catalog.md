@@ -34,6 +34,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.4 adds the read-only photo history panel query over `edit_history` and exposes only applied/undone real checkpoints to the Develop UI.
 - Task 16.5 adds catalog schema version 8 for append-only action log evidence: `action_log.side_effect_category`, `action_log.evidence_ref`, `idx_action_log_action_type_created_at`, and `idx_action_log_subject`.
 - Task 16.6 adds catalog-side sidecar status updates after history commits without a new migration: clean sidecars become `catalog_newer`, while conflict/newer states remain preserved.
+- Task 18.5.2 adds atomic batch edit sync for typed clipboard payloads: Core plans target readiness first, storage commits ready changed graphs in one transaction with one `edit_history` row per affected photo, unchanged targets are skipped, blocked targets stop all writes, and existing clean sidecars are only marked `catalog_newer`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 

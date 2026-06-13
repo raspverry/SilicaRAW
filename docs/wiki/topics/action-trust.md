@@ -55,6 +55,7 @@ External file effects are not inside undo/redo transactions. Export files, sidec
 | Operation | Class | Policy |
 | --- | --- | --- |
 | Exposure/contrast commit | Undoable and redoable | Store a validated edit graph checkpoint. Undo/redo changes active catalog edit state only. |
+| Batch edit sync | Undoable and redoable per affected photo | Plan all targets first. If any target is blocked, write nothing. If all targets are ready or unchanged, commit ready targets in one catalog transaction with one edit checkpoint per affected photo. |
 | P0 Basic reset or built-in preset apply | Undoable and redoable | Commit one validated full edit graph checkpoint through Core and storage. Do not split one preset into multiple history rows. |
 | Before/after Develop view | View-only | Switch presentation state only. No edit state, history, action log, sidecar, export, or cache write. |
 | Slider draft preview | Not persisted | Render-only request. No `edit_states`, `edit_history`, sidecar, export, or action-log write. |
@@ -168,6 +169,8 @@ Task 16.6 implements the runtime path: edit commits, flag commits, undo, and red
 Task 17.4 applies P0 Basic reset and built-in presets through the same edit commit transaction path. Before/after controls are explicitly presentation state and must not enter the action tables.
 
 Task 18.2.2 applies HSL color mixer commits through the same validated edit graph transaction path. Draft HSL preview remains render-only; committed HSL changes create one undoable catalog checkpoint and do not write sidecars, exports, cache bytes, or originals.
+
+Task 18.5.2 adds batch edit sync for typed edit clipboard payloads. Partial commit is not allowed: blocked targets produce a deterministic plan/result and no catalog writes. Successful sync writes one `edit_commit` checkpoint per changed photo in one SQLite transaction, skips unchanged targets, marks clean sidecars stale, and does not write sidecar files, exports, cache bytes, or originals.
 
 ## Stop Gates
 
