@@ -133,6 +133,10 @@ def main():
         "gridLoadingState",
         "gridStateNote",
         "libraryPhotoCount",
+        "selectionSummary",
+        "primarySelectedPhotoName",
+        "multiSelectionCount",
+        "clearMultiSelection",
         "selectedPhotoName",
         "selectedPhotoRating",
         "metadataFileType",
@@ -254,6 +258,20 @@ def main():
         "developGeometryTransformHorizontalSlider",
         "developCommitEdit",
         "developRevertEdit",
+        "developClipboardPanel",
+        "developClipboardSource",
+        "developClipboardSelectionCount",
+        "clipboardSubsetBasic",
+        "clipboardSubsetTone",
+        "clipboardSubsetColor",
+        "clipboardSubsetDetail",
+        "clipboardSubsetLens",
+        "clipboardSubsetGeometry",
+        "copyEditClipboard",
+        "pasteEditClipboard",
+        "syncEditClipboard",
+        "editClipboardStatus",
+        "editClipboardPlanList",
         "developHistoryPanel",
         "developHistoryStatus",
         "developHistoryList",
@@ -351,6 +369,7 @@ def main():
             ".sr-tone-curve-panel",
             ".sr-detail-panel",
             ".sr-geometry-panel",
+            ".sr-edit-clipboard-panel",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
         ]:
@@ -471,6 +490,65 @@ def main():
         "MLX Denoise",
     ]:
         require(marker in source, f"Detail blocked-state marker missing: {marker}", failures)
+
+    clipboard_controls = {
+        "clipboardSubsetBasic": "basic",
+        "clipboardSubsetTone": "tone",
+        "clipboardSubsetColor": "color",
+        "clipboardSubsetDetail": "detail",
+        "clipboardSubsetLens": "lens",
+        "clipboardSubsetGeometry": "geometry",
+    }
+    for control_id, section in clipboard_controls.items():
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "checkbox", f"#{control_id} must be a checkbox", failures)
+        require(
+            attrs.get("data-edit-clipboard-section") == section,
+            f"#{control_id} must declare clipboard section {section}",
+            failures,
+        )
+    require(
+        "checked" in parser.ids.get("clipboardSubsetBasic", {}),
+        "#clipboardSubsetBasic must default on for explicit minimal copy scope",
+        failures,
+    )
+    for control_id in ["clipboardSubsetDetail", "clipboardSubsetLens"]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must stay disabled until runtime support exists",
+            failures,
+        )
+    for control_id in ["pasteEditClipboard", "syncEditClipboard"]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must default disabled before a payload exists",
+            failures,
+        )
+    for command in [
+        "copy_edit_clipboard_payload",
+        "plan_edit_clipboard_sync",
+        "apply_edit_clipboard_sync",
+    ]:
+        require(command in source, f"index.html must wire {command}", failures)
+    require(
+        "function isJpegDevelopFileType" in source,
+        "Develop clipboard UI must gate copy/paste/sync to JPEG/JPG file types",
+        failures,
+    )
+    require(
+        "isJpegDevelopFileType(photo?.fileType)" in source,
+        "isDevelopable must use the JPEG/JPG file-type gate",
+        failures,
+    )
+    for marker in [
+        "Copy &amp; Sync",
+        "Edit subsets",
+        "selected on this page",
+        "Copy reads committed edit state",
+        "Batch sync requires at least two selected photos on this page.",
+        "Nothing was written.",
+    ]:
+        require(marker in source, f"Edit clipboard UI marker missing: {marker}", failures)
 
     geometry_crop_controls = {
         "developGeometryCropXSlider": ("0", "1", "0.01"),

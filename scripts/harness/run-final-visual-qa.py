@@ -33,6 +33,7 @@ SURFACES = [
     ("M003-library-populated", "grid"),
     ("M004-loupe", "loupe"),
     ("M005-develop", "develop"),
+    ("M014-edit-clipboard-sync", "clipboard"),
     ("M007-export", "export"),
     ("M008-minimal-maintenance", "maintenance"),
     ("M009-import-progress", "import"),
@@ -819,6 +820,59 @@ def state_script(state):
     developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
     developSurface.prepend(thumb(imagePath, "sr-develop-image"));
     document.querySelector("#developLensGeometryPanel").scrollIntoView({{ block: "center" }});
+  }} else if (state === "clipboard") {{
+    openLibraryBase(true);
+    setMode("develop");
+    document.querySelector("#developPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#developPreviewStatus").textContent = "Preview Ready";
+    document.querySelector("#developPreviewMessage").textContent = "Exposure 0.40, contrast 12.";
+    document.querySelector("#selectionSummary").dataset.multiSelectionState = "multi";
+    document.querySelector("#primarySelectedPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#multiSelectionCount").value = "2 selected";
+    document.querySelector("#multiSelectionCount").textContent = "2 selected";
+    document.querySelector("#developClipboardPanel").dataset.clipboardState = "ready";
+    document.querySelector("#developClipboardSource").value = "Copied 3 subset(s) from synthetic-gradient.jpg.";
+    document.querySelector("#developClipboardSource").textContent = "Copied 3 subset(s) from synthetic-gradient.jpg.";
+    document.querySelector("#developClipboardSelectionCount").value = "2 selected on this page";
+    document.querySelector("#developClipboardSelectionCount").textContent = "2 selected on this page";
+    document.querySelector("#clipboardSubsetBasic").checked = true;
+    document.querySelector("#clipboardSubsetTone").checked = true;
+    document.querySelector("#clipboardSubsetColor").checked = false;
+    document.querySelector("#clipboardSubsetGeometry").checked = true;
+    document.querySelector("#clipboardSubsetDetail").checked = false;
+    document.querySelector("#clipboardSubsetDetail").disabled = true;
+    document.querySelector("#clipboardSubsetLens").checked = false;
+    document.querySelector("#clipboardSubsetLens").disabled = true;
+    document.querySelector("#copyEditClipboard").disabled = false;
+    document.querySelector("#pasteEditClipboard").disabled = false;
+    document.querySelector("#syncEditClipboard").disabled = false;
+    document.querySelector("#editClipboardStatus").value = "Ready to paste Basic, Tone, Geometry to the primary photo or sync 2 selected on this page.";
+    document.querySelector("#editClipboardStatus").textContent = document.querySelector("#editClipboardStatus").value;
+    const plan = document.querySelector("#editClipboardPlanList");
+    plan.replaceChildren(
+      ...[
+        ["ready", "synthetic-gradient.jpg", "ready", "Ready for batch sync."],
+        ["unchanged", "synthetic-checker.jpeg", "unchanged: no_effect", "Clipboard payload does not change this target."],
+      ].map(([status, name, stateText, message]) => {{
+        const row = document.createElement("div");
+        row.className = "sr-edit-clipboard-plan-row";
+        row.dataset.clipboardTargetStatus = status;
+        row.setAttribute("role", "listitem");
+        const title = document.createElement("strong");
+        title.textContent = name;
+        const targetStatus = document.createElement("span");
+        targetStatus.textContent = stateText;
+        const targetMessage = document.createElement("small");
+        targetMessage.textContent = message;
+        row.append(title, targetStatus, targetMessage);
+        return row;
+      }})
+    );
+    developSurface.dataset.previewStatus = "ready";
+    developSurface.dataset.hasPreviewImage = "true";
+    developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
+    developSurface.prepend(thumb(imagePath, "sr-develop-image"));
+    document.querySelector("#developClipboardPanel").scrollIntoView({{ block: "center" }});
   }} else if (state === "export") {{
     openLibraryBase(true);
     setMode("export");
@@ -958,6 +1012,20 @@ def metric_script(surface):
         "#developGeometryTransformHorizontalSlider",
       ].every((selector) => disabled(selector)),
     }},
+    clipboardState: {{
+      visible: Boolean(box("#developClipboardPanel")),
+      source: text("#developClipboardSource"),
+      selectedCount: text("#developClipboardSelectionCount"),
+      status: text("#editClipboardStatus"),
+      planRows: Array.from(document.querySelectorAll(".sr-edit-clipboard-plan-row")).filter(visible).length,
+      basicChecked: Boolean(document.querySelector("#clipboardSubsetBasic")?.checked),
+      toneChecked: Boolean(document.querySelector("#clipboardSubsetTone")?.checked),
+      geometryChecked: Boolean(document.querySelector("#clipboardSubsetGeometry")?.checked),
+      detailDisabled: disabled("#clipboardSubsetDetail"),
+      lensDisabled: disabled("#clipboardSubsetLens"),
+      pasteDisabled: disabled("#pasteEditClipboard"),
+      syncDisabled: disabled("#syncEditClipboard"),
+    }},
   }};
 }})()
 """
@@ -1046,6 +1114,26 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: lens unsupported state copy wrong")
                     if develop_state["geometryTransformStatus"] != "Transform unsupported." or not develop_state["geometryUnsupportedDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: unsupported geometry/lens controls enabled")
+                if state == "clipboard":
+                    clipboard_state = metrics["clipboardState"]
+                    if not clipboard_state["visible"]:
+                        failures.append(f"{viewport_name} {surface_name}: edit clipboard panel not visible")
+                    if clipboard_state["selectedCount"] != "2 selected on this page":
+                        failures.append(f"{viewport_name} {surface_name}: edit clipboard selected count unclear")
+                    if "synthetic-gradient.jpg" not in clipboard_state["source"]:
+                        failures.append(f"{viewport_name} {surface_name}: edit clipboard source not visible")
+                    if clipboard_state["planRows"] < 2:
+                        failures.append(f"{viewport_name} {surface_name}: edit clipboard target plan rows missing")
+                    if not (
+                        clipboard_state["basicChecked"]
+                        and clipboard_state["toneChecked"]
+                        and clipboard_state["geometryChecked"]
+                    ):
+                        failures.append(f"{viewport_name} {surface_name}: edit clipboard subset choices not visible")
+                    if not clipboard_state["detailDisabled"] or not clipboard_state["lensDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: unsupported clipboard subsets enabled")
+                    if clipboard_state["pasteDisabled"] or clipboard_state["syncDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: edit clipboard paste/sync controls disabled")
     return results, failures
 
 

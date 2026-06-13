@@ -1,6 +1,6 @@
 ---
 title: Phase 18 Professional Editing Baseline
-status: active
+status: complete
 audience: all
 updated: 2026-06-13
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
@@ -41,7 +41,7 @@ Phase 18 turns the schema-owned `tone`, `color`, `detail`, `lens`, and `geometry
 | 18.4.3 | Lens Geometry Panel UI and QA | Complete: Develop exposes supported crop, quarter-turn rotate, and flip controls while lens correction and transform remain visibly disabled |
 | 18.5.1 | Edit Clipboard Contract | Complete: typed graph-only payloads copy allowed subsets while preserving target identity and excluding source-specific/model-owned data |
 | 18.5.2 | Batch Sync History | Complete: batch sync plans target states and commits ready targets all-or-none with one undoable checkpoint per affected photo |
-| 18.5.3 | Copy Paste Batch UI and QA | UI exposes copy/paste/sync without hidden broad batch mutation |
+| 18.5.3 | Copy Paste Batch UI and QA | Complete: UI exposes copy/paste/sync with explicit selected-page scope, subset choice, disabled unsupported sections, and visual QA coverage |
 
 ## Non-Goals
 
@@ -79,6 +79,12 @@ Every Phase 18 task card must keep these categories explicit:
 - Runtime parity tasks: relevant `silica-render`, `silica-core`, `silica-export`, and desktop tests.
 - UI tasks: static UI smoke, visual QA, and full harness when completing the slice.
 - Before phase completion: `scripts/harness/check.sh`.
+
+## Exit State
+
+- Tone curve, HSL, supported geometry, and edit clipboard behavior are implemented as schema-owned, history-backed Develop features.
+- Detail, lens correction, and arbitrary transform runtime paths remain explicit unsupported boundaries rather than approximated pixel effects.
+- Copy/paste and batch sync require visible subset choice and selected-photo scope, are gated to JPEG/JPG Develop photos, commit through all-or-none catalog history, and preserve originals.
 
 ## Stop Gates
 

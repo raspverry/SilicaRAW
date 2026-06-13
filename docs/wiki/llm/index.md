@@ -22,21 +22,25 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 14, Phase 15, Phase 16, and Phase 17 are complete. The current product area is Phase 18: Professional Editing Baseline.
+Phase 14, Phase 15, Phase 16, Phase 17, and Phase 18 are complete. The current product area is Phase 19: Manual Masks.
 
 For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
 
-For Phase 18 task-card creation or implementation, read:
+For Phase 19 task-card creation or implementation, read:
 
-- [Phase 18 Brief](../phases/phase-18-professional-editing-baseline.md)
-- The selected Phase 18 task card under [Task Cards](../tasks/index.md)
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-18-professional-editing-baseline)
+- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-19-masks-and-local-mask-pipeline)
+- [Edit Graph](../topics/edit-graph.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
-- [Edit Graph](../topics/edit-graph.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
+
+For Phase 18 historical Develop P1 context, read:
+
+- [Phase 18 Brief](../phases/phase-18-professional-editing-baseline.md)
+- [Task Cards](../tasks/index.md)
+- [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md)
 
 For Phase 17 historical Develop P0 context, read:
 
