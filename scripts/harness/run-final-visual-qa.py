@@ -688,6 +688,37 @@ def state_script(state):
     document.querySelector("#developHslSaturationValue").value = "24";
     document.querySelector("#developHslLuminanceSlider").value = "-8";
     document.querySelector("#developHslLuminanceValue").value = "-8";
+    document.querySelector("#developDetailPanel").dataset.detailState = "active-unsupported";
+    document.querySelector("#developDetailSupportStatus").value = "Blocked";
+    document.querySelector("#developDetailSupportStatus").textContent = "Blocked";
+    document.querySelector("#developDetailBoundaryStatus").value = "Detail preview/export is unsupported until renderer support exists.";
+    document.querySelector("#developDetailBoundaryStatus").textContent = "Detail preview/export is unsupported until renderer support exists.";
+    document.querySelector("#developDetailSharpeningAmountSlider").value = "42";
+    document.querySelector("#developDetailSharpeningAmountValue").value = "42";
+    [
+      "#developDetailSharpeningAmountSlider",
+      "#developDetailSharpeningAmountValue",
+      "#developDetailSharpeningRadiusSlider",
+      "#developDetailSharpeningRadiusValue",
+      "#developDetailSharpeningDetailSlider",
+      "#developDetailSharpeningDetailValue",
+      "#developDetailSharpeningMaskingSlider",
+      "#developDetailSharpeningMaskingValue",
+      "#developDetailNoiseLuminanceSlider",
+      "#developDetailNoiseLuminanceValue",
+      "#developDetailNoiseDetailSlider",
+      "#developDetailNoiseDetailValue",
+      "#developDetailNoiseContrastSlider",
+      "#developDetailNoiseContrastValue",
+      "#developDetailNoiseColorSlider",
+      "#developDetailNoiseColorValue",
+      "#developDetailNoiseColorDetailSlider",
+      "#developDetailNoiseColorDetailValue",
+      "#developDetailMlxDenoise",
+    ].forEach((selector) => {{
+      const control = document.querySelector(selector);
+      if (control) control.disabled = true;
+    }});
     document.querySelector("#developEditState").textContent = "Clean";
     document.querySelector("#developBeforeView").disabled = false;
     document.querySelector("#developAfterView").disabled = false;
@@ -842,6 +873,31 @@ def metric_script(surface):
       hslHue: document.querySelector("#developHslHueSlider")?.value || "",
       hslSaturation: document.querySelector("#developHslSaturationSlider")?.value || "",
       hslLuminance: document.querySelector("#developHslLuminanceSlider")?.value || "",
+      detailVisible: Boolean(box("#developDetailPanel")),
+      detailStatus: text("#developDetailSupportStatus"),
+      detailBoundary: text("#developDetailBoundaryStatus"),
+      detailAmount: document.querySelector("#developDetailSharpeningAmountSlider")?.value || "",
+      detailControlsDisabled: [
+        "#developDetailSharpeningAmountSlider",
+        "#developDetailSharpeningAmountValue",
+        "#developDetailSharpeningRadiusSlider",
+        "#developDetailSharpeningRadiusValue",
+        "#developDetailSharpeningDetailSlider",
+        "#developDetailSharpeningDetailValue",
+        "#developDetailSharpeningMaskingSlider",
+        "#developDetailSharpeningMaskingValue",
+        "#developDetailNoiseLuminanceSlider",
+        "#developDetailNoiseLuminanceValue",
+        "#developDetailNoiseDetailSlider",
+        "#developDetailNoiseDetailValue",
+        "#developDetailNoiseContrastSlider",
+        "#developDetailNoiseContrastValue",
+        "#developDetailNoiseColorSlider",
+        "#developDetailNoiseColorValue",
+        "#developDetailNoiseColorDetailSlider",
+        "#developDetailNoiseColorDetailValue",
+        "#developDetailMlxDenoise",
+      ].every((selector) => disabled(selector)),
     }},
   }};
 }})()
@@ -915,6 +971,12 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: HSL panel support state not visible")
                     if not develop_state["hslBlueActive"] or develop_state["hslHue"] != "-12" or develop_state["hslSaturation"] != "24" or develop_state["hslLuminance"] != "-8":
                         failures.append(f"{viewport_name} {surface_name}: HSL seeded blue channel state not visible")
+                    if not develop_state["detailVisible"] or develop_state["detailStatus"] != "Blocked":
+                        failures.append(f"{viewport_name} {surface_name}: Detail blocked panel state not visible")
+                    if develop_state["detailBoundary"] != "Detail preview/export is unsupported until renderer support exists.":
+                        failures.append(f"{viewport_name} {surface_name}: Detail renderer boundary copy wrong")
+                    if develop_state["detailAmount"] != "42" or not develop_state["detailControlsDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: Detail disabled readback state not preserved")
     return results, failures
 
 

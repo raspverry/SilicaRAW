@@ -71,6 +71,12 @@ Task 18.2.3 adds a compact HSL Mixer panel to the Develop inspector. The panel e
 
 Visual QA now seeds the blue channel and verifies the HSL support state plus hue, saturation, and luminance values across `1280x800`, `1440x900`, and `1728x965` with no horizontal overflow, no toolbar overlap, and no clipped controls.
 
+## Phase 18 Detail Panel Note
+
+Task 18.3.3 adds a disabled Detail readback panel to the Develop inspector. The panel shows schema-owned sharpening and non-MLX noise-reduction values, keeps all Detail and MLX Denoise controls disabled, and surfaces the renderer/export boundary instead of implying an active pixel effect.
+
+Visual QA now seeds a blocked non-neutral Detail state and verifies the blocked status, renderer/export boundary copy, readback value, and disabled controls across `1280x800`, `1440x900`, and `1728x965`.
+
 ## Final Phase 5.6.12 Refresh
 
 Final QA command:

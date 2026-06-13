@@ -204,6 +204,28 @@ def main():
         "developHslLuminanceSlider",
         "developHslLuminanceValue",
         "developHslLuminanceReset",
+        "developDetailPanel",
+        "developDetailSupportStatus",
+        "developDetailBoundaryStatus",
+        "developDetailSharpeningAmountSlider",
+        "developDetailSharpeningAmountValue",
+        "developDetailSharpeningRadiusSlider",
+        "developDetailSharpeningRadiusValue",
+        "developDetailSharpeningDetailSlider",
+        "developDetailSharpeningDetailValue",
+        "developDetailSharpeningMaskingSlider",
+        "developDetailSharpeningMaskingValue",
+        "developDetailNoiseLuminanceSlider",
+        "developDetailNoiseLuminanceValue",
+        "developDetailNoiseDetailSlider",
+        "developDetailNoiseDetailValue",
+        "developDetailNoiseContrastSlider",
+        "developDetailNoiseContrastValue",
+        "developDetailNoiseColorSlider",
+        "developDetailNoiseColorValue",
+        "developDetailNoiseColorDetailSlider",
+        "developDetailNoiseColorDetailValue",
+        "developDetailMlxDenoise",
         "developCommitEdit",
         "developRevertEdit",
         "developHistoryPanel",
@@ -301,6 +323,7 @@ def main():
             ".sr-develop-workbench",
             ".sr-adjustment-slider",
             ".sr-tone-curve-panel",
+            ".sr-detail-panel",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
         ]:
@@ -377,6 +400,50 @@ def main():
         require(attrs.get("min") == "-100", f"#{control_id} min must match HSL edit graph bounds", failures)
         require(attrs.get("max") == "100", f"#{control_id} max must match HSL edit graph bounds", failures)
         require(attrs.get("step") == "1", f"#{control_id} step must support integer HSL edits", failures)
+
+    detail_controls = {
+        "developDetailSharpeningAmountSlider": ("0", "150", "1"),
+        "developDetailSharpeningRadiusSlider": ("0.1", "5", "0.1"),
+        "developDetailSharpeningDetailSlider": ("0", "100", "1"),
+        "developDetailSharpeningMaskingSlider": ("0", "100", "1"),
+        "developDetailNoiseLuminanceSlider": ("0", "100", "1"),
+        "developDetailNoiseDetailSlider": ("0", "100", "1"),
+        "developDetailNoiseContrastSlider": ("0", "100", "1"),
+        "developDetailNoiseColorSlider": ("0", "100", "1"),
+        "developDetailNoiseColorDetailSlider": ("0", "100", "1"),
+    }
+    for control_id, (minimum, maximum, step) in detail_controls.items():
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "range", f"#{control_id} must be a range input", failures)
+        require("disabled" in attrs, f"#{control_id} must stay disabled until renderer support exists", failures)
+        require(attrs.get("min") == minimum, f"#{control_id} min must match Detail edit graph bounds", failures)
+        require(attrs.get("max") == maximum, f"#{control_id} max must match Detail edit graph bounds", failures)
+        require(attrs.get("step") == step, f"#{control_id} step must match Detail edit graph precision", failures)
+    for control_id in [
+        "developDetailSharpeningAmountValue",
+        "developDetailSharpeningRadiusValue",
+        "developDetailSharpeningDetailValue",
+        "developDetailSharpeningMaskingValue",
+        "developDetailNoiseLuminanceValue",
+        "developDetailNoiseDetailValue",
+        "developDetailNoiseContrastValue",
+        "developDetailNoiseColorValue",
+        "developDetailNoiseColorDetailValue",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "number", f"#{control_id} must be a numeric readback field", failures)
+        require("disabled" in attrs, f"#{control_id} must stay disabled until renderer support exists", failures)
+    require(
+        "disabled" in parser.ids.get("developDetailMlxDenoise", {}),
+        "#developDetailMlxDenoise must stay disabled while MLX denoise is deferred",
+        failures,
+    )
+    for marker in [
+        "Detail preview/export is unsupported until renderer support exists.",
+        "No Detail pixel effect is enabled in this build.",
+        "MLX Denoise",
+    ]:
+        require(marker in source, f"Detail blocked-state marker missing: {marker}", failures)
 
     expected_native_hosts = {
         "loupeViewer": "loupe",

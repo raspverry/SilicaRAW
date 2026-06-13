@@ -193,6 +193,28 @@ WORKFLOW_STEPS = [
             "developHslLuminanceSlider",
             "developHslLuminanceValue",
             "developHslLuminanceReset",
+            "developDetailPanel",
+            "developDetailSupportStatus",
+            "developDetailBoundaryStatus",
+            "developDetailSharpeningAmountSlider",
+            "developDetailSharpeningAmountValue",
+            "developDetailSharpeningRadiusSlider",
+            "developDetailSharpeningRadiusValue",
+            "developDetailSharpeningDetailSlider",
+            "developDetailSharpeningDetailValue",
+            "developDetailSharpeningMaskingSlider",
+            "developDetailSharpeningMaskingValue",
+            "developDetailNoiseLuminanceSlider",
+            "developDetailNoiseLuminanceValue",
+            "developDetailNoiseDetailSlider",
+            "developDetailNoiseDetailValue",
+            "developDetailNoiseContrastSlider",
+            "developDetailNoiseContrastValue",
+            "developDetailNoiseColorSlider",
+            "developDetailNoiseColorValue",
+            "developDetailNoiseColorDetailSlider",
+            "developDetailNoiseColorDetailValue",
+            "developDetailMlxDenoise",
             "developCommitEdit",
             "developRevertEdit",
             "developResetBasic",
@@ -243,6 +265,13 @@ WORKFLOW_STEPS = [
             "HSL Mixer",
             "Hue",
             "Luminance",
+            "Detail",
+            "Sharpening",
+            "Noise Reduction",
+            "Unsupported",
+            "No Detail pixel effect is enabled in this build.",
+            "Detail preview/export is unsupported until renderer support exists.",
+            "MLX Denoise",
             "History",
             "No committed history yet.",
         ],
@@ -633,6 +662,32 @@ def main():
         and parser.ids.get("developHslLuminanceSlider", {}).get("max") == "100"
         and parser.ids.get("developHslLuminanceSlider", {}).get("step") == "1",
         "HSL hue/saturation/luminance sliders must use edit graph bounds -100..100 step 1",
+        failures,
+    )
+    detail_controls = {
+        "developDetailSharpeningAmountSlider": ("0", "150", "1"),
+        "developDetailSharpeningRadiusSlider": ("0.1", "5", "0.1"),
+        "developDetailSharpeningDetailSlider": ("0", "100", "1"),
+        "developDetailSharpeningMaskingSlider": ("0", "100", "1"),
+        "developDetailNoiseLuminanceSlider": ("0", "100", "1"),
+        "developDetailNoiseDetailSlider": ("0", "100", "1"),
+        "developDetailNoiseContrastSlider": ("0", "100", "1"),
+        "developDetailNoiseColorSlider": ("0", "100", "1"),
+        "developDetailNoiseColorDetailSlider": ("0", "100", "1"),
+    }
+    for control_id, (minimum, maximum, step) in detail_controls.items():
+        attrs = parser.ids.get(control_id, {})
+        require(
+            attrs.get("min") == minimum
+            and attrs.get("max") == maximum
+            and attrs.get("step") == step
+            and "disabled" in attrs,
+            f"#{control_id} must stay disabled with Detail edit graph bounds",
+            failures,
+        )
+    require(
+        "disabled" in parser.ids.get("developDetailMlxDenoise", {}),
+        "MLX denoise control must remain disabled in local alpha",
         failures,
     )
     require(

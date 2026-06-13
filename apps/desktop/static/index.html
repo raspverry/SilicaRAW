@@ -472,6 +472,103 @@
               </div>
             </div>
           </div>
+          <div class="sr-detail-panel" id="developDetailPanel" data-detail-state="unsupported">
+            <div class="sr-detail-title-row">
+              <div class="sr-panel-heading">Detail</div>
+              <output id="developDetailSupportStatus" aria-live="polite">Unsupported</output>
+            </div>
+            <output class="sr-detail-boundary-status" id="developDetailBoundaryStatus" aria-live="polite">No Detail pixel effect is enabled in this build.</output>
+            <div class="sr-detail-disabled-grid" role="group" aria-label="Disabled Detail controls">
+              <div class="sr-detail-group">
+                <div class="sr-detail-group-heading">Sharpening</div>
+                <div class="sr-adjustment-slider" data-detail-control="sharpening.amount">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailSharpeningAmountSlider">Amount</label>
+                    <input id="developDetailSharpeningAmountValue" type="number" min="0" max="150" step="1" value="0" aria-label="Detail sharpening amount value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailSharpeningAmountSlider" type="range" min="0" max="150" step="1" value="0" aria-label="Detail sharpening amount" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="sharpening.radius">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailSharpeningRadiusSlider">Radius</label>
+                    <input id="developDetailSharpeningRadiusValue" type="number" min="0.1" max="5" step="0.1" value="1.0" aria-label="Detail sharpening radius value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailSharpeningRadiusSlider" type="range" min="0.1" max="5" step="0.1" value="1.0" aria-label="Detail sharpening radius" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="sharpening.detail">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailSharpeningDetailSlider">Detail</label>
+                    <input id="developDetailSharpeningDetailValue" type="number" min="0" max="100" step="1" value="25" aria-label="Detail sharpening detail value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailSharpeningDetailSlider" type="range" min="0" max="100" step="1" value="25" aria-label="Detail sharpening detail" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="sharpening.masking">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailSharpeningMaskingSlider">Masking</label>
+                    <input id="developDetailSharpeningMaskingValue" type="number" min="0" max="100" step="1" value="0" aria-label="Detail sharpening masking value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailSharpeningMaskingSlider" type="range" min="0" max="100" step="1" value="0" aria-label="Detail sharpening masking" disabled>
+                  </div>
+                </div>
+              </div>
+              <div class="sr-detail-group">
+                <div class="sr-detail-group-heading">Noise Reduction</div>
+                <div class="sr-adjustment-slider" data-detail-control="noiseReduction.luminance">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailNoiseLuminanceSlider">Luminance</label>
+                    <input id="developDetailNoiseLuminanceValue" type="number" min="0" max="100" step="1" value="0" aria-label="Detail noise luminance value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailNoiseLuminanceSlider" type="range" min="0" max="100" step="1" value="0" aria-label="Detail noise luminance" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="noiseReduction.detail">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailNoiseDetailSlider">Detail</label>
+                    <input id="developDetailNoiseDetailValue" type="number" min="0" max="100" step="1" value="50" aria-label="Detail noise detail value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailNoiseDetailSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Detail noise detail" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="noiseReduction.contrast">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailNoiseContrastSlider">Contrast</label>
+                    <input id="developDetailNoiseContrastValue" type="number" min="0" max="100" step="1" value="0" aria-label="Detail noise contrast value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailNoiseContrastSlider" type="range" min="0" max="100" step="1" value="0" aria-label="Detail noise contrast" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="noiseReduction.color">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailNoiseColorSlider">Color</label>
+                    <input id="developDetailNoiseColorValue" type="number" min="0" max="100" step="1" value="25" aria-label="Detail noise color value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailNoiseColorSlider" type="range" min="0" max="100" step="1" value="25" aria-label="Detail noise color" disabled>
+                  </div>
+                </div>
+                <div class="sr-adjustment-slider" data-detail-control="noiseReduction.colorDetail">
+                  <div class="sr-adjustment-header">
+                    <label for="developDetailNoiseColorDetailSlider">Color Detail</label>
+                    <input id="developDetailNoiseColorDetailValue" type="number" min="0" max="100" step="1" value="50" aria-label="Detail noise color detail value" disabled>
+                  </div>
+                  <div class="sr-adjustment-control">
+                    <input id="developDetailNoiseColorDetailSlider" type="range" min="0" max="100" step="1" value="50" aria-label="Detail noise color detail" disabled>
+                  </div>
+                </div>
+              </div>
+              <button class="sr-detail-disabled-action" id="developDetailMlxDenoise" type="button" disabled>MLX Denoise</button>
+            </div>
+          </div>
           <div class="sr-adjustment-slider" data-adjustment="white-balance">
             <div class="sr-adjustment-header">
               <label for="developWhiteBalanceMode">White Balance</label>
@@ -586,7 +683,6 @@
           </div>
           <button class="sr-collapse-row" type="button">Tone</button>
           <button class="sr-collapse-row" type="button">Color</button>
-          <button class="sr-collapse-row" type="button">Detail</button>
           <button class="sr-collapse-row" type="button">Lens</button>
           <button class="sr-collapse-row" type="button">Geometry</button>
           <button class="sr-collapse-row" type="button">Mask</button>
@@ -838,6 +934,28 @@
       const developHslLuminanceSlider = document.querySelector("#developHslLuminanceSlider");
       const developHslLuminanceValue = document.querySelector("#developHslLuminanceValue");
       const developHslLuminanceReset = document.querySelector("#developHslLuminanceReset");
+      const developDetailPanel = document.querySelector("#developDetailPanel");
+      const developDetailSupportStatus = document.querySelector("#developDetailSupportStatus");
+      const developDetailBoundaryStatus = document.querySelector("#developDetailBoundaryStatus");
+      const developDetailControls = Array.from(document.querySelectorAll("[data-detail-control] input"));
+      const developDetailMlxDenoise = document.querySelector("#developDetailMlxDenoise");
+      const developDetailControlPairs = [
+        ["developDetailSharpeningAmountSlider", "developDetailSharpeningAmountValue", "sharpening", "amount", "integer"],
+        ["developDetailSharpeningRadiusSlider", "developDetailSharpeningRadiusValue", "sharpening", "radius", "decimal"],
+        ["developDetailSharpeningDetailSlider", "developDetailSharpeningDetailValue", "sharpening", "detail", "integer"],
+        ["developDetailSharpeningMaskingSlider", "developDetailSharpeningMaskingValue", "sharpening", "masking", "integer"],
+        ["developDetailNoiseLuminanceSlider", "developDetailNoiseLuminanceValue", "noiseReduction", "luminance", "integer"],
+        ["developDetailNoiseDetailSlider", "developDetailNoiseDetailValue", "noiseReduction", "detail", "integer"],
+        ["developDetailNoiseContrastSlider", "developDetailNoiseContrastValue", "noiseReduction", "contrast", "integer"],
+        ["developDetailNoiseColorSlider", "developDetailNoiseColorValue", "noiseReduction", "color", "integer"],
+        ["developDetailNoiseColorDetailSlider", "developDetailNoiseColorDetailValue", "noiseReduction", "colorDetail", "integer"],
+      ].map(([sliderId, valueId, group, field, format]) => ({
+        slider: document.querySelector(`#${sliderId}`),
+        value: document.querySelector(`#${valueId}`),
+        group,
+        field,
+        format,
+      }));
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developResetBasic = document.querySelector("#developResetBasic");
@@ -1802,6 +1920,8 @@
       }
 
       const HSL_CHANNELS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"];
+      const DETAIL_UNSUPPORTED_MESSAGE = "Detail preview/export is unsupported until renderer support exists.";
+      const DETAIL_NEUTRAL_MESSAGE = "No Detail pixel effect is enabled in this build.";
 
       function neutralHslChannel() {
         return { hue: 0, saturation: 0, luminance: 0 };
@@ -1866,6 +1986,88 @@
 
       function hslChannelFromEditState(hslMixer, channel) {
         return normalizeHslChannel(hslMixer?.[channel]);
+      }
+
+      function detailNumber(value, min, max, fallback, precision = 0) {
+        const numeric = Number(value);
+        const base = Number.isFinite(numeric) ? numeric : fallback;
+        const bounded = clamp(base, min, max);
+        return precision > 0 ? Number(bounded.toFixed(precision)) : Math.round(bounded);
+      }
+
+      function neutralDetailState() {
+        return {
+          sharpening: {
+            amount: 0,
+            radius: 1.0,
+            detail: 25,
+            masking: 0,
+          },
+          noiseReduction: {
+            luminance: 0,
+            detail: 50,
+            contrast: 0,
+            color: 25,
+            colorDetail: 50,
+          },
+        };
+      }
+
+      function normalizeDetailState(value) {
+        const sharpening = value?.sharpening || {};
+        const noiseReduction = value?.noiseReduction || value?.noise_reduction || {};
+        return {
+          sharpening: {
+            amount: detailNumber(sharpening.amount, 0, 150, 0),
+            radius: detailNumber(sharpening.radius, 0.1, 5, 1.0, 1),
+            detail: detailNumber(sharpening.detail, 0, 100, 25),
+            masking: detailNumber(sharpening.masking, 0, 100, 0),
+          },
+          noiseReduction: {
+            luminance: detailNumber(noiseReduction.luminance, 0, 100, 0),
+            detail: detailNumber(noiseReduction.detail, 0, 100, 50),
+            contrast: detailNumber(noiseReduction.contrast, 0, 100, 0),
+            color: detailNumber(noiseReduction.color, 0, 100, 25),
+            colorDetail: detailNumber(noiseReduction.colorDetail ?? noiseReduction.color_detail, 0, 100, 50),
+          },
+        };
+      }
+
+      function cloneDetailState(value) {
+        return normalizeDetailState(value);
+      }
+
+      function detailStatesEqual(left, right) {
+        const normalizedLeft = normalizeDetailState(left);
+        const normalizedRight = normalizeDetailState(right);
+        return normalizedLeft.sharpening.amount === normalizedRight.sharpening.amount
+          && normalizedLeft.sharpening.radius === normalizedRight.sharpening.radius
+          && normalizedLeft.sharpening.detail === normalizedRight.sharpening.detail
+          && normalizedLeft.sharpening.masking === normalizedRight.sharpening.masking
+          && normalizedLeft.noiseReduction.luminance === normalizedRight.noiseReduction.luminance
+          && normalizedLeft.noiseReduction.detail === normalizedRight.noiseReduction.detail
+          && normalizedLeft.noiseReduction.contrast === normalizedRight.noiseReduction.contrast
+          && normalizedLeft.noiseReduction.color === normalizedRight.noiseReduction.color
+          && normalizedLeft.noiseReduction.colorDetail === normalizedRight.noiseReduction.colorDetail;
+      }
+
+      function detailIsNeutral(value) {
+        return detailStatesEqual(value, neutralDetailState());
+      }
+
+      function detailDisplayValue(value, format) {
+        if (format === "decimal") {
+          return Number(value).toFixed(1);
+        }
+        return String(Math.round(Number(value) || 0));
+      }
+
+      function hasUnsupportedDraftDetail(state) {
+        return Boolean(state && !detailIsNeutral(state.draftDetail || state.committedDetail));
+      }
+
+      function hasUnsupportedCommittedDetail(state) {
+        return Boolean(state && !detailIsNeutral(state.committedDetail));
       }
 
       function hslMixerCacheKey(value) {
@@ -2023,6 +2225,7 @@
             draftToneCurveMidpoint: 0.5,
             activeHslChannel: "red",
             draftHslMixer: neutralHslMixer(),
+            draftDetail: neutralDetailState(),
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
@@ -2036,6 +2239,7 @@
             committedSaturation: 0,
             committedToneCurveMidpoint: 0.5,
             committedHslMixer: neutralHslMixer(),
+            committedDetail: neutralDetailState(),
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -2074,6 +2278,31 @@
         developHslLuminanceValue.value = formatSignedHundred(values.luminance);
       }
 
+      function renderDetailControlState(state) {
+        const detail = normalizeDetailState(state?.draftDetail || state?.committedDetail);
+        const hasDetail = !detailIsNeutral(detail);
+        developDetailPanel.dataset.detailState = !isDevelopable(selectedPhoto())
+          ? "blocked"
+          : hasDetail
+            ? "active-unsupported"
+            : "unsupported";
+        developDetailSupportStatus.value = hasDetail ? "Blocked" : "Unsupported";
+        developDetailSupportStatus.textContent = developDetailSupportStatus.value;
+        developDetailBoundaryStatus.value = hasDetail ? DETAIL_UNSUPPORTED_MESSAGE : DETAIL_NEUTRAL_MESSAGE;
+        developDetailBoundaryStatus.textContent = developDetailBoundaryStatus.value;
+        developDetailControlPairs.forEach(({ slider, value, group, field, format }) => {
+          const display = detailDisplayValue(detail[group]?.[field], format);
+          slider.value = display;
+          value.value = display;
+          slider.disabled = true;
+          value.disabled = true;
+        });
+        developDetailControls.forEach((control) => {
+          control.disabled = true;
+        });
+        developDetailMlxDenoise.disabled = true;
+      }
+
       function syncAdjustmentControls(state) {
         developExposureSlider.value = formatExposure(state.draftExposure);
         developExposureValue.value = formatExposure(state.draftExposure);
@@ -2100,6 +2329,7 @@
         developToneCurveMidpointValue.value = formatToneCurvePoint(state.draftToneCurveMidpoint);
         renderToneCurveControlState(state);
         renderHslControlState(state);
+        renderDetailControlState(state);
       }
 
       function updateDevelopDirtyState(state) {
@@ -2145,6 +2375,7 @@
         state.committedSaturation = editStateNumber(editState?.saturation, 0);
         state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
         state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
+        state.committedDetail = normalizeDetailState(editState?.detail);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -2158,6 +2389,7 @@
         state.draftSaturation = state.committedSaturation;
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
+        state.draftDetail = cloneDetailState(state.committedDetail);
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -2165,6 +2397,7 @@
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
           renderDevelopPreviewState(localDevelopPreviewPlan(selectedPhoto(), state));
+          syncExportDialog();
         }
       }
 
@@ -2957,6 +3190,8 @@
       function syncExportDialog() {
         const photo = selectedPhoto();
         const hasPhoto = Boolean(photo);
+        const state = photo ? developAdjustmentState(photo.photoId) : null;
+        const detailUnsupported = hasUnsupportedCommittedDetail(state);
         setExportColorProfile(selectedExportColorProfile);
         exportSelectedPhotoName.textContent = photo?.fileName ?? "No photo selected";
         exportSelectedInline.textContent = photo?.fileName ?? "None";
@@ -2968,13 +3203,15 @@
           exportOutputPath.dataset.autofilled = "true";
         }
         const unsafeOutput = exportOutputLooksUnsafe(photo, exportOutputPath.value.trim());
-        const disabled = !hasPhoto || !isRasterExportCandidate(photo) || unsafeOutput;
+        const disabled = !hasPhoto || !isRasterExportCandidate(photo) || unsafeOutput || detailUnsupported;
         runJpegExportButton.disabled = disabled;
-        chooseExportOutputPathButton.disabled = !hasPhoto || !isRasterExportCandidate(photo);
+        chooseExportOutputPathButton.disabled = !hasPhoto || !isRasterExportCandidate(photo) || detailUnsupported;
         if (!hasPhoto) {
           exportStatus.value = "Select a photo before exporting.";
         } else if (unsafeOutput) {
           exportStatus.value = "Output path must differ from the original source path.";
+        } else if (detailUnsupported) {
+          exportStatus.value = "Export blocked because Detail adjustments are unsupported until renderer support exists.";
         } else if (photo.missing) {
           exportStatus.value = "Export blocked because the referenced original is missing.";
         } else if (photo.unsupported) {
@@ -3002,7 +3239,13 @@
         const outputPath = exportOutputPath.value.trim();
         const exportColorProfile = selectedExportColorProfile;
         const exportColorLabel = exportColorProfileLabel(exportColorProfile);
+        const state = photo ? developAdjustmentState(photo.photoId) : null;
         if (!isRasterExportCandidate(photo)) {
+          syncExportDialog();
+          setStatus(exportStatus.value);
+          return;
+        }
+        if (hasUnsupportedCommittedDetail(state)) {
           syncExportDialog();
           setStatus(exportStatus.value);
           return;
@@ -3065,6 +3308,13 @@
         }
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
+        }
+        if (hasUnsupportedDraftDetail(state)) {
+          return {
+            status: "Unsupported",
+            detail: cloneDetailState(state.draftDetail || state.committedDetail),
+            message: DETAIL_UNSUPPORTED_MESSAGE,
+          };
         }
         const activeHslChannel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
         const activeHslValues = normalizeHslChannel(state.draftHslMixer?.[activeHslChannel]);
@@ -3180,6 +3430,12 @@
         ].forEach((control) => {
           control.disabled = disabled;
         });
+        [
+          ...developDetailControls,
+          developDetailMlxDenoise,
+        ].forEach((control) => {
+          control.disabled = true;
+        });
         basicPresetButtons.forEach((button) => {
           button.disabled = disabled;
         });
@@ -3200,6 +3456,7 @@
           draftToneCurveMidpoint: 0.5,
           activeHslChannel: "red",
           draftHslMixer: neutralHslMixer(),
+          draftDetail: neutralDetailState(),
           committedExposure: 0,
           committedContrast: 0,
           committedWhiteBalance: "as_shot",
@@ -3213,6 +3470,7 @@
           committedSaturation: 0,
           committedToneCurveMidpoint: 0.5,
           committedHslMixer: neutralHslMixer(),
+          committedDetail: neutralDetailState(),
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -3267,6 +3525,7 @@
             saturation: response.data.saturation,
             toneCurve: response.data.toneCurve,
             hslColorMixer: response.data.hslColorMixer,
+            detail: response.data.detail,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -3499,6 +3758,8 @@
           state.committedSaturation = editStateNumber(response.data.saturation, state.draftSaturation);
           state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(response.data.toneCurve);
           state.committedHslMixer = normalizeHslMixer(response.data.hslColorMixer);
+          state.committedDetail = normalizeDetailState(response.data.detail);
+          state.draftDetail = cloneDetailState(state.committedDetail);
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
             state.draftTemperature = state.committedTemperature;
@@ -3605,6 +3866,7 @@
         state.draftSaturation = state.committedSaturation;
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
+        state.draftDetail = cloneDetailState(state.committedDetail);
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -3717,6 +3979,7 @@
         state.committedSaturation = editStateNumber(editState?.saturation, 0);
         state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
         state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
+        state.committedDetail = normalizeDetailState(editState?.detail);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -3730,6 +3993,7 @@
         state.draftSaturation = state.committedSaturation;
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
+        state.draftDetail = cloneDetailState(state.committedDetail);
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
       }
@@ -4208,6 +4472,12 @@
           control.disabled = developDisabled;
         });
         [
+          ...developDetailControls,
+          developDetailMlxDenoise,
+        ].forEach((control) => {
+          control.disabled = true;
+        });
+        [
           developToneCurveChannelRed,
           developToneCurveChannelGreen,
           developToneCurveChannelBlue,
@@ -4217,6 +4487,7 @@
         });
         renderToneCurveControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         renderHslControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
+        renderDetailControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         basicPresetButtons.forEach((button) => {
           button.disabled = developDisabled;
         });
@@ -4226,8 +4497,11 @@
           developHistoryPanel.dataset.canUndo === "true",
           developHistoryPanel.dataset.canRedo === "true",
         );
-        runJpegExportButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
-        chooseExportOutputPathButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
+        const exportPhoto = selectedPhoto();
+        const exportState = exportPhoto ? developAdjustmentState(exportPhoto.photoId) : null;
+        const exportDisabled = !isRasterExportCandidate(exportPhoto) || hasUnsupportedCommittedDetail(exportState);
+        runJpegExportButton.disabled = isBusy || exportDisabled;
+        chooseExportOutputPathButton.disabled = isBusy || exportDisabled;
         exportColorOptionButtons.forEach((button) => {
           button.disabled = isBusy;
         });
