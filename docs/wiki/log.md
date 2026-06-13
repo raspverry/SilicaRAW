@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] wiki | LLM routing split
+
+- Added a short [Current LLM Route](llm/current-route.md) for active Phase 19 routing.
+- Added [Completed LLM Context](llm/completed-context.md) so historical phase routes no longer crowd the main LLM index.
+- Added [Phase 18 Summary](phases/phase-18-summary.md) and routed agents away from replaying completed Phase 18 task cards by default.
+
 ## [2026-06-13] phase-18 | Edit clipboard UI completed
 
 - Completed Task 18.5.3 with a Develop Copy & Sync panel for graph-only edit clipboard copy, paste-to-primary, and selected-page batch sync.

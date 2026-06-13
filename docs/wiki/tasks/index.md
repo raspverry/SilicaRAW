@@ -82,6 +82,8 @@ For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](.
 
 ## Phase 18
 
+Phase 18 is complete. Prefer [Phase 18 Summary](../phases/phase-18-summary.md) unless a task directly changes or audits a specific completed Phase 18 slice.
+
 - [18.1.1: Tone Curve Mutators](18.1.1-tone-curve-mutators.md)
 - [18.1.2: Tone Curve Preview, Commit, and Export Parity](18.1.2-tone-curve-preview-commit-export-parity.md)
 - [18.1.3: Tone Curve Panel UI and QA](18.1.3-tone-curve-panel-ui-qa.md)

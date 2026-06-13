@@ -17,77 +17,17 @@ This page is the short routing layer for LLM agents. Use it to choose the smalle
 - [Agent Rules](../../../codex/AGENT_RULES.md)
 - [Wiki Index](../index.md)
 - This page
+- [Current LLM Route](current-route.md)
 
 If the task changes schemas, dependencies, architecture, release behavior, or product scope, also read the specific source-of-truth document linked from the relevant route below.
 
 ## Current Route
 
-Phase 14, Phase 15, Phase 16, Phase 17, and Phase 18 are complete. The current product area is Phase 19: Manual Masks.
-
-For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
-
-For Phase 19 task-card creation or implementation, read:
-
-- [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-19-masks-and-local-mask-pipeline)
-- [Edit Graph](../topics/edit-graph.md)
-- [Catalog](../topics/catalog.md)
-- [Data Safety](../topics/data-safety.md)
-- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
-- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
-
-For Phase 18 historical Develop P1 context, read:
-
-- [Phase 18 Brief](../phases/phase-18-professional-editing-baseline.md)
-- [Task Cards](../tasks/index.md)
-- [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md)
-
-For Phase 17 historical Develop P0 context, read:
-
-- [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md)
-- [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md)
-
-For Phase 15 historical RAW/color/Metal context, read:
-
-- [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
-- [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md)
-- [Phase 15 RAW Export Manual Color QA](../../../checklists/PHASE_15_RAW_EXPORT_MANUAL_QA.md)
-- [RAW Decoding](../topics/raw-decoding.md)
-- [Color Management](../topics/color-management.md)
-- [Metal Rendering](../topics/metal-rendering.md)
-
-For Phase 14 historical native viewer bridge context, read:
-
-- [Phase 14 Product Metal Viewer Bridge Plan](../roadmaps/phase-14-metal-viewer-bridge-plan.md)
-- [Phase 14 Brief](../phases/phase-14-product-metal-viewer-bridge.md)
-- [Metal Rendering](../topics/metal-rendering.md)
-- [Spike 001 Tauri + Native Metal Viewer](../../spikes/001-tauri-metal-viewer.md)
-
-For Phase 13 historical color-proof context, read:
-
-- [Phase 13 Color Pipeline Proof Plan](../roadmaps/phase-13-color-pipeline-proof-plan.md)
-- [Phase 13 Brief](../phases/phase-13-color-pipeline-proof.md)
-- The matching task card under [Task Cards](../tasks/index.md)
-- [Color Management](../topics/color-management.md)
-- [Golden Image and Tolerance Policy](../../../checklists/GOLDEN_IMAGE_TOLERANCE_POLICY.md)
-- [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
-- [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
-
-For Phase 12 historical context, read:
-
-- [Phase 12 RAW Proof Plan](../roadmaps/phase-12-raw-proof-plan.md)
-- [Phase 12 Brief](../phases/phase-12-raw-proof.md)
-- [RAW Decoding](../topics/raw-decoding.md)
-
-Do not read the full [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md) unless the current phase brief, task card, or master execution plan is missing required information.
+Read [Current LLM Route](current-route.md) for the active work area and minimal read set.
 
 ## Completed Context
 
-- Phase 11 is complete. For context, read [Phase 11 Summary](../phases/phase-11-summary.md) instead of the full Phase 11 design spec.
-- Phase 10 evidence, recovery, and public trust gates are complete. Read the full Phase 10 spec only when changing fixtures, backup/restore, public trust files, or recovery policy.
-- Phase 15 is complete. For context, read [Phase 15 Brief](../phases/phase-15-raw-color-metal-vertical-slice.md) and [Phase 15 RAW Export Manual Color QA](../../../checklists/PHASE_15_RAW_EXPORT_MANUAL_QA.md) instead of replaying Phase 15 task cards.
-- Phase 16 is complete. For context, read [Phase 16 Brief](../phases/phase-16-undo-history-action-trust.md) and [Action Trust](../topics/action-trust.md) instead of replaying Phase 16 task cards.
-- Phase 17 is complete. For context, read [Phase 17 Brief](../phases/phase-17-develop-p0-expansion.md) and [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) instead of replaying Phase 17 task cards.
+Read [Completed LLM Context](completed-context.md) when a task needs historical phase context.
 
 ## Read Avoidance Rules
 
