@@ -2896,6 +2896,7 @@ fn edit_graph_history_label(
     let color_presence_changed =
         before.vibrance != after.vibrance || before.saturation != after.saturation;
     let tone_curve_changed = before_graph.tone != after_graph.tone;
+    let hsl_color_mixer_changed = before_graph.color.hsl != after_graph.color.hsl;
 
     match (
         exposure_contrast_changed,
@@ -2903,12 +2904,14 @@ fn edit_graph_history_label(
         tone_recovery_changed,
         color_presence_changed,
         tone_curve_changed,
+        hsl_color_mixer_changed,
     ) {
-        (true, false, false, false, false) => "Exposure / contrast",
-        (false, true, false, false, false) => "White balance",
-        (false, false, true, false, false) => "Tone recovery",
-        (false, false, false, true, false) => "Color presence",
-        (false, false, false, false, true) => "Tone curve",
+        (true, false, false, false, false, false) => "Exposure / contrast",
+        (false, true, false, false, false, false) => "White balance",
+        (false, false, true, false, false, false) => "Tone recovery",
+        (false, false, false, true, false, false) => "Color presence",
+        (false, false, false, false, true, false) => "Tone curve",
+        (false, false, false, false, false, true) => "HSL color mixer",
         _ => "Develop edit",
     }
 }

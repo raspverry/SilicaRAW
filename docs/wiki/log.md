@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | HSL runtime parity added
+
+- Completed Task 18.2.2 with HSL color mixer preview, commit, desktop command, histogram, and JPEG export parity for supported local paths.
+- Kept draft HSL preview non-persistent and persisted committed HSL changes through one undoable history checkpoint.
+- Recorded HSL color mixer settings in export evidence without adding broad color-correctness, RAW renderer, UI, sidecar, MLX, MCP, or plugin claims and routed Phase 18 to Task 18.2.3.
+
 ## [2026-06-13] phase-18 | HSL color mixer mutator added
 
 - Completed Task 18.2.1 with graph-only HSL color mixer mutation for all eight schema-owned channels.

@@ -31,7 +31,7 @@ Phase 18 turns the schema-owned `tone`, `color`, `detail`, `lens`, and `geometry
 | 18.1.2 | Tone Curve Preview/Commit/Export Parity | Complete: supported JPEG/JPG preview/export paths use point tone curve semantics |
 | 18.1.3 | Tone Curve Panel UI and QA | Complete: Develop panel exposes supported RGB point curve control without overlap |
 | 18.2.1 | HSL Color Mixer Mutators | Complete: per-channel hue/saturation/luminance graph changes validate and round-trip |
-| 18.2.2 | HSL Preview/Commit/Export Parity | Supported preview/export paths use committed HSL state |
+| 18.2.2 | HSL Preview/Commit/Export Parity | Complete: supported JPEG/JPG preview/export paths use committed HSL state |
 | 18.2.3 | HSL Panel UI and QA | Compact color mixer UI follows existing Develop patterns |
 | 18.3.1 | Detail Mutators | Sharpening and noise reduction graph values validate; MLX denoise remains untouched |
 | 18.3.2 | Detail Preview/Export Boundary | Supported detail behavior is explicit; unsupported preview/export states are honest |

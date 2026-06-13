@@ -25,6 +25,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Phase 13 now has an execution plan, brief, and task cards for fixture-backed color proof.
 - The local export UI/API now keeps sRGB as the default and exposes Display P3 only as an explicit ICC-backed choice.
 - Task 17.2.1 adds deterministic local white-balance adjustment for supported JPEG/JPG Develop preview and JPEG export parity. This is product edit behavior, not a fixture-backed color-correctness claim.
+- Task 18.2.2 adds deterministic local HSL color mixer adjustment for supported JPEG/JPG Develop preview and JPEG export parity. This is product edit behavior, not a fixture-backed color-correctness claim.
 
 ## Blocked Work
 

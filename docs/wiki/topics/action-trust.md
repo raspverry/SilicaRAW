@@ -167,6 +167,8 @@ Task 16.6 implements the runtime path: edit commits, flag commits, undo, and red
 
 Task 17.4 applies P0 Basic reset and built-in presets through the same edit commit transaction path. Before/after controls are explicitly presentation state and must not enter the action tables.
 
+Task 18.2.2 applies HSL color mixer commits through the same validated edit graph transaction path. Draft HSL preview remains render-only; committed HSL changes create one undoable catalog checkpoint and do not write sidecars, exports, cache bytes, or originals.
+
 ## Stop Gates
 
 Stop before implementation if a design would:

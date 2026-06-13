@@ -105,6 +105,7 @@ pub struct ExposureContrastPreviewRequest {
     pub tone_recovery: ToneRecoveryRenderAdjustment,
     pub color_presence: ColorPresenceRenderAdjustment,
     pub tone_curve: ToneCurveRenderAdjustment,
+    pub hsl_color_mixer: HslColorMixerRenderAdjustment,
     pub message: String,
 }
 
@@ -121,6 +122,7 @@ pub struct JpegSrgbExportRenderRequest {
     pub tone_recovery: ToneRecoveryRenderAdjustment,
     pub color_presence: ColorPresenceRenderAdjustment,
     pub tone_curve: ToneCurveRenderAdjustment,
+    pub hsl_color_mixer: HslColorMixerRenderAdjustment,
     pub quality: u8,
     pub message: String,
 }
@@ -210,6 +212,53 @@ impl ToneCurveRenderAdjustment {
             red_curve: Vec::new(),
             green_curve: Vec::new(),
             blue_curve: Vec::new(),
+        }
+    }
+}
+
+/// One HSL color mixer channel carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HslColorChannelRenderAdjustment {
+    pub hue: f64,
+    pub saturation: f64,
+    pub luminance: f64,
+}
+
+impl HslColorChannelRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            hue: 0.0,
+            saturation: 0.0,
+            luminance: 0.0,
+        }
+    }
+}
+
+/// HSL color mixer values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HslColorMixerRenderAdjustment {
+    pub red: HslColorChannelRenderAdjustment,
+    pub orange: HslColorChannelRenderAdjustment,
+    pub yellow: HslColorChannelRenderAdjustment,
+    pub green: HslColorChannelRenderAdjustment,
+    pub aqua: HslColorChannelRenderAdjustment,
+    pub blue: HslColorChannelRenderAdjustment,
+    pub purple: HslColorChannelRenderAdjustment,
+    pub magenta: HslColorChannelRenderAdjustment,
+}
+
+impl HslColorMixerRenderAdjustment {
+    pub fn neutral() -> Self {
+        let neutral = HslColorChannelRenderAdjustment::neutral();
+        Self {
+            red: neutral,
+            orange: neutral,
+            yellow: neutral,
+            green: neutral,
+            aqua: neutral,
+            blue: neutral,
+            purple: neutral,
+            magenta: neutral,
         }
     }
 }
@@ -1151,6 +1200,7 @@ pub fn plan_color_presence_preview(
         tone_recovery,
         color_presence,
         tone_curve: ToneCurveRenderAdjustment::neutral(),
+        hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         message,
     }
 }
@@ -1176,6 +1226,33 @@ pub fn plan_tone_curve_preview(
     request.tone_curve = tone_curve;
     if request.status == PreviewRenderStatus::Ready {
         request.message = "Tone curve preview request is ready.".to_string();
+    }
+    request
+}
+
+/// Build a render request for a draft HSL color mixer preview update.
+pub fn plan_hsl_color_mixer_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
+    let mut request = plan_tone_curve_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+    );
+    request.hsl_color_mixer = hsl_color_mixer;
+    if request.status == PreviewRenderStatus::Ready {
+        request.message = "HSL color mixer preview request is ready.".to_string();
     }
     request
 }
@@ -1262,6 +1339,7 @@ pub fn plan_jpeg_srgb_export_with_color_presence(
         tone_recovery,
         color_presence,
         tone_curve: ToneCurveRenderAdjustment::neutral(),
+        hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
@@ -1290,6 +1368,34 @@ pub fn plan_jpeg_srgb_export_with_tone_curve(
         quality,
     );
     request.tone_curve = tone_curve;
+    request
+}
+
+/// Build a render-side request for exporting an edited raster source with HSL color mixer.
+pub fn plan_jpeg_srgb_export_with_hsl_color_mixer(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    let mut request = plan_jpeg_srgb_export_with_tone_curve(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        quality,
+    );
+    request.hsl_color_mixer = hsl_color_mixer;
     request
 }
 
@@ -1375,6 +1481,7 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_color_presence(
         tone_recovery,
         color_presence,
         tone_curve: ToneCurveRenderAdjustment::neutral(),
+        hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
@@ -1403,6 +1510,34 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_tone_curve(
         quality,
     );
     request.tone_curve = tone_curve;
+    request
+}
+
+/// Build a render-side request for exporting a RAW-derived source artifact with HSL color mixer.
+pub fn plan_raw_derived_jpeg_srgb_export_with_hsl_color_mixer(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    let mut request = plan_raw_derived_jpeg_srgb_export_with_tone_curve(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        quality,
+    );
+    request.hsl_color_mixer = hsl_color_mixer;
     request
 }
 
@@ -1642,6 +1777,54 @@ mod tests {
         assert_eq!(export.tone_curve, tone_curve);
         assert_eq!(export.exposure, 0.25);
         assert_eq!(export.contrast, -3.0);
+    }
+
+    #[test]
+    fn plans_hsl_color_mixer_preview_and_export_requests() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let hsl = super::HslColorMixerRenderAdjustment {
+            blue: super::HslColorChannelRenderAdjustment {
+                hue: -12.0,
+                saturation: 24.0,
+                luminance: -8.5,
+            },
+            ..super::HslColorMixerRenderAdjustment::neutral()
+        };
+
+        let preview = super::plan_hsl_color_mixer_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            hsl,
+        );
+        let export = super::plan_jpeg_srgb_export_with_hsl_color_mixer(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            hsl,
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.hsl_color_mixer, hsl);
+        assert!(preview.message.contains("HSL"));
+        assert_eq!(export.hsl_color_mixer, hsl);
+        assert_eq!(
+            export.tone_curve,
+            super::ToneCurveRenderAdjustment::neutral()
+        );
     }
 
     #[test]

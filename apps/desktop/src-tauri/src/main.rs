@@ -70,6 +70,27 @@ struct DesktopToneCurveState {
     blue_curve: Vec<DesktopToneCurvePoint>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopHslColorChannelState {
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopHslColorMixerState {
+    red: DesktopHslColorChannelState,
+    orange: DesktopHslColorChannelState,
+    yellow: DesktopHslColorChannelState,
+    green: DesktopHslColorChannelState,
+    aqua: DesktopHslColorChannelState,
+    blue: DesktopHslColorChannelState,
+    purple: DesktopHslColorChannelState,
+    magenta: DesktopHslColorChannelState,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopToneCurvePoint {
@@ -184,6 +205,7 @@ enum DesktopCommandData {
         vibrance: f64,
         saturation: f64,
         tone_curve: DesktopToneCurveState,
+        hsl_color_mixer: DesktopHslColorMixerState,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -201,6 +223,7 @@ enum DesktopCommandData {
         vibrance: f64,
         saturation: f64,
         tone_curve: DesktopToneCurveState,
+        hsl_color_mixer: DesktopHslColorMixerState,
         persisted: bool,
         message: String,
     },
@@ -218,6 +241,7 @@ enum DesktopCommandData {
         vibrance: f64,
         saturation: f64,
         tone_curve: DesktopToneCurveState,
+        hsl_color_mixer: DesktopHslColorMixerState,
         persisted: bool,
         message: String,
     },
@@ -1172,6 +1196,7 @@ fn preview_exposure_contrast_edit(
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1238,6 +1263,7 @@ fn preview_white_balance_edit(
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1292,6 +1318,7 @@ fn preview_tone_recovery_edit(
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1342,6 +1369,7 @@ fn preview_color_presence_edit(
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1401,6 +1429,77 @@ fn preview_tone_curve_edit(
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_hsl_color_mixer_edit(
+    library_path: String,
+    photo_id: String,
+    channel: String,
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_hsl_color_mixer_edit";
+    let hsl_channel = match parse_hsl_color_channel(&channel) {
+        Ok(channel) => channel,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+
+    match silica_core::preview_hsl_color_mixer_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        hsl_channel,
+        hue,
+        saturation,
+        luminance,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1449,6 +1548,7 @@ fn commit_exposure_contrast_edit(
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1513,6 +1613,7 @@ fn commit_white_balance_edit(
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1565,6 +1666,7 @@ fn commit_tone_recovery_edit(
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1613,6 +1715,7 @@ fn commit_color_presence_edit(
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1670,6 +1773,75 @@ fn commit_tone_curve_edit(
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_hsl_color_mixer_edit(
+    library_path: String,
+    photo_id: String,
+    channel: String,
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_hsl_color_mixer_edit";
+    let hsl_channel = match parse_hsl_color_channel(&channel) {
+        Ok(channel) => channel,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+
+    match silica_core::commit_hsl_color_mixer_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        hsl_channel,
+        hue,
+        saturation,
+        luminance,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1708,6 +1880,7 @@ fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopComma
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1764,6 +1937,7 @@ fn commit_basic_preset_edit(
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1802,6 +1976,7 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 vibrance: state.vibrance,
                 saturation: state.saturation,
                 tone_curve: tone_curve_data(state.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(state.hsl_color_mixer),
                 persisted: state.persisted,
                 message: state.message,
             },
@@ -2062,6 +2237,37 @@ fn tone_curve_points_data(
 
 fn tone_curve_pairs(points: &[DesktopToneCurvePoint]) -> Vec<(f64, f64)> {
     points.iter().map(|point| (point.x, point.y)).collect()
+}
+
+fn hsl_color_mixer_data(
+    hsl_color_mixer: silica_core::PhotoHslColorMixerState,
+) -> DesktopHslColorMixerState {
+    DesktopHslColorMixerState {
+        red: hsl_color_channel_data(hsl_color_mixer.red),
+        orange: hsl_color_channel_data(hsl_color_mixer.orange),
+        yellow: hsl_color_channel_data(hsl_color_mixer.yellow),
+        green: hsl_color_channel_data(hsl_color_mixer.green),
+        aqua: hsl_color_channel_data(hsl_color_mixer.aqua),
+        blue: hsl_color_channel_data(hsl_color_mixer.blue),
+        purple: hsl_color_channel_data(hsl_color_mixer.purple),
+        magenta: hsl_color_channel_data(hsl_color_mixer.magenta),
+    }
+}
+
+fn hsl_color_channel_data(
+    channel: silica_core::PhotoHslColorChannelState,
+) -> DesktopHslColorChannelState {
+    DesktopHslColorChannelState {
+        hue: channel.hue,
+        saturation: channel.saturation,
+        luminance: channel.luminance,
+    }
+}
+
+fn parse_hsl_color_channel(
+    channel: &str,
+) -> Result<silica_core::HslColorChannel, silica_core::CoreError> {
+    silica_core::HslColorChannel::try_from(channel).map_err(silica_core::CoreError::from)
 }
 
 fn desktop_photo_export_response(
@@ -2709,11 +2915,13 @@ fn main() {
             preview_tone_recovery_edit,
             preview_color_presence_edit,
             preview_tone_curve_edit,
+            preview_hsl_color_mixer_edit,
             commit_exposure_contrast_edit,
             commit_white_balance_edit,
             commit_tone_recovery_edit,
             commit_color_presence_edit,
             commit_tone_curve_edit,
+            commit_hsl_color_mixer_edit,
             commit_p0_basic_reset,
             commit_basic_preset_edit,
             get_photo_edit_state,
@@ -3921,6 +4129,73 @@ mod tests {
             } => {
                 assert_eq!(*vibrance, 24.0);
                 assert_eq!(*saturation, -8.5);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_preview_and_commit_hsl_color_mixer_edit() {
+        let workspace = unique_library_root("desktop-hsl-color-mixer-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_hsl_color_mixer_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            "blue".to_string(),
+            -12.0,
+            24.0,
+            -8.5,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                hsl_color_mixer,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(hsl_color_mixer.blue.hue, -12.0);
+                assert_eq!(hsl_color_mixer.blue.saturation, 24.0);
+                assert_eq!(hsl_color_mixer.blue.luminance, -8.5);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_hsl_color_mixer_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            "blue".to_string(),
+            -12.0,
+            24.0,
+            -8.5,
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                hsl_color_mixer,
+                persisted,
+                ..
+            } => {
+                assert_eq!(hsl_color_mixer.blue.hue, -12.0);
+                assert_eq!(hsl_color_mixer.blue.saturation, 24.0);
+                assert_eq!(hsl_color_mixer.blue.luminance, -8.5);
                 assert!(*persisted);
             }
             other => panic!("unexpected response data: {other:?}"),
