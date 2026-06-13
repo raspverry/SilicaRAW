@@ -58,6 +58,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Phase 17 Develop P0 Expansion Brief](phases/phase-17-develop-p0-expansion.md): completed Develop P0 control family scope and task order.
 - [Phase 18 Professional Editing Baseline Brief](phases/phase-18-professional-editing-baseline.md): completed P1 Develop control family scope and task order.
 - [Phase 18 Summary](phases/phase-18-summary.md): compact completed Phase 18 context for Phase 19 agents.
+- [Phase 19 Manual Masks Brief](phases/phase-19-manual-masks.md): active manual mask scope and task order.
 
 ### Decisions
 

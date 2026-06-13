@@ -16,15 +16,14 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 18 is complete. The current product area is **Phase 19: Manual Masks**.
 
-Before implementing Phase 19 behavior, create Phase 19 task cards under `docs/wiki/tasks/` from:
-
-- [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md#phase-19-manual-masks)
-- [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-19-masks-and-local-mask-pipeline)
+Phase 19 task cards exist. The current next task is [Task 19.1 Mask Schema and Edit Graph Audit](../tasks/19.1-mask-schema-edit-graph-audit.md).
 
 ## Minimal Read Set
 
 For Phase 19 task-card creation or implementation, read:
 
+- [Phase 19 Brief](../phases/phase-19-manual-masks.md)
+- The selected Phase 19 task card under [Task Cards](../tasks/index.md)
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 19](../roadmaps/post-alpha-product-roadmap.md#phase-19-masks-and-local-mask-pipeline)
 - [Edit Graph](../topics/edit-graph.md)
@@ -39,7 +38,6 @@ Use [Phase 18 Summary](../phases/phase-18-summary.md) for historical context. Do
 
 ## Stop Rules
 
-- Do not implement masks before Phase 19 task cards exist.
 - Do not invent mask schema fields outside the authoritative edit graph schema.
 - Do not add MLX, MCP, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support.
 - Do not mutate original photo files.

@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 18 is complete. Current next work is to create Phase 19 task cards from this plan and the product roadmap before implementing Task 19.1.
+- Phase 18 is complete. Phase 19 task cards exist. Current next task is [Task 19.1 Mask Schema and Edit Graph Audit](../tasks/19.1-mask-schema-edit-graph-audit.md).
 
 ## Wave Map
 
@@ -387,8 +387,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Create Phase 19 task cards under `docs/wiki/tasks/` from the Phase 19 plan.
-2. Start Task 19.1 Mask Schema and Edit Graph Audit only after those task cards exist.
+1. Start [Task 19.1 Mask Schema and Edit Graph Audit](../tasks/19.1-mask-schema-edit-graph-audit.md).
+2. Continue Phase 19 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links
 

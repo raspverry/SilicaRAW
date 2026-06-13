@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-19 | Manual mask task cards added
+
+- Added the Phase 19 Manual Masks brief.
+- Split Phase 19 into schema audit, gradient masks, brush storage/rasterization, preview/export compositing, and visual QA task cards.
+- Routed the current LLM path and master execution plan to Task 19.1.
+
 ## [2026-06-13] wiki | LLM routing split
 
 - Added a short [Current LLM Route](llm/current-route.md) for active Phase 19 routing.

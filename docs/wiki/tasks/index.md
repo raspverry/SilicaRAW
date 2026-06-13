@@ -100,6 +100,14 @@ Phase 18 is complete. Prefer [Phase 18 Summary](../phases/phase-18-summary.md) u
 - [18.5.2: Batch Sync History](18.5.2-batch-sync-history.md)
 - [18.5.3: Copy Paste Batch UI and QA](18.5.3-copy-paste-batch-ui-qa.md)
 
+## Phase 19
+
+- [19.1: Mask Schema and Edit Graph Audit](19.1-mask-schema-edit-graph-audit.md)
+- [19.2: Linear and Radial Manual Masks](19.2-linear-radial-manual-masks.md)
+- [19.3: Brush Mask Storage and Rasterization](19.3-brush-mask-storage-rasterization.md)
+- [19.4: Mask Compositing in Preview and Export](19.4-mask-compositing-preview-export.md)
+- [19.5: Mask Editor Visual QA](19.5-mask-editor-visual-qa.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.
