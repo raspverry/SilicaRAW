@@ -716,6 +716,103 @@ pub fn apply_detail_noise_reduction(
     Ok(edited)
 }
 
+/// Return a draft graph with schema-owned lens toggles and sliders adjusted.
+pub fn apply_lens_adjustments(
+    graph: &EditGraph,
+    profile_correction: bool,
+    chromatic_aberration: bool,
+    distortion: f64,
+    vignetting: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.lens.profile_correction = profile_correction;
+    edited.lens.chromatic_aberration = chromatic_aberration;
+    edited.lens.distortion = number_from_f64("lens.distortion", distortion)?;
+    edited.lens.vignetting = number_from_f64("lens.vignetting", vignetting)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with schema-owned geometry transform controls adjusted.
+pub fn apply_geometry_transform(
+    graph: &EditGraph,
+    vertical: f64,
+    horizontal: f64,
+    aspect: f64,
+    scale: f64,
+    x_offset: f64,
+    y_offset: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.geometry.transform.vertical = number_from_f64("geometry.transform.vertical", vertical)?;
+    edited.geometry.transform.horizontal =
+        number_from_f64("geometry.transform.horizontal", horizontal)?;
+    edited.geometry.transform.aspect = number_from_f64("geometry.transform.aspect", aspect)?;
+    edited.geometry.transform.scale = number_from_f64("geometry.transform.scale", scale)?;
+    edited.geometry.transform.x_offset = number_from_f64("geometry.transform.x_offset", x_offset)?;
+    edited.geometry.transform.y_offset = number_from_f64("geometry.transform.y_offset", y_offset)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with schema-owned rotation and flip state adjusted.
+pub fn apply_geometry_orientation(
+    graph: &EditGraph,
+    rotation: f64,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.geometry.rotation = number_from_f64("geometry.rotation", rotation)?;
+    edited.geometry.flip_horizontal = flip_horizontal;
+    edited.geometry.flip_vertical = flip_vertical;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with a normalized crop rectangle.
+pub fn apply_geometry_crop(
+    graph: &EditGraph,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    angle: f64,
+    aspect: Option<&str>,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.geometry.crop = Some(Crop {
+        x: number_from_f64("geometry.crop.x", x)?,
+        y: number_from_f64("geometry.crop.y", y)?,
+        width: number_from_f64("geometry.crop.width", width)?,
+        height: number_from_f64("geometry.crop.height", height)?,
+        angle: number_from_f64("geometry.crop.angle", angle)?,
+        aspect: aspect.map(str::to_string),
+    });
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with crop cleared while preserving other geometry state.
+pub fn clear_geometry_crop(
+    graph: &EditGraph,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.geometry.crop = None;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Reset P0 Basic controls to schema-valid defaults.
 pub fn reset_p0_basic_controls(
     graph: &EditGraph,
@@ -1148,6 +1245,22 @@ fn validate_geometry(geometry: &GeometryAdjustments) -> Result<(), EditGraphVali
         validate_exclusive_min_range("geometry.crop.width", &crop.width, 0.0, 1.0)?;
         validate_exclusive_min_range("geometry.crop.height", &crop.height, 0.0, 1.0)?;
         validate_range("geometry.crop.angle", &crop.angle, -45.0, 45.0)?;
+        let x = number_as_f64("geometry.crop.x", &crop.x)?;
+        let y = number_as_f64("geometry.crop.y", &crop.y)?;
+        let width = number_as_f64("geometry.crop.width", &crop.width)?;
+        let height = number_as_f64("geometry.crop.height", &crop.height)?;
+        if x + width > 1.0 {
+            return Err(EditGraphValidationError::new(
+                "geometry.crop.x",
+                "x plus width must be <= 1",
+            ));
+        }
+        if y + height > 1.0 {
+            return Err(EditGraphValidationError::new(
+                "geometry.crop.y",
+                "y plus height must be <= 1",
+            ));
+        }
     }
     validate_range("geometry.rotation", &geometry.rotation, -180.0, 180.0)?;
     validate_range(
@@ -1777,6 +1890,130 @@ mod tests {
         assert!(color_detail_error
             .to_string()
             .contains("detail.noise_reduction.color_detail"));
+    }
+
+    #[test]
+    fn applies_lens_and_geometry_mutators_and_round_trips_json() {
+        let mut graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        graph.lens.profile_id = Some("embedded-profile-id".to_string());
+
+        let lens = super::apply_lens_adjustments(&graph, true, true, -12.5, 18.0, "unix:3")
+            .expect("apply lens adjustments");
+        let transformed =
+            super::apply_geometry_transform(&lens, 6.0, -5.0, 2.5, 125.0, 10.0, -8.0, "unix:4")
+                .expect("apply geometry transform");
+        let oriented = super::apply_geometry_orientation(&transformed, 90.0, true, false, "unix:5")
+            .expect("apply geometry orientation");
+        let cropped =
+            super::apply_geometry_crop(&oriented, 0.1, 0.2, 0.7, 0.6, -2.5, Some("4:3"), "unix:6")
+                .expect("apply geometry crop");
+        let serialized = serde_json::to_value(&cropped).expect("serialize lens geometry graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip lens geometry graph");
+
+        assert!(cropped.lens.profile_correction);
+        assert_eq!(
+            cropped.lens.profile_id.as_deref(),
+            Some("embedded-profile-id")
+        );
+        assert!(cropped.lens.chromatic_aberration);
+        assert_eq!(cropped.lens.distortion.as_f64(), Some(-12.5));
+        assert_eq!(cropped.lens.vignetting.as_f64(), Some(18.0));
+        assert_eq!(cropped.geometry.rotation.as_f64(), Some(90.0));
+        assert!(cropped.geometry.flip_horizontal);
+        assert!(!cropped.geometry.flip_vertical);
+        assert_eq!(cropped.geometry.transform.vertical.as_f64(), Some(6.0));
+        assert_eq!(cropped.geometry.transform.horizontal.as_f64(), Some(-5.0));
+        assert_eq!(cropped.geometry.transform.aspect.as_f64(), Some(2.5));
+        assert_eq!(cropped.geometry.transform.scale.as_f64(), Some(125.0));
+        assert_eq!(cropped.geometry.transform.x_offset.as_f64(), Some(10.0));
+        assert_eq!(cropped.geometry.transform.y_offset.as_f64(), Some(-8.0));
+        let crop = cropped.geometry.crop.as_ref().expect("crop exists");
+        assert_eq!(crop.x.as_f64(), Some(0.1));
+        assert_eq!(crop.y.as_f64(), Some(0.2));
+        assert_eq!(crop.width.as_f64(), Some(0.7));
+        assert_eq!(crop.height.as_f64(), Some(0.6));
+        assert_eq!(crop.angle.as_f64(), Some(-2.5));
+        assert_eq!(crop.aspect.as_deref(), Some("4:3"));
+        assert_eq!(cropped.updated_at, "unix:6");
+        assert_eq!(round_tripped.geometry.rotation.as_f64(), Some(90.0));
+        assert_eq!(serialized["lens"]["profile_correction"], json!(true));
+        assert_eq!(
+            serialized["lens"]["profile_id"],
+            json!("embedded-profile-id")
+        );
+        assert_eq!(serialized["geometry"]["crop"]["aspect"], json!("4:3"));
+        super::validate_edit_graph_json(&serialized).expect("lens geometry graph validates");
+
+        let cleared = super::clear_geometry_crop(&cropped, "unix:7").expect("clear crop");
+        assert!(cleared.geometry.crop.is_none());
+        assert_eq!(cleared.updated_at, "unix:7");
+        super::validate_edit_graph(&cleared).expect("cleared geometry validates");
+    }
+
+    #[test]
+    fn rejects_invalid_lens_and_geometry_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let distortion_error =
+            super::apply_lens_adjustments(&graph, true, false, 101.0, 0.0, "unix:3")
+                .expect_err("distortion above schema range");
+        let vignetting_error =
+            super::apply_lens_adjustments(&graph, true, false, 0.0, -101.0, "unix:3")
+                .expect_err("vignetting below schema range");
+        let rotation_error =
+            super::apply_geometry_orientation(&graph, 181.0, false, false, "unix:3")
+                .expect_err("rotation above schema range");
+        let scale_error =
+            super::apply_geometry_transform(&graph, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, "unix:3")
+                .expect_err("scale below schema range");
+        let offset_error =
+            super::apply_geometry_transform(&graph, 0.0, 0.0, 0.0, 100.0, 101.0, 0.0, "unix:3")
+                .expect_err("offset above schema range");
+        let crop_width_error =
+            super::apply_geometry_crop(&graph, 0.0, 0.0, 0.0, 0.5, 0.0, None, "unix:3")
+                .expect_err("crop width must be positive");
+        let crop_x_bounds_error =
+            super::apply_geometry_crop(&graph, 0.6, 0.0, 0.5, 0.5, 0.0, None, "unix:3")
+                .expect_err("crop x plus width must stay in frame");
+        let crop_y_bounds_error =
+            super::apply_geometry_crop(&graph, 0.0, 0.7, 0.5, 0.4, 0.0, None, "unix:3")
+                .expect_err("crop y plus height must stay in frame");
+        let crop_angle_error =
+            super::apply_geometry_crop(&graph, 0.0, 0.0, 0.5, 0.5, 46.0, None, "unix:3")
+                .expect_err("crop angle above schema range");
+
+        assert!(distortion_error.to_string().contains("lens.distortion"));
+        assert!(vignetting_error.to_string().contains("lens.vignetting"));
+        assert!(rotation_error.to_string().contains("geometry.rotation"));
+        assert!(scale_error.to_string().contains("geometry.transform.scale"));
+        assert!(offset_error
+            .to_string()
+            .contains("geometry.transform.x_offset"));
+        assert!(crop_width_error.to_string().contains("geometry.crop.width"));
+        assert!(crop_x_bounds_error.to_string().contains("geometry.crop.x"));
+        assert!(crop_y_bounds_error.to_string().contains("geometry.crop.y"));
+        assert!(crop_angle_error.to_string().contains("geometry.crop.angle"));
     }
 
     #[test]
