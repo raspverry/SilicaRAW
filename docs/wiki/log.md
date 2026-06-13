@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Lens geometry mutators added
+
+- Completed Task 18.4.1 with graph-only mutators for lens toggles, distortion, vignetting, transform, rotation, flips, crop, and crop clearing.
+- Added round-trip and invalid-range tests in `silica-edit`, including normalized crop frame bounds.
+- Kept preview, export, UI, storage, sidecar, original metadata writes, and lens profile database behavior out of scope and routed Phase 18 to Task 18.4.2.
+
 ## [2026-06-13] phase-18 | Detail panel UI completed
 
 - Completed Task 18.3.3 with a disabled Develop Detail readback panel for sharpening and non-MLX noise reduction.
