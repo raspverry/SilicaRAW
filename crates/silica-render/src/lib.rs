@@ -887,14 +887,101 @@ fn classify_icc_profile(profile: &[u8]) -> ColorProbeInputProfile {
         "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0" => {
             ColorProbeInputProfile::DisplayP3
         }
-        _ if profile
-            .windows(b"sRGB".len())
-            .any(|window| window.eq_ignore_ascii_case(b"sRGB")) =>
-        {
-            ColorProbeInputProfile::Srgb
+        _ if icc_rgb_primaries_match(profile, DISPLAY_P3_D50_XYZ) => {
+            ColorProbeInputProfile::DisplayP3
         }
+        _ if icc_rgb_primaries_match(profile, SRGB_D50_XYZ) => ColorProbeInputProfile::Srgb,
+        _ if profile_contains_ascii(profile, b"sRGB") => ColorProbeInputProfile::Srgb,
         _ => ColorProbeInputProfile::Unknown,
     }
+}
+
+#[cfg(feature = "color-probe")]
+const DISPLAY_P3_D50_XYZ: [[f64; 3]; 3] = [
+    [0.5151214599609375, 0.2411956787109375, -0.0010528564453125],
+    [0.2919769287109375, 0.6922454833984375, 0.0418853759765625],
+    [0.1571044921875, 0.0665740966796875, 0.7840728759765625],
+];
+
+#[cfg(feature = "color-probe")]
+const SRGB_D50_XYZ: [[f64; 3]; 3] = [
+    [0.436065673828125, 0.2224884033203125, 0.013916015625],
+    [0.3851470947265625, 0.7168731689453125, 0.097076416015625],
+    [0.14306640625, 0.06060791015625, 0.7140960693359375],
+];
+
+#[cfg(feature = "color-probe")]
+fn icc_rgb_primaries_match(profile: &[u8], expected: [[f64; 3]; 3]) -> bool {
+    let Some(actual) = icc_rgb_primaries(profile) else {
+        return false;
+    };
+    actual
+        .iter()
+        .flatten()
+        .zip(expected.iter().flatten())
+        .all(|(actual, expected)| (actual - expected).abs() <= 0.02)
+}
+
+#[cfg(feature = "color-probe")]
+fn icc_rgb_primaries(profile: &[u8]) -> Option<[[f64; 3]; 3]> {
+    if profile.len() < 132 || &profile[36..40] != b"acsp" {
+        return None;
+    }
+    let tag_count = read_u32_be(profile, 128)? as usize;
+    let tag_table_end = 132_usize.checked_add(tag_count.checked_mul(12)?)?;
+    if tag_table_end > profile.len() {
+        return None;
+    }
+
+    Some([
+        icc_xyz_tag(profile, tag_count, b"rXYZ")?,
+        icc_xyz_tag(profile, tag_count, b"gXYZ")?,
+        icc_xyz_tag(profile, tag_count, b"bXYZ")?,
+    ])
+}
+
+#[cfg(feature = "color-probe")]
+fn icc_xyz_tag(profile: &[u8], tag_count: usize, signature: &[u8; 4]) -> Option<[f64; 3]> {
+    for index in 0..tag_count {
+        let record_offset = 132 + (index * 12);
+        if &profile[record_offset..record_offset + 4] != signature {
+            continue;
+        }
+        let tag_offset = read_u32_be(profile, record_offset + 4)? as usize;
+        let tag_size = read_u32_be(profile, record_offset + 8)? as usize;
+        if tag_size < 20 || tag_offset.checked_add(20)? > profile.len() {
+            return None;
+        }
+        if &profile[tag_offset..tag_offset + 4] != b"XYZ " {
+            return None;
+        }
+        return Some([
+            read_s15_fixed_16(profile, tag_offset + 8)?,
+            read_s15_fixed_16(profile, tag_offset + 12)?,
+            read_s15_fixed_16(profile, tag_offset + 16)?,
+        ]);
+    }
+    None
+}
+
+#[cfg(feature = "color-probe")]
+fn read_u32_be(bytes: &[u8], offset: usize) -> Option<u32> {
+    Some(u32::from_be_bytes(
+        bytes.get(offset..offset + 4)?.try_into().ok()?,
+    ))
+}
+
+#[cfg(feature = "color-probe")]
+fn read_s15_fixed_16(bytes: &[u8], offset: usize) -> Option<f64> {
+    let raw = i32::from_be_bytes(bytes.get(offset..offset + 4)?.try_into().ok()?);
+    Some(f64::from(raw) / 65536.0)
+}
+
+#[cfg(feature = "color-probe")]
+fn profile_contains_ascii(profile: &[u8], needle: &[u8]) -> bool {
+    profile
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle))
 }
 
 #[cfg(feature = "color-probe")]
@@ -1811,6 +1898,29 @@ mod tests {
 
     #[cfg(all(feature = "color-probe", target_os = "macos"))]
     #[test]
+    fn color_probe_classifies_display_p3_profile_by_xyz_tags_when_hash_differs() {
+        let profile = synthetic_rgb_icc_profile([
+            [0.5151214599609375, 0.2411956787109375, -0.0010528564453125],
+            [0.2919769287109375, 0.6922454833984375, 0.0418853759765625],
+            [0.1571044921875, 0.0665740966796875, 0.7840728759765625],
+        ]);
+        let path =
+            write_color_probe_fixture("display-p3-synthetic", jpeg_with_icc_profile(&profile));
+
+        let result =
+            super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(result.status, super::ColorProbeStatus::Success);
+        assert_eq!(
+            result.input_profile,
+            super::ColorProbeInputProfile::DisplayP3
+        );
+        assert!(result.embedded_icc);
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[test]
     fn color_probe_records_untagged_raster_as_assume_srgb() {
         let path = write_color_probe_fixture("untagged", minimal_jpeg_without_icc());
 
@@ -1868,6 +1978,46 @@ mod tests {
         bytes.extend_from_slice(&payload);
         bytes.extend_from_slice(&minimal_jpeg_without_icc()[2..]);
         bytes
+    }
+
+    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    fn synthetic_rgb_icc_profile(primaries: [[f64; 3]; 3]) -> Vec<u8> {
+        let tag_table_start = 128;
+        let tag_count_size = 4;
+        let tag_record_size = 12;
+        let tag_data_start = tag_table_start + tag_count_size + (3 * tag_record_size);
+        let tag_data_size = 20;
+        let profile_size = tag_data_start + (3 * tag_data_size);
+        let mut profile = vec![0_u8; profile_size];
+        profile[0..4].copy_from_slice(&(profile_size as u32).to_be_bytes());
+        profile[36..40].copy_from_slice(b"acsp");
+        profile[128..132].copy_from_slice(&3_u32.to_be_bytes());
+
+        for (index, (signature, values)) in [
+            (b"rXYZ", primaries[0]),
+            (b"gXYZ", primaries[1]),
+            (b"bXYZ", primaries[2]),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let record_offset = 132 + (index * tag_record_size);
+            let data_offset = tag_data_start + (index * tag_data_size);
+            profile[record_offset..record_offset + 4].copy_from_slice(signature);
+            profile[record_offset + 4..record_offset + 8]
+                .copy_from_slice(&(data_offset as u32).to_be_bytes());
+            profile[record_offset + 8..record_offset + 12]
+                .copy_from_slice(&(tag_data_size as u32).to_be_bytes());
+            profile[data_offset..data_offset + 4].copy_from_slice(b"XYZ ");
+            for (component, value) in values.iter().enumerate() {
+                let fixed = (value * 65536.0).round() as i32;
+                let component_offset = data_offset + 8 + (component * 4);
+                profile[component_offset..component_offset + 4]
+                    .copy_from_slice(&fixed.to_be_bytes());
+            }
+        }
+
+        profile
     }
 
     #[cfg(all(feature = "color-probe", target_os = "macos"))]

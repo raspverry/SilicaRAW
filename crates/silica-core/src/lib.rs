@@ -5537,6 +5537,7 @@ mod tests {
         assert_eq!(exported.format, "jpeg");
         assert_eq!(exported.color_profile, "display_p3");
         assert!(exported.bytes_written > 0);
+        assert_eq!(exported.icc_profile_sha256.len(), 64);
         assert_eq!(
             std::fs::read(&jpeg_file).expect("read original after"),
             original_before
@@ -5548,10 +5549,8 @@ mod tests {
         let settings: serde_json::Value =
             serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
         assert_eq!(settings["color_profile"], "display_p3");
-        assert_eq!(
-            settings["icc_profile_sha256"],
-            "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0"
-        );
+        assert_eq!(settings["icc_profile_embedded"], true);
+        assert_eq!(settings["icc_profile_sha256"], exported.icc_profile_sha256);
 
         remove_library_root(&workspace);
     }

@@ -129,7 +129,9 @@ Task 13.6 proves JPEG ICC embedding by file/profile inspection. It does not prov
 | Export target | Entry point | Embedded ICC | ICC SHA-256 | Output hash | Original hash | Product state | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `srgb` | `export_jpeg_srgb` | true | `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e` | recorded in `JpegExportResult.output_sha256` | unchanged in tests | `default_export_icc_supported` | `cargo test -p silica-export -p silica-render` |
-| `display_p3` | `export_jpeg_with_color_profile(... DisplayP3)` | true | `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0` | recorded in `JpegExportResult.output_sha256` | unchanged in tests | `explicit_api_proof_only` | `cargo test -p silica-export -p silica-render` |
+| `display_p3` | `export_jpeg_with_color_profile(... DisplayP3)` | true | recorded from active macOS system profile | recorded in `JpegExportResult.output_sha256` | unchanged in tests | `explicit_api_proof_only` | `cargo test -p silica-export -p silica-render` |
+
+The local Display P3 baseline profile hash was `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0`, but macOS runner images may ship byte-different Display P3 ICC profiles. SilicaRAW classifies sRGB and Display P3 profiles by known hashes and RGB XYZ tag semantics, then records the actual embedded ICC SHA-256 in export evidence.
 
 Manual visual review is ready but not executed:
 
