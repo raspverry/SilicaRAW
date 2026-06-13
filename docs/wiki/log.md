@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Edit clipboard UI completed
+
+- Completed Task 18.5.3 with a Develop Copy & Sync panel for graph-only edit clipboard copy, paste-to-primary, and selected-page batch sync.
+- Kept subset choice explicit, Detail and Lens unsupported subsets disabled, and no-runtime/static paths honest with no writes.
+- Extended static UI, workflow smoke, and final visual QA checks; Phase 18 is complete and routing now moves to Phase 19 task cards.
+
 ## [2026-06-13] phase-18 | Lens geometry mutators added
 
 - Completed Task 18.4.1 with graph-only mutators for lens toggles, distortion, vignetting, transform, rotation, flips, crop, and crop clearing.

@@ -772,6 +772,49 @@
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
           </div>
+          <div class="sr-edit-clipboard-panel" id="developClipboardPanel" data-clipboard-state="empty">
+            <div class="sr-edit-clipboard-title-row">
+              <div>
+                <div class="sr-panel-heading">Copy &amp; Sync</div>
+                <output id="developClipboardSource" aria-live="polite">No copied edit settings.</output>
+              </div>
+              <output id="developClipboardSelectionCount" aria-live="polite">1 selected</output>
+            </div>
+            <fieldset class="sr-edit-clipboard-section-group">
+              <legend>Edit subsets</legend>
+              <label for="clipboardSubsetBasic">
+                <input id="clipboardSubsetBasic" type="checkbox" data-edit-clipboard-section="basic" checked>
+                Basic
+              </label>
+              <label for="clipboardSubsetTone">
+                <input id="clipboardSubsetTone" type="checkbox" data-edit-clipboard-section="tone">
+                Tone
+              </label>
+              <label for="clipboardSubsetColor">
+                <input id="clipboardSubsetColor" type="checkbox" data-edit-clipboard-section="color">
+                Color
+              </label>
+              <label for="clipboardSubsetGeometry">
+                <input id="clipboardSubsetGeometry" type="checkbox" data-edit-clipboard-section="geometry">
+                Geometry
+              </label>
+              <label class="is-disabled" for="clipboardSubsetDetail" title="Detail copy is disabled until Detail runtime support exists.">
+                <input id="clipboardSubsetDetail" type="checkbox" data-edit-clipboard-section="detail" disabled>
+                Detail
+              </label>
+              <label class="is-disabled" for="clipboardSubsetLens" title="Lens copy is disabled until lens-profile runtime support exists.">
+                <input id="clipboardSubsetLens" type="checkbox" data-edit-clipboard-section="lens" disabled>
+                Lens
+              </label>
+            </fieldset>
+            <div class="sr-edit-clipboard-action-row" role="group" aria-label="Edit copy and sync actions">
+              <button id="copyEditClipboard" type="button">Copy Settings</button>
+              <button id="pasteEditClipboard" type="button" disabled>Paste to Primary</button>
+              <button class="primary" id="syncEditClipboard" type="button" disabled>Sync Selected</button>
+            </div>
+            <output class="sr-edit-clipboard-status" id="editClipboardStatus" aria-live="polite">Choose at least one subset before copying.</output>
+            <div class="sr-edit-clipboard-plan" id="editClipboardPlanList" role="list" aria-label="Batch sync target plan"></div>
+          </div>
           <div class="sr-history-panel" id="developHistoryPanel" data-history-state="empty">
             <div class="sr-panel-heading">History</div>
             <div class="sr-history-command-row" role="group" aria-label="Develop history commands">
@@ -1114,6 +1157,21 @@
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developResetBasic = document.querySelector("#developResetBasic");
       const basicPresetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
+      const developClipboardPanel = document.querySelector("#developClipboardPanel");
+      const developClipboardSource = document.querySelector("#developClipboardSource");
+      const developClipboardSelectionCount = document.querySelector("#developClipboardSelectionCount");
+      const clipboardSubsetInputs = Array.from(document.querySelectorAll("[data-edit-clipboard-section]"));
+      const clipboardSubsetBasic = document.querySelector("#clipboardSubsetBasic");
+      const clipboardSubsetTone = document.querySelector("#clipboardSubsetTone");
+      const clipboardSubsetColor = document.querySelector("#clipboardSubsetColor");
+      const clipboardSubsetDetail = document.querySelector("#clipboardSubsetDetail");
+      const clipboardSubsetLens = document.querySelector("#clipboardSubsetLens");
+      const clipboardSubsetGeometry = document.querySelector("#clipboardSubsetGeometry");
+      const copyEditClipboardButton = document.querySelector("#copyEditClipboard");
+      const pasteEditClipboardButton = document.querySelector("#pasteEditClipboard");
+      const syncEditClipboardButton = document.querySelector("#syncEditClipboard");
+      const editClipboardStatus = document.querySelector("#editClipboardStatus");
+      const editClipboardPlanList = document.querySelector("#editClipboardPlanList");
       const developHistoryPanel = document.querySelector("#developHistoryPanel");
       const developHistoryStatus = document.querySelector("#developHistoryStatus");
       const developHistoryList = document.querySelector("#developHistoryList");
@@ -1175,6 +1233,10 @@
       let developBeforeAfterMode = "after";
       let lastDevelopPreviewState = null;
       let controlsBusy = false;
+      let editClipboardPayload = null;
+      let editClipboardSourcePhotoId = "";
+      let editClipboardSourceName = "";
+      let editClipboardPlan = null;
       let layoutHydrating = false;
       let layoutSaveTimer = 0;
       let gridVirtualRenderFrame = 0;
@@ -2500,12 +2562,140 @@
         multiSelectionCount.value = count === 1 ? "1 selected" : `${count} selected`;
         multiSelectionCount.textContent = multiSelectionCount.value;
         clearMultiSelectionButton.disabled = count <= 1;
+        updateEditClipboardControls({ preserveStatus: true });
       }
 
       function clearMultiSelection() {
         selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
         selectionAnchorPhotoId = selectedPhotoId;
         selectPhoto(selectedPhotoId, { persist: false, preserveSelectionSet: true });
+      }
+
+      function editClipboardSelection() {
+        return {
+          basic: clipboardSubsetBasic.checked && !clipboardSubsetBasic.disabled,
+          tone: clipboardSubsetTone.checked && !clipboardSubsetTone.disabled,
+          color: clipboardSubsetColor.checked && !clipboardSubsetColor.disabled,
+          detail: clipboardSubsetDetail.checked && !clipboardSubsetDetail.disabled,
+          lens: clipboardSubsetLens.checked && !clipboardSubsetLens.disabled,
+          geometry: clipboardSubsetGeometry.checked && !clipboardSubsetGeometry.disabled,
+        };
+      }
+
+      function editClipboardSelectedSectionNames() {
+        const labels = {
+          basic: "Basic",
+          tone: "Tone",
+          color: "Color",
+          detail: "Detail",
+          lens: "Lens",
+          geometry: "Geometry",
+        };
+        const selection = editClipboardSelection();
+        return Object.entries(selection)
+          .filter(([, selected]) => selected)
+          .map(([section]) => labels[section]);
+      }
+
+      function selectedPagePhotos() {
+        const selectedIds = new Set(selectedPhotoIds);
+        return libraryPhotos.filter((photo) => selectedIds.has(photo.photoId));
+      }
+
+      function editClipboardTargetPhotoIds({ primaryOnly = false } = {}) {
+        if (primaryOnly) {
+          return selectedPhotoId ? [selectedPhotoId] : [];
+        }
+        return selectedPagePhotos().map((photo) => photo.photoId);
+      }
+
+      function clearEditClipboardPayload(message = "Choose at least one subset before copying.") {
+        editClipboardPayload = null;
+        editClipboardSourcePhotoId = "";
+        editClipboardSourceName = "";
+        editClipboardPlan = null;
+        editClipboardPlanList.replaceChildren();
+        editClipboardStatus.value = message;
+        editClipboardStatus.textContent = message;
+        updateEditClipboardControls({ preserveStatus: true });
+      }
+
+      function renderEditClipboardPlan(plan) {
+        editClipboardPlan = plan || null;
+        editClipboardPlanList.replaceChildren();
+        if (!plan?.targets?.length) {
+          return;
+        }
+        plan.targets.forEach((target) => {
+          const row = document.createElement("div");
+          row.className = "sr-edit-clipboard-plan-row";
+          row.dataset.clipboardTargetStatus = target.status || "unknown";
+          row.setAttribute("role", "listitem");
+          const photo = libraryPhotos.find((item) => item.photoId === target.photoId);
+          const name = document.createElement("strong");
+          name.textContent = photo?.fileName || target.photoId || "Unknown target";
+          const status = document.createElement("span");
+          status.textContent = target.code
+            ? `${target.status}: ${target.code}`
+            : target.status || "unknown";
+          const message = document.createElement("small");
+          message.textContent = target.message || "No target message.";
+          row.append(name, status, message);
+          editClipboardPlanList.append(row);
+        });
+      }
+
+      function updateEditClipboardControls(options = {}) {
+        if (!developClipboardPanel) {
+          return;
+        }
+        const primary = selectedPhoto();
+        const selectedPhotos = selectedPagePhotos();
+        const selectedCount = selectedPhotos.length;
+        const sectionNames = editClipboardSelectedSectionNames();
+        const hasSections = sectionNames.length > 0;
+        const primaryDevelopable = isDevelopable(primary);
+        const selectedTargetsDevelopable = selectedPhotos.every((photo) => isDevelopable(photo));
+        const hasPayload = Boolean(editClipboardPayload);
+        const canUseRuntime = Boolean(activeLibraryPath && invoke);
+        const noPhoto = !primary;
+        const sourceText = hasPayload
+          ? `Copied ${sectionNames.length} subset(s) from ${editClipboardSourceName || "selected photo"}.`
+          : "No copied edit settings.";
+        developClipboardSource.value = sourceText;
+        developClipboardSource.textContent = sourceText;
+        developClipboardSelectionCount.value = `${selectedCount} selected on this page`;
+        developClipboardSelectionCount.textContent = developClipboardSelectionCount.value;
+        developClipboardPanel.dataset.clipboardState = hasPayload ? "ready" : "empty";
+        if (!hasSections) {
+          developClipboardPanel.dataset.clipboardState = "invalid";
+        } else if (hasPayload && editClipboardPlan?.blockedCount > 0) {
+          developClipboardPanel.dataset.clipboardState = "blocked";
+        }
+
+        copyEditClipboardButton.disabled = controlsBusy || noPhoto || !primaryDevelopable || !hasSections;
+        pasteEditClipboardButton.disabled = controlsBusy || !hasPayload || noPhoto || !primaryDevelopable;
+        syncEditClipboardButton.disabled = controlsBusy
+          || !hasPayload
+          || selectedCount <= 1
+          || !selectedTargetsDevelopable;
+
+        if (options.preserveStatus) {
+          return;
+        }
+        const message = !hasSections
+          ? "Select at least one edit subset before copying."
+          : noPhoto
+            ? "Select a photo before copying edit settings."
+            : !primaryDevelopable
+              ? "Unsupported target; JPEG/JPG Develop edits are required for copy and paste."
+              : !canUseRuntime
+                ? "Desktop runtime required to persist clipboard sync; static UI remains read-only."
+                : hasPayload
+                  ? `Ready to paste ${sectionNames.join(", ")} to the primary photo or sync ${selectedCount} selected on this page.`
+                  : "Copy selected edit subsets before paste or sync.";
+        editClipboardStatus.value = message;
+        editClipboardStatus.textContent = message;
       }
 
       function selectedPhotoBaseName(photo) {
@@ -2573,8 +2763,16 @@
         return developAdjustmentsByPhoto.get(photoId);
       }
 
+      function isJpegDevelopFileType(fileType) {
+        return ["JPG", "JPEG"].includes((fileType || "").toUpperCase());
+      }
+
       function isDevelopable(photo) {
-        return Boolean(photo && !photo.missing && !photo.unsupported);
+        return Boolean(photo
+          && !photo.missing
+          && !photo.unsupported
+          && isJpegDevelopFileType(photo?.fileType)
+        );
       }
 
       function renderToneCurveControlState(state) {
@@ -3803,9 +4001,12 @@
           developCommitEdit,
           developRevertEdit,
           developResetBasic,
+          ...clipboardSubsetInputs.filter((input) => !["detail", "lens"].includes(input.dataset.editClipboardSection)),
         ].forEach((control) => {
           control.disabled = disabled;
         });
+        clipboardSubsetDetail.disabled = true;
+        clipboardSubsetLens.disabled = true;
         [
           ...developDetailControls,
           developDetailMlxDenoise,
@@ -3816,6 +4017,7 @@
         basicPresetButtons.forEach((button) => {
           button.disabled = disabled;
         });
+        updateEditClipboardControls();
         developBeforeView.disabled = !photo;
         developAfterView.disabled = !photo;
         const state = photo ? developAdjustmentState(photo.photoId) : {
@@ -4252,6 +4454,180 @@
             : responseMessage(response));
         } catch (error) {
           setStatus(responseErrorMessage(error, "Develop edit commit failed."));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function copyEditClipboardPayload() {
+        const photo = selectedPhoto();
+        if (!isDevelopable(photo)) {
+          const message = "Select a supported catalog photo before copying edit settings.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+        const selection = editClipboardSelection();
+        const sectionNames = editClipboardSelectedSectionNames();
+        if (sectionNames.length === 0) {
+          clearEditClipboardPayload("Select at least one edit subset before copying.");
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          const message = "Desktop runtime unavailable; edit clipboard copy needs committed catalog state.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+
+        setBusy(true);
+        editClipboardStatus.value = "Copying committed edit settings...";
+        editClipboardStatus.textContent = editClipboardStatus.value;
+        try {
+          const response = await invoke("copy_edit_clipboard_payload", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+            selection,
+          });
+          if (commandFailed(response)) {
+            const message = responseErrorMessage(response, "Edit clipboard copy failed.");
+            clearEditClipboardPayload(message);
+            setStatus(message);
+            return;
+          }
+          if (!response.data?.payload) {
+            const message = "Edit clipboard copy failed because the catalog photo was not found.";
+            clearEditClipboardPayload(message);
+            setStatus(message);
+            return;
+          }
+          editClipboardPayload = response.data.payload;
+          editClipboardSourcePhotoId = photo.photoId;
+          editClipboardSourceName = photo.fileName || "selected photo";
+          editClipboardPlan = null;
+          editClipboardPlanList.replaceChildren();
+          const message = `${responseMessage(response)} Copy reads committed edit state; commit drafts first.`;
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+        } catch (error) {
+          const message = responseErrorMessage(error, "Edit clipboard copy failed.");
+          clearEditClipboardPayload(message);
+          setStatus(message);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function runEditClipboardSync(options = {}) {
+        const primaryOnly = options.primaryOnly === true;
+        const targetIds = editClipboardTargetPhotoIds({ primaryOnly });
+        if (!editClipboardPayload) {
+          const message = "Copy edit settings before paste or batch sync.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+        if (targetIds.length === 0) {
+          const message = "No selected target photo for edit clipboard sync.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+        if (!primaryOnly && targetIds.length <= 1) {
+          const message = "Batch sync requires at least two selected photos on this page.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+        const targetPhotos = primaryOnly ? [selectedPhoto()].filter(Boolean) : selectedPagePhotos();
+        const unsupported = targetPhotos.find((photo) => !isDevelopable(photo));
+        if (unsupported) {
+          const message = "Unsupported target; batch sync is limited to JPEG/JPG Develop photos.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          const message = "Desktop runtime unavailable; edit clipboard sync wrote nothing.";
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          updateEditClipboardControls({ preserveStatus: true });
+          return;
+        }
+
+        setBusy(true);
+        editClipboardStatus.value = primaryOnly ? "Planning paste to primary..." : `Planning batch sync for ${targetIds.length} selected on this page...`;
+        editClipboardStatus.textContent = editClipboardStatus.value;
+        try {
+          const planResponse = await invoke("plan_edit_clipboard_sync", {
+            libraryPath: activeLibraryPath,
+            photoIds: targetIds,
+            payload: editClipboardPayload,
+          });
+          if (commandFailed(planResponse)) {
+            const message = responseErrorMessage(planResponse, "Edit clipboard sync planning failed.");
+            editClipboardStatus.value = message;
+            editClipboardStatus.textContent = message;
+            setStatus(message);
+            return;
+          }
+          renderEditClipboardPlan(planResponse.data);
+          if (planResponse.data?.blockedCount > 0 || planResponse.data?.status === "blocked") {
+            const message = `${responseMessage(planResponse)} Nothing was written.`;
+            editClipboardStatus.value = message;
+            editClipboardStatus.textContent = message;
+            setStatus(message);
+            updateEditClipboardControls({ preserveStatus: true });
+            return;
+          }
+
+          const response = await invoke("apply_edit_clipboard_sync", {
+            libraryPath: activeLibraryPath,
+            photoIds: targetIds,
+            payload: editClipboardPayload,
+          });
+          if (commandFailed(response)) {
+            const message = responseErrorMessage(response, "Edit clipboard sync failed.");
+            editClipboardStatus.value = message;
+            editClipboardStatus.textContent = message;
+            setStatus(message);
+            return;
+          }
+          renderEditClipboardPlan(response.data);
+          const applied = Number(response.data?.appliedCount || 0);
+          const skipped = Number(response.data?.skippedCount || 0);
+          const blocked = Number(response.data?.blockedCount || 0);
+          const message = `${responseMessage(response)} ${applied} applied, ${skipped} unchanged, ${blocked} blocked.`;
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
+          if (selectedPhoto()) {
+            await readPersistedDevelopState(selectedPhoto(), { force: true });
+            await loadDevelopHistory();
+            await loadPhotoHistogram();
+            await previewDevelopEdit();
+          }
+          updateEditClipboardControls({ preserveStatus: true });
+        } catch (error) {
+          const message = responseErrorMessage(error, "Edit clipboard sync failed.");
+          editClipboardStatus.value = message;
+          editClipboardStatus.textContent = message;
+          setStatus(message);
         } finally {
           setBusy(false);
         }
@@ -4963,9 +5339,12 @@
           developCommitEdit,
           developRevertEdit,
           developResetBasic,
+          ...clipboardSubsetInputs.filter((input) => !["detail", "lens"].includes(input.dataset.editClipboardSection)),
         ].forEach((control) => {
           control.disabled = developDisabled;
         });
+        clipboardSubsetDetail.disabled = true;
+        clipboardSubsetLens.disabled = true;
         [
           ...developDetailControls,
           developDetailMlxDenoise,
@@ -5002,6 +5381,7 @@
         exportColorOptionButtons.forEach((button) => {
           button.disabled = isBusy;
         });
+        updateEditClipboardControls({ preserveStatus: true });
       }
 
       async function runLibraryCommand(command) {
@@ -5304,6 +5684,14 @@
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       developResetBasic.addEventListener("click", resetP0BasicControls);
+      clipboardSubsetInputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          clearEditClipboardPayload("Subset choice changed; copy settings again before paste or batch sync.");
+        });
+      });
+      copyEditClipboardButton.addEventListener("click", copyEditClipboardPayload);
+      pasteEditClipboardButton.addEventListener("click", () => runEditClipboardSync({ primaryOnly: true }));
+      syncEditClipboardButton.addEventListener("click", () => runEditClipboardSync({ primaryOnly: false }));
       developBeforeView.addEventListener("click", () => setDevelopBeforeAfterMode("before"));
       developAfterView.addEventListener("click", () => setDevelopBeforeAfterMode("after"));
       basicPresetButtons.forEach((button) => {

@@ -157,6 +157,30 @@ struct DesktopToneCurvePoint {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopEditClipboardTarget {
+    photo_id: String,
+    status: String,
+    code: Option<String>,
+    message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopEditClipboardCommit {
+    photo_id: String,
+    history_id: String,
+    sequence: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopEditClipboardFailure {
+    photo_id: String,
+    message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(
     rename_all = "camelCase",
     tag = "kind",
@@ -309,6 +333,34 @@ enum DesktopCommandData {
         persisted: bool,
         message: String,
     },
+    EditClipboard {
+        photo_id: String,
+        selection: silica_core::EditClipboardSelection,
+        payload: silica_core::EditClipboardPayload,
+        section_count: usize,
+        message: String,
+    },
+    EditClipboardPlan {
+        status: String,
+        requested_count: usize,
+        ready_count: usize,
+        unchanged_count: usize,
+        blocked_count: usize,
+        targets: Vec<DesktopEditClipboardTarget>,
+        message: String,
+    },
+    EditClipboardSync {
+        status: String,
+        requested_count: usize,
+        applied_count: usize,
+        skipped_count: usize,
+        blocked_count: usize,
+        failed_count: usize,
+        commits: Vec<DesktopEditClipboardCommit>,
+        targets: Vec<DesktopEditClipboardTarget>,
+        failures: Vec<DesktopEditClipboardFailure>,
+        message: String,
+    },
     HistoryCommand {
         photo_id: String,
         command: String,
@@ -381,6 +433,9 @@ impl DesktopCommandData {
             Self::EditPreview { .. } => "editPreview",
             Self::EditCommit { .. } => "editCommit",
             Self::EditState { .. } => "editState",
+            Self::EditClipboard { .. } => "editClipboard",
+            Self::EditClipboardPlan { .. } => "editClipboardPlan",
+            Self::EditClipboardSync { .. } => "editClipboardSync",
             Self::HistoryCommand { .. } => "historyCommand",
             Self::HistoryPanel { .. } => "historyPanel",
             Self::Histogram { .. } => "histogram",
@@ -2633,6 +2688,88 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
 }
 
 #[tauri::command]
+fn copy_edit_clipboard_payload(
+    library_path: String,
+    photo_id: String,
+    selection: silica_core::EditClipboardSelection,
+) -> DesktopCommandResponse {
+    let command = "copy_edit_clipboard_payload";
+    match silica_core::copy_photo_edit_clipboard_payload(
+        PathBuf::from(&library_path),
+        &photo_id,
+        selection,
+    ) {
+        Ok(Some(payload)) => DesktopCommandResponse::ok(
+            command,
+            "Copied selected edit sections.",
+            edit_clipboard_data(photo_id, selection, payload),
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn plan_edit_clipboard_sync(
+    library_path: String,
+    photo_ids: Vec<String>,
+    payload: silica_core::EditClipboardPayload,
+) -> DesktopCommandResponse {
+    let command = "plan_edit_clipboard_sync";
+    match silica_core::plan_edit_clipboard_sync(PathBuf::from(&library_path), &photo_ids, &payload)
+    {
+        Ok(plan) => DesktopCommandResponse::ok(
+            command,
+            plan.message.clone(),
+            edit_clipboard_plan_data(plan),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: photo_ids.first().cloned(),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn apply_edit_clipboard_sync(
+    library_path: String,
+    photo_ids: Vec<String>,
+    payload: silica_core::EditClipboardPayload,
+) -> DesktopCommandResponse {
+    let command = "apply_edit_clipboard_sync";
+    match silica_core::apply_edit_clipboard_sync(PathBuf::from(&library_path), &photo_ids, &payload)
+    {
+        Ok(result) => DesktopCommandResponse::ok(
+            command,
+            result.message.clone(),
+            edit_clipboard_sync_data(result),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: photo_ids.first().cloned(),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn get_photo_histogram(library_path: String, photo_id: String) -> DesktopCommandResponse {
     let command = "get_photo_histogram";
     match silica_core::get_photo_histogram(PathBuf::from(&library_path), &photo_id) {
@@ -3256,6 +3393,98 @@ fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
     }
 }
 
+fn edit_clipboard_section_count(selection: &silica_core::EditClipboardSelection) -> usize {
+    [
+        selection.basic,
+        selection.tone,
+        selection.color,
+        selection.detail,
+        selection.lens,
+        selection.geometry,
+    ]
+    .into_iter()
+    .filter(|selected| *selected)
+    .count()
+}
+
+fn edit_clipboard_data(
+    photo_id: String,
+    selection: silica_core::EditClipboardSelection,
+    payload: silica_core::EditClipboardPayload,
+) -> DesktopCommandData {
+    let section_count = edit_clipboard_section_count(&selection);
+    DesktopCommandData::EditClipboard {
+        photo_id,
+        selection,
+        payload,
+        section_count,
+        message: format!("Copied {section_count} edit section(s)."),
+    }
+}
+
+fn edit_clipboard_target_data(
+    target: silica_core::BatchEditClipboardSyncTarget,
+) -> DesktopEditClipboardTarget {
+    DesktopEditClipboardTarget {
+        photo_id: target.photo_id,
+        status: target.status,
+        code: target.code,
+        message: target.message,
+    }
+}
+
+fn edit_clipboard_plan_data(plan: silica_core::BatchEditClipboardSyncPlan) -> DesktopCommandData {
+    DesktopCommandData::EditClipboardPlan {
+        status: plan.status,
+        requested_count: plan.requested_count,
+        ready_count: plan.ready_count,
+        unchanged_count: plan.unchanged_count,
+        blocked_count: plan.blocked_count,
+        targets: plan
+            .targets
+            .into_iter()
+            .map(edit_clipboard_target_data)
+            .collect(),
+        message: plan.message,
+    }
+}
+
+fn edit_clipboard_sync_data(
+    result: silica_core::BatchEditClipboardSyncResult,
+) -> DesktopCommandData {
+    DesktopCommandData::EditClipboardSync {
+        status: result.status,
+        requested_count: result.requested_count,
+        applied_count: result.applied_count,
+        skipped_count: result.skipped_count,
+        blocked_count: result.blocked_count,
+        failed_count: result.failed_count,
+        commits: result
+            .commits
+            .into_iter()
+            .map(|commit| DesktopEditClipboardCommit {
+                photo_id: commit.photo_id,
+                history_id: commit.history_id,
+                sequence: commit.sequence,
+            })
+            .collect(),
+        targets: result
+            .targets
+            .into_iter()
+            .map(edit_clipboard_target_data)
+            .collect(),
+        failures: result
+            .failures
+            .into_iter()
+            .map(|failure| DesktopEditClipboardFailure {
+                photo_id: failure.photo_id,
+                message: failure.message,
+            })
+            .collect(),
+        message: result.message,
+    }
+}
+
 fn history_command_data(result: silica_core::HistoryCommandResult) -> DesktopCommandData {
     DesktopCommandData::HistoryCommand {
         photo_id: result.photo_id,
@@ -3617,6 +3846,9 @@ fn main() {
             commit_p0_basic_reset,
             commit_basic_preset_edit,
             get_photo_edit_state,
+            copy_edit_clipboard_payload,
+            plan_edit_clipboard_sync,
+            apply_edit_clipboard_sync,
             get_photo_histogram,
             undo_last_history_action,
             redo_last_history_action,
@@ -5107,6 +5339,216 @@ mod tests {
                 assert!(*persisted);
             }
             other => panic!("unexpected reset response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_copy_plan_and_apply_edit_clipboard_sync() {
+        let workspace = unique_library_root("desktop-edit-clipboard-sync");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let source_file = import_root.join("source.jpg");
+        let target_file = import_root.join("target.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&source_file);
+        write_source_jpeg(&target_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let source_photo_id = stable_catalog_id("photo", &source_file.display().to_string());
+        let target_photo_id = stable_catalog_id("photo", &target_file.display().to_string());
+        let source_commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            source_photo_id.clone(),
+            0.55,
+            14.0,
+        );
+        assert!(source_commit.ok, "source commit failed: {source_commit:?}");
+
+        let selection = silica_core::EditClipboardSelection {
+            basic: true,
+            ..Default::default()
+        };
+        let copied = super::copy_edit_clipboard_payload(
+            library_root.display().to_string(),
+            source_photo_id.clone(),
+            selection,
+        );
+        assert!(copied.ok, "copy failed: {copied:?}");
+        let payload = match response_data(&copied) {
+            super::DesktopCommandData::EditClipboard {
+                photo_id,
+                section_count,
+                payload,
+                ..
+            } => {
+                assert_eq!(photo_id, &source_photo_id);
+                assert_eq!(*section_count, 1);
+                assert!(payload.basic.is_some());
+                payload.clone()
+            }
+            other => panic!("unexpected copy response data: {other:?}"),
+        };
+
+        let targets = vec![target_photo_id.clone()];
+        let plan = super::plan_edit_clipboard_sync(
+            library_root.display().to_string(),
+            targets.clone(),
+            payload.clone(),
+        );
+        assert!(plan.ok, "plan failed: {plan:?}");
+        match response_data(&plan) {
+            super::DesktopCommandData::EditClipboardPlan {
+                status,
+                ready_count,
+                blocked_count,
+                targets,
+                ..
+            } => {
+                assert_eq!(status, "ready");
+                assert_eq!(*ready_count, 1);
+                assert_eq!(*blocked_count, 0);
+                assert_eq!(targets[0].photo_id, target_photo_id);
+                assert_eq!(targets[0].status, "ready");
+            }
+            other => panic!("unexpected plan response data: {other:?}"),
+        }
+
+        let applied =
+            super::apply_edit_clipboard_sync(library_root.display().to_string(), targets, payload);
+        assert!(applied.ok, "apply failed: {applied:?}");
+        match response_data(&applied) {
+            super::DesktopCommandData::EditClipboardSync {
+                status,
+                applied_count,
+                blocked_count,
+                commits,
+                ..
+            } => {
+                assert_eq!(status, "applied");
+                assert_eq!(*applied_count, 1);
+                assert_eq!(*blocked_count, 0);
+                assert_eq!(commits.len(), 1);
+                assert_eq!(commits[0].photo_id, target_photo_id);
+            }
+            other => panic!("unexpected apply response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_edit_clipboard_blocks_raw_copy_and_sync_target() {
+        let workspace = unique_library_root("desktop-edit-clipboard-raw-blocked");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let source_file = import_root.join("source.jpg");
+        let raw_file = import_root.join("target.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&source_file);
+        std::fs::write(&raw_file, b"raw target placeholder").expect("write raw target");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let source_photo_id = stable_catalog_id("photo", &source_file.display().to_string());
+        let raw_photo_id = stable_catalog_id("photo", &raw_file.display().to_string());
+        let selection = silica_core::EditClipboardSelection {
+            basic: true,
+            ..Default::default()
+        };
+
+        let raw_copy = super::copy_edit_clipboard_payload(
+            library_root.display().to_string(),
+            raw_photo_id.clone(),
+            selection,
+        );
+        assert!(
+            !raw_copy.ok,
+            "RAW copy unexpectedly succeeded: {raw_copy:?}"
+        );
+        assert_eq!(
+            raw_copy.error.as_ref().map(|error| error.kind.as_str()),
+            Some("unsupportedEdit")
+        );
+        assert!(raw_copy.message.contains("JPEG/JPG"));
+
+        let source_commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            source_photo_id.clone(),
+            0.55,
+            14.0,
+        );
+        assert!(source_commit.ok, "source commit failed: {source_commit:?}");
+
+        let copied = super::copy_edit_clipboard_payload(
+            library_root.display().to_string(),
+            source_photo_id,
+            silica_core::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        );
+        assert!(copied.ok, "source copy failed: {copied:?}");
+        let payload = match response_data(&copied) {
+            super::DesktopCommandData::EditClipboard { payload, .. } => payload.clone(),
+            other => panic!("unexpected copy response data: {other:?}"),
+        };
+
+        let targets = vec![raw_photo_id.clone()];
+        let plan = super::plan_edit_clipboard_sync(
+            library_root.display().to_string(),
+            targets.clone(),
+            payload.clone(),
+        );
+        assert!(plan.ok, "raw target plan failed: {plan:?}");
+        match response_data(&plan) {
+            super::DesktopCommandData::EditClipboardPlan {
+                status,
+                ready_count,
+                blocked_count,
+                targets,
+                ..
+            } => {
+                assert_eq!(status, "blocked");
+                assert_eq!(*ready_count, 0);
+                assert_eq!(*blocked_count, 1);
+                assert_eq!(targets[0].photo_id, raw_photo_id);
+                assert_eq!(targets[0].status, "blocked");
+                assert_eq!(targets[0].code.as_deref(), Some("unsupported_target"));
+                assert!(targets[0].message.contains("JPEG/JPG"));
+            }
+            other => panic!("unexpected raw plan response data: {other:?}"),
+        }
+
+        let applied =
+            super::apply_edit_clipboard_sync(library_root.display().to_string(), targets, payload);
+        assert!(applied.ok, "raw target apply failed: {applied:?}");
+        match response_data(&applied) {
+            super::DesktopCommandData::EditClipboardSync {
+                status,
+                applied_count,
+                blocked_count,
+                failed_count,
+                commits,
+                failures,
+                targets,
+                ..
+            } => {
+                assert_eq!(status, "blocked");
+                assert_eq!(*applied_count, 0);
+                assert_eq!(*blocked_count, 1);
+                assert_eq!(*failed_count, 1);
+                assert!(commits.is_empty());
+                assert_eq!(failures[0].photo_id, raw_photo_id);
+                assert_eq!(targets[0].code.as_deref(), Some("unsupported_target"));
+            }
+            other => panic!("unexpected raw apply response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

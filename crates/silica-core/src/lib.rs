@@ -18,6 +18,8 @@ pub use silica_decode::RawFullResolutionExportSourceError;
 pub use silica_decode::RawPreviewArtifactError;
 pub use silica_edit::BasicPreset;
 pub use silica_edit::CurveMode;
+pub use silica_edit::EditClipboardPayload;
+pub use silica_edit::EditClipboardSelection;
 pub use silica_edit::HslColorChannel;
 pub use silica_edit::WhiteBalance;
 pub use silica_storage::ActionLogEntry;
@@ -943,6 +945,31 @@ pub fn apply_edit_clipboard_payload_to_graph(
     updated_at: impl Into<String>,
 ) -> Result<silica_edit::EditGraph, CoreError> {
     silica_edit::apply_edit_clipboard_payload(target, payload, updated_at).map_err(CoreError::from)
+}
+
+/// Copy edit sections from one catalog photo through the core boundary.
+pub fn copy_photo_edit_clipboard_payload(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    selection: silica_edit::EditClipboardSelection,
+) -> Result<Option<silica_edit::EditClipboardPayload>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    if let Some((code, message)) = edit_clipboard_catalog_target_block(library_root_path, photo_id)?
+    {
+        if code == "missing_photo" {
+            return Ok(None);
+        }
+        return Err(CoreError::UnsupportedEdit(message));
+    }
+
+    let Some(graph) =
+        silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)?
+    else {
+        return Ok(None);
+    };
+    silica_edit::copy_edit_clipboard_payload(&graph, selection)
+        .map(Some)
+        .map_err(CoreError::from)
 }
 
 /// Plan a batch edit clipboard sync without mutating catalog state.
@@ -4985,6 +5012,13 @@ fn prepare_edit_clipboard_sync(
             continue;
         }
 
+        if let Some((code, message)) =
+            edit_clipboard_catalog_target_block(library_root_path, photo_id)?
+        {
+            targets.push(batch_sync_target(photo_id, "blocked", Some(code), &message));
+            continue;
+        }
+
         let target =
             match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
                 Some(graph) => graph,
@@ -5111,6 +5145,23 @@ fn ensure_supported_edit_clipboard_sync(
         }
     }
     Ok(())
+}
+
+fn edit_clipboard_catalog_target_block(
+    library_root_path: &Path,
+    photo_id: &str,
+) -> Result<Option<(&'static str, String)>, CoreError> {
+    let Some(metadata) = silica_storage::get_photo_metadata(library_root_path, photo_id)? else {
+        return Ok(Some(("missing_photo", "Photo not found.".to_string())));
+    };
+    if metadata.unsupported || metadata.file_type != "jpeg" {
+        return Ok(Some((
+            "unsupported_target",
+            "Edit clipboard copy and sync are limited to JPEG/JPG Develop photos in this alpha."
+                .to_string(),
+        )));
+    }
+    Ok(None)
 }
 
 fn has_unsupported_basic_runtime(graph: &silica_edit::EditGraph) -> bool {
@@ -5457,6 +5508,74 @@ mod tests {
     }
 
     #[test]
+    fn copies_photo_edit_clipboard_payload_from_catalog_state() {
+        let workspace = unique_library_root("core-copy-photo-edit-clipboard");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import root");
+        write_source_jpeg(&supported_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+        let photo = list_library_photos(&created.root_path)
+            .expect("list photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.jpg")
+            .expect("sample photo");
+        commit_exposure_contrast_edit(&created.root_path, &photo.photo_id, 0.65, 9.0)
+            .expect("commit source edit")
+            .expect("committed edit");
+
+        let payload = copy_photo_edit_clipboard_payload(
+            &created.root_path,
+            &photo.photo_id,
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        )
+        .expect("copy catalog clipboard payload")
+        .expect("payload");
+
+        assert_eq!(payload.schema, silica_edit::EDIT_CLIPBOARD_SCHEMA);
+        assert!(payload.basic.is_some());
+        assert_eq!(
+            payload
+                .basic
+                .as_ref()
+                .and_then(|basic| basic.exposure.as_f64()),
+            Some(0.65)
+        );
+        assert_eq!(
+            payload
+                .basic
+                .as_ref()
+                .and_then(|basic| basic.contrast.as_f64()),
+            Some(9.0)
+        );
+        assert!(payload.tone.is_none());
+        assert!(payload.color.is_none());
+        assert!(payload.detail.is_none());
+        assert!(payload.lens.is_none());
+        assert!(payload.geometry.is_none());
+
+        let missing = copy_photo_edit_clipboard_payload(
+            &created.root_path,
+            "missing-photo",
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        )
+        .expect("missing photo is not an error");
+        assert!(missing.is_none());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn batch_sync_edit_clipboard_applies_payload_with_per_photo_history() {
         let workspace = unique_library_root("core-batch-sync");
         let library_root = workspace.join("SilicaRAW Library");
@@ -5695,6 +5814,96 @@ mod tests {
             &original_hash,
             "blocked detail batch original",
         );
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn edit_clipboard_blocks_raw_copy_and_batch_target_without_writes() {
+        let workspace = unique_library_root("core-edit-clipboard-raw-blocked");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let source_file = import_root.join("source.jpg");
+        let raw_file = import_root.join("target.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import root");
+        write_source_jpeg(&source_file);
+        std::fs::write(&raw_file, b"raw target placeholder").expect("write raw target");
+        let raw_hash = file_hash(&raw_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+        let photos = list_library_photos(&created.root_path).expect("list photos");
+        let source_photo = photos
+            .iter()
+            .find(|photo| photo.file_name == "source.jpg")
+            .expect("source photo");
+        let raw_photo = photos
+            .iter()
+            .find(|photo| photo.file_name == "target.DNG")
+            .expect("raw target photo");
+        assert_eq!(raw_photo.file_type, "DNG");
+        assert!(!raw_photo.unsupported);
+
+        let raw_copy = copy_photo_edit_clipboard_payload(
+            &created.root_path,
+            &raw_photo.photo_id,
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        )
+        .expect_err("RAW copy must be blocked");
+        assert!(matches!(raw_copy, CoreError::UnsupportedEdit(_)));
+        assert!(raw_copy.to_string().contains("JPEG/JPG"));
+
+        commit_exposure_contrast_edit(&created.root_path, &source_photo.photo_id, 0.8, 12.0)
+            .expect("commit source edit");
+        let payload = copy_photo_edit_clipboard_payload(
+            &created.root_path,
+            &source_photo.photo_id,
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        )
+        .expect("copy source payload")
+        .expect("source payload");
+
+        let plan = plan_edit_clipboard_sync(
+            &created.root_path,
+            std::slice::from_ref(&raw_photo.photo_id),
+            &payload,
+        )
+        .expect("plan raw target");
+        assert_eq!(plan.status, "blocked");
+        assert_eq!(plan.ready_count, 0);
+        assert_eq!(plan.blocked_count, 1);
+        assert_eq!(plan.targets[0].code.as_deref(), Some("unsupported_target"));
+        assert!(plan.targets[0].message.contains("JPEG/JPG"));
+
+        let result = apply_edit_clipboard_sync(
+            &created.root_path,
+            std::slice::from_ref(&raw_photo.photo_id),
+            &payload,
+        )
+        .expect("raw target returns blocked result");
+        assert_eq!(result.status, "blocked");
+        assert_eq!(result.applied_count, 0);
+        assert_eq!(result.blocked_count, 1);
+        assert_eq!(
+            result.targets[0].code.as_deref(),
+            Some("unsupported_target")
+        );
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &raw_photo.photo_id)
+                .expect("load raw active graph")
+                .is_none(),
+            "RAW target batch must not write active edit graph"
+        );
+        let history = list_photo_history(&created.root_path, &raw_photo.photo_id)
+            .expect("read raw history after blocked batch");
+        assert!(history.items.is_empty());
+        assert_original_hash(&raw_file, &raw_hash, "blocked raw batch target");
         remove_library_root(&workspace);
     }
 
