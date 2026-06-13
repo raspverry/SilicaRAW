@@ -2895,17 +2895,20 @@ fn edit_graph_history_label(
         || before.blacks != after.blacks;
     let color_presence_changed =
         before.vibrance != after.vibrance || before.saturation != after.saturation;
+    let tone_curve_changed = before_graph.tone != after_graph.tone;
 
     match (
         exposure_contrast_changed,
         white_balance_changed,
         tone_recovery_changed,
         color_presence_changed,
+        tone_curve_changed,
     ) {
-        (true, false, false, false) => "Exposure / contrast",
-        (false, true, false, false) => "White balance",
-        (false, false, true, false) => "Tone recovery",
-        (false, false, false, true) => "Color presence",
+        (true, false, false, false, false) => "Exposure / contrast",
+        (false, true, false, false, false) => "White balance",
+        (false, false, true, false, false) => "Tone recovery",
+        (false, false, false, true, false) => "Color presence",
+        (false, false, false, false, true) => "Tone curve",
         _ => "Develop edit",
     }
 }

@@ -104,6 +104,7 @@ pub struct ExposureContrastPreviewRequest {
     pub white_balance: WhiteBalanceRenderAdjustment,
     pub tone_recovery: ToneRecoveryRenderAdjustment,
     pub color_presence: ColorPresenceRenderAdjustment,
+    pub tone_curve: ToneCurveRenderAdjustment,
     pub message: String,
 }
 
@@ -119,6 +120,7 @@ pub struct JpegSrgbExportRenderRequest {
     pub white_balance: WhiteBalanceRenderAdjustment,
     pub tone_recovery: ToneRecoveryRenderAdjustment,
     pub color_presence: ColorPresenceRenderAdjustment,
+    pub tone_curve: ToneCurveRenderAdjustment,
     pub quality: u8,
     pub message: String,
 }
@@ -171,6 +173,43 @@ impl ToneRecoveryRenderAdjustment {
             shadows: 0.0,
             whites: 0.0,
             blacks: 0.0,
+        }
+    }
+}
+
+/// Tone curve mode carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToneCurveRenderMode {
+    None,
+    Parametric,
+    Point,
+}
+
+/// One normalized point in a render-side tone curve.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ToneCurveRenderPoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Tone curve values carried by preview/export render requests.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToneCurveRenderAdjustment {
+    pub mode: ToneCurveRenderMode,
+    pub rgb_curve: Vec<ToneCurveRenderPoint>,
+    pub red_curve: Vec<ToneCurveRenderPoint>,
+    pub green_curve: Vec<ToneCurveRenderPoint>,
+    pub blue_curve: Vec<ToneCurveRenderPoint>,
+}
+
+impl ToneCurveRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            mode: ToneCurveRenderMode::None,
+            rgb_curve: Vec::new(),
+            red_curve: Vec::new(),
+            green_curve: Vec::new(),
+            blue_curve: Vec::new(),
         }
     }
 }
@@ -1111,8 +1150,34 @@ pub fn plan_color_presence_preview(
         white_balance,
         tone_recovery,
         color_presence,
+        tone_curve: ToneCurveRenderAdjustment::neutral(),
         message,
     }
+}
+
+/// Build a render request for a draft tone-curve preview update.
+pub fn plan_tone_curve_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
+    let mut request = plan_color_presence_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+    );
+    request.tone_curve = tone_curve;
+    if request.status == PreviewRenderStatus::Ready {
+        request.message = "Tone curve preview request is ready.".to_string();
+    }
+    request
 }
 
 /// Build a render-side request for exporting an edited raster source as sRGB JPEG.
@@ -1196,9 +1261,36 @@ pub fn plan_jpeg_srgb_export_with_color_presence(
         white_balance,
         tone_recovery,
         color_presence,
+        tone_curve: ToneCurveRenderAdjustment::neutral(),
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
+}
+
+/// Build a render-side request for exporting an edited raster source with tone curve.
+pub fn plan_jpeg_srgb_export_with_tone_curve(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    let mut request = plan_jpeg_srgb_export_with_color_presence(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        quality,
+    );
+    request.tone_curve = tone_curve;
+    request
 }
 
 /// Build a render-side request for exporting a full-resolution RAW-derived source artifact.
@@ -1282,9 +1374,36 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_color_presence(
         white_balance,
         tone_recovery,
         color_presence,
+        tone_curve: ToneCurveRenderAdjustment::neutral(),
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
+}
+
+/// Build a render-side request for exporting a RAW-derived source artifact with tone curve.
+pub fn plan_raw_derived_jpeg_srgb_export_with_tone_curve(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    let mut request = plan_raw_derived_jpeg_srgb_export_with_color_presence(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        quality,
+    );
+    request.tone_curve = tone_curve;
+    request
 }
 
 #[cfg(test)]
@@ -1474,6 +1593,53 @@ mod tests {
         assert_eq!(preview.tone_recovery, tone_recovery);
         assert!(preview.message.contains("Tone recovery"));
         assert_eq!(export.tone_recovery, tone_recovery);
+        assert_eq!(export.exposure, 0.25);
+        assert_eq!(export.contrast, -3.0);
+    }
+
+    #[test]
+    fn plans_tone_curve_preview_and_export_requests() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let tone_curve = super::ToneCurveRenderAdjustment {
+            mode: super::ToneCurveRenderMode::Point,
+            rgb_curve: vec![
+                super::ToneCurveRenderPoint { x: 0.0, y: 0.0 },
+                super::ToneCurveRenderPoint { x: 0.5, y: 0.35 },
+                super::ToneCurveRenderPoint { x: 1.0, y: 1.0 },
+            ],
+            red_curve: Vec::new(),
+            green_curve: Vec::new(),
+            blue_curve: Vec::new(),
+        };
+
+        let preview = super::plan_tone_curve_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            tone_curve.clone(),
+        );
+        let export = super::plan_jpeg_srgb_export_with_tone_curve(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            tone_curve.clone(),
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.tone_curve, tone_curve);
+        assert!(preview.message.contains("Tone curve"));
+        assert_eq!(export.tone_curve, tone_curve);
         assert_eq!(export.exposure, 0.25);
         assert_eq!(export.contrast, -3.0);
     }

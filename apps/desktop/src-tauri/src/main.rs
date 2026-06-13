@@ -61,6 +61,23 @@ impl DesktopCommandResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopToneCurveState {
+    curve_mode: &'static str,
+    rgb_curve: Vec<DesktopToneCurvePoint>,
+    red_curve: Vec<DesktopToneCurvePoint>,
+    green_curve: Vec<DesktopToneCurvePoint>,
+    blue_curve: Vec<DesktopToneCurvePoint>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopToneCurvePoint {
+    x: f64,
+    y: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(
     rename_all = "camelCase",
     tag = "kind",
@@ -166,6 +183,7 @@ enum DesktopCommandData {
         blacks: f64,
         vibrance: f64,
         saturation: f64,
+        tone_curve: DesktopToneCurveState,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -182,6 +200,7 @@ enum DesktopCommandData {
         blacks: f64,
         vibrance: f64,
         saturation: f64,
+        tone_curve: DesktopToneCurveState,
         persisted: bool,
         message: String,
     },
@@ -198,6 +217,7 @@ enum DesktopCommandData {
         blacks: f64,
         vibrance: f64,
         saturation: f64,
+        tone_curve: DesktopToneCurveState,
         persisted: bool,
         message: String,
     },
@@ -1151,6 +1171,7 @@ fn preview_exposure_contrast_edit(
                 blacks: preview.blacks,
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1216,6 +1237,7 @@ fn preview_white_balance_edit(
                 blacks: preview.blacks,
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1269,6 +1291,7 @@ fn preview_tone_recovery_edit(
                 blacks: preview.blacks,
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1318,6 +1341,66 @@ fn preview_color_presence_edit(
                 blacks: preview.blacks,
                 vibrance: preview.vibrance,
                 saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_tone_curve_edit(
+    library_path: String,
+    photo_id: String,
+    rgb_curve: Vec<DesktopToneCurvePoint>,
+    red_curve: Vec<DesktopToneCurvePoint>,
+    green_curve: Vec<DesktopToneCurvePoint>,
+    blue_curve: Vec<DesktopToneCurvePoint>,
+) -> DesktopCommandResponse {
+    let command = "preview_tone_curve_edit";
+    let rgb_curve = tone_curve_pairs(&rgb_curve);
+    let red_curve = tone_curve_pairs(&red_curve);
+    let green_curve = tone_curve_pairs(&green_curve);
+    let blue_curve = tone_curve_pairs(&blue_curve);
+
+    match silica_core::preview_tone_curve_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        &rgb_curve,
+        &red_curve,
+        &green_curve,
+        &blue_curve,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1365,6 +1448,7 @@ fn commit_exposure_contrast_edit(
                 blacks: commit.blacks,
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1428,6 +1512,7 @@ fn commit_white_balance_edit(
                 blacks: commit.blacks,
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1479,6 +1564,7 @@ fn commit_tone_recovery_edit(
                 blacks: commit.blacks,
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1526,6 +1612,64 @@ fn commit_color_presence_edit(
                 blacks: commit.blacks,
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_tone_curve_edit(
+    library_path: String,
+    photo_id: String,
+    rgb_curve: Vec<DesktopToneCurvePoint>,
+    red_curve: Vec<DesktopToneCurvePoint>,
+    green_curve: Vec<DesktopToneCurvePoint>,
+    blue_curve: Vec<DesktopToneCurvePoint>,
+) -> DesktopCommandResponse {
+    let command = "commit_tone_curve_edit";
+    let rgb_curve = tone_curve_pairs(&rgb_curve);
+    let red_curve = tone_curve_pairs(&red_curve);
+    let green_curve = tone_curve_pairs(&green_curve);
+    let blue_curve = tone_curve_pairs(&blue_curve);
+
+    match silica_core::commit_tone_curve_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        &rgb_curve,
+        &red_curve,
+        &green_curve,
+        &blue_curve,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1563,6 +1707,7 @@ fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopComma
                 blacks: commit.blacks,
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1618,6 +1763,7 @@ fn commit_basic_preset_edit(
                 blacks: commit.blacks,
                 vibrance: commit.vibrance,
                 saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1655,6 +1801,7 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 blacks: state.blacks,
                 vibrance: state.vibrance,
                 saturation: state.saturation,
+                tone_curve: tone_curve_data(state.tone_curve),
                 persisted: state.persisted,
                 message: state.message,
             },
@@ -1881,6 +2028,40 @@ fn white_balance_text(white_balance: silica_core::WhiteBalance) -> &'static str 
         silica_core::WhiteBalance::Flash => "flash",
         silica_core::WhiteBalance::Custom => "custom",
     }
+}
+
+fn tone_curve_data(tone_curve: silica_core::PhotoToneCurveState) -> DesktopToneCurveState {
+    DesktopToneCurveState {
+        curve_mode: curve_mode_text(tone_curve.curve_mode),
+        rgb_curve: tone_curve_points_data(tone_curve.rgb_curve),
+        red_curve: tone_curve_points_data(tone_curve.red_curve),
+        green_curve: tone_curve_points_data(tone_curve.green_curve),
+        blue_curve: tone_curve_points_data(tone_curve.blue_curve),
+    }
+}
+
+fn curve_mode_text(curve_mode: silica_core::CurveMode) -> &'static str {
+    match curve_mode {
+        silica_core::CurveMode::None => "none",
+        silica_core::CurveMode::Parametric => "parametric",
+        silica_core::CurveMode::Point => "point",
+    }
+}
+
+fn tone_curve_points_data(
+    points: Vec<silica_core::PhotoToneCurvePoint>,
+) -> Vec<DesktopToneCurvePoint> {
+    points
+        .into_iter()
+        .map(|point| DesktopToneCurvePoint {
+            x: point.x,
+            y: point.y,
+        })
+        .collect()
+}
+
+fn tone_curve_pairs(points: &[DesktopToneCurvePoint]) -> Vec<(f64, f64)> {
+    points.iter().map(|point| (point.x, point.y)).collect()
 }
 
 fn desktop_photo_export_response(
@@ -2527,10 +2708,12 @@ fn main() {
             preview_white_balance_edit,
             preview_tone_recovery_edit,
             preview_color_presence_edit,
+            preview_tone_curve_edit,
             commit_exposure_contrast_edit,
             commit_white_balance_edit,
             commit_tone_recovery_edit,
             commit_color_presence_edit,
+            commit_tone_curve_edit,
             commit_p0_basic_reset,
             commit_basic_preset_edit,
             get_photo_edit_state,
@@ -3603,6 +3786,78 @@ mod tests {
                 assert_eq!(*shadows, 42.0);
                 assert_eq!(*whites, 10.0);
                 assert_eq!(*blacks, -12.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_preview_and_commit_tone_curve_edit() {
+        let workspace = unique_library_root("desktop-tone-curve-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let rgb_curve = vec![
+            super::DesktopToneCurvePoint { x: 0.0, y: 0.0 },
+            super::DesktopToneCurvePoint { x: 0.5, y: 0.28 },
+            super::DesktopToneCurvePoint { x: 1.0, y: 1.0 },
+        ];
+        let preview = super::preview_tone_curve_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            rgb_curve.clone(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                tone_curve,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(tone_curve.curve_mode, "point");
+                assert_eq!(tone_curve.rgb_curve.len(), 3);
+                assert_eq!(tone_curve.rgb_curve[1].y, 0.28);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_tone_curve_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            rgb_curve,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                tone_curve,
+                persisted,
+                ..
+            } => {
+                assert_eq!(tone_curve.curve_mode, "point");
+                assert_eq!(tone_curve.rgb_curve[1].x, 0.5);
+                assert_eq!(tone_curve.rgb_curve[1].y, 0.28);
                 assert!(*persisted);
             }
             other => panic!("unexpected response data: {other:?}"),

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Tone curve runtime parity added
+
+- Completed Task 18.1.2 with point tone curve preview, commit, desktop command, and JPEG export parity.
+- Kept draft preview non-persistent and persisted committed tone curves through one undoable history checkpoint.
+- Blocked parametric tone curve runtime behavior instead of silently approximating unsupported state and routed Phase 18 to Task 18.1.3.
+
 ## [2026-06-13] phase-18 | Tone curve mutator added
 
 - Completed Task 18.1.1 with a graph-only tone curve mutator.

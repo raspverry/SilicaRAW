@@ -40,6 +40,7 @@ pub struct JpegSrgbExportRequest {
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
     pub color_presence: ColorPresenceAdjustment,
+    pub tone_curve: ToneCurveAdjustment,
     pub quality: u8,
 }
 
@@ -53,6 +54,7 @@ pub struct JpegColorExportRequest {
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
     pub color_presence: ColorPresenceAdjustment,
+    pub tone_curve: ToneCurveAdjustment,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
 }
@@ -105,6 +107,43 @@ impl ToneRecoveryAdjustment {
             shadows: 0.0,
             whites: 0.0,
             blacks: 0.0,
+        }
+    }
+}
+
+/// Tone curve mode applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToneCurveMode {
+    None,
+    Parametric,
+    Point,
+}
+
+/// One normalized point in a tone curve.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ToneCurvePoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Tone curve values applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToneCurveAdjustment {
+    pub mode: ToneCurveMode,
+    pub rgb_curve: Vec<ToneCurvePoint>,
+    pub red_curve: Vec<ToneCurvePoint>,
+    pub green_curve: Vec<ToneCurvePoint>,
+    pub blue_curve: Vec<ToneCurvePoint>,
+}
+
+impl ToneCurveAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            mode: ToneCurveMode::None,
+            rgb_curve: Vec::new(),
+            red_curve: Vec::new(),
+            green_curve: Vec::new(),
+            blue_curve: Vec::new(),
         }
     }
 }
@@ -170,6 +209,7 @@ pub struct JpegDevelopPreviewRequest {
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
     pub color_presence: ColorPresenceAdjustment,
+    pub tone_curve: ToneCurveAdjustment,
 }
 
 /// Request to compute Develop histogram data from a supported JPEG source.
@@ -181,6 +221,7 @@ pub struct JpegHistogramRequest {
     pub white_balance: WhiteBalanceAdjustment,
     pub tone_recovery: ToneRecoveryAdjustment,
     pub color_presence: ColorPresenceAdjustment,
+    pub tone_curve: ToneCurveAdjustment,
 }
 
 /// Result returned after a JPEG thumbnail is written.
@@ -206,6 +247,7 @@ pub enum ExportError {
     InvalidQuality(u8),
     InvalidThumbnailEdge(u32),
     NonFiniteAdjustment,
+    InvalidToneCurveAdjustment(String),
     SameSourceAndOutput(PathBuf),
     IccProfileUnavailable {
         profile: ExportColorProfile,
@@ -237,6 +279,9 @@ impl fmt::Display for ExportError {
                     formatter,
                     "exposure and contrast adjustments must be finite"
                 )
+            }
+            Self::InvalidToneCurveAdjustment(message) => {
+                write!(formatter, "invalid tone curve adjustment: {message}")
             }
             Self::SameSourceAndOutput(path) => {
                 write!(
@@ -276,6 +321,7 @@ impl Error for ExportError {
             Self::InvalidQuality(_)
             | Self::InvalidThumbnailEdge(_)
             | Self::NonFiniteAdjustment
+            | Self::InvalidToneCurveAdjustment(_)
             | Self::SameSourceAndOutput(_)
             | Self::IccProfileUnavailable { .. }
             | Self::InvalidJpegIccProfile(_) => None,
@@ -307,6 +353,7 @@ pub fn export_jpeg_srgb(
         white_balance: request.white_balance,
         tone_recovery: request.tone_recovery,
         color_presence: request.color_presence,
+        tone_curve: request.tone_curve,
         quality: request.quality,
         color_profile: ExportColorProfile::Srgb,
     })
@@ -328,9 +375,11 @@ pub fn export_jpeg_with_color_profile(
         request.white_balance,
         request.tone_recovery,
         request.color_presence,
+        &request.tone_curve,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
+    validate_tone_curve_adjustment(&request.tone_curve)?;
 
     let source_sha256 = sha256_file(&request.source_path)?;
     let icc_profile = export_icc_profile(request.color_profile)?;
@@ -341,6 +390,7 @@ pub fn export_jpeg_with_color_profile(
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
     apply_white_balance(&mut rgb, request.white_balance);
     apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
 
     let mut output = File::create(&request.output_path)?;
@@ -466,9 +516,11 @@ pub fn write_jpeg_develop_preview(
         request.white_balance,
         request.tone_recovery,
         request.color_presence,
+        &request.tone_curve,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
+    validate_tone_curve_adjustment(&request.tone_curve)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -479,6 +531,7 @@ pub fn write_jpeg_develop_preview(
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
     apply_white_balance(&mut rgb, request.white_balance);
     apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
 
     let mut output = File::create(&request.output_path)?;
@@ -509,9 +562,11 @@ pub fn compute_jpeg_develop_histogram(
         request.white_balance,
         request.tone_recovery,
         request.color_presence,
+        &request.tone_curve,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
+    validate_tone_curve_adjustment(&request.tone_curve)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -520,6 +575,7 @@ pub fn compute_jpeg_develop_histogram(
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
     apply_white_balance(&mut rgb, request.white_balance);
     apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
     silica_render::compute_rgb_histogram(rgb.as_raw()).map_err(|error| {
         ExportError::Image(image::ImageError::IoError(std::io::Error::new(
@@ -594,6 +650,54 @@ fn apply_tone_recovery(image: &mut image::RgbImage, tone_recovery: ToneRecoveryA
     }
 }
 
+fn apply_tone_curve(image: &mut image::RgbImage, tone_curve: &ToneCurveAdjustment) {
+    if tone_curve.mode == ToneCurveMode::None {
+        return;
+    }
+
+    for pixel in image.pixels_mut() {
+        pixel.0[0] = apply_curve_channel(pixel.0[0], &tone_curve.rgb_curve, &tone_curve.red_curve);
+        pixel.0[1] =
+            apply_curve_channel(pixel.0[1], &tone_curve.rgb_curve, &tone_curve.green_curve);
+        pixel.0[2] = apply_curve_channel(pixel.0[2], &tone_curve.rgb_curve, &tone_curve.blue_curve);
+    }
+}
+
+fn apply_curve_channel(
+    channel: u8,
+    rgb_curve: &[ToneCurvePoint],
+    channel_curve: &[ToneCurvePoint],
+) -> u8 {
+    let mut value = f32::from(channel) / 255.0;
+    value = evaluate_curve(value, rgb_curve);
+    value = evaluate_curve(value, channel_curve);
+    (value.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+fn evaluate_curve(value: f32, curve: &[ToneCurvePoint]) -> f32 {
+    if curve.is_empty() {
+        return value;
+    }
+    if value <= curve[0].x as f32 {
+        return curve[0].y as f32;
+    }
+    for window in curve.windows(2) {
+        let start = window[0];
+        let end = window[1];
+        let start_x = start.x as f32;
+        let end_x = end.x as f32;
+        if value <= end_x {
+            let span = end_x - start_x;
+            if span <= f32::EPSILON {
+                return end.y as f32;
+            }
+            let t = ((value - start_x) / span).clamp(0.0, 1.0);
+            return (start.y as f32) + ((end.y - start.y) as f32) * t;
+        }
+    }
+    curve.last().map(|point| point.y as f32).unwrap_or(value)
+}
+
 fn apply_color_presence(image: &mut image::RgbImage, color_presence: ColorPresenceAdjustment) {
     let vibrance = (color_presence.vibrance / 100.0).clamp(-1.0, 1.0) as f32;
     let saturation = (color_presence.saturation / 100.0).clamp(-1.0, 1.0) as f32;
@@ -620,6 +724,7 @@ fn adjustments_are_finite(
     white_balance: WhiteBalanceAdjustment,
     tone_recovery: ToneRecoveryAdjustment,
     color_presence: ColorPresenceAdjustment,
+    tone_curve: &ToneCurveAdjustment,
 ) -> bool {
     exposure.is_finite()
         && contrast.is_finite()
@@ -631,6 +736,74 @@ fn adjustments_are_finite(
         && tone_recovery.blacks.is_finite()
         && color_presence.vibrance.is_finite()
         && color_presence.saturation.is_finite()
+        && tone_curve_points_are_finite(&tone_curve.rgb_curve)
+        && tone_curve_points_are_finite(&tone_curve.red_curve)
+        && tone_curve_points_are_finite(&tone_curve.green_curve)
+        && tone_curve_points_are_finite(&tone_curve.blue_curve)
+}
+
+fn tone_curve_points_are_finite(points: &[ToneCurvePoint]) -> bool {
+    points
+        .iter()
+        .all(|point| point.x.is_finite() && point.y.is_finite())
+}
+
+fn validate_tone_curve_adjustment(tone_curve: &ToneCurveAdjustment) -> Result<(), ExportError> {
+    match tone_curve.mode {
+        ToneCurveMode::None => {
+            if tone_curve.rgb_curve.is_empty()
+                && tone_curve.red_curve.is_empty()
+                && tone_curve.green_curve.is_empty()
+                && tone_curve.blue_curve.is_empty()
+            {
+                Ok(())
+            } else {
+                Err(ExportError::InvalidToneCurveAdjustment(
+                    "none mode must not carry curve points".to_string(),
+                ))
+            }
+        }
+        ToneCurveMode::Parametric => Err(ExportError::InvalidToneCurveAdjustment(
+            "parametric curves have no schema-owned parameters yet".to_string(),
+        )),
+        ToneCurveMode::Point => {
+            validate_tone_curve_points("rgb_curve", &tone_curve.rgb_curve)?;
+            validate_tone_curve_points("red_curve", &tone_curve.red_curve)?;
+            validate_tone_curve_points("green_curve", &tone_curve.green_curve)?;
+            validate_tone_curve_points("blue_curve", &tone_curve.blue_curve)
+        }
+    }
+}
+
+fn validate_tone_curve_points(path: &str, points: &[ToneCurvePoint]) -> Result<(), ExportError> {
+    if points.is_empty() {
+        return Ok(());
+    }
+    if points.len() < 2 {
+        return Err(ExportError::InvalidToneCurveAdjustment(format!(
+            "{path} must include endpoints"
+        )));
+    }
+    for (index, point) in points.iter().enumerate() {
+        if !(0.0..=1.0).contains(&point.x) || !(0.0..=1.0).contains(&point.y) {
+            return Err(ExportError::InvalidToneCurveAdjustment(format!(
+                "{path}.{index} must be between 0 and 1"
+            )));
+        }
+        if index > 0 && point.x <= points[index - 1].x {
+            return Err(ExportError::InvalidToneCurveAdjustment(format!(
+                "{path}.{index}.x must be strictly increasing"
+            )));
+        }
+    }
+    let first = points.first().expect("non-empty curve checked");
+    let last = points.last().expect("non-empty curve checked");
+    if first.x != 0.0 || first.y != 0.0 || last.x != 1.0 || last.y != 1.0 {
+        return Err(ExportError::InvalidToneCurveAdjustment(format!(
+            "{path} must start at (0, 0) and end at (1, 1)"
+        )));
+    }
+    Ok(())
 }
 
 fn export_icc_profile(profile: ExportColorProfile) -> Result<Vec<u8>, ExportError> {
@@ -842,6 +1015,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -905,6 +1079,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::DisplayP3,
         })
@@ -967,6 +1142,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -1033,6 +1209,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1045,6 +1222,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write adjusted preview");
 
@@ -1089,6 +1267,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1101,6 +1280,7 @@ mod tests {
             white_balance,
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write white balance preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1113,6 +1293,7 @@ mod tests {
             white_balance,
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("export white balance jpeg");
 
@@ -1159,6 +1340,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1171,6 +1353,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery,
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write tone recovery preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1181,10 +1364,89 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery,
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
         .expect("export tone recovery jpeg");
+
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_tone_curve_adjusted_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("tone-curve");
+        let source_path = root.join("source.jpg");
+        let neutral_preview_path = root.join("previews").join("neutral.jpg");
+        let adjusted_preview_path = root.join("previews").join("adjusted.jpg");
+        let adjusted_export_path = root.join("export").join("adjusted.jpg");
+        std::fs::create_dir_all(adjusted_export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(neutral_preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let tone_curve = super::ToneCurveAdjustment {
+            mode: super::ToneCurveMode::Point,
+            rgb_curve: vec![
+                super::ToneCurvePoint { x: 0.0, y: 0.0 },
+                super::ToneCurvePoint { x: 0.5, y: 0.28 },
+                super::ToneCurvePoint { x: 1.0, y: 1.0 },
+            ],
+            red_curve: Vec::new(),
+            green_curve: Vec::new(),
+            blue_curve: Vec::new(),
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: tone_curve.clone(),
+        })
+        .expect("write tone curve preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve,
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect("export tone curve jpeg");
 
         assert_ne!(
             std::fs::read(neutral.output_path).expect("read neutral preview"),
@@ -1227,6 +1489,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1239,6 +1502,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence,
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("write color presence preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1249,6 +1513,7 @@ mod tests {
             white_balance: super::WhiteBalanceAdjustment::neutral(),
             tone_recovery: super::ToneRecoveryAdjustment::neutral(),
             color_presence,
+            tone_curve: super::ToneCurveAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1285,6 +1550,7 @@ mod tests {
                 vibrance: 24.0,
                 saturation: -8.5,
             },
+            tone_curve: super::ToneCurveAdjustment::neutral(),
         })
         .expect("compute histogram");
 
