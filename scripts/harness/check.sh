@@ -42,6 +42,9 @@ python3 scripts/harness/check-qa-fixtures.py
 echo "==> Checking static UI contract"
 python3 scripts/harness/check-static-ui.py
 
+echo "==> Checking native viewer QA routing"
+python3 scripts/harness/check-native-viewer-qa.py
+
 echo "==> Checking UI workflow smoke path"
 python3 scripts/harness/check-ui-workflow-smoke.py
 

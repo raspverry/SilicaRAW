@@ -2,7 +2,7 @@
 title: UI MVP Baseline
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-11
 source_of_truth: docs/05_Design_System_Specification.md
 ---
 
@@ -143,7 +143,7 @@ Task 5.5.5 replaces the placeholder grid with the M003 Library Grid MVP:
 - Rating, Pick, and Reject inspector actions route through the existing `set_photo_flags` command.
 - Empty and loading states are represented without copying or decoding originals.
 - Static thumbnail art remains a UI placeholder until real thumbnail cache generation and virtualization are scoped.
-- Loupe opening, full metadata population, advanced filters, and real histogram values remain future work.
+- Loupe opening, advanced filters, and real histogram values remain future work in this baseline. Phase 11 later replaces placeholder metadata rows with catalog-backed metadata inspector UI.
 
 ## Task 5.5.6 Preview/Loupe
 
@@ -155,7 +155,7 @@ Task 5.5.6 adds the M004 Loupe MVP inside Library mode:
 - RAW candidates render the blocked decode state and must not imply RAW decoding is implemented.
 - Unsupported catalog entries render a clear unsupported state.
 - The bottom filmstrip mirrors the current grid selection and keeps M004 navigation visible.
-- Real image pixels, Metal output, RAW decoding, full metadata, and Develop edits remain future work.
+- Real image pixels, Metal output, RAW decoding, and Develop edits remain future work in this baseline. Phase 11 later shares the catalog-backed metadata inspector with Loupe.
 
 ## Task 5.5.7 Develop Panel
 
@@ -176,13 +176,13 @@ Task 5.5.8 adds the M007 Export Dialog MVP:
 
 - Export mode and the toolbar Export action open the same modal dialog.
 - The dialog uses the selected Library photo as the export target.
-- The local-alpha settings are locked to JPEG, sRGB, and quality 90.
+- The local-alpha settings default to JPEG, sRGB, and quality 90. Phase 13.8 adds an explicit Display P3 choice after ICC proof.
 - The user can enter a local output path.
 - The UI states that original files are not modified and blocks output paths that equal the referenced original path.
-- Runtime export calls `export_photo_jpeg_srgb`.
+- Runtime export calls `export_photo_jpeg`; omitted color profile means default sRGB, while `display_p3` is explicit.
 - Static smoke mode does not claim to write a file; it shows that desktop runtime is required for the JPEG and catalog export record.
 - RAW, missing, and unsupported candidates show blocked states instead of implying exportable pixels.
-- Native folder picking, multi-photo export, export presets, alternate formats, resizing, metadata policy editing, real image pixels, RAW decoding, Metal output, and sidecar writing remain future work.
+- Native folder picking, multi-photo export, export presets, alternate formats, resizing, metadata policy editing, real image pixels, RAW decoding, Metal output, sidecar writing, and visual color correctness proof remain future work.
 
 ## Task 5.5.9 UI Workflow Smoke Harness
 
@@ -190,7 +190,7 @@ Task 5.5.9 adds a lightweight static harness for the connected local alpha UI wo
 
 - `scripts/harness/check.sh` runs `scripts/harness/check-ui-workflow-smoke.py` after the static UI contract check.
 - The smoke harness verifies the path `open/create library -> import by reference -> grid/cull -> loupe -> develop -> export`.
-- It checks required element IDs, Tauri command wiring, import-by-reference copy safety text, Develop exposure/contrast bounds, locked JPEG sRGB export settings, static runtime messaging, and the guard that blocks exporting over the referenced original source path.
+- It checks required element IDs, Tauri command wiring, import-by-reference copy safety text, Develop exposure/contrast bounds, default JPEG sRGB export settings, explicit Display P3 export choice wiring, static runtime messaging, and the guard that blocks exporting over the referenced original source path.
 - It intentionally avoids browser automation and new dependencies so the check can run locally and in CI as part of the existing harness.
 - It does not require MLX, MCP, plugin runtime, cloud, telemetry, RAW decoding, or Metal rendering.
 
@@ -204,6 +204,39 @@ Task 5.5.10 checks the implemented M003/M005/M007 surfaces against their compact
 - Real image pixels and thumbnail cache generation remain outside this static UI QA task.
 
 See [UI Visual and Responsive QA](ui-visual-responsive-qa.md) for the recorded notes.
+
+## Phase 11 Workspace Layout Preferences
+
+Task 11.4 makes workspace layout an app-session preference, not frontend-only state.
+
+Defaults are owned by `silica-core`:
+
+| Preference | Default | Invalid Value Behavior |
+|---|---:|---|
+| `sidebar_collapsed` | `false` | Reset to `false` |
+| `inspector_collapsed` | `false` | Reset to `false` |
+| `filmstrip_visible` | `true` | Reset to `true` |
+| `thumbnail_size` | `168` | Clamp to `132..=220` |
+| `sort` | `imported_at_desc` | Reset to `imported_at_desc` |
+| `filters.min_rating` | `null` | Clamp numeric values to `0..=5`; non-numeric resets to `null` |
+| `filters.picked` | `null` | Non-boolean resets to `null` |
+| `filters.rejected` | `null` | Non-boolean resets to `null` |
+| `filters.file_type` | `null` | Unknown values reset to `null` |
+| `filters.search` | `""` | Non-string resets to `""` |
+
+Reset layout means only `AppSession.layout` returns to these defaults. It must not clear recents, last library, selected photo, culling flags, edit state, catalog rows, sidecars, caches, or original-file references.
+
+The default sort remains `imported_at_desc` so Task 11.5 can introduce paged, sorted, and filtered query APIs without changing the first page ordering contract.
+
+## Task 16.4 Develop History Panel
+
+Task 16.4 adds the first real history surface to the Develop inspector:
+
+- The static HTML ships an empty `developHistoryList`; no demo or hard-coded checkpoint rows are allowed.
+- Runtime history data comes from the desktop `get_photo_history` command, which delegates to `silica-core::list_photo_history`.
+- Empty, loading, error, runtime-unavailable, undo-disabled, and redo-disabled states are explicit.
+- Only the next valid undo row or next valid redo row is selectable. Selection calls `undo_last_history_action` or `redo_last_history_action`; it does not jump directly to arbitrary historical state.
+- The panel uses existing tokens and fits inside the Develop inspector without changing the reserved native viewer host.
 
 ## QA Strategy
 

@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -15,14 +15,21 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ## How to Use This Wiki
 
 - Start with [Project Overview](overview/project.md) if you are new to SilicaRAW.
+- Start with [LLM Routing Index](llm/index.md) if you are an agent trying to minimize read context.
 - Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
 - Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
+- For Phase 14 through v1.0 sequencing, use the [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md) before creating new phase task cards.
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
 - Check [Open Questions](questions/open-questions.md) before inventing answers.
 - Use [Conventions](conventions.md) when adding or editing wiki pages.
 - Use [Git and PR Workflow](contributing/git-and-pr-workflow.md) before starting a new branch or pull request.
 
 ## Sections
+
+### LLM Routing
+
+- [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
+- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including Phase 16.
 
 ### Overview
 
@@ -33,6 +40,20 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local DMG Release Runbook](roadmaps/local-dmg-release-runbook.md): maintainer steps for signed local releases and current unsigned preview artifacts.
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
+- [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through v1.0.
+- [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
+- [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): completed color proof execution plan and fixture evidence gate.
+- [Phase 14 Product Metal Viewer Bridge Plan](roadmaps/phase-14-metal-viewer-bridge-plan.md): completed native viewer bridge plan and Path B evidence gate.
+
+### Phase Briefs
+
+- [Phase 11 Summary](phases/phase-11-summary.md): completed session, grid, metadata, and import foundation context.
+- [Phase 12 RAW Proof Brief](phases/phase-12-raw-proof.md): completed RAW proof scope and task order.
+- [Phase 13 Color Pipeline Proof Brief](phases/phase-13-color-pipeline-proof.md): completed color proof scope and task order.
+- [Phase 14 Product Metal Viewer Bridge Brief](phases/phase-14-product-metal-viewer-bridge.md): completed native viewer bridge scope and task order.
+- [Phase 15 RAW Color Metal Vertical Slice Brief](phases/phase-15-raw-color-metal-vertical-slice.md): completed RAW/color/Metal vertical slice scope and task order.
+- [Phase 16 Undo History Action Trust Brief](phases/phase-16-undo-history-action-trust.md): completed undo, history, and action trust scope and task order.
+- [Phase 17 Develop P0 Expansion Brief](phases/phase-17-develop-p0-expansion.md): completed Develop P0 control family scope and task order.
 
 ### Decisions
 
@@ -57,6 +78,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [UI Visual and Responsive QA](topics/ui-visual-responsive-qa.md)
 - [Product Alpha Runtime Completion](topics/product-alpha-runtime-completion.md)
 - [Edit Graph](topics/edit-graph.md)
+- [Action Trust](topics/action-trust.md)
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)
 

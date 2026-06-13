@@ -9,5 +9,10 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+color-probe = ["dep:sha2"]
+
 [dependencies]
+sha2 = { version = "0.10.9", default-features = false, features = ["std"], optional = true }
 silica-decode = { path = "../silica-decode" }

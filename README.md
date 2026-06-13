@@ -13,7 +13,10 @@ SilicaRAW is not production-ready. Current repository claims are limited to fixt
 - Local library folder create/open path
 - Non-recursive folder import scanner for catalog candidates
 - Rating, pick, reject, and color label persistence in SQLite `photo_flags`
-- JPEG/JPG thumbnail, loupe preview, Develop preview, exposure/contrast, edit-state persistence, and JPEG sRGB export path
+- JPEG/JPG thumbnail, loupe preview, Develop preview, histogram, exposure/contrast, white balance, tone recovery, color presence, reset, built-in presets, edit-state persistence, and JPEG sRGB export path
+- Undo/redo for edit and culling checkpoints plus a real Develop history panel backed by catalog history
+- Append-only action log evidence for sensitive local actions
+- Catalog-side sidecar stale status after history commits without hidden sidecar rewrites
 - Product cache clear command for disposable cache directories
 - Connected static UI vertical slice for the local alpha workflow
 - Clear RAW/unsupported/missing-file blocked states without RAW decoding claims
@@ -34,6 +37,7 @@ Release docs:
 - [Local DMG Distribution Plan](docs/wiki/roadmaps/local-dmg-distribution-plan.md)
 - [Local DMG Release Runbook](docs/wiki/roadmaps/local-dmg-release-runbook.md)
 - [Developer Preview Artifact Runbook](docs/wiki/roadmaps/developer-preview-artifact-runbook.md)
+- [Post-Alpha Master Execution Plan](docs/wiki/roadmaps/post-alpha-master-execution-plan.md)
 
 ## Workspace Layout
 

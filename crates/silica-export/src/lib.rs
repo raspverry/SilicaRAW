@@ -8,7 +8,11 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+
+use image::ImageEncoder;
+use sha2::{Digest, Sha256};
 
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-export";
@@ -23,6 +27,7 @@ pub enum ExportImageFormat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportColorProfile {
     Srgb,
+    DisplayP3,
 }
 
 /// Request to export an already-rendered raster source as JPEG sRGB.
@@ -32,16 +37,116 @@ pub struct JpegSrgbExportRequest {
     pub output_path: PathBuf,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
+    pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
     pub quality: u8,
 }
 
-/// Result returned after a JPEG sRGB export is written.
+/// Request to export an already-rendered raster source as JPEG with an explicit color profile.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JpegColorExportRequest {
+    pub source_path: PathBuf,
+    pub output_path: PathBuf,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
+    pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
+    pub quality: u8,
+    pub color_profile: ExportColorProfile,
+}
+
+/// White balance mode carried through local JPEG preview/export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WhiteBalanceMode {
+    AsShot,
+    Auto,
+    Daylight,
+    Cloudy,
+    Shade,
+    Tungsten,
+    Fluorescent,
+    Flash,
+    Custom,
+}
+
+/// White balance values applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WhiteBalanceAdjustment {
+    pub mode: WhiteBalanceMode,
+    pub temperature: f64,
+    pub tint: f64,
+}
+
+impl WhiteBalanceAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            mode: WhiteBalanceMode::AsShot,
+            temperature: 5200.0,
+            tint: 0.0,
+        }
+    }
+}
+
+/// Tone recovery values applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ToneRecoveryAdjustment {
+    pub highlights: f64,
+    pub shadows: f64,
+    pub whites: f64,
+    pub blacks: f64,
+}
+
+impl ToneRecoveryAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            highlights: 0.0,
+            shadows: 0.0,
+            whites: 0.0,
+            blacks: 0.0,
+        }
+    }
+}
+
+/// Color presence values applied to local JPEG preview/export pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColorPresenceAdjustment {
+    pub vibrance: f64,
+    pub saturation: f64,
+}
+
+impl ColorPresenceAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            vibrance: 0.0,
+            saturation: 0.0,
+        }
+    }
+}
+
+/// Result returned after a JPEG export is written.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JpegSrgbExportResult {
+pub struct JpegExportResult {
     pub output_path: PathBuf,
     pub format: ExportImageFormat,
     pub color_profile: ExportColorProfile,
     pub bytes_written: u64,
+    pub source_sha256: String,
+    pub output_sha256: String,
+    pub icc_profile_embedded: bool,
+    pub icc_profile_sha256: String,
+}
+
+/// Backwards-compatible result name for the local alpha sRGB export path.
+pub type JpegSrgbExportResult = JpegExportResult;
+
+/// ICC inspection result for exported JPEG proof work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegIccProfileInspection {
+    pub embedded: bool,
+    pub color_profile: Option<ExportColorProfile>,
+    pub icc_profile_sha256: Option<String>,
 }
 
 /// Request to create a disposable JPEG thumbnail for a raster source.
@@ -62,6 +167,20 @@ pub struct JpegDevelopPreviewRequest {
     pub quality: u8,
     pub exposure: f64,
     pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
+    pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
+}
+
+/// Request to compute Develop histogram data from a supported JPEG source.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JpegHistogramRequest {
+    pub source_path: PathBuf,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
+    pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
 }
 
 /// Result returned after a JPEG thumbnail is written.
@@ -70,6 +189,13 @@ pub struct JpegThumbnailResult {
     pub output_path: PathBuf,
     pub format: ExportImageFormat,
     pub bytes_written: u64,
+}
+
+/// Dimensions read from an existing raster file without writing output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RasterDimensions {
+    pub width: u32,
+    pub height: u32,
 }
 
 /// Errors returned by the export crate.
@@ -81,6 +207,12 @@ pub enum ExportError {
     InvalidThumbnailEdge(u32),
     NonFiniteAdjustment,
     SameSourceAndOutput(PathBuf),
+    IccProfileUnavailable {
+        profile: ExportColorProfile,
+        path: PathBuf,
+        message: String,
+    },
+    InvalidJpegIccProfile(PathBuf),
 }
 
 impl fmt::Display for ExportError {
@@ -113,6 +245,25 @@ impl fmt::Display for ExportError {
                     path.display()
                 )
             }
+            Self::IccProfileUnavailable {
+                profile,
+                path,
+                message,
+            } => {
+                write!(
+                    formatter,
+                    "{} ICC profile is unavailable at {}: {message}",
+                    export_color_profile_label(*profile),
+                    path.display()
+                )
+            }
+            Self::InvalidJpegIccProfile(path) => {
+                write!(
+                    formatter,
+                    "jpeg ICC profile could not be inspected: {}",
+                    path.display()
+                )
+            }
         }
     }
 }
@@ -125,7 +276,9 @@ impl Error for ExportError {
             Self::InvalidQuality(_)
             | Self::InvalidThumbnailEdge(_)
             | Self::NonFiniteAdjustment
-            | Self::SameSourceAndOutput(_) => None,
+            | Self::SameSourceAndOutput(_)
+            | Self::IccProfileUnavailable { .. }
+            | Self::InvalidJpegIccProfile(_) => None,
         }
     }
 }
@@ -146,25 +299,56 @@ impl From<image::ImageError> for ExportError {
 pub fn export_jpeg_srgb(
     request: JpegSrgbExportRequest,
 ) -> Result<JpegSrgbExportResult, ExportError> {
+    export_jpeg_with_color_profile(JpegColorExportRequest {
+        source_path: request.source_path,
+        output_path: request.output_path,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: request.white_balance,
+        tone_recovery: request.tone_recovery,
+        color_presence: request.color_presence,
+        quality: request.quality,
+        color_profile: ExportColorProfile::Srgb,
+    })
+}
+
+/// Export an already-rendered raster source as a separate JPEG with an explicit ICC profile.
+pub fn export_jpeg_with_color_profile(
+    request: JpegColorExportRequest,
+) -> Result<JpegExportResult, ExportError> {
     if paths_match(&request.source_path, &request.output_path)? {
         return Err(ExportError::SameSourceAndOutput(request.output_path));
     }
     if !(1..=100).contains(&request.quality) {
         return Err(ExportError::InvalidQuality(request.quality));
     }
-    if !request.exposure.is_finite() || !request.contrast.is_finite() {
+    if !adjustments_are_finite(
+        request.exposure,
+        request.contrast,
+        request.white_balance,
+        request.tone_recovery,
+        request.color_presence,
+    ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
 
+    let source_sha256 = sha256_file(&request.source_path)?;
+    let icc_profile = export_icc_profile(request.color_profile)?;
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
         .decode()?;
     let mut rgb = decoded.to_rgb8();
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
+    apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_color_presence(&mut rgb, request.color_presence);
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut output, request.quality);
+    encoder
+        .set_icc_profile(icc_profile)
+        .map_err(image::ImageError::Unsupported)?;
     encoder.encode(
         rgb.as_raw(),
         rgb.width(),
@@ -173,12 +357,55 @@ pub fn export_jpeg_srgb(
     )?;
     drop(output);
 
-    Ok(JpegSrgbExportResult {
+    let output_sha256 = sha256_file(&request.output_path)?;
+    let inspection = inspect_jpeg_icc_profile(&request.output_path)?;
+    if inspection.color_profile != Some(request.color_profile) {
+        return Err(ExportError::InvalidJpegIccProfile(request.output_path));
+    }
+    let icc_profile_sha256 = inspection
+        .icc_profile_sha256
+        .ok_or_else(|| ExportError::InvalidJpegIccProfile(request.output_path.clone()))?;
+
+    Ok(JpegExportResult {
         bytes_written: fs::metadata(&request.output_path)?.len(),
         output_path: request.output_path,
         format: ExportImageFormat::Jpeg,
-        color_profile: ExportColorProfile::Srgb,
+        color_profile: request.color_profile,
+        source_sha256,
+        output_sha256,
+        icc_profile_embedded: inspection.embedded,
+        icc_profile_sha256,
     })
+}
+
+/// Inspect the first embedded ICC profile in a JPEG file.
+pub fn inspect_jpeg_icc_profile(
+    path: impl AsRef<Path>,
+) -> Result<JpegIccProfileInspection, ExportError> {
+    let path = path.as_ref();
+    let bytes = fs::read(path)?;
+    let profile = first_icc_profile(&bytes)
+        .map_err(|_| ExportError::InvalidJpegIccProfile(path.to_path_buf()))?;
+    let Some(profile) = profile else {
+        return Ok(JpegIccProfileInspection {
+            embedded: false,
+            color_profile: None,
+            icc_profile_sha256: None,
+        });
+    };
+
+    let icc_profile_sha256 = sha256_hex(&profile);
+    Ok(JpegIccProfileInspection {
+        embedded: true,
+        color_profile: classify_icc_profile(&profile),
+        icc_profile_sha256: Some(icc_profile_sha256),
+    })
+}
+
+/// Read raster dimensions through the existing image path.
+pub fn read_raster_dimensions(path: PathBuf) -> Result<RasterDimensions, ExportError> {
+    let (width, height) = image::image_dimensions(path)?;
+    Ok(RasterDimensions { width, height })
 }
 
 /// Write a disposable JPEG thumbnail for a raster source.
@@ -233,7 +460,13 @@ pub fn write_jpeg_develop_preview(
     if request.max_edge == 0 {
         return Err(ExportError::InvalidThumbnailEdge(request.max_edge));
     }
-    if !request.exposure.is_finite() || !request.contrast.is_finite() {
+    if !adjustments_are_finite(
+        request.exposure,
+        request.contrast,
+        request.white_balance,
+        request.tone_recovery,
+        request.color_presence,
+    ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
 
@@ -244,6 +477,9 @@ pub fn write_jpeg_develop_preview(
         .thumbnail(request.max_edge, request.max_edge)
         .to_rgb8();
     apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
+    apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_color_presence(&mut rgb, request.color_presence);
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -260,6 +496,36 @@ pub fn write_jpeg_develop_preview(
         bytes_written: fs::metadata(&request.output_path)?.len(),
         output_path: request.output_path,
         format: ExportImageFormat::Jpeg,
+    })
+}
+
+/// Compute real histogram data from the same local JPEG adjustment path used for Develop preview.
+pub fn compute_jpeg_develop_histogram(
+    request: JpegHistogramRequest,
+) -> Result<silica_render::RgbHistogram, ExportError> {
+    if !adjustments_are_finite(
+        request.exposure,
+        request.contrast,
+        request.white_balance,
+        request.tone_recovery,
+        request.color_presence,
+    ) {
+        return Err(ExportError::NonFiniteAdjustment);
+    }
+
+    let decoded = image::ImageReader::open(&request.source_path)?
+        .with_guessed_format()?
+        .decode()?;
+    let mut rgb = decoded.to_rgb8();
+    apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
+    apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_color_presence(&mut rgb, request.color_presence);
+    silica_render::compute_rgb_histogram(rgb.as_raw()).map_err(|error| {
+        ExportError::Image(image::ImageError::IoError(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            error.to_string(),
+        )))
     })
 }
 
@@ -288,6 +554,266 @@ fn apply_exposure_contrast(image: &mut image::RgbImage, exposure: f64, contrast:
     }
 }
 
+fn apply_white_balance(image: &mut image::RgbImage, white_balance: WhiteBalanceAdjustment) {
+    let warmth = ((white_balance.temperature - 5200.0) / 4800.0).clamp(-1.0, 1.0) as f32;
+    let tint = (white_balance.tint / 150.0).clamp(-1.0, 1.0) as f32;
+    let red_scale = (1.0 + warmth * 0.20 + tint * 0.04).clamp(0.25, 2.0);
+    let green_scale = (1.0 + tint * 0.12).clamp(0.25, 2.0);
+    let blue_scale = (1.0 - warmth * 0.20 - tint * 0.04).clamp(0.25, 2.0);
+
+    for pixel in image.pixels_mut() {
+        pixel.0[0] = scale_channel(pixel.0[0], red_scale);
+        pixel.0[1] = scale_channel(pixel.0[1], green_scale);
+        pixel.0[2] = scale_channel(pixel.0[2], blue_scale);
+    }
+}
+
+fn scale_channel(channel: u8, scale: f32) -> u8 {
+    (f32::from(channel) * scale).clamp(0.0, 255.0).round() as u8
+}
+
+fn apply_tone_recovery(image: &mut image::RgbImage, tone_recovery: ToneRecoveryAdjustment) {
+    let highlights = (tone_recovery.highlights / 100.0).clamp(-1.0, 1.0) as f32;
+    let shadows = (tone_recovery.shadows / 100.0).clamp(-1.0, 1.0) as f32;
+    let whites = (tone_recovery.whites / 100.0).clamp(-1.0, 1.0) as f32;
+    let blacks = (tone_recovery.blacks / 100.0).clamp(-1.0, 1.0) as f32;
+
+    for pixel in image.pixels_mut() {
+        for channel in &mut pixel.0 {
+            let normalized = f32::from(*channel) / 255.0;
+            let shadow_weight = (1.0 - normalized).powi(2);
+            let highlight_weight = normalized.powi(2);
+            let adjusted = (normalized
+                + shadows * 0.22 * shadow_weight
+                + blacks * 0.14 * shadow_weight
+                + highlights * 0.22 * highlight_weight
+                + whites * 0.14 * highlight_weight)
+                .clamp(0.0, 1.0);
+            *channel = (adjusted * 255.0).round() as u8;
+        }
+    }
+}
+
+fn apply_color_presence(image: &mut image::RgbImage, color_presence: ColorPresenceAdjustment) {
+    let vibrance = (color_presence.vibrance / 100.0).clamp(-1.0, 1.0) as f32;
+    let saturation = (color_presence.saturation / 100.0).clamp(-1.0, 1.0) as f32;
+
+    for pixel in image.pixels_mut() {
+        let red = f32::from(pixel.0[0]) / 255.0;
+        let green = f32::from(pixel.0[1]) / 255.0;
+        let blue = f32::from(pixel.0[2]) / 255.0;
+        let luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+        let max_channel = red.max(green).max(blue);
+        let min_channel = red.min(green).min(blue);
+        let chroma = max_channel - min_channel;
+        let factor = (1.0 + saturation * 0.55 + vibrance * 0.45 * (1.0 - chroma)).clamp(0.0, 2.0);
+
+        pixel.0[0] = ((luma + (red - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+        pixel.0[1] = ((luma + (green - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+        pixel.0[2] = ((luma + (blue - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+    }
+}
+
+fn adjustments_are_finite(
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceAdjustment,
+    tone_recovery: ToneRecoveryAdjustment,
+    color_presence: ColorPresenceAdjustment,
+) -> bool {
+    exposure.is_finite()
+        && contrast.is_finite()
+        && white_balance.temperature.is_finite()
+        && white_balance.tint.is_finite()
+        && tone_recovery.highlights.is_finite()
+        && tone_recovery.shadows.is_finite()
+        && tone_recovery.whites.is_finite()
+        && tone_recovery.blacks.is_finite()
+        && color_presence.vibrance.is_finite()
+        && color_presence.saturation.is_finite()
+}
+
+fn export_icc_profile(profile: ExportColorProfile) -> Result<Vec<u8>, ExportError> {
+    let path = export_icc_profile_path(profile);
+    fs::read(&path).map_err(|error| ExportError::IccProfileUnavailable {
+        profile,
+        path,
+        message: error.to_string(),
+    })
+}
+
+fn export_icc_profile_path(profile: ExportColorProfile) -> PathBuf {
+    match profile {
+        ExportColorProfile::Srgb => {
+            PathBuf::from("/System/Library/ColorSync/Profiles/sRGB Profile.icc")
+        }
+        ExportColorProfile::DisplayP3 => {
+            PathBuf::from("/System/Library/ColorSync/Profiles/Display P3.icc")
+        }
+    }
+}
+
+fn first_icc_profile(bytes: &[u8]) -> Result<Option<Vec<u8>>, ()> {
+    if bytes.len() < 2 || bytes[0..2] != [0xff, 0xd8] {
+        return Err(());
+    }
+
+    let mut index = 2;
+    while index + 4 <= bytes.len() {
+        if bytes[index] != 0xff {
+            return Err(());
+        }
+
+        let marker = bytes[index + 1];
+        if marker == 0xd9 || marker == 0xda {
+            return Ok(None);
+        }
+
+        let length = u16::from_be_bytes([bytes[index + 2], bytes[index + 3]]) as usize;
+        if length < 2 || index + 2 + length > bytes.len() {
+            return Err(());
+        }
+
+        let marker_payload = &bytes[index + 4..index + 2 + length];
+        if marker == 0xe2
+            && marker_payload.starts_with(b"ICC_PROFILE\0")
+            && marker_payload.len() >= 14
+        {
+            return Ok(Some(marker_payload[14..].to_vec()));
+        }
+
+        index += 2 + length;
+    }
+
+    Ok(None)
+}
+
+fn classify_icc_profile(profile: &[u8]) -> Option<ExportColorProfile> {
+    match sha256_hex(profile).as_str() {
+        "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e" => {
+            Some(ExportColorProfile::Srgb)
+        }
+        "0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0" => {
+            Some(ExportColorProfile::DisplayP3)
+        }
+        _ if icc_rgb_primaries_match(profile, DISPLAY_P3_D50_XYZ) => {
+            Some(ExportColorProfile::DisplayP3)
+        }
+        _ if icc_rgb_primaries_match(profile, SRGB_D50_XYZ) => Some(ExportColorProfile::Srgb),
+        _ if profile_contains_ascii(profile, b"sRGB") => Some(ExportColorProfile::Srgb),
+        _ => None,
+    }
+}
+
+const DISPLAY_P3_D50_XYZ: [[f64; 3]; 3] = [
+    [0.5151214599609375, 0.2411956787109375, -0.0010528564453125],
+    [0.2919769287109375, 0.6922454833984375, 0.0418853759765625],
+    [0.1571044921875, 0.0665740966796875, 0.7840728759765625],
+];
+
+const SRGB_D50_XYZ: [[f64; 3]; 3] = [
+    [0.436065673828125, 0.2224884033203125, 0.013916015625],
+    [0.3851470947265625, 0.7168731689453125, 0.097076416015625],
+    [0.14306640625, 0.06060791015625, 0.7140960693359375],
+];
+
+fn icc_rgb_primaries_match(profile: &[u8], expected: [[f64; 3]; 3]) -> bool {
+    let Some(actual) = icc_rgb_primaries(profile) else {
+        return false;
+    };
+    actual
+        .iter()
+        .flatten()
+        .zip(expected.iter().flatten())
+        .all(|(actual, expected)| (actual - expected).abs() <= 0.02)
+}
+
+fn icc_rgb_primaries(profile: &[u8]) -> Option<[[f64; 3]; 3]> {
+    if profile.len() < 132 || &profile[36..40] != b"acsp" {
+        return None;
+    }
+    let tag_count = read_u32_be(profile, 128)? as usize;
+    let tag_table_end = 132_usize.checked_add(tag_count.checked_mul(12)?)?;
+    if tag_table_end > profile.len() {
+        return None;
+    }
+
+    Some([
+        icc_xyz_tag(profile, tag_count, b"rXYZ")?,
+        icc_xyz_tag(profile, tag_count, b"gXYZ")?,
+        icc_xyz_tag(profile, tag_count, b"bXYZ")?,
+    ])
+}
+
+fn icc_xyz_tag(profile: &[u8], tag_count: usize, signature: &[u8; 4]) -> Option<[f64; 3]> {
+    for index in 0..tag_count {
+        let record_offset = 132 + (index * 12);
+        if &profile[record_offset..record_offset + 4] != signature {
+            continue;
+        }
+        let tag_offset = read_u32_be(profile, record_offset + 4)? as usize;
+        let tag_size = read_u32_be(profile, record_offset + 8)? as usize;
+        if tag_size < 20 || tag_offset.checked_add(20)? > profile.len() {
+            return None;
+        }
+        if &profile[tag_offset..tag_offset + 4] != b"XYZ " {
+            return None;
+        }
+        return Some([
+            read_s15_fixed_16(profile, tag_offset + 8)?,
+            read_s15_fixed_16(profile, tag_offset + 12)?,
+            read_s15_fixed_16(profile, tag_offset + 16)?,
+        ]);
+    }
+    None
+}
+
+fn read_u32_be(bytes: &[u8], offset: usize) -> Option<u32> {
+    Some(u32::from_be_bytes(
+        bytes.get(offset..offset + 4)?.try_into().ok()?,
+    ))
+}
+
+fn read_s15_fixed_16(bytes: &[u8], offset: usize) -> Option<f64> {
+    let raw = i32::from_be_bytes(bytes.get(offset..offset + 4)?.try_into().ok()?);
+    Some(f64::from(raw) / 65536.0)
+}
+
+fn profile_contains_ascii(profile: &[u8], needle: &[u8]) -> bool {
+    profile
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle))
+}
+
+fn sha256_file(path: &Path) -> Result<String, io::Error> {
+    let mut file = File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+fn export_color_profile_label(profile: ExportColorProfile) -> &'static str {
+    match profile {
+        ExportColorProfile::Srgb => "sRGB",
+        ExportColorProfile::DisplayP3 => "Display P3",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
@@ -313,6 +839,9 @@ mod tests {
             output_path: output_path.clone(),
             exposure: 0.5,
             contrast: -8.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -321,9 +850,29 @@ mod tests {
         assert_eq!(result.format, super::ExportImageFormat::Jpeg);
         assert_eq!(result.color_profile, super::ExportColorProfile::Srgb);
         assert!(result.bytes_written > 0);
+        assert!(result.icc_profile_embedded);
+        assert_eq!(
+            result.output_sha256,
+            super::sha256_file(&result.output_path).expect("hash exported jpeg")
+        );
+        assert_eq!(
+            result.source_sha256,
+            super::sha256_file(&source_path).expect("hash source jpeg")
+        );
         assert_eq!(
             std::fs::read(&source_path).expect("read original after"),
             original_before
+        );
+        let inspection =
+            super::inspect_jpeg_icc_profile(&result.output_path).expect("inspect exported ICC");
+        assert!(inspection.embedded);
+        assert_eq!(
+            inspection.color_profile,
+            Some(super::ExportColorProfile::Srgb)
+        );
+        assert_eq!(
+            inspection.icc_profile_sha256.as_deref(),
+            Some(result.icc_profile_sha256.as_str())
         );
 
         let exported = image::ImageReader::open(&result.output_path)
@@ -339,6 +888,71 @@ mod tests {
     }
 
     #[test]
+    fn exports_display_p3_jpeg_only_when_explicitly_requested() {
+        let root = unique_export_root("display-p3");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("display-p3.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: output_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            quality: 90,
+            color_profile: super::ExportColorProfile::DisplayP3,
+        })
+        .expect("export display p3 jpeg");
+
+        assert_eq!(result.output_path, output_path);
+        assert_eq!(result.format, super::ExportImageFormat::Jpeg);
+        assert_eq!(result.color_profile, super::ExportColorProfile::DisplayP3);
+        assert!(result.icc_profile_embedded);
+        assert_eq!(
+            result.output_sha256,
+            super::sha256_file(&result.output_path).expect("hash exported jpeg")
+        );
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        let inspection =
+            super::inspect_jpeg_icc_profile(&result.output_path).expect("inspect exported ICC");
+        assert!(inspection.embedded);
+        assert_eq!(
+            inspection.color_profile,
+            Some(super::ExportColorProfile::DisplayP3)
+        );
+        assert_eq!(
+            inspection.icc_profile_sha256.as_deref(),
+            Some(result.icc_profile_sha256.as_str())
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn classifies_display_p3_icc_profile_by_xyz_tags_when_hash_differs() {
+        let profile = synthetic_rgb_icc_profile([
+            [0.5151214599609375, 0.2411956787109375, -0.0010528564453125],
+            [0.2919769287109375, 0.6922454833984375, 0.0418853759765625],
+            [0.1571044921875, 0.0665740966796875, 0.7840728759765625],
+        ]);
+
+        assert_eq!(
+            super::classify_icc_profile(&profile),
+            Some(super::ExportColorProfile::DisplayP3)
+        );
+    }
+
+    #[test]
     fn refuses_to_export_over_original_path() {
         let root = unique_export_root("same-path");
         let source_path = root.join("source.jpg");
@@ -350,6 +964,9 @@ mod tests {
             output_path: source_path.clone(),
             exposure: 0.0,
             contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -413,6 +1030,9 @@ mod tests {
             quality: 82,
             exposure: 0.0,
             contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -422,6 +1042,9 @@ mod tests {
             quality: 82,
             exposure: 1.0,
             contrast: 20.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
         })
         .expect("write adjusted preview");
 
@@ -432,6 +1055,247 @@ mod tests {
         assert_ne!(
             std::fs::read(neutral.output_path).expect("read neutral preview"),
             std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_white_balance_adjusted_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("white-balance");
+        let source_path = root.join("source.jpg");
+        let neutral_preview_path = root.join("previews").join("neutral.jpg");
+        let adjusted_preview_path = root.join("previews").join("adjusted.jpg");
+        let adjusted_export_path = root.join("export").join("adjusted.jpg");
+        std::fs::create_dir_all(adjusted_export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(neutral_preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let white_balance = super::WhiteBalanceAdjustment {
+            mode: super::WhiteBalanceMode::Custom,
+            temperature: 6500.0,
+            tint: 20.0,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance,
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("write white balance preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+            white_balance,
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("export white balance jpeg");
+
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_tone_recovery_adjusted_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("tone-recovery");
+        let source_path = root.join("source.jpg");
+        let neutral_preview_path = root.join("previews").join("neutral.jpg");
+        let adjusted_preview_path = root.join("previews").join("adjusted.jpg");
+        let adjusted_export_path = root.join("export").join("adjusted.jpg");
+        std::fs::create_dir_all(adjusted_export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(neutral_preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let tone_recovery = super::ToneRecoveryAdjustment {
+            highlights: -35.0,
+            shadows: 42.0,
+            whites: 10.0,
+            blacks: -12.0,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery,
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("write tone recovery preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery,
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect("export tone recovery jpeg");
+
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_color_presence_adjusted_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("color-presence");
+        let source_path = root.join("source.jpg");
+        let neutral_preview_path = root.join("previews").join("neutral.jpg");
+        let adjusted_preview_path = root.join("previews").join("adjusted.jpg");
+        let adjusted_export_path = root.join("export").join("adjusted.jpg");
+        std::fs::create_dir_all(adjusted_export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(neutral_preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let color_presence = super::ColorPresenceAdjustment {
+            vibrance: 24.0,
+            saturation: -8.5,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+        })
+        .expect("write neutral preview");
+        let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_preview_path,
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence,
+        })
+        .expect("write color presence preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: adjusted_export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence,
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect("export color presence jpeg");
+
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+        assert!(exported.bytes_written > 0);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn computes_adjusted_jpeg_histogram_without_mutating_original() {
+        let root = unique_export_root("histogram");
+        let source_path = root.join("source.jpg");
+        std::fs::create_dir_all(&root).expect("create histogram root");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let histogram = super::compute_jpeg_develop_histogram(super::JpegHistogramRequest {
+            source_path: source_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment {
+                vibrance: 24.0,
+                saturation: -8.5,
+            },
+        })
+        .expect("compute histogram");
+
+        assert_eq!(histogram.pixel_count, 4);
+        assert_eq!(histogram.red.len(), 256);
+        assert_eq!(histogram.green.len(), 256);
+        assert_eq!(histogram.blue.len(), 256);
+        assert_eq!(histogram.luminance.len(), 256);
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
         );
 
         remove_export_root(&root);
@@ -448,6 +1312,45 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn synthetic_rgb_icc_profile(primaries: [[f64; 3]; 3]) -> Vec<u8> {
+        let tag_table_start = 128;
+        let tag_count_size = 4;
+        let tag_record_size = 12;
+        let tag_data_start = tag_table_start + tag_count_size + (3 * tag_record_size);
+        let tag_data_size = 20;
+        let profile_size = tag_data_start + (3 * tag_data_size);
+        let mut profile = vec![0_u8; profile_size];
+        profile[0..4].copy_from_slice(&(profile_size as u32).to_be_bytes());
+        profile[36..40].copy_from_slice(b"acsp");
+        profile[128..132].copy_from_slice(&3_u32.to_be_bytes());
+
+        for (index, (signature, values)) in [
+            (b"rXYZ", primaries[0]),
+            (b"gXYZ", primaries[1]),
+            (b"bXYZ", primaries[2]),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let record_offset = 132 + (index * tag_record_size);
+            let data_offset = tag_data_start + (index * tag_data_size);
+            profile[record_offset..record_offset + 4].copy_from_slice(signature);
+            profile[record_offset + 4..record_offset + 8]
+                .copy_from_slice(&(data_offset as u32).to_be_bytes());
+            profile[record_offset + 8..record_offset + 12]
+                .copy_from_slice(&(tag_data_size as u32).to_be_bytes());
+            profile[data_offset..data_offset + 4].copy_from_slice(b"XYZ ");
+            for (component, value) in values.iter().enumerate() {
+                let fixed = (value * 65536.0).round() as i32;
+                let component_offset = data_offset + 8 + (component * 4);
+                profile[component_offset..component_offset + 4]
+                    .copy_from_slice(&fixed.to_be_bytes());
+            }
+        }
+
+        profile
     }
 
     fn unique_export_root(label: &str) -> PathBuf {

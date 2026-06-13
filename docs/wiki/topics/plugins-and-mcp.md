@@ -19,6 +19,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Direct SQLite writes from plugins or MCP are forbidden.
 - Dangerous tools and arbitrary executable plugins are forbidden without explicit approval.
 - MCP is off by default.
+- Task 16.5 adds append-only action log groundwork for future permissioned extension work, but it does not add plugin runtime, MCP runtime, MLX execution, or extension write permissions.
 
 ## Required Manifest Areas
 
@@ -35,5 +36,4 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 
 ## Notes for LLM Agents
 
-Do not add MCP tools, plugin runtimes, or permission bypasses early. Any future mutation path must be explicit, logged, and reversible where possible.
-
+Do not add MCP tools, plugin runtimes, or permission bypasses early. Any future mutation path must go through Core APIs, be explicit, be logged through the action log, and be reversible where possible. Direct SQLite access from plugins or MCP remains forbidden.

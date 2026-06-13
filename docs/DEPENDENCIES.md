@@ -14,6 +14,10 @@ This file is the dependency and third-party license inventory for the repository
 
 Future model weights, sample assets, binary tools, or bundled runtime components must add their own license/source/hash records before they are committed or shipped.
 
+## Deferred Dependency Decisions
+
+- Task 11.7.1 does not add an EXIF or metadata parser dependency. Camera make, camera model, lens model, orientation, and capture-time metadata remain explicitly unavailable until a later task adds a parser and records it in this file.
+
 ## Required Entry Format
 
 ```txt
@@ -102,16 +106,16 @@ Verification source: local workspace Cargo metadata and Phase 5.3 edit flow test
 ```txt
 Name: silica-export
 Version: workspace
-Purpose: Local alpha JPEG sRGB export boundary.
+Purpose: Local alpha JPEG export boundary with sRGB default and explicit Display P3 ICC proof path.
 License: project internal
 Repository/Homepage: this repository
 Used by: crates/silica-core
-Why needed: Phase 5.4 keeps JPEG file writing and export-specific validation out of Core, Render, and Storage while still allowing Core to orchestrate the local alpha workflow.
+Why needed: Phase 5.4 keeps JPEG file writing and export-specific validation out of Core, Render, and Storage while still allowing Core to orchestrate the local alpha workflow. Task 13.6 keeps ICC embedding and output/profile hash proof inside the export boundary.
 Alternatives considered: direct JPEG encoding in `silica-core`, postponing export until UI screens, placeholder output files.
-Risk notes: This crate handles already-rendered raster inputs only. It does not implement RAW decoding, a Metal renderer, ICC fixture validation, or broad fallback export paths.
+Risk notes: This crate handles already-rendered raster inputs only. It does not implement RAW decoding, a Metal renderer, visual color correctness, or broad fallback export paths.
 Binary size impact: Internal workspace code only; external image codec impact is tracked under `image`.
 Security notes: Reject exporting over the original source path and treat image inputs as untrusted files.
-Verification source: local workspace Cargo metadata and Phase 5.4 `silica-export` tests.
+Verification source: local workspace Cargo metadata, Phase 5.4 `silica-export` tests, and Task 13.6 ICC export tests.
 ```
 
 ### Tauri Runtime
@@ -196,7 +200,7 @@ Alternatives considered: Swift/AppKit spike code, raw Objective-C FFI, no native
 Risk notes: Keep isolated behind a non-default feature. Do not spread Objective-C runtime calls into product code without a follow-up bridge design.
 Binary size impact: No default app impact while the feature is disabled. Feature builds link native framework bridge code for the spike.
 Security notes: Uses local macOS runtime APIs only. Avoid exposing these handles to webview IPC or plugins.
-Verification source: `cargo info objc2` for 0.6.4 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+Verification source: `cargo info objc2@0.6.4 --verbose`; repository license and docs at https://github.com/madsmtm/objc2.
 ```
 
 ### AppKit Bindings
@@ -207,7 +211,7 @@ Version: 0.3.2
 Purpose: AppKit NSWindow, NSView, NSEvent, and autoresizing APIs for Spike 001.
 License: Zlib OR Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/madsmtm/objc2
-Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature; crates/silica-decode behind the `core-image-raw-probe` feature.
 Why needed: Required to access the Tauri window content view, attach a native MTKView, and log mouse/trackpad event routing.
 Alternatives considered: Swift/AppKit shim, raw Objective-C message sends only, Tauri webview-only proof.
 Risk notes: Feature-gated proof only. Event mapping from this spike does not finalize the product viewer architecture.
@@ -230,7 +234,7 @@ Alternatives considered: Raw CoreGraphics structs and raw Objective-C FFI.
 Risk notes: Keep scoped to platform bridge code. Do not introduce broader Foundation usage until a native bridge design is accepted.
 Binary size impact: No default app impact while the feature is disabled. Spike builds use macOS system frameworks.
 Security notes: No file, network, or user data access is introduced by this dependency.
-Verification source: `cargo info objc2-foundation` for 0.3.2 metadata; repository license and docs at https://github.com/madsmtm/objc2.
+Verification source: `cargo info objc2-foundation@0.3.2 --verbose`; repository license and docs at https://github.com/madsmtm/objc2.
 ```
 
 ### CoreGraphics Bindings
@@ -238,16 +242,16 @@ Verification source: `cargo info objc2-foundation` for 0.3.2 metadata; repositor
 ```txt
 Name: objc2-core-graphics
 Version: 0.3.2
-Purpose: CoreGraphics framework linkage for Metal device creation during Spike 001.
+Purpose: CoreGraphics framework linkage for Metal device creation during Spike 001 and feature-gated RAW preview artifact scaling/color-space selection in Task 15.2.
 License: Zlib OR Apache-2.0 OR MIT
 Repository/Homepage: https://github.com/madsmtm/objc2
-Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature.
-Why needed: `objc2-metal` documents that `MTLCreateSystemDefaultDevice` requires CoreGraphics linkage.
+Used by: apps/desktop/src-tauri behind the `metal-host-spike` feature; crates/silica-decode behind the `core-image-raw-probe` feature.
+Why needed: `objc2-metal` documents that `MTLCreateSystemDefaultDevice` requires CoreGraphics linkage; `silica-decode` uses the `CGAffineTransform` and `CGColorSpace` features behind `core-image-raw-probe` for bounded Core Image JPEG sRGB preview artifacts.
 Alternatives considered: Manual `#[link(name = "CoreGraphics", kind = "framework")]` declaration.
-Risk notes: Linkage helper only for the spike; keep feature-gated.
+Risk notes: Linkage and RAW preview helper only while the relevant non-default feature is enabled; keep feature-gated.
 Binary size impact: No default app impact while the feature is disabled. CoreGraphics is a macOS system framework.
-Security notes: No image capture or display enumeration behavior is added by this use.
-Verification source: `cargo info objc2-core-graphics` for 0.3.2 metadata; `objc2-metal` crate note for `MTLCreateSystemDefaultDevice`.
+Security notes: No image capture or display enumeration behavior is added by this use. The RAW preview path reads fixture-backed local files and writes disposable preview artifacts only.
+Verification source: `cargo info objc2-core-graphics@0.3.2 --verbose`; `objc2-metal` crate note for `MTLCreateSystemDefaultDevice`.
 ```
 
 ### Metal Bindings
@@ -359,13 +363,13 @@ Version: 1.0.150
 Purpose: JSON value, number, map, parsing, and serialization support.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/serde-rs/json
-Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, and crates/silica-core in Phase 5.4; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
-Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, active edit graph JSON persistence in SQLite, export settings JSON validation, and export settings JSON construction at the Core orchestration boundary.
+Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, crates/silica-core in Phase 5.4, and crates/silica-decode behind `core-image-raw-probe` in Phase 12.2; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
+Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, active edit graph JSON persistence in SQLite, export settings JSON validation, export settings JSON construction at the Core orchestration boundary, and RAW fixture manifest parsing for probe evidence.
 Alternatives considered: simd-json, manual JSON parsing, schemars-only workflows
 Risk notes: JSON Schema validation rules still need explicit validation or a schema validator; serde_json only parses and serializes JSON.
 Binary size impact: Low/typical Rust ecosystem dependency.
 Security notes: Treat imported edit graph JSON and stored export settings JSON as untrusted and validate before accepting or reusing them.
-Verification source: `Cargo.lock` after Phase 5.4 and serde_json repository license section.
+Verification source: `cargo info serde_json@1.0.150` during Phase 12.2 and serde_json repository license section.
 ```
 
 ### Raster Image I/O
@@ -373,19 +377,49 @@ Verification source: `Cargo.lock` after Phase 5.4 and serde_json repository lice
 ```txt
 Name: image
 Version: 0.25.6
-Purpose: JPEG decode/encode for the local alpha JPEG sRGB export path, JPEG thumbnail, Loupe preview, and Develop preview cache generation, and JPEG fixture inspection in integration tests.
+Purpose: JPEG decode/encode for the local alpha JPEG export path, ICC embedding, JPEG thumbnail, Loupe preview, Develop preview cache generation, import-time JPEG dimension inspection, and JPEG fixture inspection in integration tests.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/image-rs/image
 Used by: crates/silica-export at runtime; crates/silica-core and apps/desktop/src-tauri as dev-dependencies for JPEG test fixture generation and inspection.
-Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer. Tasks 5.6.4, 5.6.5, and 5.6.6 reuse the same JPEG-only runtime image path to create disposable grid thumbnails, Loupe previews, and adjusted Develop previews for JPEG/JPG originals.
+Why needed: Task 5.4 must produce a real JPEG file, inspect the exported JPEG, and verify original files remain unchanged without implementing RAW decoding or the Metal viewer. Tasks 5.6.4, 5.6.5, and 5.6.6 reuse the same JPEG-only runtime image path to create disposable grid thumbnails, Loupe previews, and adjusted Develop previews for JPEG/JPG originals. Task 11.7.3 reuses `image::image_dimensions` to persist JPEG/JPG width and height during import without adding an EXIF parser. Task 13.6 uses `ImageEncoder::set_icc_profile` for export ICC proof.
 Alternatives considered: placeholder export bytes, direct `zune-jpeg` use, Core Image export bridge, postponing export until UI implementation.
-Risk notes: Pinned exactly to 0.25.6 because it declares Rust 1.70 compatibility while the workspace targets Rust 1.80. Default features are disabled and only the `jpeg` feature is enabled. This does not prove final ICC/color correctness.
+Risk notes: Pinned exactly to 0.25.6 because it declares Rust 1.70 compatibility while the workspace targets Rust 1.80. Default features are disabled and only the `jpeg` feature is enabled. ICC embedding proof does not prove visual color correctness.
 Binary size impact: Adds the JPEG-only subset of `image` and its transitive codec support; measure final `.app` and `.dmg` during packaging QA.
 Security notes: Treat decoded image files as untrusted. Export path protection is enforced before writing so original source files are not overwritten.
-Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, Task 5.4 export tests, Task 5.6.4 thumbnail cache tests, Task 5.6.5 Loupe preview cache tests, and Task 5.6.6 Develop preview tests.
+Verification source: `cargo info image@0.25.6`, local Cargo metadata after Phase 5.4, Task 5.4 export tests, Task 5.6.4 thumbnail cache tests, Task 5.6.5 Loupe preview cache tests, Task 5.6.6 Develop preview tests, Task 11.7.3 metadata import tests, and Task 13.6 ICC export tests.
 ```
 
 ### RAW Decode — Core Image
+
+```txt
+Name: objc2-core-image
+Version: 0.3.2
+Purpose: Feature-gated Core Image RAW probe bindings for Task 12.1 and bounded RAW preview artifact writing for Task 15.2.
+License: Zlib OR Apache-2.0 OR MIT
+Repository/Homepage: https://github.com/madsmtm/objc2
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature.
+Why needed: Access Core Image RAW probe and JPEG representation APIs without adding LibRaw.
+Alternatives considered: raw Objective-C FFI, Swift shim, LibRaw, no probe.
+Risk notes: Non-default macOS path only; fixture-backed preview artifacts remain evidence-limited and do not imply broad RAW support. Enables `objc2-image-io` transitively for Core Image URL/image source support.
+Binary size impact: No default build impact while feature is disabled. Feature builds link Core Image, already present on macOS.
+Security notes: Reads local fixture paths only, verifies source hash evidence before writing, and must not mutate originals.
+Verification source: `cargo info objc2-core-image@0.3.2 --verbose`.
+```
+
+```txt
+Name: sha2
+Version: 0.10.9
+Purpose: Compute SHA-256 source/output/profile hashes for feature-gated RAW, color fixture probe, and ICC export evidence.
+License: MIT OR Apache-2.0
+Repository/Homepage: https://github.com/RustCrypto/hashes
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature; crates/silica-export for Task 13.6 ICC export proof.
+Why needed: Task 12.2 RAW evidence, Task 13.3 color profile evidence, and Task 13.6 ICC export proof must verify source/output/profile hashes and original-file preservation.
+Alternatives considered: Python-only hash verification, existing partial FNV-style test hash, platform-specific hashing APIs.
+Risk notes: Do not use partial hashes for fixture or export evidence.
+Binary size impact: Pure Rust hashing code is linked into the local alpha export crate and feature-gated proof builds.
+Security notes: Reads local fixture/export files only and does not mutate originals.
+Verification source: `cargo info sha2@0.10.9`; Task 13.3 color-probe tests; Task 13.6 export ICC tests.
+```
 
 ```txt
 Name: Core Image RAW backend
@@ -400,7 +434,7 @@ Risk notes: Supported formats depend on Apple. Less low-level control.
 Binary size impact: platform framework
 Security notes: Decode failures must be non-fatal.
 Verification source: Apple Developer documentation.
-Status after Spike 002: selected as first implementation target, but no Rust/Core Image binding has been added yet.
+Status after Spike 002: selected as first implementation target. Task 12.1 adds a non-default `core-image-raw-probe` binding path for proof work, and Task 15.2 uses the same gated path for bounded JPEG sRGB RAW preview artifacts. Broad RAW support, final color correctness, and full-resolution RAW export remain out of scope.
 ```
 
 ### RAW Decode — LibRaw

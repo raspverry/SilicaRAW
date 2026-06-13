@@ -2,7 +2,7 @@
 title: RAW Decoding
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/20_v1_1_Architecture_Patch.md
 ---
 
@@ -18,6 +18,9 @@ RAW decoding is one of SilicaRAW's highest-risk technical areas. Spike 002 selec
 - Spike 002 selected Core Image RAW primary.
 - LibRaw remains a deferred fallback until legal fixtures prove a camera-support gap.
 - Phase 5.1 adds preview decode readiness routing, not RAW pixels.
+- Phase 12.1 adds a feature-gated Core Image RAW probe contract and macOS metadata path, not product RAW pixels.
+- Task 15.2 adds a narrow feature-gated Core Image RAW preview artifact writer for fixture-backed classes A-D only.
+- Task 15.5 adds a feature-gated full-resolution Core Image RAW export source artifact for fixture-backed RAW-derived JPEG sRGB export. It writes under `render-cache/raw-export-sources/`, not `previews/`, and remains separate from viewer texture cache identity.
 - Full decoder-dependent features remain blocked until real fixture-backed decoding exists.
 
 ## Blocked Work
@@ -82,8 +85,180 @@ RAW candidate -> Core Image RAW blocked until fixture-backed probe
 
 This preserves the Spike 002 decision without pretending RAW decoding exists.
 
+## Phase 12.1 Core Image RAW Probe Contract
+
+`silica-decode` now exposes a proof-only Core Image RAW probe behind the non-default `core-image-raw-probe` feature.
+
+The probe result records:
+
+```txt
+backend
+platform
+macos_version
+source_path
+source_sha256
+original_file_size
+original_modified_at
+status
+width
+height
+orientation
+error_category
+message
+```
+
+On macOS feature builds, the probe:
+
+- reads the source file by path
+- records file size and modified time before Core Image work
+- computes SHA-256 for fixture evidence
+- checks expected SHA-256 when supplied
+- opens the source with Core Image and records image dimensions when available
+- returns explicit failure categories for missing files, permission failures, source hash mismatch, Core Image open failure, missing metadata, invalid fixtures, and unknown errors
+
+Default builds still return an unavailable probe result and do not compile the Core Image path.
+
+Phase 12.1 does not prove RAW support. Support claims remain blocked until Task 12.2 fixture probe evidence and Task 12.3 support-matrix decisions exist.
+
+## Phase 12.2 Fixture Probe Harness
+
+The RAW fixture probe harness exists and now emits a JSON report after running the ignored fixture test.
+
+Current local fixture state:
+
+```txt
+SILICARAW_RAW_FIXTURE_MANIFEST -> .tmp/legal-raw-fixtures/raw-fixtures.json in this maintainer workspace
+legal local RAW fixture manifest -> available locally, ignored by git
+committed legal RAW fixture corpus -> not present
+.tmp blocked placeholder RAW files -> not valid RAW proof evidence
+```
+
+The manual harness command is:
+
+```bash
+SILICARAW_RAW_FIXTURE_MANIFEST=/absolute/path/to/local/raw-fixtures.json scripts/harness/check-raw-probe-fixtures.py
+```
+
+Do not fabricate RAW samples or use user photos without a reviewed legal fixture manifest.
+
+## Phase 12.5 Legal Fixture Source Review
+
+[raw.pixls.us Source Review](../sources/raw-pixls-us.md) accepts raw.pixls.us as the first external source for local ignored RAW probe fixtures.
+
+Accepted local-only candidates:
+
+| Fixture class | Candidate id | Format | License | SHA-256 | Status |
+| --- | --- | --- | --- | --- | --- |
+| A | `raw_pixls_canon_eos_7d_cr2_raw_3_2` | cr2 | CC0 1.0 Universal | `b5e47c5fcf7332ac03e0134926f17a338a42e68c1fd7f83e16f45f4b767544e8` | accepted_for_local_ignored_probe |
+| B | `raw_pixls_canon_eos_r6_mark_iii_cr3_full_frame` | cr3 | CC0 1.0 Universal | `e491e4bb960961b5fa299361bf698310a80cbe7b15d30d8dad3bb21bc5457dab` | accepted_for_local_ignored_probe |
+| C | `raw_pixls_fujifilm_x_t30_iii_raf_compressed` | raf | CC0 1.0 Universal | `49f77d6162abfa5c94d2d8b90e4e926b7386c42bcf7e84a152c9ffe1ebd584da` | accepted_for_local_ignored_probe |
+| D | `raw_pixls_apple_iphone_12_pro_dng` | dng | CC0 1.0 Universal | `e91e77a4533ed7cce551d83330676ea5c47dd5e55fb38adda7819366afdbdfc2` | accepted_for_local_ignored_probe |
+
+Fixture class E remains pending source review. No candidate is probe evidence until the file is downloaded into an ignored local path, hash-verified, declared in a local fixture manifest, and run through `scripts/harness/check-raw-probe-fixtures.py`.
+
+## Phase 12.5 Local Probe Evidence
+
+The local ignored fixture manifest ran successfully on macOS 26.4.
+
+Evidence command:
+
+```bash
+SILICARAW_RAW_FIXTURE_MANIFEST=/Users/hansol/dev/personal/SilicaRAW/.tmp/legal-raw-fixtures/raw-fixtures.json scripts/harness/check-raw-probe-fixtures.py
+```
+
+Evidence summary:
+
+| Fixture class | Fixture id | Format | Probe status | Dimensions | Orientation | Original hash unchanged |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | `raw_pixls_canon_eos_7d_cr2_raw_3_2` | cr2 | success | 5184 x 3456 | unknown | true |
+| B | `raw_pixls_canon_eos_r6_mark_iii_cr3_full_frame` | cr3 | success | 6960 x 4640 | unknown | true |
+| C | `raw_pixls_fujifilm_x_t30_iii_raf_compressed` | raf | success | 6240 x 4160 | unknown | true |
+| D | `raw_pixls_apple_iphone_12_pro_dng` | dng | success | 4032 x 3024 | unknown | true |
+
+This evidence proves Core Image can open these local legal fixtures and report dimensions. It does not prove final color correctness, camera profiles, lens correction, product UI RAW display, or export behavior.
+
+## Phase 12 Core Image Support Matrix
+
+The matrix records fixture-backed Core Image support for classes A-D and keeps class E blocked pending a legal source decision.
+
+| Fixture class | Fixture role | Fixture id | Format | Backend | Probe status | Dimensions | Orientation | Product status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A | Ordinary Core Image candidate RAW | `raw_pixls_canon_eos_7d_cr2_raw_3_2` | cr2 | core_image_raw | success | 5184 x 3456 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| B | High-risk or edge-case RAW | `raw_pixls_canon_eos_r6_mark_iii_cr3_full_frame` | cr3 | core_image_raw | success | 6960 x 4640 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| C | Fuji RAF candidate | `raw_pixls_fujifilm_x_t30_iii_raf_compressed` | raf | core_image_raw | success | 6240 x 4160 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| D | Apple ProRAW DNG candidate | `raw_pixls_apple_iphone_12_pro_dng` | dng | core_image_raw | success | 4032 x 3024 | unknown | core_image_supported | Task 12.5 local ignored manifest probe on macOS 26.4 |
+| E | RAW-like file expected to stay unsupported or blocked | pending_legal_fixture | unknown | core_image_raw | blocked_pending_evidence | unknown | unknown | blocked_pending_evidence | Source decision still pending; no legal manifest entry supplied |
+
+LibRaw remains deferred. No fixture-backed Core Image gap has been recorded, and no decoder dependency should be added from this matrix.
+
+## Phase 12.4 Product RAW Decode API Contract
+
+`silica-decode` and `silica-core` now expose a product RAW decode planning contract.
+
+Current behavior:
+
+```txt
+RAW candidate -> BlockedPendingEvidence
+non-RAW candidate -> BlockedUnsupportedClass
+successful probe evidence for fixture classes A-D -> Supported metadata-only plan
+class E, unknown class, failed probe, or missing dimensions -> blocked state
+```
+
+The API returns backend, status, optional dimensions, optional orientation, and a UI-suitable message. It does not return decoded pixels and does not trigger rendering, cache writes, export, or original-file mutation.
+
+The path-only `plan_product_raw_decode` stays conservative and does not infer support from file extension alone. The evidence-driven `plan_product_raw_decode_from_probe` maps only fixture-backed Core Image probe results to metadata-only product plans.
+
+## Phase 15 Entry Gate
+
+Task 15.0 rechecked the local ignored RAW fixture manifest and allows Phase 15 implementation to use only fixture-backed RAW classes A-D.
+
+Allowed Phase 15 RAW scope:
+
+```txt
+Class A CR2 -> required minimum fixture-backed path
+Class B CR3 -> optional edge-case fixture-backed path
+Class C RAF -> recommended higher-risk fixture-backed path
+Class D DNG -> recommended higher-risk fixture-backed path
+Class E and unknown RAW classes -> blocked
+```
+
+This gate does not claim broad RAW camera support, RAW support from file extensions, product RAW pixel display, RAW-derived export correctness, final color correctness, camera profile behavior, lens correction, or LibRaw coverage.
+
+## Phase 15.1 Decoded Image Handoff Contract
+
+`silica-decode` now exposes a decoded image handoff contract for the first fixture-backed product path. The contract can represent:
+
+```txt
+ready fixture-backed Core Image RAW handoff
+blocked pending evidence
+blocked Core Image failure
+blocked unsupported class
+```
+
+The handoff records source path, source SHA-256, decoder backend, dimensions, orientation, input profile, working space, disposable cache identity, pixel format, and a UI-suitable message. It intentionally carries no image bytes and does not create cache files. RAW class E and unknown RAW classes remain blocked without cache identity or pixel format.
+
+## Phase 15.2 RAW Preview Artifact
+
+`silica-decode` now exposes `write_raw_preview_artifact` for the Phase 15 vertical slice. On macOS `core-image-raw-probe` feature builds, it can write bounded JPEG sRGB preview artifacts for fixture-backed Core Image RAW classes A-D.
+
+Task 15.2 behavior:
+
+```txt
+supported fixture class A-D + successful probe + matching source SHA -> bounded JPEG sRGB preview artifact
+class E or unknown fixture class -> blocked, no artifact path, no bytes written
+stale source SHA -> rejected before artifact write
+source/output canonical match -> rejected
+```
+
+The product wrapper in `silica-core` constructs RAW preview artifact paths under the library `previews/` directory and records cache metadata only after successful artifact creation. `silica-storage` rejects preview cache records outside the disposable preview directory, including `..` escapes.
+
+This does not claim broad RAW camera support, final color correctness, full-resolution RAW export, or Metal display. Task 15.3 owns native viewer display of the preview artifact.
+
 ## Links
 
+- [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)
+- [Phase 15 Vertical Slice Evidence Gate](../../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md)
+- [Phase 12 Task Cards](../tasks/index.md)
 - [Spike 002 Report](../../spikes/002-raw-decoder.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [RAW Editing Feature Specification](../../07_RAW_Editing_Feature_Specification.md)

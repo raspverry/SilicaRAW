@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-12
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -13,6 +13,8 @@ source_of_truth: docs/13_Development_Roadmap.md
 This roadmap starts after the local DMG alpha distribution track is complete.
 
 The local DMG plan proves that a user can download a GitHub Release DMG, install `SilicaRAW.app`, and complete the minimal local alpha workflow. This post-alpha roadmap defines the atomic product tasks needed to grow that alpha into a credible RAW editor.
+
+Use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md) as the Phase 14 through v1.0 execution router. This roadmap defines scope; the master plan defines cross-phase dependency order, stop gates, and known future task splits.
 
 The order is deliberate:
 
@@ -162,7 +164,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Make launch, relaunch, browsing, metadata, and selection behavior real and scalable.
 
-**Design Gate:** [Phase 11 Session, Library, and Metadata Design](../../superpowers/specs/2026-06-11-phase-11-session-library-metadata-design.md) defines the app-session boundary, atomic task order, query scalability gate, metadata truth gate, recursive import policy gate, and validation strategy before Phase 11 implementation begins.
+**Design Gate:** [Phase 11 Session, Library, and Metadata Design](../../superpowers/specs/2026-06-11-phase-11-session-library-metadata-design.md) defines the app-session boundary, atomic task order, bounded offset query gate, page-scoped thumbnail gate, metadata truth gate, import-error-before-recursive gate, and validation strategy before Phase 11 implementation begins.
 
 ### Task 11.1: App Session and Recents Contract
 
@@ -174,6 +176,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Missing recent paths degrade to disabled/error states.
   - No fictional recent rows are introduced.
 - **Validation:** `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. Task 11.1 established the app-session boundary, added core app-session v1 types and JSON read/write helpers, and exposed desktop read/write/reset/inspect command handlers using the Tauri app config path. Real recent recording and Welcome recents UI remain Task 11.2.
 
 ### Task 11.2: Persist Real Recent Libraries
 
@@ -187,6 +190,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - `cargo test -p silica-core`
   - UI workflow smoke.
+- **Status:** Completed on 2026-06-11. Task 11.2 records recent libraries only after successful create/open, dedupes and caps them in app-session state, and renders real Welcome recents with honest empty and unavailable states. Relaunch restore, selected-photo restore, and layout persistence remain Task 11.3 and Task 11.4.
 
 ### Task 11.3: Restore Last Library, Mode, and Selection
 
@@ -198,6 +202,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Missing library or missing photo does not crash the app.
   - Static/demo rows remain absent.
 - **Validation:** Connected runtime smoke.
+- **Status:** Completed on 2026-06-11. Task 11.3 now resolves launch restore read-only, restores the last valid library shell state, records user-driven selected-photo and mode state in app-session JSON, restores the saved selected photo only when the catalog row still exists, and falls back to Library when selection is missing. Layout preference persistence remains Task 11.4.
 
 ### Task 11.4: Persist Workspace Layout Preferences
 
@@ -211,6 +216,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - Static UI check.
   - Visual responsive QA.
+- **Status:** Completed on 2026-06-11. Task 11.4 established the core layout default/reset model, wired desktop/sidebar/inspector/filmstrip/thumbnail/sort/filter persistence to app-session state, and extended visual QA with sidebar-collapsed, inspector-collapsed, and reset layout states across `1280x800`, `1440x900`, and `1728x965`.
 
 ### Task 11.5: Paged, Sorted, and Filtered Library Query API
 
@@ -219,9 +225,12 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Dependencies:** Task 11.4
 - **Acceptance Criteria:**
   - Grid does not require loading every photo at once.
+  - Product grid thumbnail hydration is page- or viewport-scoped, not whole-catalog eager work.
   - Sort/filter fields use columns and indexes where appropriate.
+  - Query uses bounded offset pagination with deterministic tie breakers.
   - Query shape is documented.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
+- **Status:** Completed on 2026-06-11. Task 11.5.1 added the typed paged query contract in `silica-catalog`; Task 11.5.2 raised the catalog schema to version 3 with normalized `photos.file_type` values and accepted query indexes; Task 11.5.3 added read-only storage/core paged query APIs; Task 11.5.4 exposed the typed desktop paged grid command; Task 11.5.5 moved product grid thumbnail hydration to requested page rows only. Page UI states and pagination controls were completed by Task 11.6.1.
 
 ### Task 11.6: Virtualized Grid, Keyboard, and Multi-Select
 
@@ -233,6 +242,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No horizontal overflow or control clipping at `1280x800`, `1440x900`, or `1728x965`.
   - Selection state is visually coherent and never fake.
 - **Validation:** Visual QA across current mockup viewports.
+- **Status:** Completed on 2026-06-11. Task 11.6.1 completed page-driven grid loading, empty, page, and error states with previous/next controls backed by real page metadata. Task 11.6.2 added a page-local virtualized grid window with spacer rows and grid-owned thumbnail URL cleanup. Task 11.6.3 added roving-focus keyboard navigation for Arrow, Home, End, PageUp, PageDown, and Enter-to-loupe. Task 11.6.4 added explicit primary selection, Shift range selection, Cmd/Ctrl or Space toggle selection, inspector selection counts, and clear multi-select without adding batch edit behavior.
 
 ### Task 11.7: Metadata Extraction and Storage
 
@@ -246,10 +256,11 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core`
   - Original hash checks.
+- **Status:** Completed on 2026-06-11. Task 11.7.1 completed the metadata schema/dependency gate: normalized metadata fields are documented, file-system metadata remains on `photos`, and no EXIF parser dependency is added yet. Task 11.7.2 recorded the no-open/restore-backfill policy and JPEG-only dimension extraction policy without implying RAW decode support. Task 11.7.3 added the metadata migration and JPEG/JPG dimension extraction without mutating originals. Task 11.7.4 exposed typed metadata queries with explicit `known`, `unknown`, and `unavailable` field states.
 
 ### Task 11.8: Metadata Inspector, Search, and Filters
 
-- **Location:** `apps/desktop/static/`, `crates/silica-core`
+- **Location:** `apps/desktop/static/`, `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`
 - **Description:** Wire real metadata into Library and Loupe inspector/search/filter surfaces.
 - **Dependencies:** Task 11.7
 - **Acceptance Criteria:**
@@ -257,21 +268,26 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Search/filter behavior never implies unavailable metadata exists.
   - Empty and missing states are clear.
 - **Validation:** UI workflow smoke.
+- **Status:** Completed on 2026-06-11. Task 11.8.1 wired stored metadata into the shared Library/Loupe inspector with honest unavailable states, and Task 11.8.2 added the stored `has_dimensions` metadata filter without implying camera/lens parser support.
 
-### Task 11.9: Recursive Import and Reviewable Errors
+### Task 11.9: Reviewable Import Errors and Recursive Import
 
 - **Location:** `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`, `apps/desktop/static/`
-- **Description:** Add an explicit recursive import option and reviewable import errors.
+- **Description:** Add reviewable import errors first, then an explicit recursive import option.
 - **Dependencies:** Task 11.8
 - **Acceptance Criteria:**
-  - Recursive import is user-selected, not silent.
+  - Structured import errors exist for the current non-recursive path before recursive scanning lands.
   - Unsupported and failed files are visible in an error review surface.
+  - Recursive import is user-selected, not silent.
   - Browsing can continue after recoverable import errors.
 - **Validation:** Connected runtime smoke.
+- **Status:** Completed on 2026-06-11. Task 11.9.1 documents the import-error policy before implementation: recursive import defaults off, recoverable errors and unsupported files are reviewable, symlink entries are skipped, hidden/package/max-depth/permission behavior is explicit, and originals remain referenced by path only. Task 11.9.2 adds structured `ImportIssue` records to `FolderImportSummary.issues` and forwards them through the desktop import response for the current non-recursive import path, so unsupported files and recoverable skipped/read-error entries can be reviewed while accepted rows remain browseable. Task 11.9.3 adds the import issue review UI for unsupported, skipped, and failed entries. Task 11.9.4 adds explicit opt-in recursive import while keeping the default import path non-recursive and symlink-safe. Task 11.9.5 extends connected runtime smoke across Phase 11 recents, restore, fallback, paged grid, metadata, recursive issue review, and original-file safety.
 
 ## Phase 12: Core Image RAW Decode Proof
 
 **Goal:** Prove Core Image RAW support on legal fixtures before showing product RAW pixels.
+
+**Agent Brief:** Use [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md) and [Task Cards](../tasks/index.md) for the small read path.
 
 ### Task 12.1: Feature-Gated Core Image RAW Probe
 
@@ -319,9 +335,39 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Unsupported RAWs still surface clear blocked states.
 - **Validation:** `cargo test -p silica-decode -p silica-core`
 
+### Task 12.5: Legal RAW Fixture Evidence Gate
+
+- **Location:** `docs/wiki/topics/raw-decoding.md`, `docs/wiki/tasks/12.5-legal-raw-fixture-evidence.md`, ignored local fixture paths
+- **Description:** Review legal RAW fixture sources, create an ignored local fixture manifest, run the Core Image probe harness, and update the support matrix from evidence.
+- **Dependencies:** Task 12.2
+- **Acceptance Criteria:**
+  - Fixture media and local manifests are not committed.
+  - Every used fixture has source, license, privacy, SHA-256, and fixture class recorded.
+  - Probe results preserve original hashes and classify success or failure.
+  - Support matrix updates are evidence-backed.
+  - Product RAW support changes after successful evidence are separate atomic tasks.
+- **Validation:**
+  - `SILICARAW_RAW_FIXTURE_MANIFEST=... scripts/harness/check-raw-probe-fixtures.py`
+  - `python3 scripts/harness/check-md-links.py`
+  - `scripts/harness/check.sh`
+
+### Task 12.6: Product RAW Support Mapping
+
+- **Location:** `crates/silica-decode`, `crates/silica-core`, `docs/wiki/topics/raw-decoding.md`
+- **Description:** Map fixture-backed Core Image probe evidence into metadata-only product RAW decode plans without showing RAW pixels.
+- **Dependencies:** Task 12.5
+- **Acceptance Criteria:**
+  - Successful macOS probe results for fixture classes A-D can return `Supported` with backend, dimensions, orientation metadata, and source hash evidence.
+  - Arbitrary path-based RAW candidates remain blocked unless probe evidence is supplied.
+  - Failed, unsupported, class E, or unknown fixture classes return explicit blocked states.
+  - No UI RAW display, export expansion, cache generation, broad camera support claim, color correctness claim, original mutation, or LibRaw dependency is added.
+- **Validation:** `cargo test -p silica-decode -p silica-core`, `scripts/harness/check.sh`
+
 ## Phase 13: Color Pipeline Proof
 
 **Goal:** Prove the Core Image/ColorSync-compatible path before expanding export and preview claims.
+
+**Planning Status:** Phase 13 implementation is complete in the dedicated [Color Pipeline Proof Plan](phase-13-color-pipeline-proof-plan.md), [brief](../phases/phase-13-color-pipeline-proof.md), and task cards. Color correctness claims remain blocked pending approved tolerance results and executed manual visual review.
 
 ### Task 13.1: Tagged Raster Color Probe
 
@@ -372,6 +418,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
 ## Phase 14: Product Metal Viewer Bridge
 
 **Goal:** Replace the Spike 001 proof with a product viewer bridge boundary.
+
+**Planning Status:** Phase 14 now has a dedicated [Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md), [brief](../phases/phase-14-product-metal-viewer-bridge.md), and task cards. Phase 14 through v1.0 sequencing is routed by the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md).
 
 ### Task 14.1: AppKit/Metal Viewer Bridge Contract
 
@@ -458,34 +506,62 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No-draft-write test.
   - Viewer performance checklist.
 
-### Task 15.4: RAW-Derived JPEG sRGB Export with ICC
+### Task 15.4: Exposure and Contrast Metal Draft Path
 
-- **Location:** `crates/silica-export`, `crates/silica-core`, `apps/desktop/src-tauri`
+- **Location:** `crates/silica-render`, `crates/silica-core`, `apps/desktop/src-tauri`
+- **Description:** Carry exposure/contrast drafts to the Metal preview request path without catalog or history writes per slider tick.
+- **Dependencies:** Task 15.3
+- **Acceptance Criteria:**
+  - Draft payloads validate through the edit graph exposure/contrast validator.
+  - Draft render requests do not write catalog, sidecar, export, or original state.
+  - Commit still writes one validated edit graph.
+- **Status:** Completed on 2026-06-12.
+- **Validation:**
+  - `cargo test -p silica-edit -p silica-render -p silica-core`
+  - `cargo test -p silica-desktop --features native-metal-viewer`
+  - `scripts/harness/check.sh`
+
+### Task 15.5: RAW-Derived JPEG sRGB Export with ICC
+
+- **Location:** `crates/silica-decode`, `crates/silica-export`, `crates/silica-render`, `crates/silica-core`, `apps/desktop/src-tauri`
 - **Description:** Export full-resolution RAW-derived JPEG sRGB with ICC embedding.
-- **Dependencies:** Tasks 13.2 and 15.3
+- **Dependencies:** Tasks 13.2 and 15.4
 - **Acceptance Criteria:**
   - Export path is separate from preview.
   - sRGB ICC is embedded.
   - Decoder/color metadata is recorded.
   - Original RAW files remain unchanged.
+- **Status:** Completed on 2026-06-12. Added the full-resolution RAW export source artifact path, RAW-derived JPEG sRGB export orchestration, committed exposure/contrast export application, ICC/hash/decoder/profile evidence recording, and fixture-gated Class A RAW export validation.
 - **Validation:**
   - Export inspection.
   - Original hash protection.
   - `scripts/harness/check.sh`
 
-### Task 15.5: Installed-App RAW Vertical Smoke
+### Task 15.6: RAW Export Manual Color QA
 
-- **Location:** `scripts/harness/`, `checklists/LOCAL_DMG_INSTALL_CHECKLIST.md`
-- **Description:** Extend installed-app QA to cover the fixture-backed RAW vertical slice.
-- **Dependencies:** Task 15.4
+- **Location:** `checklists/`, `docs/wiki/topics/color-management.md`
+- **Description:** Record Preview.app or Photos review for RAW-derived sRGB JPEG export before broadening color claims.
+- **Dependencies:** Task 15.5
 - **Acceptance Criteria:**
-  - Installed app imports supported RAW fixtures, shows preview, edits exposure/contrast, exports JPEG sRGB, and preserves originals.
+  - Manual review record exists for exported RAW-derived JPEG sRGB.
+  - Release language remains evidence-limited and does not claim broad color correctness.
   - Unsupported RAWs remain blocked and reviewable.
 - **Validation:** Clean-Mac install QA record.
 
 ## Phase 16: Undo, History, and Action Trust
 
 **Goal:** Protect non-destructive editing before adding more Develop controls.
+
+### Task 16.0: Phase 16 Design Gate
+
+- **Location:** `docs/wiki/phases/phase-16-undo-history-action-trust.md`, `docs/wiki/topics/catalog.md`, `docs/wiki/topics/data-safety.md`, `docs/wiki/topics/edit-graph.md`
+- **Description:** Lock action classes, transaction boundaries, schema ownership, and sidecar sync policy before migrations or runtime changes.
+- **Dependencies:** Phase 15
+- **Acceptance Criteria:**
+  - Undoable, redoable, logged-only, non-reversible, and blocked action classes are documented.
+  - Export, cache clear, sidecar, original-file, and extension stop gates are explicit.
+  - No runtime behavior or migrations are added in this design gate.
+- **Validation:** `python3 scripts/harness/check-md-links.py`
 
 ### Task 16.1: Undo, History, and Action Semantics
 
@@ -528,8 +604,10 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Acceptance Criteria:**
   - Panel lists real checkpoints only.
   - Keyboard focus and disabled states are coherent.
-  - Selecting a checkpoint previews and commits according to the documented semantics.
-- **Validation:** UI smoke and visual QA.
+  - Selecting a checkpoint routes through documented undo/redo semantics, not direct state jumps.
+- **Validation:** UI smoke, static UI contract, and command tests.
+
+**Status:** Completed on 2026-06-12. Storage/core expose real `edit_history` checkpoints through `list_photo_history`, desktop exposes `get_photo_history`, and the Develop history panel renders only runtime checkpoint rows. Empty, loading, error, disabled, undo, and redo states are explicit.
 
 ### Task 16.5: Action Log Storage API
 
@@ -541,6 +619,21 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Action log records actor, action, target, timestamp, and side-effect category.
   - Original file mutation remains forbidden.
 - **Validation:** `cargo test -p silica-storage -p silica-core`
+
+**Status:** Completed on 2026-06-12. Catalog schema version 8 adds action log side-effect/evidence fields plus lookup indexes. Storage/core expose append/read APIs, and Core records import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear as evidence-only log rows without adding extension runtime behavior.
+
+### Task 16.6: Sidecar Sync Status After History Commits
+
+- **Location:** `crates/silica-storage`, `crates/silica-core`, `schemas/sidecar.schema.json`, `docs/wiki/topics/catalog.md`
+- **Description:** Update sidecar sync status after committed history changes without silently overwriting conflicts or newer sidecars.
+- **Dependencies:** Task 16.5
+- **Acceptance Criteria:**
+  - History commits update sidecar sync status only after validated catalog commits.
+  - Newer or conflicting sidecars are reported, not overwritten.
+  - `sidecar.flags` remains limited to portable culling fields.
+- **Validation:** `cargo test -p silica-storage -p silica-core`
+
+**Status:** Completed on 2026-06-12. Storage/core expose sidecar status reads. Edit commits, flag commits, undo, and redo mark clean sidecars as `catalog_newer` without writing sidecar files, while preserving `conflict` and `sidecar_newer`. `sidecar.flags` remains limited to portable culling fields.
 
 ## Phase 17: Develop P0 Expansion
 
@@ -600,6 +693,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Controls use consistent typography, spacing, and tokenized styling.
   - No text or controls overlap.
 - **Validation:** `python3 scripts/harness/run-final-visual-qa.py`
+- **Status:** Completed on 2026-06-13. Final visual QA now captures 36 screenshots across 12 surfaces and three desktop widths, with Develop-specific checks for selected-photo state, histogram state, Before/After availability, and active basic presets.
 
 ## Phase 18: Professional Editing Baseline
 
@@ -1160,6 +1254,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 - [Local DMG Distribution Plan](local-dmg-distribution-plan.md)
 - [Roadmap Overview](../overview/roadmap.md)
+- [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md)
 - [RAW Decoding](../topics/raw-decoding.md)
 - [Metal Rendering](../topics/metal-rendering.md)
 - [Color Management](../topics/color-management.md)
@@ -1173,7 +1268,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 ## Notes for LLM Agents
 
-Pick the next task by dependency order. Do not jump to MLX, plugins, MCP, masks, or broad RAW support because this roadmap mentions them. A task name is permission only for that task's explicit scope.
+Pick the next task by dependency order using the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md). Do not jump to MLX, plugins, MCP, masks, or broad RAW support because this roadmap mentions them. A task name is permission only for that task's explicit scope.
 
 When implementing a task from this roadmap:
 

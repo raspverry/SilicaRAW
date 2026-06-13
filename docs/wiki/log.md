@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-13
 source_of_truth: none
 ---
 
@@ -13,6 +13,541 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-13] phase-17 | Develop P0 visual QA completed
+
+- Completed Task 17.5 with 36 final visual QA screenshots across 12 surfaces and three desktop widths.
+- Replaced the blocked `agent-browser screenshot` path with a dependency-free Chrome DevTools Protocol runner.
+- Added Develop visual checks for selected-photo state, histogram state, Before/After availability, and active basic presets; Phase 17 is now complete.
+
+## [2026-06-13] phase-17 | Reset before-after presets added
+
+- Completed Task 17.4 with validated P0 Basic reset and built-in preset graph helpers.
+- Reset and preset application commit one undoable edit checkpoint through the existing history transaction path.
+- Added static Develop Before/After view-only controls and routed Phase 17 execution to Task 17.5.
+
+## [2026-06-13] phase-17 | Real histogram cache display added
+
+- Completed Task 17.3 with real RGB/luminance histogram data for supported local JPEG/JPG committed Develop state.
+- Stored histogram JSON only under disposable `render-cache/` and kept missing, blocked, and unsupported states explicit.
+- Replaced the static fake histogram placeholder with command-backed luminance bars and routed Phase 17 execution to Task 17.4.
+
+## [2026-06-13] phase-17 | Color presence preview commit export parity added
+
+- Completed Task 17.2.3 with color presence preview, commit, history, and export parity for supported local JPEG/JPG paths.
+- Recorded vibrance and saturation in export settings for raster and RAW-derived export routes without broad RAW or color-correctness claims.
+- Added desktop command/static Develop controls and routed Phase 17 execution to Task 17.3.
+
+## [2026-06-13] phase-17 | Tone recovery preview commit export parity added
+
+- Completed Task 17.2.2 with tone recovery preview, commit, history, and export parity for supported local JPEG/JPG paths.
+- Recorded highlights, shadows, whites, and blacks in export settings for raster and RAW-derived export routes without broad RAW or color-correctness claims.
+- Added desktop command/static Develop controls and routed Phase 17 execution to Task 17.2.3.
+
+## [2026-06-13] phase-17 | White balance preview commit export parity added
+
+- Completed Task 17.2.1 with white-balance-family preview, commit, history, and export parity for supported local JPEG/JPG paths.
+- Recorded WB export settings for raster and RAW-derived export routes without broad RAW or color-correctness claims.
+- Added desktop command/static Develop controls and routed Phase 17 execution to Task 17.2.2.
+
+## [2026-06-13] phase-17 | Color presence edit graph mutator added
+
+- Completed Task 17.1.3 with a graph-only mutator for vibrance and saturation.
+- Kept preview, export, UI, storage, sidecar, and color-correctness behavior unchanged.
+- Routed Phase 17 execution to Task 17.2.1.
+
+## [2026-06-13] phase-17 | Tone recovery edit graph mutator added
+
+- Completed Task 17.1.2 with a graph-only mutator for highlights, shadows, whites, and blacks.
+- Kept preview, export, UI, storage, and sidecar behavior unchanged.
+- Routed Phase 17 execution to Task 17.1.3.
+
+## [2026-06-13] phase-17 | White balance edit graph mutator added
+
+- Completed Task 17.1.1 with a graph-only mutator for white balance, temperature, and tint.
+- Kept schema, preview, export, UI, storage, and sidecar behavior unchanged.
+- Routed Phase 17 execution to Task 17.1.2.
+
+## [2026-06-13] phase-17 | Develop P0 task cards added
+
+- Added the Phase 17 Develop P0 Expansion brief.
+- Split Phase 17 into atomic control-family task cards for mutators, preview/commit/export parity, histogram, reset/before-after/presets, and visual QA.
+- Routed the LLM index and master execution plan to Task 17.1.1.
+
+## [2026-06-12] phase-16 | Sidecar history status added
+
+- Completed Task 16.6 with storage/core sidecar status read APIs.
+- Marked clean sidecars `catalog_newer` after edit commits, flag commits, undo, and redo without rewriting sidecar files.
+- Preserved `conflict` and `sidecar_newer` states, kept `sidecar.flags` unchanged, and completed Phase 16.
+
+## [2026-06-12] phase-16 | Append-only action log added
+
+- Completed Task 16.5 with schema version 8 action log side-effect/evidence fields and lookup indexes.
+- Added storage/core append/read APIs and Core logging for import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear.
+- Kept plugins, MCP, MLX, permission UI, raw SQLite extension writes, and original mutation claims out of scope.
+
+## [2026-06-12] phase-16 | Develop history panel contract added
+
+- Completed Task 16.4 with storage/core history listing, desktop `get_photo_history`, and a Develop history panel backed only by runtime checkpoints.
+- Kept static HTML history rows empty; the UI renders loading, empty, error, disabled, undo, and redo states from real command responses.
+- Verified row selection uses the existing core undo/redo command path instead of direct checkpoint jumps.
+
+## [2026-06-12] phase-16 | Undo redo commands added
+
+- Completed Task 16.3 with storage, core, and desktop undo/redo command boundaries for edit checkpoints and culling flags.
+- Added catalog schema version 7 with `edit_history.history_state` and state/sequence lookup.
+- Tested transaction restore behavior, redo invalidation, desktop command responses, and export-output preservation.
+
+## [2026-06-12] phase-16 | Edit history persistence added
+
+- Completed Task 16.2 with catalog schema version 6 and ordered edit history checkpoint columns.
+- Persisted one `silica.action` edit checkpoint per committed exposure/contrast edit, including schema-valid before/after edit graphs.
+- Added tests for reopen persistence, draft no-history behavior, and migration idempotence.
+
+## [2026-06-12] phase-16 | Action semantics contract recorded
+
+- Completed Task 16.1 with `silica.action` payload version 1 semantics.
+- Defined per-photo edit and flag checkpoint units, redo invalidation, disabled undo/redo states, and logged-only action behavior.
+- Reconfirmed slider drafts create no history entries and undo never deletes exports, restores cache bytes, reverses sidecars silently, or mutates originals.
+
+## [2026-06-12] phase-16 | Action trust design gate recorded
+
+- Completed Task 16.0 with an Action Trust topic for undoable, redoable, logged-only, non-reversible, and blocked action classes.
+- Linked action trust from catalog, data-safety, edit-graph, schema reference, and LLM routing.
+- Kept the task docs-only: no code, migrations, runtime behavior, dependencies, or broad fallback systems added.
+
+## [2026-06-12] phase-16 | Undo history action trust task cards added
+
+- Added the Phase 16 Undo History Action Trust brief and task cards 16.0 through 16.6.
+- Split the trust gate into design, semantics, edit history persistence, undo/redo commands, history panel contract, append-only action log, and sidecar sync status tasks.
+- Routed the next task to 16.0 while keeping broad Develop controls, masks, MLX, plugins, MCP, and original-file mutation out of scope.
+
+## [2026-06-12] phase-15 | RAW export manual color QA recorded
+
+- Completed Task 15.6 with a Preview.app manual QA record for one Class A fixture-backed RAW-derived JPEG sRGB export.
+- Recorded local ignored QA artifact paths, source/output/ICC hashes, macOS/display context, and known limitations.
+- Marked Phase 15 complete while keeping broad RAW support and broad visual color correctness claims blocked.
+
+## [2026-06-12] phase-15 | RAW-derived JPEG sRGB export added
+
+- Completed Task 15.5 with a fixture-gated full-resolution RAW export source artifact path under `render-cache/raw-export-sources/`.
+- Added RAW-derived JPEG sRGB export evidence for source SHA-256, output SHA-256, embedded ICC state, ICC profile SHA-256, decoder backend, input profile, working space, and original hash preservation.
+- Kept viewer texture cache, preview cache, unsupported RAW classes, broad RAW/color correctness claims, and original-file mutation out of the export source-of-truth path.
+
+## [2026-06-12] phase-15 | Exposure contrast Metal draft path added
+
+- Completed Task 15.4 by carrying exposure/contrast draft values on viewer preview render requests.
+- Added Core-side edit graph validation for Metal draft requests without catalog/history writes.
+- Kept commit as the only validated edit graph persistence path and preserved preview/export separation.
+
+## [2026-06-12] phase-15 | Metal preview display identity added
+
+- Completed Task 15.3 by promoting decoded RAW preview artifacts into disposable native viewer texture identity.
+- Preserved latest-request-wins scheduling and cleared stale texture identity when decode is blocked.
+- Kept image bytes, export source-of-truth behavior, catalog writes, sidecar writes, and original-file mutation out of the native viewer bridge.
+
+## [2026-06-12] phase-15 | RAW preview artifact path added
+
+- Completed Task 15.2 with fixture-backed Core Image RAW preview artifact writing behind `core-image-raw-probe`.
+- Added bounded JPEG sRGB preview artifact identity, stale source SHA rejection, canonical source/output overwrite rejection, and original hash preservation checks.
+- Added product cache path bounding under library `previews/` with cache escape rejection, while keeping RAW class E, broad RAW support, full-resolution export, and Metal display out of scope.
+
+## [2026-06-12] phase-15 | Decoded image handoff contract added
+
+- Completed Task 15.1 with typed decode, render, and core handoff contracts.
+- Added fixture-backed decoded image identity fields for source SHA, decoder backend, dimensions, orientation, profile state, working space, disposable cache identity, and pixel format.
+- Kept image bytes, cache file generation, product RAW artifact writing, catalog writes, sidecar writes, export writes, and original-file mutation out of scope.
+
+## [2026-06-12] phase-15 | Vertical slice evidence gate completed
+
+- Completed Task 15.0 with [Phase 15 Vertical Slice Evidence Gate](../../checklists/PHASE_15_VERTICAL_SLICE_EVIDENCE.md).
+- Rechecked local ignored RAW classes A-D through the Core Image RAW probe harness and Color Class F through the color profile probe harness.
+- Allowed Phase 15 to proceed to Task 15.1 while keeping RAW class E, broad RAW support, visual color correctness, committed fixture media, and original-file mutation blocked.
+
+## [2026-06-12] phase-15 | RAW color Metal vertical slice task cards added
+
+- Added the Phase 15 RAW Color Metal Vertical Slice brief and task cards 15.0 through 15.6.
+- Routed Phase 15 through the master execution plan split: evidence gate, decoded image handoff, RAW preview artifact, Metal preview display, exposure/contrast draft path, RAW-derived JPEG sRGB export, and manual color QA.
+- Kept broad RAW support, broad color correctness, product texture allocation beyond scoped tasks, MLX/MCP/plugin scope, and original-file mutation out of Phase 15 planning.
+
+## [2026-06-12] phase-14 | Viewer QA harness and checklist added
+
+- Completed Task 14.8 with `checklists/NATIVE_VIEWER_QA.md` and `scripts/harness/check-native-viewer-qa.py`.
+- Added default harness routing that checks native viewer QA documentation and static reserved-layout evidence without requiring feature-gated native viewer execution in default CI.
+- Recorded feature-gated macOS commands, manual proof fields, and viewport targets `1280x800`, `1440x900`, and `1728x965`.
+
+## [2026-06-12] phase-14 | Disposable texture lifecycle boundary added
+
+- Completed Task 14.7 with `silica-render` disposable texture identity, drawable size, lifecycle state, and release reason contracts.
+- Added a feature-gated desktop native viewer texture boundary for photo change, drawable resize, library close, and app close cleanup.
+- Kept real product texture allocation, image pixel upload, persistent GPU cache state, catalog writes, sidecar writes, and original-file mutation out of scope.
+
+## [2026-06-12] phase-14 | Render request boundary added
+
+- Completed Task 14.6 with typed `silica-render` viewer preview requests, viewport, future texture identity, and latest-request-wins scheduler behavior.
+- Added a feature-gated desktop native viewer render bridge that schedules requests without catalog writes and records neutral evidence.
+- Kept RAW decoding, color transform output, shader passes, image pixel upload, and product texture allocation out of scope.
+
+## [2026-06-12] phase-14 | Native viewer input ownership proof added
+
+- Completed Task 14.5 with feature-gated input ownership proof state for mouse down, drag, scroll, magnify, native-owned viewer samples, and web-owned outside samples.
+- Added a neutral macOS input smoke evidence path and `checklists/NATIVE_VIEWER_INPUT_QA.md`.
+- Kept telemetry, analytics, persistent input logging, product image rendering, RAW pixels, and texture cache behavior out of scope.
+
+## [2026-06-12] phase-14 | Native viewer lifecycle proof added
+
+- Completed Task 14.4 with feature-gated product module lifecycle proof state for reserved host geometry, drawable size, backing scale, install/uninstall lifecycle, render timing, and cleanup reason.
+- Added a neutral macOS smoke evidence path and `checklists/NATIVE_VIEWER_LIFECYCLE_QA.md`.
+- Kept final product image viewer installation, product texture allocation, RAW pixels, shader passes, and default feature-off app behavior out of scope.
+
+## [2026-06-12] phase-14 | Reserved viewer layout handshake added
+
+- Completed Task 14.3 with reserved native viewer host markers for Loupe and Develop surfaces plus an inert feature-off geometry reporting API.
+- Extended the static UI harness to require exact reserved hosts, external controls, and native viewer geometry functions.
+- Kept AppKit view installation, Metal rendering, texture cache, shader passes, RAW pixels, and native input ownership out of scope.
+
+## [2026-06-12] phase-14 | Native viewer feature gate added
+
+- Completed Task 14.2 with a non-default `native-metal-viewer` feature and macOS-only `native_metal_viewer` product module shell.
+- Added a module contract test proving the product shell is separate from `metal_host_spike.rs` and not compiled into the default app path.
+- Kept RAW pixels, shader passes, texture cache, AppKit view installation, and UI layout changes out of scope.
+
+## [2026-06-12] phase-14 | AppKit Metal viewer bridge contract added
+
+- Completed Task 14.1 with the product bridge contract for reserved viewer layout, AppKit/Metal lifecycle, event ownership, render request boundaries, disposable texture boundaries, and Path B stop gates.
+- Preserved the rule that `metal_host_spike.rs` remains proof code and `native-metal-viewer` product work must be feature-gated.
+- Narrowed the open architecture question for Task 14.8 physical mouse and trackpad checklist evidence.
+
+## [2026-06-12] roadmap | Post-alpha master execution plan added
+
+- Added a Phase 14 through v1.0 master execution plan so maintainers and agents do not recreate phase-wide plans before each phase.
+- Recorded wave order, dependency graph, stop gates, validation matrix, and future task splits for Phase 15, Phase 16, Phase 17, Phase 20, Phase 22, Phase 23, Phase 27, and Phase 28.
+- Linked the master plan from the wiki index, LLM routing index, roadmap overview, post-alpha roadmap, Phase 14 plan, Phase 14 brief, task index, wiki README, and root README.
+
+## [2026-06-12] phase-14 | Product Metal viewer bridge plan added
+
+- Added the Phase 14 Product Metal Viewer Bridge plan, phase brief, and task cards 14.0 through 14.8.
+- Split Path B product viewer work into atomic gates for bridge contract, feature-gated module shell, reserved layout, lifecycle, input, render request, texture lifecycle, and QA.
+- Kept RAW pixels, exposure/contrast Metal rendering, shader breadth, and color correctness out of Phase 14.
+
+## [2026-06-12] phase-13 | Explicit export color options added
+
+- Completed Task 13.8 with sRGB as the default JPEG export path and Display P3 as an explicit ICC-backed option.
+- Added desktop command parsing that rejects unsupported export color profile strings instead of silently falling through.
+- Marked Phase 13 implementation complete while keeping visual color correctness blocked pending tolerance results and manual review.
+
+## [2026-06-12] phase-13 | Color metadata contract added
+
+- Completed Task 13.7 with schema-owned edit graph profile metadata helpers and validation.
+- Export records now preserve output SHA-256, ICC embedded state, ICC profile SHA-256, and profile metadata source in existing `export_settings_json`.
+- Kept unknown profile data explicit and avoided new hidden schema fields.
+
+## [2026-06-12] phase-13 | ICC export proof added
+
+- Completed Task 13.6 with JPEG ICC embedding and inspection for default sRGB export and explicit Display P3 export API proof.
+- Recorded output SHA-256, ICC profile SHA-256, embedded ICC state, output profile, separate output path behavior, and original-preservation coverage.
+- Added the manual Preview.app or Photos QA checklist while keeping color correctness and user-facing Display P3 export blocked.
+
+## [2026-06-12] phase-13 | Color support matrix added
+
+- Completed Task 13.5 with a fixture-backed color probe support matrix.
+- Recorded sRGB, Display P3, and untagged JPEG probe status, profile state, working/output profile, transform path, original hash state, and evidence source.
+- Kept color correctness, export ICC embedding, Display P3 export options, and committed fixture media blocked pending later proof tasks.
+
+## [2026-06-12] phase-13 | Color probe harness added
+
+- Completed Task 13.4 with a manifest-driven local color probe harness.
+- The harness validates Class F fixture safety, runs the feature-gated `silica-render` probe, and records structured source hash, profile, transform-path, file size, modified-time, status, and original-preservation evidence.
+- No ColorSync transform, export ICC embedding, rendered pixels, or color correctness claim was added.
+
+## [2026-06-12] phase-13 | Color profile probe added
+
+- Completed Task 13.3 with a non-default `silica-render` `color-probe` feature.
+- The probe records source SHA-256, embedded ICC marker state, input profile classification, working space, output profile, transform path, and failure category.
+- No ColorSync transform, ICC export embedding, rendered pixels, or color correctness claim was added.
+
+## [2026-06-12] phase-13 | Local color fixture manifest added
+
+- Completed Task 13.2 locally with ignored synthetic Color Class F fixtures and `.tmp/legal-color-fixtures/color-fixtures.json`.
+- Recorded hashes for sRGB, Display P3, and untagged JPEG fixtures.
+- Kept fixture media and manifest out of git; profile probing remains Task 13.3 and Task 13.4.
+
+## [2026-06-12] phase-13 | Color fixture source review added
+
+- Completed Task 13.1 source review for local-only synthetic Color Class F fixtures.
+- Accepted generated local fixtures for sRGB, Display P3, and untagged JPEG subclasses.
+- Kept fixture media and Apple system-profile-derived outputs blocked from git until redistribution permission is reviewed.
+
+## [2026-06-12] phase-13 | Color proof plan added
+
+- Added Phase 13 color pipeline proof plan, phase brief, and task cards 13.0 through 13.8.
+- Routed current LLM work from completed Phase 12 to Phase 13.
+- Kept color correctness, Display P3 export claims, RAW color behavior, and new dependencies behind explicit evidence gates.
+
+## [2026-06-12] phase-12 | RAW proof phase completed
+
+- Phase 12 completion gate is satisfied for legal fixture classes A-D.
+- Class E remains blocked pending source review, and LibRaw remains deferred because no fixture-backed Core Image gap was recorded.
+- Next product roadmap area is Phase 13 color pipeline proof.
+
+## [2026-06-12] phase-12 | Product RAW support mapping added
+
+- Completed Task 12.6 with an evidence-driven product RAW support mapping API.
+- The path-only RAW plan remains conservative; only successful A-D Core Image probe evidence can return metadata-only `Supported`.
+- No RAW pixels, export expansion, cache generation, broad support claim, original mutation, or LibRaw dependency was added.
+
+## [2026-06-12] phase-12 | RAW fixture probe evidence recorded
+
+- Completed local Task 12.5.2 through Task 12.5.4 for raw.pixls.us candidates A-D.
+- The ignored local manifest probe succeeded on macOS 26.4, and original hashes remained unchanged.
+- Classes A-D are now fixture-backed Core Image-supported in the RAW support matrix; class E remains pending source review.
+
+## [2026-06-12] phase-12 | RAW fixture source review added
+
+- Completed Task 12.5.1 source review for raw.pixls.us candidates.
+- Accepted local-only CC0 candidates for fixture classes A-D.
+- Kept fixture class E pending and kept all RAW media out of git.
+
+## [2026-06-12] phase-12 | RAW proof plan page added
+
+- Added a public wiki Phase 12 RAW proof plan page.
+- Added Task 12.5 as the legal RAW fixture evidence gate before any product RAW support claim.
+- Linked the plan from the wiki index, Phase 12 brief, LLM routing index, task cards, and post-alpha roadmap.
+
+## [2026-06-12] phase-12 | Product RAW decode contract added
+
+- Completed Task 12.4 product RAW decode API contract.
+- RAW candidates now return an explicit blocked-pending-evidence plan, and non-RAW candidates return an unsupported-class plan.
+- No RAW pixels, UI display, export path, cache generation, or color correctness claim was added.
+
+## [2026-06-12] phase-12 | Core Image support matrix recorded
+
+- Completed Task 12.3 with every RAW fixture class marked `blocked_pending_evidence`.
+- No legal RAW fixture manifest is available, so no fixture class graduated to Core Image-supported.
+- LibRaw remains deferred because no fixture-backed Core Image gap has been recorded.
+
+## [2026-06-12] phase-12 | RAW fixture probe harness added
+
+- Added Task 12.2.1 RAW fixture probe report types, manifest loader, ignored fixture test, and manual harness command.
+- The harness rejects unsafe or incomplete manifest entries before probing.
+- Running the ignored fixture probe remains blocked until `SILICARAW_RAW_FIXTURE_MANIFEST` points to a legal local RAW fixture manifest.
+
+## [2026-06-12] phase-12 | Core Image RAW probe backend added
+
+- Completed Task 12.1.3 macOS Core Image probe backend.
+- The non-default probe records source metadata, SHA-256, explicit errors, and Core Image dimensions when available.
+- Product RAW pixels, fixture-backed support claims, LibRaw, and UI RAW display remain out of scope.
+
+## [2026-06-12] wiki | Phase 12 design gate task card added
+
+- Added Task 12.0 as a wiki task card so Phase 12 routing starts at the design gate.
+- Linked the Phase 12 brief and task index to the new card.
+- Kept the full implementation details in the existing design and plan docs.
+
+## [2026-06-12] phase-12 | RAW probe contract added
+
+- Completed Task 12.1.2 probe type contract.
+- `silica-decode` now exposes proof-only RAW probe request/result/status/error types and an unsupported fallback route.
+- Existing preview readiness remains unchanged; product RAW pixels are still out of scope.
+
+## [2026-06-12] phase-12 | Core Image RAW probe feature gated
+
+- Completed Task 12.1.1 Core Image dependency and feature gate.
+- Added the non-default `core-image-raw-probe` feature to `silica-decode`.
+- Documented direct Core Image binding and SHA-256 dependencies without adding product RAW pixels or LibRaw.
+
+## [2026-06-11] phase-12 | RAW proof plan added
+
+- Added the Phase 12 RAW proof design gate and implementation plan.
+- The plan keeps Core Image probing feature-gated, fixture-backed, and separate from product RAW pixels.
+- The Phase 12 brief now links to the design, plan, and task cards before implementation starts.
+
+## [2026-06-11] wiki | LLM routing added
+
+- Added the LLM routing index, completed Phase 11 summary, Phase 12 brief, and Phase 12 task cards.
+- The default agent route now points to small phase/task pages before large roadmap or design-spec files.
+- Wiki conventions now describe routing pages and task cards as token-saving navigation aids.
+
+## [2026-06-11] phase-11 | Connected runtime smoke extended
+
+- Completed Task 11.9.5 connected runtime smoke for Phase 11.
+- The smoke now covers recents, relaunch restore, missing-library fallback, paged grid, stored metadata, recursive import review issues, and original-file safety.
+- `check-connected-runtime-smoke.py` now requires a Phase 11 completion marker from the exact desktop smoke test.
+
+## [2026-06-11] phase-11 | Opt-in recursive import added
+
+- Added Task 11.9.4 opt-in recursive import.
+- Recursive scanning is disabled by default and only runs when `FolderImportOptions.recursive` or the desktop `Include subfolders` checkbox is selected.
+- Recursive issues reuse the structured import issue model and skip symlinks instead of following them.
+
+## [2026-06-11] phase-11 | Import issue review UI added
+
+- Added Task 11.9.3 import issue review UI.
+- The import panel now renders structured unsupported, skipped, and failed import issues from the latest import response.
+- UI workflow smoke and final visual QA cover the import issue review surface without enabling recursive import.
+
+## [2026-06-11] phase-11 | Structured import issues added
+
+- Added Task 11.9.2 structured import issue model.
+- `FolderImportSummary.issues` now returns recoverable `ImportIssue` records for the non-recursive import path.
+- The desktop import command forwards the issue list in its response data for Task 11.9.3.
+- Unsupported files, hidden entries, package directories, symlinks, and entry metadata/read failures are reviewable without blocking library browsing.
+
+## [2026-06-11] phase-11 | Import error policy added
+
+- Added Task 11.9.1 import error and recursive import policy.
+- Recursive import remains explicit and defaults off.
+- Recoverable issues, unsupported files, symlinks, hidden entries, packages, max depth, and permission errors now have documented review behavior.
+
+## [2026-06-11] phase-11 | Metadata-backed filter added
+
+- Added Task 11.8.2 `has_dimensions` grid filter backed by stored metadata.
+- Catalog schema version 5 adds the dimension filter index.
+- Camera/lens metadata filters remain disabled until parser and indexed query support exist.
+
+## [2026-06-11] phase-11 | Metadata inspector UI added
+
+- Added Task 11.8.1 Library and Loupe metadata inspector UI.
+- The inspector now uses the `get_photo_metadata` command and shows unavailable values honestly when metadata is missing.
+- Multi-selection keeps metadata primary-photo-only instead of inventing aggregate metadata.
+
+## [2026-06-11] phase-11 | Metadata query API added
+
+- Added Task 11.7.4 typed metadata query APIs across storage, core, and desktop.
+- Metadata fields now serialize explicit `known`, `unknown`, or `unavailable` states for inspector use.
+- Query APIs read only catalog state; tests remove originals before query to guard against display-time source-file reads.
+
+## [2026-06-11] phase-11 | Metadata migration and extraction added
+
+- Added Task 11.7.3 metadata migration and import-time extraction.
+- Catalog schema version 4 adds nullable width, height, and orientation fields under `photo_metadata`.
+- JPEG/JPG imports persist width and height when readable; RAW missing metadata stays unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
+
+## [2026-06-11] phase-11 | Metadata backfill policy added
+
+- Added Task 11.7.2 metadata backfill and JPEG-only extraction policy.
+- Library open/session restore do not run metadata backfill; existing unknown metadata stays unknown until explicit import or backfill work.
+- JPEG/JPG dimensions may use the existing raster path; RAW metadata does not imply RAW decode support.
+
+## [2026-06-11] phase-11 | Metadata schema gate recorded
+
+- Added Task 11.7.1 metadata field and dependency gate.
+- No EXIF parser dependency is added yet; camera/lens/orientation/capture metadata remains explicitly unavailable.
+- Backfill policy was later completed by Task 11.7.2; migration and import-time JPEG dimension extraction were later completed by Task 11.7.3.
+
+## [2026-06-11] phase-11 | Multi-select grid semantics added
+
+- Added Task 11.6.4 current-page multi-selection semantics.
+- The product grid now distinguishes primary selection from multi-selection, supports range/toggle selection, and shows inspector selection counts.
+- Batch edit behavior remains out of scope.
+
+## [2026-06-11] phase-11 | Keyboard grid navigation added
+
+- Added Task 11.6.3 current-page roving-focus keyboard navigation.
+- Arrow keys, Home, End, PageUp, PageDown, and Enter-to-loupe are wired through the product grid.
+- Multi-select was later completed by Task 11.6.4.
+
+## [2026-06-11] phase-11 | Virtualized grid window added
+
+- Added Task 11.6.2 page-local virtualized grid rendering.
+- The product grid now renders visible rows plus overscan spacer rows and cleans up grid-owned thumbnail object URLs when rows leave the window.
+- Keyboard navigation was later completed by Task 11.6.3; multi-select remains Task 11.6.4.
+
+## [2026-06-11] phase-11 | Page-driven grid UI added
+
+- Added Task 11.6.1 page-driven grid UI states.
+- The product grid now shows page metadata, previous/next controls, loading, empty, and error states from `query_library_photos`.
+- Virtualized windowing was later completed by Task 11.6.2; keyboard navigation and multi-select remain Task 11.6.3 and Task 11.6.4.
+
+## [2026-06-11] phase-11 | Page-scoped thumbnail hydration added
+
+- Added Task 11.5.5 page-scoped thumbnail hydration for paged grid queries.
+- The product grid now calls `query_library_photos` and the UI smoke harness checks the page-scoped thumbnail request marker.
+- Full page UI states and pagination controls were later completed by Task 11.6.1.
+
+## [2026-06-11] phase-11 | Desktop paged grid command added
+
+- Added Task 11.5.4 `query_library_photos` desktop command for page-based grid queries.
+- The command accepts typed page/sort/filter fields and returns `photoGridPage` metadata.
+- At the time, page-scoped thumbnail hydration remained Task 11.5.5.
+
+## [2026-06-11] phase-11 | Storage/core paged query added
+
+- Added Task 11.5.3 read-only paged library query APIs in `silica-storage` and `silica-core`.
+- Query responses include bounded rows, total-count metadata, deterministic order fields, and deterministic empty pages.
+- At the time, desktop command wiring remained Task 11.5.4.
+
+## [2026-06-11] phase-11 | Paged query indexes added
+
+- Added Task 11.5.2 catalog schema version 3 for paged library queries.
+- Storage migration 3 adds normalized `photos.file_type` values and query indexes for accepted sort/filter fields.
+- At the time, storage/core paged query execution remained Task 11.5.3.
+
+## [2026-06-11] phase-11 | Paged query contract added
+
+- Added Task 11.5.1 typed `silica-catalog` request and page contracts for bounded offset library queries.
+- Whitelisted sort/filter enums and deterministic tie breakers now define what storage may implement.
+- At the time, query indexes and storage/core execution remained Task 11.5.2 and Task 11.5.3.
+
+## [2026-06-11] phase-11 | Layout visual QA states added
+
+- Added Task 11.4.3 visual QA states for sidebar collapsed, inspector collapsed, and layout reset.
+- The final visual QA runner now captures 11 surfaces across `1280x800`, `1440x900`, and `1728x965`.
+- Latest run produced 33 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or layout-state assertion failures.
+
+## [2026-06-11] phase-11 | Layout interactions persisted
+
+- Added Task 11.4.2 desktop commands for recording and resetting app-session layout preferences.
+- Wired sidebar, inspector, filmstrip, thumbnail size, sort, and filter controls to app-session layout state without adding catalog query filtering ahead of Task 11.5.
+- Dedicated layout screenshot states remain Task 11.4.3.
+
+## [2026-06-11] phase-11 | Layout preference model documented
+
+- Added Task 11.4.1 core helpers for layout defaults and layout reset.
+- Documented sidebar, inspector, filmstrip, thumbnail size, sort, and filter defaults plus invalid-value behavior in the UI MVP baseline.
+- Desktop layout persistence wiring and responsive QA remain Task 11.4.2 and Task 11.4.3.
+
+## [2026-06-11] phase-11 | Selected photo restore added
+
+- Added Task 11.3.2 selected-photo restore from app-session state.
+- User-driven selection and mode changes now record to app-session JSON, and launch restore validates the saved photo id through a read-only catalog probe before applying it.
+- Missing selected photos clear selection and resolve mode back to Library without crashing or opening write-side workflows.
+
+## [2026-06-11] phase-11 | Launch restore resolver added
+
+- Added Task 11.3.1 launch restore resolution from app-session state.
+- The resolver validates the last library and catalog without opening the normal migrate/repair path, and the UI applies Welcome vs Library state on boot without calling `open_library`.
+- Selected-photo restore and true Develop/Export mode restore remain Task 11.3.2.
+
+## [2026-06-11] phase-11 | Welcome recent libraries connected
+
+- Added Task 11.2.2 Welcome recents rendering from real app-session data.
+- First launch stays empty, unavailable recent paths are disabled and labeled, and valid recent libraries open through the existing desktop command path.
+- Relaunch restore, selected-photo restore, and layout preference persistence remain separate Phase 11 tasks.
+
+## [2026-06-11] phase-11 | Real recent recording added
+
+- Added Task 11.2.1 app-session recent recording after successful library create/open.
+- Recent entries dedupe, cap at the documented limit, update last-library state, and remain outside library catalogs and sidecars.
+- Welcome recents rendering and unavailable-path UI remain Task 11.2.2.
+
+## [2026-06-11] phase-11 | Desktop app session commands added
+
+- Added Task 11.1.3 desktop app-session command boundary.
+- Desktop resolves `app-session.json` under the Tauri app config directory and exposes read, write, reset, and inspect handlers backed by `silica-core`.
+- Real recent recording, Welcome recents, and relaunch restore remain separate Phase 11 tasks.
+
+## [2026-06-11] phase-11 | App session core types added
+
+- Added Task 11.1.2 core app-session v1 types and JSON read/write helpers.
+- Kept app session state outside `catalog.db`, sidecars, and frontend-only storage; desktop path commands, recents, and restore behavior remain next tasks.
+- Verified the targeted `silica-core` app-session tests and full `silica-core` crate tests before moving on.
+
+## [2026-06-11] phase-11 | Plan tightening after agent re-audit
+
+- Re-audited the Phase 11 plan with architecture, storage, preview/export, and release/harness agents.
+- Tightened the existing plan without changing the product direction: bounded offset pagination, page-scoped thumbnail hydration, metadata backfill policy, and import-error review before recursive scanning.
+- Reaffirmed lean validation: task-specific checks during development and `scripts/harness/check.sh` as the PR completion gate, without broad fallback systems or large test matrices.
 
 ## [2026-06-11] phase-11 | Session, library, and metadata design added
 

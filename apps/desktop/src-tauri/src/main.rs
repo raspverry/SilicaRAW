@@ -1,8 +1,12 @@
 #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
 mod metal_host_spike;
+#[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
+mod native_metal_viewer;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use tauri::{path::BaseDirectory, Manager};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,15 +72,53 @@ enum DesktopCommandData {
         catalog_path: String,
         schema_version: i64,
     },
+    AppSession {
+        session_path: String,
+        session: DesktopAppSession,
+        warnings: Vec<String>,
+    },
+    AppSessionWrite {
+        session_path: String,
+        bytes_written: u64,
+    },
+    AppSessionInspection {
+        session_path: String,
+        exists: bool,
+        warnings: Vec<String>,
+    },
+    LaunchRestore {
+        session_path: String,
+        session: DesktopAppSession,
+        warnings: Vec<String>,
+        status: String,
+        state: String,
+        fallback_reason: Option<String>,
+        requested_mode: String,
+        resolved_mode: String,
+        selected_photo_id: Option<String>,
+        selected_photo_status: String,
+        library_root_path: Option<String>,
+        catalog_path: Option<String>,
+        schema_version: Option<i64>,
+    },
     ImportSummary {
         folder_path: String,
         scanned_files: usize,
         supported_files: usize,
         unsupported_files: usize,
+        issues: Vec<DesktopImportIssue>,
         originals_unchanged: bool,
     },
     PhotoGrid {
         photos: Vec<DesktopPhotoGridItem>,
+    },
+    PhotoGridPage {
+        photos: Vec<DesktopPhotoGridItem>,
+        offset: u64,
+        limit: u16,
+        total_count: u64,
+        has_next_page: bool,
+        order_fields: Vec<&'static str>,
     },
     PhotoFlags {
         photo_id: String,
@@ -84,6 +126,22 @@ enum DesktopCommandData {
         picked: bool,
         rejected: bool,
         color_label: Option<String>,
+    },
+    PhotoMetadata {
+        photo_id: String,
+        file_name: String,
+        source_path: String,
+        file_type: String,
+        unsupported: bool,
+        file_size: DesktopMetadataField<i64>,
+        modified_at: DesktopMetadataField<String>,
+        width: DesktopMetadataField<i64>,
+        height: DesktopMetadataField<i64>,
+        orientation: DesktopMetadataField<String>,
+        capture_time: DesktopMetadataField<String>,
+        camera_make: DesktopMetadataField<String>,
+        camera_model: DesktopMetadataField<String>,
+        lens_model: DesktopMetadataField<String>,
     },
     PhotoPreview {
         photo_id: String,
@@ -99,6 +157,15 @@ enum DesktopCommandData {
         status: &'static str,
         exposure: f64,
         contrast: f64,
+        white_balance: &'static str,
+        temperature: f64,
+        tint: f64,
+        highlights: f64,
+        shadows: f64,
+        whites: f64,
+        blacks: f64,
+        vibrance: f64,
+        saturation: f64,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -106,6 +173,15 @@ enum DesktopCommandData {
         photo_id: String,
         exposure: f64,
         contrast: f64,
+        white_balance: &'static str,
+        temperature: f64,
+        tint: f64,
+        highlights: f64,
+        shadows: f64,
+        whites: f64,
+        blacks: f64,
+        vibrance: f64,
+        saturation: f64,
         persisted: bool,
         message: String,
     },
@@ -113,7 +189,45 @@ enum DesktopCommandData {
         photo_id: String,
         exposure: f64,
         contrast: f64,
+        white_balance: &'static str,
+        temperature: f64,
+        tint: f64,
+        highlights: f64,
+        shadows: f64,
+        whites: f64,
+        blacks: f64,
+        vibrance: f64,
+        saturation: f64,
         persisted: bool,
+        message: String,
+    },
+    HistoryCommand {
+        photo_id: String,
+        command: String,
+        applied: bool,
+        action_kind: Option<String>,
+        history_id: Option<String>,
+        message: String,
+    },
+    HistoryPanel {
+        photo_id: String,
+        items: Vec<DesktopHistoryItem>,
+        can_undo: bool,
+        can_redo: bool,
+        status: String,
+        message: String,
+    },
+    Histogram {
+        photo_id: String,
+        source_path: String,
+        status: &'static str,
+        red: Vec<u32>,
+        green: Vec<u32>,
+        blue: Vec<u32>,
+        luminance: Vec<u32>,
+        pixel_count: u64,
+        cache_key: String,
+        cache_path: String,
         message: String,
     },
     Export {
@@ -123,6 +237,13 @@ enum DesktopCommandData {
         format: String,
         color_profile: String,
         bytes_written: u64,
+        source_sha256: Option<String>,
+        output_sha256: String,
+        icc_profile_embedded: bool,
+        icc_profile_sha256: String,
+        decoder_backend: Option<String>,
+        input_profile: Option<String>,
+        working_space: Option<String>,
         export_record_id: String,
         message: String,
     },
@@ -139,13 +260,22 @@ impl DesktopCommandData {
     fn kind(&self) -> &'static str {
         match self {
             Self::LibrarySession { .. } => "librarySession",
+            Self::AppSession { .. } => "appSession",
+            Self::AppSessionWrite { .. } => "appSessionWrite",
+            Self::AppSessionInspection { .. } => "appSessionInspection",
+            Self::LaunchRestore { .. } => "launchRestore",
             Self::ImportSummary { .. } => "importSummary",
             Self::PhotoGrid { .. } => "photoGrid",
+            Self::PhotoGridPage { .. } => "photoGridPage",
             Self::PhotoFlags { .. } => "photoFlags",
+            Self::PhotoMetadata { .. } => "photoMetadata",
             Self::PhotoPreview { .. } => "photoPreview",
             Self::EditPreview { .. } => "editPreview",
             Self::EditCommit { .. } => "editCommit",
             Self::EditState { .. } => "editState",
+            Self::HistoryCommand { .. } => "historyCommand",
+            Self::HistoryPanel { .. } => "historyPanel",
+            Self::Histogram { .. } => "histogram",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
         }
@@ -168,6 +298,306 @@ impl DesktopCommandData {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopAppSession {
+    schema: String,
+    version: i64,
+    last_library_root_path: Option<String>,
+    last_mode: String,
+    recents: Vec<DesktopRecentLibrary>,
+    layout: DesktopLayoutPreferences,
+    per_library: BTreeMap<String, DesktopPerLibrarySession>,
+}
+
+impl Default for DesktopAppSession {
+    fn default() -> Self {
+        Self::from_core(silica_core::AppSession::default())
+    }
+}
+
+impl DesktopAppSession {
+    fn from_core(session: silica_core::AppSession) -> Self {
+        Self {
+            schema: session.schema,
+            version: session.version,
+            last_library_root_path: session
+                .last_library_root_path
+                .map(|path| path.display().to_string()),
+            last_mode: app_session_mode_string(session.last_mode).to_string(),
+            recents: session
+                .recents
+                .into_iter()
+                .map(DesktopRecentLibrary::from_core)
+                .collect(),
+            layout: DesktopLayoutPreferences::from_core(session.layout),
+            per_library: session
+                .per_library
+                .into_iter()
+                .map(|(key, value)| (key, DesktopPerLibrarySession::from_core(value)))
+                .collect(),
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppSession, silica_core::CoreError> {
+        if self.schema != silica_core::APP_SESSION_SCHEMA {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session schema: {}",
+                self.schema
+            )));
+        }
+        if self.version != silica_core::APP_SESSION_VERSION {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session version: {}",
+                self.version
+            )));
+        }
+
+        Ok(silica_core::AppSession {
+            schema: self.schema,
+            version: self.version,
+            last_library_root_path: self.last_library_root_path.map(PathBuf::from),
+            last_mode: parse_desktop_app_session_mode(&self.last_mode)?,
+            recents: self
+                .recents
+                .into_iter()
+                .map(DesktopRecentLibrary::into_core)
+                .collect(),
+            layout: self.layout.into_core()?,
+            per_library: self
+                .per_library
+                .into_iter()
+                .map(|(key, value)| value.into_core().map(|value| (key, value)))
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopRecentLibrary {
+    root_path: String,
+    display_name: String,
+    last_opened_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    available: Option<bool>,
+}
+
+impl DesktopRecentLibrary {
+    fn from_core(recent: silica_core::AppRecentLibrary) -> Self {
+        let available = recent.root_path.join("catalog.db").is_file();
+        Self {
+            root_path: recent.root_path.display().to_string(),
+            display_name: recent.display_name,
+            last_opened_at: recent.last_opened_at,
+            available: Some(available),
+        }
+    }
+
+    fn into_core(self) -> silica_core::AppRecentLibrary {
+        silica_core::AppRecentLibrary {
+            root_path: PathBuf::from(self.root_path),
+            display_name: self.display_name,
+            last_opened_at: self.last_opened_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopPerLibrarySession {
+    selected_photo_id: Option<String>,
+    last_mode: String,
+    last_opened_at: String,
+}
+
+impl DesktopPerLibrarySession {
+    fn from_core(session: silica_core::AppPerLibrarySession) -> Self {
+        Self {
+            selected_photo_id: session.selected_photo_id,
+            last_mode: app_session_mode_string(session.last_mode).to_string(),
+            last_opened_at: session.last_opened_at,
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppPerLibrarySession, silica_core::CoreError> {
+        Ok(silica_core::AppPerLibrarySession {
+            selected_photo_id: self.selected_photo_id,
+            last_mode: parse_desktop_app_session_mode(&self.last_mode)?,
+            last_opened_at: self.last_opened_at,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopLayoutPreferences {
+    sidebar_collapsed: bool,
+    inspector_collapsed: bool,
+    filmstrip_visible: bool,
+    thumbnail_size: u16,
+    sort: String,
+    filters: DesktopSessionFilters,
+}
+
+impl DesktopLayoutPreferences {
+    fn from_core(layout: silica_core::AppLayoutPreferences) -> Self {
+        Self {
+            sidebar_collapsed: layout.sidebar_collapsed,
+            inspector_collapsed: layout.inspector_collapsed,
+            filmstrip_visible: layout.filmstrip_visible,
+            thumbnail_size: layout.thumbnail_size,
+            sort: app_library_sort_string(layout.sort).to_string(),
+            filters: DesktopSessionFilters::from_core(layout.filters),
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppLayoutPreferences, silica_core::CoreError> {
+        if self.thumbnail_size < silica_core::MIN_APP_SESSION_THUMBNAIL_SIZE
+            || self.thumbnail_size > silica_core::MAX_APP_SESSION_THUMBNAIL_SIZE
+        {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session thumbnail size: {}",
+                self.thumbnail_size
+            )));
+        }
+
+        Ok(silica_core::AppLayoutPreferences {
+            sidebar_collapsed: self.sidebar_collapsed,
+            inspector_collapsed: self.inspector_collapsed,
+            filmstrip_visible: self.filmstrip_visible,
+            thumbnail_size: self.thumbnail_size,
+            sort: parse_desktop_app_library_sort(&self.sort)?,
+            filters: self.filters.into_core()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopSessionFilters {
+    min_rating: Option<u8>,
+    picked: Option<bool>,
+    rejected: Option<bool>,
+    file_type: Option<String>,
+    metadata: Option<String>,
+    search: String,
+}
+
+impl DesktopSessionFilters {
+    fn from_core(filters: silica_core::AppSessionFilters) -> Self {
+        Self {
+            min_rating: filters.min_rating,
+            picked: filters.picked,
+            rejected: filters.rejected,
+            file_type: filters
+                .file_type
+                .map(app_file_type_filter_string)
+                .map(str::to_string),
+            metadata: filters
+                .metadata
+                .map(app_metadata_filter_string)
+                .map(str::to_string),
+            search: filters.search,
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppSessionFilters, silica_core::CoreError> {
+        if self.min_rating.is_some_and(|rating| rating > 5) {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session min rating: {}",
+                self.min_rating.unwrap_or_default()
+            )));
+        }
+
+        Ok(silica_core::AppSessionFilters {
+            min_rating: self.min_rating,
+            picked: self.picked,
+            rejected: self.rejected,
+            file_type: self
+                .file_type
+                .as_deref()
+                .map(parse_desktop_app_file_type_filter)
+                .transpose()?,
+            metadata: self
+                .metadata
+                .as_deref()
+                .map(parse_desktop_app_metadata_filter)
+                .transpose()?,
+            search: self.search,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DesktopLibraryQueryRequest {
+    offset: u64,
+    limit: u16,
+    sort: String,
+    #[serde(default)]
+    filters: DesktopLibraryQueryFilters,
+}
+
+impl DesktopLibraryQueryRequest {
+    fn into_core(self) -> Result<silica_core::LibraryQueryRequest, silica_core::CoreError> {
+        Ok(silica_core::LibraryQueryRequest::new(
+            self.offset,
+            self.limit,
+            parse_desktop_library_query_sort(&self.sort)?,
+            self.filters.into_core()?,
+        ))
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+struct DesktopLibraryQueryFilters {
+    min_rating: Option<u8>,
+    picked: Option<bool>,
+    rejected: Option<bool>,
+    file_type: Option<String>,
+    metadata: Option<String>,
+    search: String,
+}
+
+impl DesktopLibraryQueryFilters {
+    fn into_core(self) -> Result<silica_core::LibraryQueryFilters, silica_core::CoreError> {
+        if self.min_rating.is_some_and(|rating| rating > 5) {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid library query min rating: {}",
+                self.min_rating.unwrap_or_default()
+            )));
+        }
+
+        Ok(silica_core::LibraryQueryFilters {
+            min_rating: self.min_rating,
+            picked: self.picked,
+            rejected: self.rejected,
+            file_type: self
+                .file_type
+                .as_deref()
+                .map(parse_desktop_library_query_file_type)
+                .transpose()?,
+            metadata: self
+                .metadata
+                .as_deref()
+                .map(parse_desktop_library_query_metadata)
+                .transpose()?,
+            search: self.search,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopImportIssue {
+    kind: &'static str,
+    path: String,
+    file_name: Option<String>,
+    message: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopPhotoGridItem {
@@ -183,6 +613,27 @@ struct DesktopPhotoGridItem {
     picked: bool,
     rejected: bool,
     color_label: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopHistoryItem {
+    history_id: String,
+    photo_id: String,
+    sequence: i64,
+    action_kind: String,
+    label: String,
+    history_state: String,
+    can_undo: bool,
+    can_redo: bool,
+    created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopMetadataField<T> {
+    state: &'static str,
+    value: Option<T>,
 }
 
 impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
@@ -207,6 +658,22 @@ impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
     }
 }
 
+impl From<silica_core::PhotoHistoryItem> for DesktopHistoryItem {
+    fn from(item: silica_core::PhotoHistoryItem) -> Self {
+        Self {
+            history_id: item.history_id,
+            photo_id: item.photo_id,
+            sequence: item.sequence,
+            action_kind: item.action_kind,
+            label: item.label,
+            history_state: item.history_state,
+            can_undo: item.can_undo,
+            can_redo: item.can_redo,
+            created_at: item.created_at,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopCommandContext {
@@ -225,14 +692,156 @@ struct DesktopCommandError {
 }
 
 #[tauri::command]
-fn create_library(path: String) -> DesktopCommandResponse {
+fn read_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => read_app_session_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "read_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn write_app_session(app: tauri::AppHandle, session: DesktopAppSession) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => write_app_session_at_path(session_path, session),
+        Err(error) => DesktopCommandResponse::error(
+            "write_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn reset_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => reset_app_session_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "reset_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn record_app_session_layout(
+    app: tauri::AppHandle,
+    layout: DesktopLayoutPreferences,
+) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => record_app_session_layout_at_path(session_path, layout),
+        Err(error) => DesktopCommandResponse::error(
+            "record_app_session_layout",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn reset_app_session_layout(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => reset_app_session_layout_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "reset_app_session_layout",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn inspect_app_session(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => inspect_app_session_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "inspect_app_session",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn resolve_launch_restore(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => resolve_launch_restore_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "resolve_launch_restore",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn record_app_session_selection(
+    app: tauri::AppHandle,
+    library_path: String,
+    selected_photo_id: Option<String>,
+    mode: String,
+) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => record_app_session_selection_at_path(
+            session_path,
+            library_path,
+            selected_photo_id,
+            mode,
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            "record_app_session_selection",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn create_library(app: tauri::AppHandle, path: String) -> DesktopCommandResponse {
+    let session_path = match resolve_app_session_path(&app) {
+        Ok(session_path) => Some(session_path),
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                "create_library",
+                error,
+                DesktopCommandContext {
+                    library_path: Some(path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    create_library_at_path(path, session_path)
+}
+
+fn create_library_at_path(path: String, session_path: Option<PathBuf>) -> DesktopCommandResponse {
     let command = "create_library";
     match silica_core::create_library(PathBuf::from(&path)) {
-        Ok(session) => DesktopCommandResponse::ok(
-            command,
-            format!("Library created: {}", session.root_path.display()),
-            library_session_data(session),
-        ),
+        Ok(session) => {
+            if let Some(session_path) = session_path {
+                if let Err(error) =
+                    silica_core::record_app_session_recent_library(&session_path, &session)
+                {
+                    return DesktopCommandResponse::error(
+                        command,
+                        error,
+                        DesktopCommandContext {
+                            library_path: Some(path),
+                            ..DesktopCommandContext::default()
+                        },
+                    );
+                }
+            }
+            DesktopCommandResponse::ok(
+                command,
+                format!("Library created: {}", session.root_path.display()),
+                library_session_data(session),
+            )
+        }
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -245,14 +854,47 @@ fn create_library(path: String) -> DesktopCommandResponse {
 }
 
 #[tauri::command]
-fn open_library(path: String) -> DesktopCommandResponse {
+fn open_library(app: tauri::AppHandle, path: String) -> DesktopCommandResponse {
+    let session_path = match resolve_app_session_path(&app) {
+        Ok(session_path) => Some(session_path),
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                "open_library",
+                error,
+                DesktopCommandContext {
+                    library_path: Some(path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    open_library_at_path(path, session_path)
+}
+
+fn open_library_at_path(path: String, session_path: Option<PathBuf>) -> DesktopCommandResponse {
     let command = "open_library";
     match silica_core::open_library(PathBuf::from(&path)) {
-        Ok(session) => DesktopCommandResponse::ok(
-            command,
-            format!("Library opened: {}", session.root_path.display()),
-            library_session_data(session),
-        ),
+        Ok(session) => {
+            if let Some(session_path) = session_path {
+                if let Err(error) =
+                    silica_core::record_app_session_recent_library(&session_path, &session)
+                {
+                    return DesktopCommandResponse::error(
+                        command,
+                        error,
+                        DesktopCommandContext {
+                            library_path: Some(path),
+                            ..DesktopCommandContext::default()
+                        },
+                    );
+                }
+            }
+            DesktopCommandResponse::ok(
+                command,
+                format!("Library opened: {}", session.root_path.display()),
+                library_session_data(session),
+            )
+        }
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -265,9 +907,20 @@ fn open_library(path: String) -> DesktopCommandResponse {
 }
 
 #[tauri::command]
-fn import_folder(library_path: String, folder_path: String) -> DesktopCommandResponse {
+fn import_folder(
+    library_path: String,
+    folder_path: String,
+    recursive: Option<bool>,
+) -> DesktopCommandResponse {
     let command = "import_folder";
-    match silica_core::import_folder(PathBuf::from(&library_path), PathBuf::from(&folder_path)) {
+    let options = silica_core::FolderImportOptions {
+        recursive: recursive.unwrap_or(false),
+    };
+    match silica_core::import_folder_with_options(
+        PathBuf::from(&library_path),
+        PathBuf::from(&folder_path),
+        options,
+    ) {
         Ok(summary) => DesktopCommandResponse::ok(
             command,
             format!(
@@ -279,6 +932,11 @@ fn import_folder(library_path: String, folder_path: String) -> DesktopCommandRes
                 scanned_files: summary.scanned_files,
                 supported_files: summary.supported_files,
                 unsupported_files: summary.unsupported_files,
+                issues: summary
+                    .issues
+                    .into_iter()
+                    .map(desktop_import_issue)
+                    .collect(),
                 originals_unchanged: true,
             },
         ),
@@ -306,6 +964,46 @@ fn list_library_photos(library_path: String) -> DesktopCommandResponse {
                 DesktopCommandData::PhotoGrid { photos },
             )
         }
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn query_library_photos(
+    library_path: String,
+    request: DesktopLibraryQueryRequest,
+) -> DesktopCommandResponse {
+    let command = "query_library_photos";
+    let query = match request.into_core() {
+        Ok(query) => query,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            );
+        }
+    };
+
+    match silica_core::query_library_photos_with_thumbnail_hydration(
+        PathBuf::from(&library_path),
+        query,
+    ) {
+        Ok(page) => DesktopCommandResponse::ok(
+            command,
+            "Library grid page loaded.",
+            photo_grid_page_data(page),
+        ),
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -371,6 +1069,28 @@ fn get_photo_flags(library_path: String, photo_id: String) -> DesktopCommandResp
 }
 
 #[tauri::command]
+fn get_photo_metadata(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_metadata";
+    match silica_core::get_photo_metadata(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(metadata)) => DesktopCommandResponse::ok(
+            command,
+            "Photo metadata loaded.",
+            photo_metadata_data(metadata),
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn open_photo_preview(library_path: String, photo_id: String) -> DesktopCommandResponse {
     let command = "open_photo_preview";
     match silica_core::open_photo_preview(PathBuf::from(&library_path), &photo_id) {
@@ -422,6 +1142,182 @@ fn preview_exposure_contrast_edit(
                 status: preview_status_text(preview.status),
                 exposure: preview.exposure,
                 contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_white_balance_edit(
+    library_path: String,
+    photo_id: String,
+    white_balance: String,
+    temperature: f64,
+    tint: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_white_balance_edit";
+    let white_balance_mode = match parse_white_balance(&white_balance) {
+        Ok(mode) => mode,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    match silica_core::preview_white_balance_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        white_balance_mode,
+        temperature,
+        tint,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_tone_recovery_edit(
+    library_path: String,
+    photo_id: String,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_tone_recovery_edit";
+    match silica_core::preview_tone_recovery_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        highlights,
+        shadows,
+        whites,
+        blacks,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_color_presence_edit(
+    library_path: String,
+    photo_id: String,
+    vibrance: f64,
+    saturation: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_color_presence_edit";
+    match silica_core::preview_color_presence_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        vibrance,
+        saturation,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -460,6 +1356,268 @@ fn commit_exposure_contrast_edit(
                 photo_id: commit.photo_id,
                 exposure: commit.exposure,
                 contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_white_balance_edit(
+    library_path: String,
+    photo_id: String,
+    white_balance: String,
+    temperature: f64,
+    tint: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_white_balance_edit";
+    let white_balance_mode = match parse_white_balance(&white_balance) {
+        Ok(mode) => mode,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    match silica_core::commit_white_balance_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        white_balance_mode,
+        temperature,
+        tint,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_tone_recovery_edit(
+    library_path: String,
+    photo_id: String,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_tone_recovery_edit";
+    match silica_core::commit_tone_recovery_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        highlights,
+        shadows,
+        whites,
+        blacks,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_color_presence_edit(
+    library_path: String,
+    photo_id: String,
+    vibrance: f64,
+    saturation: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_color_presence_edit";
+    match silica_core::commit_color_presence_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        vibrance,
+        saturation,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "commit_p0_basic_reset";
+    match silica_core::commit_p0_basic_reset(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_basic_preset_edit(
+    library_path: String,
+    photo_id: String,
+    preset: String,
+) -> DesktopCommandResponse {
+    let command = "commit_basic_preset_edit";
+    let preset = match parse_basic_preset(&preset) {
+        Ok(preset) => preset,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+    match silica_core::commit_basic_preset_edit(PathBuf::from(&library_path), &photo_id, preset) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -488,11 +1646,117 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 photo_id: state.photo_id,
                 exposure: state.exposure,
                 contrast: state.contrast,
+                white_balance: white_balance_text(state.white_balance),
+                temperature: state.temperature,
+                tint: state.tint,
+                highlights: state.highlights,
+                shadows: state.shadows,
+                whites: state.whites,
+                blacks: state.blacks,
+                vibrance: state.vibrance,
+                saturation: state.saturation,
                 persisted: state.persisted,
                 message: state.message,
             },
         ),
         Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn get_photo_histogram(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_histogram";
+    match silica_core::get_photo_histogram(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(histogram)) => DesktopCommandResponse::ok(
+            command,
+            histogram.message.clone(),
+            DesktopCommandData::Histogram {
+                photo_id: histogram.photo_id,
+                source_path: histogram.source_path,
+                status: histogram_status_text(histogram.status),
+                red: histogram.red,
+                green: histogram.green,
+                blue: histogram.blue,
+                luminance: histogram.luminance,
+                pixel_count: histogram.pixel_count,
+                cache_key: histogram.cache_key,
+                cache_path: histogram.cache_path,
+                message: histogram.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn undo_last_history_action(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "undo_last_history_action";
+    match silica_core::undo_last_history_action(PathBuf::from(&library_path), &photo_id) {
+        Ok(result) => DesktopCommandResponse::ok(
+            command,
+            result.message.clone(),
+            history_command_data(result),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn redo_last_history_action(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "redo_last_history_action";
+    match silica_core::redo_last_history_action(PathBuf::from(&library_path), &photo_id) {
+        Ok(result) => DesktopCommandResponse::ok(
+            command,
+            result.message.clone(),
+            history_command_data(result),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn get_photo_history(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_photo_history";
+    match silica_core::list_photo_history(PathBuf::from(&library_path), &photo_id) {
+        Ok(panel) => DesktopCommandResponse::ok(
+            command,
+            panel.message.clone(),
+            photo_history_panel_data(panel),
+        ),
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -512,11 +1776,121 @@ fn export_photo_jpeg_srgb(
     output_path: String,
 ) -> DesktopCommandResponse {
     let command = "export_photo_jpeg_srgb";
-    match silica_core::export_photo_jpeg_srgb(
-        PathBuf::from(&library_path),
-        &photo_id,
-        PathBuf::from(&output_path),
-    ) {
+    desktop_photo_export_response(
+        command,
+        silica_core::export_photo_jpeg_srgb(
+            PathBuf::from(&library_path),
+            &photo_id,
+            PathBuf::from(&output_path),
+        ),
+        library_path,
+        output_path,
+        photo_id,
+    )
+}
+
+#[tauri::command]
+fn export_photo_jpeg(
+    library_path: String,
+    photo_id: String,
+    output_path: String,
+    color_profile: Option<String>,
+) -> DesktopCommandResponse {
+    let command = "export_photo_jpeg";
+    let requested_profile = match parse_export_color_profile(color_profile.as_deref()) {
+        Ok(profile) => profile,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    output_path: Some(output_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+
+    desktop_photo_export_response(
+        command,
+        silica_core::export_photo_jpeg(
+            PathBuf::from(&library_path),
+            &photo_id,
+            PathBuf::from(&output_path),
+            requested_profile,
+        ),
+        library_path,
+        output_path,
+        photo_id,
+    )
+}
+
+fn parse_export_color_profile(
+    color_profile: Option<&str>,
+) -> Result<silica_core::PhotoExportColorProfile, silica_core::CoreError> {
+    match color_profile.unwrap_or("srgb") {
+        "srgb" => Ok(silica_core::PhotoExportColorProfile::Srgb),
+        "display_p3" => Ok(silica_core::PhotoExportColorProfile::DisplayP3),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported export color profile: {unsupported}. Supported profiles: srgb, display_p3."
+        ))),
+    }
+}
+
+fn parse_white_balance(
+    white_balance: &str,
+) -> Result<silica_core::WhiteBalance, silica_core::CoreError> {
+    match white_balance {
+        "as_shot" => Ok(silica_core::WhiteBalance::AsShot),
+        "auto" => Ok(silica_core::WhiteBalance::Auto),
+        "daylight" => Ok(silica_core::WhiteBalance::Daylight),
+        "cloudy" => Ok(silica_core::WhiteBalance::Cloudy),
+        "shade" => Ok(silica_core::WhiteBalance::Shade),
+        "tungsten" => Ok(silica_core::WhiteBalance::Tungsten),
+        "fluorescent" => Ok(silica_core::WhiteBalance::Fluorescent),
+        "flash" => Ok(silica_core::WhiteBalance::Flash),
+        "custom" => Ok(silica_core::WhiteBalance::Custom),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported white balance mode: {unsupported}."
+        ))),
+    }
+}
+
+fn parse_basic_preset(preset: &str) -> Result<silica_core::BasicPreset, silica_core::CoreError> {
+    match preset {
+        "silica_neutral" => Ok(silica_core::BasicPreset::SilicaNeutral),
+        "warm_contrast" => Ok(silica_core::BasicPreset::WarmContrast),
+        "soft_matte" => Ok(silica_core::BasicPreset::SoftMatte),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported basic preset: {unsupported}."
+        ))),
+    }
+}
+
+fn white_balance_text(white_balance: silica_core::WhiteBalance) -> &'static str {
+    match white_balance {
+        silica_core::WhiteBalance::AsShot => "as_shot",
+        silica_core::WhiteBalance::Auto => "auto",
+        silica_core::WhiteBalance::Daylight => "daylight",
+        silica_core::WhiteBalance::Cloudy => "cloudy",
+        silica_core::WhiteBalance::Shade => "shade",
+        silica_core::WhiteBalance::Tungsten => "tungsten",
+        silica_core::WhiteBalance::Fluorescent => "fluorescent",
+        silica_core::WhiteBalance::Flash => "flash",
+        silica_core::WhiteBalance::Custom => "custom",
+    }
+}
+
+fn desktop_photo_export_response(
+    command: &'static str,
+    export_result: Result<Option<silica_core::PhotoExportSession>, silica_core::CoreError>,
+    library_path: String,
+    output_path: String,
+    photo_id: String,
+) -> DesktopCommandResponse {
+    match export_result {
         Ok(Some(export)) => DesktopCommandResponse::ok(
             command,
             export.message.clone(),
@@ -527,6 +1901,13 @@ fn export_photo_jpeg_srgb(
                 format: export.format,
                 color_profile: export.color_profile,
                 bytes_written: export.bytes_written,
+                source_sha256: export.source_sha256,
+                output_sha256: export.output_sha256,
+                icc_profile_embedded: export.icc_profile_embedded,
+                icc_profile_sha256: export.icc_profile_sha256,
+                decoder_backend: export.decoder_backend,
+                input_profile: export.input_profile,
+                working_space: export.working_space,
                 export_record_id: export.export_record_id,
                 message: export.message,
             },
@@ -578,6 +1959,226 @@ fn library_session_data(session: silica_core::LibrarySession) -> DesktopCommandD
     }
 }
 
+fn resolve_app_session_path(app: &tauri::AppHandle) -> Result<PathBuf, silica_core::CoreError> {
+    app.path()
+        .resolve("app-session.json", BaseDirectory::AppConfig)
+        .map_err(|error| {
+            silica_core::CoreError::AppSession(format!("resolve app session path: {error}"))
+        })
+}
+
+fn read_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "read_app_session";
+    match silica_core::load_app_session(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session loaded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn write_app_session_at_path(
+    session_path: PathBuf,
+    session: DesktopAppSession,
+) -> DesktopCommandResponse {
+    let command = "write_app_session";
+    let session = match session.into_core() {
+        Ok(session) => session,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+
+    match silica_core::write_app_session(&session_path, &session) {
+        Ok(written) => DesktopCommandResponse::ok(
+            command,
+            "App session written.",
+            DesktopCommandData::AppSessionWrite {
+                session_path: written.session_path.display().to_string(),
+                bytes_written: written.bytes_written,
+            },
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn reset_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "reset_app_session";
+    let session = silica_core::AppSession::default();
+    match silica_core::write_app_session(&session_path, &session) {
+        Ok(_) => DesktopCommandResponse::ok(
+            command,
+            "App session reset.",
+            DesktopCommandData::AppSession {
+                session_path: session_path.display().to_string(),
+                session: DesktopAppSession::from_core(session),
+                warnings: Vec::new(),
+            },
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn record_app_session_layout_at_path(
+    session_path: PathBuf,
+    layout: DesktopLayoutPreferences,
+) -> DesktopCommandResponse {
+    let command = "record_app_session_layout";
+    let layout = match layout.into_core() {
+        Ok(layout) => layout,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+
+    match silica_core::record_app_session_layout(&session_path, layout) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session layout recorded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn reset_app_session_layout_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "reset_app_session_layout";
+    match silica_core::reset_app_session_layout(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session layout reset.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn inspect_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "inspect_app_session";
+    let exists = session_path.is_file();
+    match silica_core::load_app_session(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session inspected.",
+            DesktopCommandData::AppSessionInspection {
+                session_path: session_path.display().to_string(),
+                exists,
+                warnings: app_session_warning_strings(&loaded.warnings),
+            },
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn resolve_launch_restore_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "resolve_launch_restore";
+    match silica_core::plan_app_session_restore(&session_path) {
+        Ok(plan) => {
+            let status = app_session_restore_status_string(plan.status).to_string();
+            let state = if plan.status == silica_core::AppSessionRestoreStatus::Restored {
+                "library".to_string()
+            } else {
+                "welcome".to_string()
+            };
+            let fallback_reason = if state == "welcome" {
+                Some(status.clone())
+            } else {
+                None
+            };
+            DesktopCommandResponse::ok(
+                command,
+                "Launch restore resolved.",
+                DesktopCommandData::LaunchRestore {
+                    session_path: session_path.display().to_string(),
+                    session: DesktopAppSession::from_core(plan.session),
+                    warnings: app_session_warning_strings(&plan.warnings),
+                    status,
+                    state,
+                    fallback_reason,
+                    requested_mode: app_session_mode_string(plan.requested_mode).to_string(),
+                    resolved_mode: app_session_mode_string(plan.resolved_mode).to_string(),
+                    selected_photo_id: plan.selected_photo_id,
+                    selected_photo_status: app_session_selected_photo_status_string(
+                        plan.selected_photo_status,
+                    )
+                    .to_string(),
+                    library_root_path: plan
+                        .library_root_path
+                        .map(|path| path.display().to_string()),
+                    catalog_path: plan.catalog_path.map(|path| path.display().to_string()),
+                    schema_version: plan.schema_version,
+                },
+            )
+        }
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn record_app_session_selection_at_path(
+    session_path: PathBuf,
+    library_path: String,
+    selected_photo_id: Option<String>,
+    mode: String,
+) -> DesktopCommandResponse {
+    let command = "record_app_session_selection";
+    let mode = match parse_desktop_app_session_mode(&mode) {
+        Ok(mode) => mode,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+    let selected_photo_id =
+        selected_photo_id.and_then(|photo_id| (!photo_id.trim().is_empty()).then_some(photo_id));
+
+    match silica_core::record_app_session_library_state(
+        &session_path,
+        PathBuf::from(&library_path),
+        selected_photo_id,
+        mode,
+    ) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session selection recorded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+fn app_session_data(
+    session_path: PathBuf,
+    loaded: silica_core::AppSessionLoadResult,
+) -> DesktopCommandData {
+    DesktopCommandData::AppSession {
+        session_path: session_path.display().to_string(),
+        session: DesktopAppSession::from_core(loaded.session),
+        warnings: app_session_warning_strings(&loaded.warnings),
+    }
+}
+
 fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
     DesktopCommandData::PhotoFlags {
         photo_id: flags.photo_id,
@@ -585,6 +2186,257 @@ fn photo_flags_data(flags: silica_core::PhotoFlags) -> DesktopCommandData {
         picked: flags.picked,
         rejected: flags.rejected,
         color_label: flags.color_label,
+    }
+}
+
+fn history_command_data(result: silica_core::HistoryCommandResult) -> DesktopCommandData {
+    DesktopCommandData::HistoryCommand {
+        photo_id: result.photo_id,
+        command: result.command,
+        applied: result.applied,
+        action_kind: result.action_kind,
+        history_id: result.history_id,
+        message: result.message,
+    }
+}
+
+fn photo_history_panel_data(panel: silica_core::PhotoHistoryPanel) -> DesktopCommandData {
+    DesktopCommandData::HistoryPanel {
+        photo_id: panel.photo_id,
+        items: panel
+            .items
+            .into_iter()
+            .map(DesktopHistoryItem::from)
+            .collect(),
+        can_undo: panel.can_undo,
+        can_redo: panel.can_redo,
+        status: panel.status,
+        message: panel.message,
+    }
+}
+
+fn photo_metadata_data(metadata: silica_core::PhotoMetadata) -> DesktopCommandData {
+    DesktopCommandData::PhotoMetadata {
+        photo_id: metadata.photo_id,
+        file_name: metadata.file_name,
+        source_path: metadata.source_path,
+        file_type: metadata.file_type,
+        unsupported: metadata.unsupported,
+        file_size: metadata_field(metadata.file_size),
+        modified_at: metadata_field(metadata.modified_at),
+        width: metadata_field(metadata.width),
+        height: metadata_field(metadata.height),
+        orientation: metadata_field(metadata.orientation),
+        capture_time: metadata_field(metadata.capture_time),
+        camera_make: metadata_field(metadata.camera_make),
+        camera_model: metadata_field(metadata.camera_model),
+        lens_model: metadata_field(metadata.lens_model),
+    }
+}
+
+fn desktop_import_issue(issue: silica_core::ImportIssue) -> DesktopImportIssue {
+    DesktopImportIssue {
+        kind: issue.kind.as_str(),
+        path: issue.path,
+        file_name: issue.file_name,
+        message: issue.message,
+    }
+}
+
+fn metadata_field<T>(field: silica_core::PhotoMetadataField<T>) -> DesktopMetadataField<T> {
+    DesktopMetadataField {
+        state: metadata_field_state_string(field.state),
+        value: field.value,
+    }
+}
+
+fn metadata_field_state_string(state: silica_core::PhotoMetadataFieldState) -> &'static str {
+    match state {
+        silica_core::PhotoMetadataFieldState::Known => "known",
+        silica_core::PhotoMetadataFieldState::Unknown => "unknown",
+        silica_core::PhotoMetadataFieldState::Unavailable => "unavailable",
+    }
+}
+
+fn photo_grid_page_data(
+    page: silica_core::LibraryQueryPage<silica_core::LibraryPhotoGridItem>,
+) -> DesktopCommandData {
+    DesktopCommandData::PhotoGridPage {
+        photos: page
+            .items
+            .into_iter()
+            .map(DesktopPhotoGridItem::from)
+            .collect(),
+        offset: page.offset,
+        limit: page.limit,
+        total_count: page.total_count,
+        has_next_page: page.has_next_page,
+        order_fields: page
+            .order_fields
+            .iter()
+            .copied()
+            .map(library_query_order_field_string)
+            .collect(),
+    }
+}
+
+fn app_session_warning_strings(warnings: &[silica_core::AppSessionWarning]) -> Vec<String> {
+    warnings
+        .iter()
+        .map(|warning| match warning {
+            silica_core::AppSessionWarning::Missing => "missing",
+            silica_core::AppSessionWarning::Corrupt => "corrupt",
+            silica_core::AppSessionWarning::UnsupportedVersion => "unsupportedVersion",
+            silica_core::AppSessionWarning::InvalidValues => "invalidValues",
+        })
+        .map(str::to_string)
+        .collect()
+}
+
+fn app_session_restore_status_string(status: silica_core::AppSessionRestoreStatus) -> &'static str {
+    match status {
+        silica_core::AppSessionRestoreStatus::NoLastLibrary => "noLastLibrary",
+        silica_core::AppSessionRestoreStatus::MissingLibrary => "missingLibrary",
+        silica_core::AppSessionRestoreStatus::MissingCatalog => "missingCatalog",
+        silica_core::AppSessionRestoreStatus::InvalidCatalog => "invalidCatalog",
+        silica_core::AppSessionRestoreStatus::Restored => "restored",
+    }
+}
+
+fn app_session_selected_photo_status_string(
+    status: silica_core::AppSessionSelectedPhotoStatus,
+) -> &'static str {
+    match status {
+        silica_core::AppSessionSelectedPhotoStatus::None => "none",
+        silica_core::AppSessionSelectedPhotoStatus::Missing => "missing",
+        silica_core::AppSessionSelectedPhotoStatus::Restored => "restored",
+    }
+}
+
+fn parse_desktop_app_session_mode(
+    mode: &str,
+) -> Result<silica_core::AppSessionMode, silica_core::CoreError> {
+    match mode {
+        "library" => Ok(silica_core::AppSessionMode::Library),
+        "develop" => Ok(silica_core::AppSessionMode::Develop),
+        "export" => Ok(silica_core::AppSessionMode::Export),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app session mode: {other}"
+        ))),
+    }
+}
+
+fn app_session_mode_string(mode: silica_core::AppSessionMode) -> &'static str {
+    match mode {
+        silica_core::AppSessionMode::Library => "library",
+        silica_core::AppSessionMode::Develop => "develop",
+        silica_core::AppSessionMode::Export => "export",
+    }
+}
+
+fn parse_desktop_app_library_sort(
+    sort: &str,
+) -> Result<silica_core::AppLibrarySort, silica_core::CoreError> {
+    match sort {
+        "imported_at_desc" => Ok(silica_core::AppLibrarySort::ImportedAtDesc),
+        "file_name_asc" => Ok(silica_core::AppLibrarySort::FileNameAsc),
+        "rating_desc" => Ok(silica_core::AppLibrarySort::RatingDesc),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app library sort: {other}"
+        ))),
+    }
+}
+
+fn app_library_sort_string(sort: silica_core::AppLibrarySort) -> &'static str {
+    match sort {
+        silica_core::AppLibrarySort::ImportedAtDesc => "imported_at_desc",
+        silica_core::AppLibrarySort::FileNameAsc => "file_name_asc",
+        silica_core::AppLibrarySort::RatingDesc => "rating_desc",
+    }
+}
+
+fn parse_desktop_app_file_type_filter(
+    file_type: &str,
+) -> Result<silica_core::AppFileTypeFilter, silica_core::CoreError> {
+    match file_type {
+        "jpeg" => Ok(silica_core::AppFileTypeFilter::Jpeg),
+        "raw" => Ok(silica_core::AppFileTypeFilter::Raw),
+        "unsupported" => Ok(silica_core::AppFileTypeFilter::Unsupported),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app file type filter: {other}"
+        ))),
+    }
+}
+
+fn app_file_type_filter_string(filter: silica_core::AppFileTypeFilter) -> &'static str {
+    match filter {
+        silica_core::AppFileTypeFilter::Jpeg => "jpeg",
+        silica_core::AppFileTypeFilter::Raw => "raw",
+        silica_core::AppFileTypeFilter::Unsupported => "unsupported",
+    }
+}
+
+fn parse_desktop_app_metadata_filter(
+    metadata: &str,
+) -> Result<silica_core::AppMetadataFilter, silica_core::CoreError> {
+    match metadata {
+        "has_dimensions" => Ok(silica_core::AppMetadataFilter::HasDimensions),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app metadata filter: {other}"
+        ))),
+    }
+}
+
+fn app_metadata_filter_string(filter: silica_core::AppMetadataFilter) -> &'static str {
+    match filter {
+        silica_core::AppMetadataFilter::HasDimensions => "has_dimensions",
+    }
+}
+
+fn parse_desktop_library_query_sort(
+    sort: &str,
+) -> Result<silica_core::LibraryQuerySort, silica_core::CoreError> {
+    match sort {
+        "imported_at_desc" => Ok(silica_core::LibraryQuerySort::ImportedAtDesc),
+        "file_name_asc" => Ok(silica_core::LibraryQuerySort::FileNameAsc),
+        "rating_desc" => Ok(silica_core::LibraryQuerySort::RatingDesc),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid library query sort: {other}"
+        ))),
+    }
+}
+
+fn parse_desktop_library_query_file_type(
+    file_type: &str,
+) -> Result<silica_core::LibraryQueryFileType, silica_core::CoreError> {
+    match file_type {
+        "jpeg" => Ok(silica_core::LibraryQueryFileType::Jpeg),
+        "raw" => Ok(silica_core::LibraryQueryFileType::Raw),
+        "unsupported" => Ok(silica_core::LibraryQueryFileType::Unsupported),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid library query file type: {other}"
+        ))),
+    }
+}
+
+fn parse_desktop_library_query_metadata(
+    metadata: &str,
+) -> Result<silica_core::LibraryQueryMetadataFilter, silica_core::CoreError> {
+    match metadata {
+        "has_dimensions" => Ok(silica_core::LibraryQueryMetadataFilter::HasDimensions),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid library query metadata filter: {other}"
+        ))),
+    }
+}
+
+fn library_query_order_field_string(field: silica_core::LibraryQueryOrderField) -> &'static str {
+    match field {
+        silica_core::LibraryQueryOrderField::ImportedAtDesc => "imported_at_desc",
+        silica_core::LibraryQueryOrderField::FileNameAsc => "file_name_asc",
+        silica_core::LibraryQueryOrderField::RatingDesc => "rating_desc",
+        silica_core::LibraryQueryOrderField::PhotoIdAsc => "photo_id_asc",
+        silica_core::LibraryQueryOrderField::PathAsc => "path_asc",
     }
 }
 
@@ -596,34 +2448,98 @@ fn preview_status_text(status: silica_core::PhotoPreviewStatus) -> &'static str 
     }
 }
 
+fn histogram_status_text(status: silica_core::PhotoHistogramStatus) -> &'static str {
+    match status {
+        silica_core::PhotoHistogramStatus::Ready => "Ready",
+        silica_core::PhotoHistogramStatus::BlockedByDecode => "BlockedByDecode",
+        silica_core::PhotoHistogramStatus::Unsupported => "Unsupported",
+        silica_core::PhotoHistogramStatus::Missing => "Missing",
+    }
+}
+
 fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
     match error {
         silica_core::CoreError::Storage(_) => "storage",
+        silica_core::CoreError::Decode(_) => "decode",
+        silica_core::CoreError::RawExport(_) => "decode",
         silica_core::CoreError::EditGraph(_) => "editGraph",
         silica_core::CoreError::Export(_) => "export",
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
+        silica_core::CoreError::AppSession(_) => "appSession",
     }
 }
 
 fn main() {
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
 
+    #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
+    {
+        let _native_viewer_contract = native_metal_viewer::module_contract();
+        if std::env::var_os("SILICA_NATIVE_VIEWER_LIFECYCLE_PROOF").is_some() {
+            match native_metal_viewer::lifecycle_smoke_evidence() {
+                Ok(evidence) => eprintln!("[SilicaRAW Native Viewer] {evidence}"),
+                Err(error) => {
+                    eprintln!("[SilicaRAW Native Viewer] lifecycle proof unavailable: {error}")
+                }
+            }
+        }
+        if std::env::var_os("SILICA_NATIVE_VIEWER_INPUT_PROOF").is_some() {
+            match native_metal_viewer::input_smoke_evidence() {
+                Ok(evidence) => eprintln!("[SilicaRAW Native Viewer] {evidence}"),
+                Err(error) => {
+                    eprintln!("[SilicaRAW Native Viewer] input proof unavailable: {error}")
+                }
+            }
+        }
+        if std::env::var_os("SILICA_NATIVE_VIEWER_RENDER_REQUEST_PROOF").is_some() {
+            let evidence = native_metal_viewer::render_request_smoke_evidence();
+            eprintln!("[SilicaRAW Native Viewer] {evidence}");
+        }
+        if std::env::var_os("SILICA_NATIVE_VIEWER_TEXTURE_LIFECYCLE_PROOF").is_some() {
+            let evidence = native_metal_viewer::texture_lifecycle_smoke_evidence();
+            eprintln!("[SilicaRAW Native Viewer] {evidence}");
+        }
+    }
+
     #[cfg(all(target_os = "macos", feature = "metal-host-spike"))]
     let builder = builder.setup(metal_host_spike::install);
 
     builder
         .invoke_handler(tauri::generate_handler![
+            read_app_session,
+            write_app_session,
+            reset_app_session,
+            record_app_session_layout,
+            reset_app_session_layout,
+            inspect_app_session,
+            resolve_launch_restore,
+            record_app_session_selection,
             create_library,
             open_library,
             import_folder,
             list_library_photos,
+            query_library_photos,
             set_photo_flags,
             get_photo_flags,
+            get_photo_metadata,
             open_photo_preview,
             preview_exposure_contrast_edit,
+            preview_white_balance_edit,
+            preview_tone_recovery_edit,
+            preview_color_presence_edit,
             commit_exposure_contrast_edit,
+            commit_white_balance_edit,
+            commit_tone_recovery_edit,
+            commit_color_presence_edit,
+            commit_p0_basic_reset,
+            commit_basic_preset_edit,
             get_photo_edit_state,
+            get_photo_histogram,
+            undo_last_history_action,
+            redo_last_history_action,
+            get_photo_history,
             export_photo_jpeg_srgb,
+            export_photo_jpeg,
             clear_library_cache
         ])
         .run(tauri::generate_context!())
@@ -636,11 +2552,408 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
+    fn desktop_core_error_kind_maps_decode_errors() {
+        let error =
+            silica_core::CoreError::Decode(silica_core::RawPreviewArtifactError::InvalidRequest(
+                "invalid RAW preview request".to_string(),
+            ));
+
+        assert_eq!(super::core_error_kind(&error), "decode");
+    }
+
+    #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
+    #[test]
+    fn product_native_viewer_contract_is_separate_from_spike() {
+        let contract = super::native_metal_viewer::module_contract();
+
+        assert_eq!(contract.module_name, "native_metal_viewer");
+        assert_eq!(contract.feature_name, "native-metal-viewer");
+        assert_eq!(contract.phase_task, "14.2");
+        assert!(contract.product_module);
+        assert!(!contract.uses_spike_module);
+        assert!(!contract.installs_in_default_build);
+        assert_eq!(contract.reserved_surfaces, ["loupe", "develop"]);
+        assert!(contract.consumes_web_host_geometry);
+        assert!(contract.controls_must_be_external);
+    }
+
+    #[test]
+    fn desktop_app_session_commands_round_trip_temp_path() {
+        let workspace = unique_library_root("desktop-app-session");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        let missing = super::read_app_session_at_path(session_path.clone());
+        assert!(missing.ok);
+        match response_data(&missing) {
+            super::DesktopCommandData::AppSession {
+                session_path: returned_path,
+                session,
+                warnings,
+            } => {
+                assert_eq!(returned_path, &session_path.display().to_string());
+                assert_eq!(session.last_mode, "library");
+                assert_eq!(session.layout.thumbnail_size, 168);
+                assert_eq!(warnings, &vec!["missing".to_string()]);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(!session_path.exists());
+
+        let mut expected_session = super::DesktopAppSession::default();
+        expected_session.last_library_root_path = Some(library_root.display().to_string());
+        expected_session.last_mode = "develop".to_string();
+        expected_session.recents.push(super::DesktopRecentLibrary {
+            root_path: library_root.display().to_string(),
+            display_name: "SilicaRAW Library".to_string(),
+            last_opened_at: "unix:42".to_string(),
+            available: None,
+        });
+        expected_session.per_library.insert(
+            library_root.display().to_string(),
+            super::DesktopPerLibrarySession {
+                selected_photo_id: Some("photo-1".to_string()),
+                last_mode: "develop".to_string(),
+                last_opened_at: "unix:42".to_string(),
+            },
+        );
+
+        let written =
+            super::write_app_session_at_path(session_path.clone(), expected_session.clone());
+        assert!(written.ok);
+        match response_data(&written) {
+            super::DesktopCommandData::AppSessionWrite {
+                session_path: returned_path,
+                bytes_written,
+            } => {
+                assert_eq!(returned_path, &session_path.display().to_string());
+                assert!(*bytes_written > 0);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(session_path.is_file());
+
+        let inspected = super::inspect_app_session_at_path(session_path.clone());
+        assert!(inspected.ok);
+        match response_data(&inspected) {
+            super::DesktopCommandData::AppSessionInspection {
+                session_path: returned_path,
+                exists,
+                warnings,
+            } => {
+                assert_eq!(returned_path, &session_path.display().to_string());
+                assert!(*exists);
+                assert!(warnings.is_empty());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let loaded = super::read_app_session_at_path(session_path.clone());
+        assert!(loaded.ok);
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession {
+                session, warnings, ..
+            } => {
+                assert_eq!(session.last_mode, "develop");
+                assert_eq!(
+                    session.last_library_root_path.as_deref(),
+                    Some(library_root.display().to_string().as_str())
+                );
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    expected_session.recents[0].root_path
+                );
+                assert_eq!(session.recents[0].available, Some(false));
+                assert!(warnings.is_empty());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let reset = super::reset_app_session_at_path(session_path.clone());
+        assert!(reset.ok);
+        match response_data(&reset) {
+            super::DesktopCommandData::AppSession {
+                session, warnings, ..
+            } => {
+                assert_eq!(session.last_mode, "library");
+                assert!(session.last_library_root_path.is_none());
+                assert!(session.recents.is_empty());
+                assert!(warnings.is_empty());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_app_session_write_rejects_invalid_payload() {
+        let workspace = unique_library_root("desktop-app-session-invalid");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let mut session = super::DesktopAppSession::default();
+        session.last_mode = "not-real".to_string();
+
+        let response = super::write_app_session_at_path(session_path.clone(), session);
+
+        assert!(!response.ok);
+        assert_eq!(response.command, "write_app_session");
+        let error = response.error.as_ref().expect("structured error");
+        assert_eq!(error.kind, "appSession");
+        assert!(error.message.contains("invalid app session mode"));
+        assert!(!session_path.exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_layout_commands_round_trip_and_reset() {
+        let workspace = unique_library_root("desktop-layout-preferences");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let mut layout = super::DesktopLayoutPreferences::from_core(
+            silica_core::default_app_layout_preferences(),
+        );
+        layout.sidebar_collapsed = true;
+        layout.inspector_collapsed = true;
+        layout.filmstrip_visible = false;
+        layout.thumbnail_size = 220;
+        layout.sort = "rating_desc".to_string();
+        layout.filters.min_rating = Some(4);
+        layout.filters.file_type = Some("jpeg".to_string());
+        layout.filters.metadata = Some("has_dimensions".to_string());
+        layout.filters.search = "portrait".to_string();
+
+        let recorded = super::record_app_session_layout_at_path(session_path.clone(), layout);
+
+        assert!(recorded.ok);
+        assert_eq!(recorded.command, "record_app_session_layout");
+        match response_data(&recorded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert!(session.layout.sidebar_collapsed);
+                assert!(session.layout.inspector_collapsed);
+                assert!(!session.layout.filmstrip_visible);
+                assert_eq!(session.layout.thumbnail_size, 220);
+                assert_eq!(session.layout.sort, "rating_desc");
+                assert_eq!(session.layout.filters.min_rating, Some(4));
+                assert_eq!(session.layout.filters.file_type.as_deref(), Some("jpeg"));
+                assert_eq!(
+                    session.layout.filters.metadata.as_deref(),
+                    Some("has_dimensions")
+                );
+                assert_eq!(session.layout.filters.search, "portrait");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let reset = super::reset_app_session_layout_at_path(session_path);
+
+        assert!(reset.ok);
+        assert_eq!(reset.command, "reset_app_session_layout");
+        match response_data(&reset) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert!(!session.layout.sidebar_collapsed);
+                assert!(!session.layout.inspector_collapsed);
+                assert!(session.layout.filmstrip_visible);
+                assert_eq!(session.layout.thumbnail_size, 168);
+                assert_eq!(session.layout.sort, "imported_at_desc");
+                assert_eq!(session.layout.filters.min_rating, None);
+                assert_eq!(session.layout.filters.file_type, None);
+                assert_eq!(session.layout.filters.metadata, None);
+                assert_eq!(session.layout.filters.search, "");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_launch_restore_returns_existing_library_without_repair() {
+        let workspace = unique_library_root("desktop-app-session-restore");
+        let library_root = workspace.join("SilicaRAW Library");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(created.ok);
+
+        let mut session = super::DesktopAppSession::default();
+        session.last_library_root_path = Some(library_root.display().to_string());
+        session.last_mode = "develop".to_string();
+        let written = super::write_app_session_at_path(session_path.clone(), session);
+        assert!(written.ok);
+        std::fs::remove_dir_all(library_root.join("thumbnails")).expect("remove thumbnails");
+
+        let restored = super::resolve_launch_restore_at_path(session_path);
+
+        assert!(restored.ok);
+        assert_eq!(restored.command, "resolve_launch_restore");
+        match response_data(&restored) {
+            super::DesktopCommandData::LaunchRestore {
+                status,
+                state,
+                requested_mode,
+                resolved_mode,
+                library_root_path,
+                catalog_path,
+                ..
+            } => {
+                assert_eq!(status, "restored");
+                assert_eq!(state, "library");
+                assert_eq!(requested_mode, "develop");
+                assert_eq!(resolved_mode, "library");
+                assert_eq!(
+                    library_root_path.as_deref(),
+                    Some(library_root.display().to_string().as_str())
+                );
+                assert_eq!(
+                    catalog_path.as_deref(),
+                    Some(
+                        library_root
+                            .join("catalog.db")
+                            .display()
+                            .to_string()
+                            .as_str()
+                    )
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(!library_root.join("thumbnails").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_launch_restore_returns_recorded_selected_photo() {
+        let workspace = unique_library_root("desktop-selected-photo-restore");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let supported_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(created.ok);
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = silica_core::list_library_photos(&library_root)
+            .expect("list photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.DNG")
+            .map(|photo| photo.photo_id)
+            .expect("photo id");
+
+        let recorded = super::record_app_session_selection_at_path(
+            session_path.clone(),
+            library_root.display().to_string(),
+            Some(photo_id.clone()),
+            "develop".to_string(),
+        );
+        assert!(recorded.ok);
+
+        let restored = super::resolve_launch_restore_at_path(session_path);
+
+        assert!(restored.ok);
+        match response_data(&restored) {
+            super::DesktopCommandData::LaunchRestore {
+                selected_photo_id,
+                selected_photo_status,
+                requested_mode,
+                resolved_mode,
+                ..
+            } => {
+                assert_eq!(selected_photo_id.as_deref(), Some(photo_id.as_str()));
+                assert_eq!(selected_photo_status, "restored");
+                assert_eq!(requested_mode, "develop");
+                assert_eq!(resolved_mode, "develop");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_create_open_records_real_recent_after_success() {
+        let workspace = unique_library_root("desktop-real-recents");
+        let library_root = workspace.join("SilicaRAW Library");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(created.ok);
+
+        let loaded = super::read_app_session_at_path(session_path.clone());
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(
+                    session.last_library_root_path.as_deref(),
+                    Some(library_root.display().to_string().as_str())
+                );
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+                assert_eq!(session.recents[0].available, Some(true));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let opened = super::open_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(opened.ok);
+        let loaded = super::read_app_session_at_path(session_path.clone());
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+                assert_eq!(session.recents[0].available, Some(true));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let failed = super::open_library_at_path(
+            workspace.join("Missing Library").display().to_string(),
+            Some(session_path.clone()),
+        );
+        assert!(!failed.ok);
+        let loaded = super::read_app_session_at_path(session_path);
+        match response_data(&loaded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn desktop_commands_create_and_open_library() {
         let root = unique_library_root("desktop");
 
-        let created = super::create_library(root.display().to_string());
-        let opened = super::open_library(root.display().to_string());
+        let created = super::create_library_at_path(root.display().to_string(), None);
+        let opened = super::open_library_at_path(root.display().to_string(), None);
 
         assert!(created.ok);
         assert!(created.error.is_none());
@@ -660,7 +2973,7 @@ mod tests {
             response_data(&created).catalog_path()
         );
 
-        let missing = super::open_library(root.join("missing").display().to_string());
+        let missing = super::open_library_at_path(root.join("missing").display().to_string(), None);
         assert!(!missing.ok);
         assert_eq!(missing.command, "open_library");
         let error = missing.error.as_ref().expect("structured error");
@@ -785,6 +3098,7 @@ mod tests {
         let imported = super::import_folder(
             library_root.display().to_string(),
             import_root.display().to_string(),
+            None,
         );
 
         assert!(imported.ok);
@@ -793,12 +3107,15 @@ mod tests {
                 scanned_files,
                 supported_files,
                 unsupported_files,
+                issues,
                 originals_unchanged,
                 ..
             } => {
                 assert_eq!(*scanned_files, 2);
                 assert_eq!(*supported_files, 1);
                 assert_eq!(*unsupported_files, 1);
+                assert!(issues.iter().any(|issue| issue.kind == "unsupported_file"
+                    && issue.file_name == Some("notes.txt".to_string())));
                 assert!(*originals_unchanged);
             }
             other => panic!("unexpected response data: {other:?}"),
@@ -860,6 +3177,157 @@ mod tests {
             }
             other => panic!("unexpected response data: {other:?}"),
         }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn paged_grid_command_returns_typed_page_and_structured_errors() {
+        let workspace = unique_library_root("desktop-paged-grid");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("portrait.jpg");
+        let raw_file = import_root.join("sample.DNG");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let raw_id = stable_catalog_id("photo", &raw_file.display().to_string());
+        silica_core::set_photo_flags(&library_root, raw_id.clone(), 5, true, false, None)
+            .expect("set raw flags");
+
+        let page = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 1,
+                sort: "rating_desc".to_string(),
+                filters: super::DesktopLibraryQueryFilters {
+                    min_rating: Some(4),
+                    picked: Some(true),
+                    rejected: None,
+                    file_type: Some("raw".to_string()),
+                    metadata: None,
+                    search: "sample".to_string(),
+                },
+            },
+        );
+
+        assert!(page.ok);
+        assert_eq!(page.command, "query_library_photos");
+        match response_data(&page) {
+            super::DesktopCommandData::PhotoGridPage {
+                photos,
+                offset,
+                limit,
+                total_count,
+                has_next_page,
+                order_fields,
+            } => {
+                assert_eq!(*offset, 0);
+                assert_eq!(*limit, 1);
+                assert_eq!(*total_count, 1);
+                assert!(!has_next_page);
+                assert_eq!(order_fields, &["rating_desc", "photo_id_asc"]);
+                assert_eq!(photos.len(), 1);
+                assert_eq!(photos[0].photo_id, raw_id);
+                assert_eq!(photos[0].thumbnail_bytes, None);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let invalid = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 1,
+                sort: "created_at_desc".to_string(),
+                filters: super::DesktopLibraryQueryFilters::default(),
+            },
+        );
+        assert!(!invalid.ok);
+        assert_eq!(invalid.command, "query_library_photos");
+        let error = invalid.error.as_ref().expect("structured error");
+        assert_eq!(error.kind, "appSession");
+        assert_eq!(
+            error.context.library_path.as_deref(),
+            Some(library_root.to_string_lossy().as_ref())
+        );
+
+        let invalid_metadata = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 1,
+                sort: "file_name_asc".to_string(),
+                filters: super::DesktopLibraryQueryFilters {
+                    metadata: Some("camera_make".to_string()),
+                    ..super::DesktopLibraryQueryFilters::default()
+                },
+            },
+        );
+        assert!(!invalid_metadata.ok);
+        assert_eq!(invalid_metadata.command, "query_library_photos");
+        assert!(invalid_metadata
+            .error
+            .as_ref()
+            .expect("metadata error")
+            .message
+            .contains("invalid library query metadata filter"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_command_returns_typed_field_states() {
+        let workspace = unique_library_root("desktop-metadata-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("portrait.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        std::fs::remove_file(&jpeg_file).expect("remove original before desktop metadata query");
+
+        let photo_id = stable_catalog_id("photo", &jpeg_file.display().to_string());
+        let response = super::get_photo_metadata(library_root.display().to_string(), photo_id);
+
+        assert!(response.ok);
+        assert_eq!(response.command, "get_photo_metadata");
+        match response_data(&response) {
+            super::DesktopCommandData::PhotoMetadata {
+                photo_id,
+                width,
+                height,
+                camera_make,
+                ..
+            } => {
+                assert_eq!(
+                    photo_id,
+                    &stable_catalog_id("photo", &jpeg_file.display().to_string())
+                );
+                assert_eq!(width.state, "known");
+                assert_eq!(width.value, Some(2));
+                assert_eq!(height.state, "known");
+                assert_eq!(height.value, Some(2));
+                assert_eq!(camera_make.state, "unavailable");
+                assert_eq!(camera_make.value, None);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let missing = super::get_photo_metadata(
+            library_root.display().to_string(),
+            "missing-photo".to_string(),
+        );
+        assert!(missing.ok);
+        assert_eq!(missing.data, None);
 
         remove_library_root(&workspace);
     }
@@ -981,6 +3449,466 @@ mod tests {
     }
 
     #[test]
+    fn desktop_commands_preview_and_commit_white_balance_edit() {
+        let workspace = unique_library_root("desktop-white-balance-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_white_balance_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            "custom".to_string(),
+            6500.0,
+            20.0,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                white_balance,
+                temperature,
+                tint,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*white_balance, "custom");
+                assert_eq!(*temperature, 6500.0);
+                assert_eq!(*tint, 20.0);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_white_balance_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            "custom".to_string(),
+            6500.0,
+            20.0,
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                white_balance,
+                temperature,
+                tint,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*white_balance, "custom");
+                assert_eq!(*temperature, 6500.0);
+                assert_eq!(*tint, 20.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let restored =
+            super::get_photo_edit_state(library_root.display().to_string(), photo_id.clone());
+        assert!(restored.ok);
+        match response_data(&restored) {
+            super::DesktopCommandData::EditState {
+                white_balance,
+                temperature,
+                tint,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*white_balance, "custom");
+                assert_eq!(*temperature, 6500.0);
+                assert_eq!(*tint, 20.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_preview_and_commit_tone_recovery_edit() {
+        let workspace = unique_library_root("desktop-tone-recovery-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_tone_recovery_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            -35.0,
+            42.0,
+            10.0,
+            -12.0,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                highlights,
+                shadows,
+                whites,
+                blacks,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*highlights, -35.0);
+                assert_eq!(*shadows, 42.0);
+                assert_eq!(*whites, 10.0);
+                assert_eq!(*blacks, -12.0);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_tone_recovery_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            -35.0,
+            42.0,
+            10.0,
+            -12.0,
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                highlights,
+                shadows,
+                whites,
+                blacks,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*highlights, -35.0);
+                assert_eq!(*shadows, 42.0);
+                assert_eq!(*whites, 10.0);
+                assert_eq!(*blacks, -12.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_preview_and_commit_color_presence_edit() {
+        let workspace = unique_library_root("desktop-color-presence-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_color_presence_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            24.0,
+            -8.5,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                vibrance,
+                saturation,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*vibrance, 24.0);
+                assert_eq!(*saturation, -8.5);
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_color_presence_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            24.0,
+            -8.5,
+        );
+        assert!(committed.ok);
+        match response_data(&committed) {
+            super::DesktopCommandData::EditCommit {
+                vibrance,
+                saturation,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*vibrance, 24.0);
+                assert_eq!(*saturation, -8.5);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_commit_basic_preset_and_reset() {
+        let workspace = unique_library_root("desktop-basic-preset-reset");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preset = super::commit_basic_preset_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            "warm_contrast".to_string(),
+        );
+        assert!(preset.ok, "preset failed: {preset:?}");
+        match response_data(&preset) {
+            super::DesktopCommandData::EditCommit {
+                white_balance,
+                temperature,
+                contrast,
+                vibrance,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*white_balance, "custom");
+                assert_eq!(*temperature, 6200.0);
+                assert_eq!(*contrast, 18.0);
+                assert_eq!(*vibrance, 12.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected preset response data: {other:?}"),
+        }
+
+        let reset =
+            super::commit_p0_basic_reset(library_root.display().to_string(), photo_id.clone());
+        assert!(reset.ok, "reset failed: {reset:?}");
+        match response_data(&reset) {
+            super::DesktopCommandData::EditCommit {
+                white_balance,
+                temperature,
+                exposure,
+                contrast,
+                highlights,
+                shadows,
+                whites,
+                blacks,
+                vibrance,
+                saturation,
+                persisted,
+                ..
+            } => {
+                assert_eq!(*white_balance, "as_shot");
+                assert_eq!(*temperature, 5200.0);
+                assert_eq!(*exposure, 0.0);
+                assert_eq!(*contrast, 0.0);
+                assert_eq!(*highlights, 0.0);
+                assert_eq!(*shadows, 0.0);
+                assert_eq!(*whites, 0.0);
+                assert_eq!(*blacks, 0.0);
+                assert_eq!(*vibrance, 0.0);
+                assert_eq!(*saturation, 0.0);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected reset response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_returns_histogram_contract() {
+        let workspace = unique_library_root("desktop-histogram-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let histogram =
+            super::get_photo_histogram(library_root.display().to_string(), photo_id.clone());
+        assert!(histogram.ok);
+        match response_data(&histogram) {
+            super::DesktopCommandData::Histogram {
+                status,
+                red,
+                green,
+                blue,
+                luminance,
+                pixel_count,
+                cache_path,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(*pixel_count, 4);
+                assert_eq!(red.len(), 256);
+                assert_eq!(green.len(), 256);
+                assert_eq!(blue.len(), 256);
+                assert_eq!(luminance.len(), 256);
+                assert!(cache_path.contains("render-cache"));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_undo_and_redo_history() {
+        let workspace = unique_library_root("desktop-undo-redo");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.5,
+            -8.0,
+        );
+        assert!(commit.ok, "commit failed: {commit:?}");
+
+        let undo =
+            super::undo_last_history_action(library_root.display().to_string(), photo_id.clone());
+        assert!(undo.ok, "undo failed: {undo:?}");
+        match response_data(&undo) {
+            super::DesktopCommandData::HistoryCommand {
+                applied,
+                action_kind,
+                ..
+            } => {
+                assert!(*applied);
+                assert_eq!(action_kind.as_deref(), Some("edit_commit"));
+            }
+            other => panic!("unexpected undo response data: {other:?}"),
+        }
+
+        let redo = super::redo_last_history_action(library_root.display().to_string(), photo_id);
+        assert!(redo.ok, "redo failed: {redo:?}");
+        match response_data(&redo) {
+            super::DesktopCommandData::HistoryCommand {
+                applied,
+                action_kind,
+                ..
+            } => {
+                assert!(*applied);
+                assert_eq!(action_kind.as_deref(), Some("edit_commit"));
+            }
+            other => panic!("unexpected redo response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_returns_history_panel_contract() {
+        let workspace = unique_library_root("desktop-history-panel");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let empty = super::get_photo_history(library_root.display().to_string(), photo_id.clone());
+        assert!(empty.ok, "empty history failed: {empty:?}");
+        match response_data(&empty) {
+            super::DesktopCommandData::HistoryPanel {
+                items,
+                can_undo,
+                can_redo,
+                status,
+                ..
+            } => {
+                assert!(items.is_empty());
+                assert!(!can_undo);
+                assert!(!can_redo);
+                assert_eq!(status, "empty");
+            }
+            other => panic!("unexpected empty history response data: {other:?}"),
+        }
+
+        let commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.5,
+            -8.0,
+        );
+        assert!(commit.ok, "commit failed: {commit:?}");
+
+        let history = super::get_photo_history(library_root.display().to_string(), photo_id);
+        assert!(history.ok, "history failed: {history:?}");
+        assert_eq!(response_data(&history).kind(), "historyPanel");
+        match response_data(&history) {
+            super::DesktopCommandData::HistoryPanel {
+                items,
+                can_undo,
+                can_redo,
+                status,
+                ..
+            } => {
+                assert_eq!(status, "ready");
+                assert!(*can_undo);
+                assert!(!can_redo);
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0].action_kind, "edit_commit");
+                assert_eq!(items[0].label, "Exposure / contrast");
+                assert_eq!(items[0].history_state, "applied");
+            }
+            other => panic!("unexpected history response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn desktop_command_exports_photo_jpeg_srgb() {
         let workspace = unique_library_root("desktop-export");
         let library_root = workspace.join("SilicaRAW Library");
@@ -1024,6 +3952,66 @@ mod tests {
         assert!(output_path.is_file());
 
         remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_exports_photo_jpeg_display_p3_explicitly() {
+        let workspace = unique_library_root("desktop-export-display-p3");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-display-p3.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let export = super::export_photo_jpeg(
+            library_root.display().to_string(),
+            photo_id,
+            output_path.display().to_string(),
+            Some("display_p3".to_string()),
+        );
+
+        assert!(export.ok);
+        match response_data(&export) {
+            super::DesktopCommandData::Export {
+                format,
+                color_profile,
+                output_path: actual_output_path,
+                ..
+            } => {
+                assert_eq!(format, "jpeg");
+                assert_eq!(color_profile, "display_p3");
+                assert_eq!(actual_output_path, &output_path.display().to_string());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(output_path.is_file());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_blocks_unsupported_jpeg_color_profile() {
+        let rejected = super::export_photo_jpeg(
+            "/tmp/missing-library".to_string(),
+            "photo-1".to_string(),
+            "/tmp/output.jpg".to_string(),
+            Some("adobe_rgb".to_string()),
+        );
+
+        assert!(!rejected.ok);
+        let error = rejected.error.as_ref().expect("error payload");
+        assert_eq!(error.kind, "exportBlocked");
+        assert!(error
+            .message
+            .contains("Unsupported export color profile: adobe_rgb"));
     }
 
     #[test]
@@ -1106,6 +4094,7 @@ mod tests {
         let library_root = run_root.join("SilicaRAW Library");
         let import_root = run_root.join("Import Originals");
         let export_root = run_root.join("Exports");
+        let session_path = run_root.join("AppConfig").join("app-session.json");
         std::fs::create_dir_all(&import_root).expect("create connected smoke import folder");
         std::fs::create_dir_all(&export_root).expect("create connected smoke export folder");
 
@@ -1117,6 +4106,13 @@ mod tests {
         let secondary_original = import_root.join("synthetic-checker.jpeg");
         let raw_placeholder = import_root.join("blocked-raw.DNG");
         let unsupported_original = import_root.join("notes.txt");
+        let recursive_root = import_root.join("Recursive");
+        let recursive_original = recursive_root.join("recursive-child.jpg");
+        let recursive_unsupported = recursive_root.join("recursive-notes.txt");
+        let recursive_hidden = recursive_root.join(".hidden.jpg");
+        let recursive_package = recursive_root.join("Archive.photoslibrary");
+        let recursive_package_child = recursive_package.join("package-child.jpg");
+        std::fs::create_dir_all(&recursive_package).expect("create recursive smoke package");
         std::fs::copy(
             fixtures_root.join("supported/synthetic-gradient.jpg"),
             &primary_original,
@@ -1137,23 +4133,67 @@ mod tests {
             &unsupported_original,
         )
         .expect("copy unsupported fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-checker.jpeg"),
+            &recursive_original,
+        )
+        .expect("copy recursive JPEG fixture");
+        std::fs::copy(
+            fixtures_root.join("unsupported/notes.txt"),
+            &recursive_unsupported,
+        )
+        .expect("copy recursive unsupported fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            &recursive_hidden,
+        )
+        .expect("copy recursive hidden fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            &recursive_package_child,
+        )
+        .expect("copy recursive package fixture");
         let originals = tracked_originals(&[
             primary_original.clone(),
             secondary_original.clone(),
             raw_placeholder.clone(),
             unsupported_original.clone(),
+            recursive_original.clone(),
+            recursive_unsupported.clone(),
+            recursive_hidden.clone(),
+            recursive_package_child.clone(),
         ]);
 
-        let created = super::create_library(library_root.display().to_string());
+        let created = super::create_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
         assert!(created.ok, "create library failed: {created:?}");
         assert_eq!(response_data(&created).kind(), "librarySession");
-        let opened = super::open_library(library_root.display().to_string());
+        let opened = super::open_library_at_path(
+            library_root.display().to_string(),
+            Some(session_path.clone()),
+        );
         assert!(opened.ok, "open library failed: {opened:?}");
+        let app_session = super::read_app_session_at_path(session_path.clone());
+        assert!(app_session.ok, "read app session failed: {app_session:?}");
+        match response_data(&app_session) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.recents.len(), 1);
+                assert_eq!(
+                    session.recents[0].root_path,
+                    library_root.display().to_string()
+                );
+                assert_eq!(session.recents[0].available, Some(true));
+            }
+            other => panic!("unexpected app session data: {other:?}"),
+        }
         assert_originals_unchanged(&originals, "create/open library");
 
         let imported = super::import_folder(
             library_root.display().to_string(),
             import_root.display().to_string(),
+            None,
         );
         assert!(imported.ok, "import folder failed: {imported:?}");
         match response_data(&imported) {
@@ -1203,6 +4243,49 @@ mod tests {
             other => panic!("unexpected grid response data: {other:?}"),
         };
         assert_originals_unchanged(&originals, "grid thumbnail generation");
+
+        let paged = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 2,
+                sort: "file_name_asc".to_string(),
+                filters: super::DesktopLibraryQueryFilters::default(),
+            },
+        );
+        assert!(paged.ok, "paged grid failed: {paged:?}");
+        match response_data(&paged) {
+            super::DesktopCommandData::PhotoGridPage {
+                photos,
+                total_count,
+                has_next_page,
+                ..
+            } => {
+                assert_eq!(*total_count, 4);
+                assert_eq!(photos.len(), 2);
+                assert!(*has_next_page);
+            }
+            other => panic!("unexpected paged grid data: {other:?}"),
+        }
+
+        let metadata =
+            super::get_photo_metadata(library_root.display().to_string(), photo_id.clone());
+        assert!(metadata.ok, "metadata query failed: {metadata:?}");
+        match response_data(&metadata) {
+            super::DesktopCommandData::PhotoMetadata {
+                width,
+                height,
+                camera_make,
+                ..
+            } => {
+                assert_eq!(width.state, "known");
+                assert!(width.value.is_some_and(|value| value > 0));
+                assert_eq!(height.state, "known");
+                assert!(height.value.is_some_and(|value| value > 0));
+                assert_eq!(camera_make.state, "unavailable");
+            }
+            other => panic!("unexpected metadata data: {other:?}"),
+        }
 
         let picked = super::set_photo_flags(
             library_root.display().to_string(),
@@ -1376,7 +4459,110 @@ mod tests {
         }
         assert_originals_unchanged(&originals, "cache clear");
 
-        let reopened = super::open_library(library_root.display().to_string());
+        let recorded_selection = super::record_app_session_selection_at_path(
+            session_path.clone(),
+            library_root.display().to_string(),
+            Some(photo_id.clone()),
+            "develop".to_string(),
+        );
+        assert!(
+            recorded_selection.ok,
+            "record session selection failed: {recorded_selection:?}"
+        );
+        let restored_launch = super::resolve_launch_restore_at_path(session_path.clone());
+        assert!(
+            restored_launch.ok,
+            "launch restore failed: {restored_launch:?}"
+        );
+        match response_data(&restored_launch) {
+            super::DesktopCommandData::LaunchRestore {
+                status,
+                state,
+                selected_photo_id,
+                selected_photo_status,
+                requested_mode,
+                resolved_mode,
+                ..
+            } => {
+                assert_eq!(status, "restored");
+                assert_eq!(state, "library");
+                assert_eq!(selected_photo_id.as_deref(), Some(photo_id.as_str()));
+                assert_eq!(selected_photo_status, "restored");
+                assert_eq!(requested_mode, "develop");
+                assert_eq!(resolved_mode, "develop");
+            }
+            other => panic!("unexpected launch restore data: {other:?}"),
+        }
+
+        let missing_session_path = run_root.join("AppConfig").join("missing-session.json");
+        let mut missing_session = super::DesktopAppSession::default();
+        missing_session.last_library_root_path =
+            Some(run_root.join("Missing Library").display().to_string());
+        let written_missing =
+            super::write_app_session_at_path(missing_session_path.clone(), missing_session);
+        assert!(
+            written_missing.ok,
+            "write missing fallback session failed: {written_missing:?}"
+        );
+        let missing_restore = super::resolve_launch_restore_at_path(missing_session_path);
+        assert!(
+            missing_restore.ok,
+            "missing restore failed: {missing_restore:?}"
+        );
+        match response_data(&missing_restore) {
+            super::DesktopCommandData::LaunchRestore {
+                status,
+                state,
+                selected_photo_status,
+                fallback_reason,
+                ..
+            } => {
+                assert_eq!(status, "missingLibrary");
+                assert_eq!(state, "welcome");
+                assert_eq!(selected_photo_status, "none");
+                assert_eq!(fallback_reason.as_deref(), Some("missingLibrary"));
+            }
+            other => panic!("unexpected missing restore data: {other:?}"),
+        }
+
+        let recursive_import = super::import_folder(
+            library_root.display().to_string(),
+            import_root.display().to_string(),
+            Some(true),
+        );
+        assert!(
+            recursive_import.ok,
+            "recursive import failed: {recursive_import:?}"
+        );
+        match response_data(&recursive_import) {
+            super::DesktopCommandData::ImportSummary {
+                scanned_files,
+                supported_files,
+                unsupported_files,
+                issues,
+                ..
+            } => {
+                assert_eq!(*scanned_files, 6);
+                assert_eq!(*supported_files, 4);
+                assert_eq!(*unsupported_files, 2);
+                assert!(issues.iter().any(|issue| {
+                    issue.kind == "unsupported_file"
+                        && issue.file_name == Some("recursive-notes.txt".to_string())
+                }));
+                assert!(issues.iter().any(|issue| {
+                    issue.kind == "hidden_entry_skipped"
+                        && issue.file_name == Some(".hidden.jpg".to_string())
+                }));
+                assert!(issues.iter().any(|issue| {
+                    issue.kind == "package_directory_skipped"
+                        && issue.file_name == Some("Archive.photoslibrary".to_string())
+                }));
+            }
+            other => panic!("unexpected recursive import data: {other:?}"),
+        }
+        assert_originals_unchanged(&originals, "recursive import");
+
+        let reopened = super::open_library_at_path(library_root.display().to_string(), None);
         assert!(reopened.ok, "reopen library failed: {reopened:?}");
         let restored_flags =
             super::get_photo_flags(library_root.display().to_string(), photo_id.clone());
@@ -1419,6 +4605,7 @@ mod tests {
             other => panic!("unexpected restored edit response data: {other:?}"),
         }
         assert_originals_unchanged(&originals, "library reopen");
+        eprintln!("phase-11 connected runtime smoke complete");
     }
 
     fn response_data(response: &super::DesktopCommandResponse) -> &super::DesktopCommandData {

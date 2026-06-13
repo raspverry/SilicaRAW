@@ -18,19 +18,32 @@ class StaticUiParser(HTMLParser):
         self.ids = {}
         self.styles = 0
         self.mode_buttons = {}
+        self.native_viewer_hosts = {}
+        self.native_viewer_descendant_ids = {}
+        self._element_stack = []
         self._current_button_mode = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        current_native_host = next(
+            (entry["native_host_id"] for entry in reversed(self._element_stack) if entry["native_host_id"]),
+            None,
+        )
         if tag == "style":
             self.styles += 1
         if tag == "link" and attrs.get("rel") == "stylesheet":
             self.links.append(attrs.get("href", ""))
         if "id" in attrs:
             self.ids[attrs["id"]] = attrs
+            if current_native_host:
+                self.native_viewer_descendant_ids[attrs["id"]] = current_native_host
+        native_host_id = attrs.get("id") if attrs.get("data-native-viewer-host") == "reserved" else None
+        if native_host_id:
+            self.native_viewer_hosts[native_host_id] = attrs
         if tag == "button" and "data-mode" in attrs:
             self._current_button_mode = attrs["data-mode"]
             self.mode_buttons[attrs["data-mode"]] = {"attrs": attrs, "text": ""}
+        self._element_stack.append({"tag": tag, "native_host_id": native_host_id})
 
     def handle_data(self, data):
         if self._current_button_mode:
@@ -39,6 +52,10 @@ class StaticUiParser(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "button":
             self._current_button_mode = None
+        for index in range(len(self._element_stack) - 1, -1, -1):
+            if self._element_stack[index]["tag"] == tag:
+                del self._element_stack[index:]
+                break
 
 
 def require(condition, message, failures):
@@ -53,6 +70,21 @@ def main():
     failures = []
 
     require(parser.styles == 0, "index.html must not use inline <style> blocks", failures)
+    require(
+        "function countImportErrorIssues" in source,
+        "index.html must separate error issue counting from unsupported/skipped issue counting",
+        failures,
+    )
+    require(
+        "response.data?.issues?.length" not in source,
+        "#importErrorCount must not count every structured import issue as an error",
+        failures,
+    )
+    require(
+        "Unsupported and failed files will be reviewable after import." not in source,
+        "import issue review must not be placeholder status text",
+        failures,
+    )
     for href in [
         "./styles/tokens.css",
         "./styles/base.css",
@@ -67,6 +99,8 @@ def main():
         "modeLibrary",
         "modeDevelop",
         "modeExport",
+        "toggleSidebar",
+        "toggleInspector",
         "leftSidebar",
         "mainSurface",
         "rightInspector",
@@ -79,6 +113,7 @@ def main():
         "createLibrary",
         "openRecent",
         "recentEmptyState",
+        "recentLibraryList",
         "importPanel",
         "importFolderPath",
         "startImport",
@@ -86,6 +121,12 @@ def main():
         "importProgress",
         "importSummary",
         "unsupportedCount",
+        "importRecursive",
+        "importIssueReview",
+        "importIssueReviewTitle",
+        "importIssueReviewSummary",
+        "importIssueList",
+        "closeImportIssues",
         "viewImportErrors",
         "libraryGrid",
         "gridEmptyState",
@@ -94,12 +135,28 @@ def main():
         "libraryPhotoCount",
         "selectedPhotoName",
         "selectedPhotoRating",
+        "metadataFileType",
+        "metadataDimensions",
+        "metadataCaptureTime",
+        "metadataCamera",
+        "metadataLens",
+        "metadataModifiedAt",
+        "metadataFileSize",
+        "metadataStatus",
         "ratingControlGroup",
         "clearCullingFlags",
         "pickSelectedPhoto",
         "rejectSelectedPhoto",
         "cullingStatus",
         "thumbnailSize",
+        "toggleFilmstrip",
+        "resetLayout",
+        "librarySearch",
+        "fileTypeFilter",
+        "metadataFilter",
+        "minRatingFilter",
+        "cullingFilter",
+        "librarySort",
         "openLoupe",
         "closeLoupe",
         "loupeSurface",
@@ -121,6 +178,11 @@ def main():
         "developContrastReset",
         "developCommitEdit",
         "developRevertEdit",
+        "developHistoryPanel",
+        "developHistoryStatus",
+        "developHistoryList",
+        "developUndoHistory",
+        "developRedoHistory",
         "developFilmstrip",
         "developEditState",
         "openExportDialog",
@@ -144,6 +206,18 @@ def main():
         require(element_id in parser.ids, f"missing #{element_id}", failures)
     for rating in range(6):
         require(f"ratePhoto{rating}" in parser.ids, f"missing #ratePhoto{rating}", failures)
+
+    require(
+        '<ol class="sr-history-list" id="developHistoryList" aria-live="polite"></ol>' in source,
+        "#developHistoryList must be empty static markup backed only by runtime checkpoints",
+        failures,
+    )
+    for command in [
+        "get_photo_history",
+        "undo_last_history_action",
+        "redo_last_history_action",
+    ]:
+        require(command in source, f"index.html must wire {command}", failures)
 
     require(
         "disabled" in parser.ids.get("openRecent", {}),
@@ -215,11 +289,86 @@ def main():
     require(exposure_slider.get("max") == "5", "#developExposureSlider max must match edit graph exposure", failures)
     require(exposure_slider.get("step") == "0.05", "#developExposureSlider step must support precise exposure edits", failures)
 
+    import_recursive = parser.ids.get("importRecursive", {})
+    require(
+        import_recursive.get("type") == "checkbox",
+        "#importRecursive must be a checkbox",
+        failures,
+    )
+    require(
+        "checked" not in import_recursive,
+        "#importRecursive must default off",
+        failures,
+    )
+
     contrast_slider = parser.ids.get("developContrastSlider", {})
     require(contrast_slider.get("type") == "range", "#developContrastSlider must be a range input", failures)
     require(contrast_slider.get("min") == "-100", "#developContrastSlider min must match edit graph contrast", failures)
     require(contrast_slider.get("max") == "100", "#developContrastSlider max must match edit graph contrast", failures)
     require(contrast_slider.get("step") == "1", "#developContrastSlider step must support integer contrast edits", failures)
+
+    expected_native_hosts = {
+        "loupeViewer": "loupe",
+        "developPreviewSurface": "develop",
+    }
+    require(
+        set(parser.native_viewer_hosts) == set(expected_native_hosts),
+        "reserved native viewer hosts must be exactly Loupe and Develop viewer surfaces",
+        failures,
+    )
+    for host_id, surface in expected_native_hosts.items():
+        host_attrs = parser.native_viewer_hosts.get(host_id, {})
+        require(
+            host_attrs.get("data-native-viewer-surface") == surface,
+            f"#{host_id} must report native viewer surface {surface}",
+            failures,
+        )
+        require(
+            host_attrs.get("data-native-viewer-state") == "web-fallback",
+            f"#{host_id} must default to web-fallback while native viewer is feature-gated",
+            failures,
+        )
+        require(
+            host_attrs.get("data-native-viewer-controls") == "external",
+            f"#{host_id} must declare controls outside the reserved native viewer host",
+            failures,
+        )
+
+    interactive_viewer_controls = {
+        "closeLoupe",
+        "loupeFitMode",
+        "developExposureSlider",
+        "developExposureValue",
+        "developExposureReset",
+        "developContrastSlider",
+        "developContrastValue",
+        "developContrastReset",
+        "developCommitEdit",
+        "developRevertEdit",
+        "openExportDialog",
+        "exportDialog",
+    }
+    for control_id in interactive_viewer_controls:
+        require(
+            control_id not in parser.native_viewer_descendant_ids,
+            f"#{control_id} must remain outside reserved native viewer hosts",
+            failures,
+        )
+    require(
+        "function viewerHostGeometry" in source,
+        "index.html must expose viewerHostGeometry for native bridge geometry reporting",
+        failures,
+    )
+    require(
+        "function currentNativeViewerHostGeometry" in source,
+        "index.html must expose currentNativeViewerHostGeometry",
+        failures,
+    )
+    require(
+        "window.SilicaRAWViewerHost" in source,
+        "index.html must expose inert feature-off native viewer host API",
+        failures,
+    )
 
     require(
         parser.ids.get("developExposureValue", {}).get("type") == "number",

@@ -19,6 +19,12 @@ pub const EDIT_GRAPH_SCHEMA: &str = "silica.edit_graph";
 /// Stable edit graph schema version for v0.1.
 pub const EDIT_GRAPH_VERSION: i64 = 1;
 
+/// Explicit input profile value when no fixture-backed profile evidence exists.
+pub const INPUT_PROFILE_UNKNOWN: &str = "unknown";
+
+/// First working space selected by the color pipeline proof plan.
+pub const WORKING_SPACE_LINEAR_DISPLAY_P3: &str = "linear_display_p3";
+
 /// Source fields needed to build a default edit graph for a catalog photo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditGraphSource {
@@ -90,6 +96,32 @@ pub enum DecoderBackend {
     Raster,
 }
 
+/// Evidence-backed color profile metadata for schema-owned edit graph fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorProfileMetadata {
+    pub input_profile: String,
+    pub working_space: String,
+    pub decoder_backend: Option<DecoderBackend>,
+}
+
+impl ColorProfileMetadata {
+    pub fn unknown() -> Self {
+        Self {
+            input_profile: INPUT_PROFILE_UNKNOWN.to_string(),
+            working_space: WORKING_SPACE_LINEAR_DISPLAY_P3.to_string(),
+            decoder_backend: None,
+        }
+    }
+
+    pub fn raster(input_profile: impl Into<String>) -> Self {
+        Self {
+            input_profile: input_profile.into(),
+            working_space: WORKING_SPACE_LINEAR_DISPLAY_P3.to_string(),
+            decoder_backend: Some(DecoderBackend::Raster),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BasicAdjustments {
@@ -121,6 +153,14 @@ pub enum WhiteBalance {
     Fluorescent,
     Flash,
     Custom,
+}
+
+/// Built-in P0 Basic presets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BasicPreset {
+    SilicaNeutral,
+    WarmContrast,
+    SoftMatte,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -388,8 +428,8 @@ pub fn default_edit_graph(source: EditGraphSource, updated_at: impl Into<String>
         },
         profile: Profile {
             name: "silica_standard".to_string(),
-            input_profile: "camera_default".to_string(),
-            working_space: "linear_display_p3".to_string(),
+            input_profile: INPUT_PROFILE_UNKNOWN.to_string(),
+            working_space: WORKING_SPACE_LINEAR_DISPLAY_P3.to_string(),
             camera_profile: None,
             decoder_backend: None,
         },
@@ -500,6 +540,137 @@ pub fn apply_exposure_contrast(
     Ok(edited)
 }
 
+/// Return a draft graph with white balance, temperature, and tint adjusted.
+pub fn apply_white_balance_temperature_tint(
+    graph: &EditGraph,
+    white_balance: WhiteBalance,
+    temperature: f64,
+    tint: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.white_balance = white_balance;
+    edited.basic.temperature = number_from_f64("basic.temperature", temperature)?;
+    edited.basic.tint = number_from_f64("basic.tint", tint)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with tone recovery controls adjusted.
+pub fn apply_tone_recovery(
+    graph: &EditGraph,
+    highlights: f64,
+    shadows: f64,
+    whites: f64,
+    blacks: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.highlights = number_from_f64("basic.highlights", highlights)?;
+    edited.basic.shadows = number_from_f64("basic.shadows", shadows)?;
+    edited.basic.whites = number_from_f64("basic.whites", whites)?;
+    edited.basic.blacks = number_from_f64("basic.blacks", blacks)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with color presence controls adjusted.
+pub fn apply_color_presence(
+    graph: &EditGraph,
+    vibrance: f64,
+    saturation: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.vibrance = number_from_f64("basic.vibrance", vibrance)?;
+    edited.basic.saturation = number_from_f64("basic.saturation", saturation)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Reset P0 Basic controls to schema-valid defaults.
+pub fn reset_p0_basic_controls(
+    graph: &EditGraph,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.white_balance = WhiteBalance::AsShot;
+    edited.basic.temperature = Number::from(5200);
+    edited.basic.tint = Number::from(0);
+    edited.basic.exposure = Number::from(0);
+    edited.basic.contrast = Number::from(0);
+    edited.basic.highlights = Number::from(0);
+    edited.basic.shadows = Number::from(0);
+    edited.basic.whites = Number::from(0);
+    edited.basic.blacks = Number::from(0);
+    edited.basic.vibrance = Number::from(0);
+    edited.basic.saturation = Number::from(0);
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Apply one built-in P0 Basic preset through the edit graph validator.
+pub fn apply_basic_preset(
+    graph: &EditGraph,
+    preset: BasicPreset,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    match preset {
+        BasicPreset::SilicaNeutral => {
+            return reset_p0_basic_controls(graph, updated_at);
+        }
+        BasicPreset::WarmContrast => {
+            edited.basic.white_balance = WhiteBalance::Custom;
+            edited.basic.temperature = Number::from(6200);
+            edited.basic.tint = Number::from(4);
+            edited.basic.exposure = number_from_f64("basic.exposure", 0.15)?;
+            edited.basic.contrast = Number::from(18);
+            edited.basic.highlights = Number::from(-20);
+            edited.basic.shadows = Number::from(10);
+            edited.basic.whites = Number::from(12);
+            edited.basic.blacks = Number::from(-8);
+            edited.basic.vibrance = Number::from(12);
+            edited.basic.saturation = Number::from(4);
+        }
+        BasicPreset::SoftMatte => {
+            edited.basic.white_balance = WhiteBalance::Custom;
+            edited.basic.temperature = Number::from(5400);
+            edited.basic.tint = Number::from(2);
+            edited.basic.exposure = Number::from(0);
+            edited.basic.contrast = Number::from(-18);
+            edited.basic.highlights = Number::from(-30);
+            edited.basic.shadows = Number::from(24);
+            edited.basic.whites = Number::from(-12);
+            edited.basic.blacks = Number::from(18);
+            edited.basic.vibrance = Number::from(8);
+            edited.basic.saturation = Number::from(-6);
+        }
+    }
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a graph with evidence-backed color profile metadata in schema-owned fields.
+pub fn apply_color_profile_metadata(
+    graph: &EditGraph,
+    metadata: ColorProfileMetadata,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.profile.input_profile = metadata.input_profile;
+    edited.profile.working_space = metadata.working_space;
+    edited.profile.decoder_backend = metadata.decoder_backend;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Validate JSON against the local alpha edit graph contract.
 pub fn validate_edit_graph_json(value: &Value) -> Result<(), EditGraphValidationError> {
     let graph: EditGraph = serde_json::from_value(value.clone())
@@ -523,6 +694,7 @@ pub fn validate_edit_graph(graph: &EditGraph) -> Result<(), EditGraphValidationE
     }
 
     validate_source(&graph.source)?;
+    validate_profile(&graph.profile)?;
     validate_basic(&graph.basic)?;
     validate_tone(&graph.tone)?;
     validate_color(&graph.color)?;
@@ -533,6 +705,39 @@ pub fn validate_edit_graph(graph: &EditGraph) -> Result<(), EditGraphValidationE
         validate_mask(index, mask)?;
     }
     validate_metadata(&graph.metadata)?;
+
+    Ok(())
+}
+
+fn validate_profile(profile: &Profile) -> Result<(), EditGraphValidationError> {
+    if profile.name.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            "profile.name",
+            "must not be empty",
+        ));
+    }
+    if profile.input_profile.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            "profile.input_profile",
+            "must not be empty",
+        ));
+    }
+    if profile.working_space.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            "profile.working_space",
+            "must not be empty",
+        ));
+    }
+    if profile
+        .camera_profile
+        .as_ref()
+        .is_some_and(|camera_profile| camera_profile.trim().is_empty())
+    {
+        return Err(EditGraphValidationError::new(
+            "profile.camera_profile",
+            "must not be empty when present",
+        ));
+    }
 
     Ok(())
 }
@@ -916,6 +1121,12 @@ mod tests {
         assert_eq!(graph.basic.exposure.as_f64(), Some(0.0));
         assert_eq!(graph.basic.contrast.as_f64(), Some(0.0));
         assert_eq!(graph.source.photo_id, "photo-1");
+        assert_eq!(graph.profile.input_profile, super::INPUT_PROFILE_UNKNOWN);
+        assert_eq!(
+            graph.profile.working_space,
+            super::WORKING_SPACE_LINEAR_DISPLAY_P3
+        );
+        assert_eq!(graph.profile.decoder_backend, None);
         super::validate_edit_graph(&graph).expect("default edit graph validates");
 
         let edited = super::apply_exposure_contrast(&graph, 0.75, -12.0, "unix:3")
@@ -925,6 +1136,239 @@ mod tests {
         assert_eq!(edited.basic.contrast.as_f64(), Some(-12.0));
         assert_eq!(edited.updated_at, "unix:3");
         super::validate_edit_graph(&edited).expect("edited graph validates");
+    }
+
+    #[test]
+    fn applies_white_balance_temperature_tint_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Cloudy,
+            6400.0,
+            12.5,
+            "unix:3",
+        )
+        .expect("apply white balance family");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.basic.white_balance, super::WhiteBalance::Cloudy);
+        assert_eq!(edited.basic.temperature.as_f64(), Some(6400.0));
+        assert_eq!(edited.basic.tint.as_f64(), Some(12.5));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(
+            round_tripped.basic.white_balance,
+            super::WhiteBalance::Cloudy
+        );
+        assert_eq!(round_tripped.basic.temperature.as_f64(), Some(6400.0));
+        assert_eq!(round_tripped.basic.tint.as_f64(), Some(12.5));
+        assert_eq!(serialized["basic"]["white_balance"], json!("cloudy"));
+        assert_eq!(serialized["basic"]["temperature"].as_f64(), Some(6400.0));
+        assert_eq!(serialized["basic"]["tint"].as_f64(), Some(12.5));
+        super::validate_edit_graph_json(&serialized).expect("white balance graph validates");
+    }
+
+    #[test]
+    fn applies_tone_recovery_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_tone_recovery(&graph, -35.0, 42.0, 10.0, -12.5, "unix:3")
+            .expect("apply tone recovery");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.basic.highlights.as_f64(), Some(-35.0));
+        assert_eq!(edited.basic.shadows.as_f64(), Some(42.0));
+        assert_eq!(edited.basic.whites.as_f64(), Some(10.0));
+        assert_eq!(edited.basic.blacks.as_f64(), Some(-12.5));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.basic.highlights.as_f64(), Some(-35.0));
+        assert_eq!(round_tripped.basic.shadows.as_f64(), Some(42.0));
+        assert_eq!(round_tripped.basic.whites.as_f64(), Some(10.0));
+        assert_eq!(round_tripped.basic.blacks.as_f64(), Some(-12.5));
+        assert_eq!(serialized["basic"]["highlights"].as_f64(), Some(-35.0));
+        assert_eq!(serialized["basic"]["shadows"].as_f64(), Some(42.0));
+        assert_eq!(serialized["basic"]["whites"].as_f64(), Some(10.0));
+        assert_eq!(serialized["basic"]["blacks"].as_f64(), Some(-12.5));
+        super::validate_edit_graph_json(&serialized).expect("tone recovery graph validates");
+    }
+
+    #[test]
+    fn applies_color_presence_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_color_presence(&graph, 24.0, -8.5, "unix:3")
+            .expect("apply color presence");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.basic.vibrance.as_f64(), Some(24.0));
+        assert_eq!(edited.basic.saturation.as_f64(), Some(-8.5));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.basic.vibrance.as_f64(), Some(24.0));
+        assert_eq!(round_tripped.basic.saturation.as_f64(), Some(-8.5));
+        assert_eq!(serialized["basic"]["vibrance"].as_f64(), Some(24.0));
+        assert_eq!(serialized["basic"]["saturation"].as_f64(), Some(-8.5));
+        super::validate_edit_graph_json(&serialized).expect("color presence graph validates");
+    }
+
+    #[test]
+    fn resets_p0_basic_controls_to_schema_defaults_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        let graph = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Custom,
+            6400.0,
+            12.0,
+            "unix:3",
+        )
+        .expect("apply white balance");
+        let graph = super::apply_tone_recovery(&graph, -20.0, 15.0, 8.0, -10.0, "unix:4")
+            .expect("apply tone");
+        let graph = super::apply_color_presence(&graph, 18.0, -6.0, "unix:5").expect("apply color");
+        let graph =
+            super::apply_exposure_contrast(&graph, 0.75, 24.0, "unix:6").expect("apply exposure");
+
+        let reset = super::reset_p0_basic_controls(&graph, "unix:7").expect("reset P0 basic");
+        let serialized = serde_json::to_value(&reset).expect("serialize reset graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip reset graph");
+
+        assert_eq!(reset.basic.white_balance, super::WhiteBalance::AsShot);
+        assert_eq!(reset.basic.temperature.as_f64(), Some(5200.0));
+        assert_eq!(reset.basic.tint.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.contrast.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.highlights.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.shadows.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.whites.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.blacks.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.vibrance.as_f64(), Some(0.0));
+        assert_eq!(reset.basic.saturation.as_f64(), Some(0.0));
+        assert_eq!(reset.updated_at, "unix:7");
+        assert_eq!(round_tripped.basic.exposure.as_f64(), Some(0.0));
+        super::validate_edit_graph_json(&serialized).expect("reset graph validates");
+    }
+
+    #[test]
+    fn applies_builtin_basic_presets_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let warm = super::apply_basic_preset(&graph, super::BasicPreset::WarmContrast, "unix:3")
+            .expect("apply warm contrast preset");
+        let soft = super::apply_basic_preset(&graph, super::BasicPreset::SoftMatte, "unix:4")
+            .expect("apply soft matte preset");
+        let serialized = serde_json::to_value(&warm).expect("serialize preset graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip preset graph");
+
+        assert_eq!(warm.basic.white_balance, super::WhiteBalance::Custom);
+        assert_eq!(warm.basic.temperature.as_f64(), Some(6200.0));
+        assert_eq!(warm.basic.tint.as_f64(), Some(4.0));
+        assert_eq!(warm.basic.exposure.as_f64(), Some(0.15));
+        assert_eq!(warm.basic.contrast.as_f64(), Some(18.0));
+        assert_eq!(warm.basic.highlights.as_f64(), Some(-20.0));
+        assert_eq!(warm.basic.shadows.as_f64(), Some(10.0));
+        assert_eq!(warm.basic.whites.as_f64(), Some(12.0));
+        assert_eq!(warm.basic.blacks.as_f64(), Some(-8.0));
+        assert_eq!(warm.basic.vibrance.as_f64(), Some(12.0));
+        assert_eq!(warm.basic.saturation.as_f64(), Some(4.0));
+        assert_eq!(soft.basic.contrast.as_f64(), Some(-18.0));
+        assert_eq!(soft.basic.blacks.as_f64(), Some(18.0));
+        assert_eq!(round_tripped.basic.contrast.as_f64(), Some(18.0));
+        super::validate_edit_graph_json(&serialized).expect("preset graph validates");
+    }
+
+    #[test]
+    fn applies_color_profile_metadata_to_schema_owned_fields() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_color_profile_metadata(
+            &graph,
+            super::ColorProfileMetadata::raster("srgb"),
+            "unix:3",
+        )
+        .expect("apply raster profile metadata");
+        let serialized = serde_json::to_value(&edited).expect("serialize graph");
+
+        assert_eq!(edited.profile.input_profile, "srgb");
+        assert_eq!(
+            edited.profile.working_space,
+            super::WORKING_SPACE_LINEAR_DISPLAY_P3
+        );
+        assert_eq!(
+            edited.profile.decoder_backend,
+            Some(super::DecoderBackend::Raster)
+        );
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(serialized["profile"]["input_profile"], json!("srgb"));
+        assert_eq!(serialized["profile"]["decoder_backend"], json!("raster"));
+        assert_eq!(serialized["extensions"], json!({}));
+        super::validate_edit_graph_json(&serialized).expect("profile metadata validates");
     }
 
     #[test]
@@ -943,5 +1387,86 @@ mod tests {
 
         assert!(super::apply_exposure_contrast(&graph, 8.0, 0.0, "unix:3").is_err());
         assert!(super::apply_exposure_contrast(&graph, 0.0, 180.0, "unix:3").is_err());
+    }
+
+    #[test]
+    fn rejects_out_of_range_white_balance_temperature_tint_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let cold_error = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Custom,
+            999.0,
+            0.0,
+            "unix:3",
+        )
+        .expect_err("temperature below schema range");
+        let tint_error = super::apply_white_balance_temperature_tint(
+            &graph,
+            super::WhiteBalance::Custom,
+            5200.0,
+            151.0,
+            "unix:3",
+        )
+        .expect_err("tint above schema range");
+
+        assert!(cold_error.to_string().contains("basic.temperature"));
+        assert!(tint_error.to_string().contains("basic.tint"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_tone_recovery_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let highlights_error = super::apply_tone_recovery(&graph, 101.0, 0.0, 0.0, 0.0, "unix:3")
+            .expect_err("highlights above schema range");
+        let blacks_error = super::apply_tone_recovery(&graph, 0.0, 0.0, 0.0, -101.0, "unix:3")
+            .expect_err("blacks below schema range");
+
+        assert!(highlights_error.to_string().contains("basic.highlights"));
+        assert!(blacks_error.to_string().contains("basic.blacks"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_color_presence_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let vibrance_error = super::apply_color_presence(&graph, 101.0, 0.0, "unix:3")
+            .expect_err("vibrance above schema range");
+        let saturation_error = super::apply_color_presence(&graph, 0.0, -101.0, "unix:3")
+            .expect_err("saturation below schema range");
+
+        assert!(vibrance_error.to_string().contains("basic.vibrance"));
+        assert!(saturation_error.to_string().contains("basic.saturation"));
     }
 }

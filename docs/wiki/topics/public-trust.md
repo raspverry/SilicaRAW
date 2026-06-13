@@ -32,6 +32,7 @@ This page records what SilicaRAW can publicly claim today and what remains unpro
 - Do not describe SilicaRAW as production-ready.
 - Do not claim broad RAW camera support.
 - Do not claim color correctness until tagged fixtures and tolerance checks exist.
+- Do not turn the Task 15.6 single fixture-backed Preview.app RAW export QA record into a broad RAW or color correctness claim.
 - Do not claim the product Metal viewer is implemented.
 - Do not claim MLX, MCP, plugins, Homebrew, auto-update, Mac App Store distribution, or public beta readiness.
 - Do not treat unsigned developer-preview DMGs as user-ready releases.

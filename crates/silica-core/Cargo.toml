@@ -9,6 +9,10 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+core-image-raw-probe = ["silica-decode/core-image-raw-probe"]
+
 [dependencies]
 silica-decode = { path = "../silica-decode" }
 silica-edit = { path = "../silica-edit" }

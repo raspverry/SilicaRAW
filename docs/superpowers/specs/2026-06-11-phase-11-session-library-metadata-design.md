@@ -37,13 +37,13 @@ Keep this order:
 7. Keyboard and multi-select grid behavior.
 8. Metadata extraction and storage.
 9. Metadata inspector, search, and filters.
-10. Recursive import and reviewable import errors.
+10. Reviewable import errors, then opt-in recursive import.
 
 Do not implement virtualized grid before paged queries exist. Virtualization is not useful if the backend still loads every catalog row and every thumbnail.
 
 Do not implement metadata UI before the stored metadata contract exists. Unknown metadata must stay unknown.
 
-Do not implement recursive import before import errors are reviewable. Recursive scans increase recoverable failure cases.
+Do not implement recursive import before import errors are modeled and reviewable. Recursive scans increase recoverable failure cases.
 
 ## Persistence Domains
 
@@ -169,6 +169,7 @@ Rules:
 - Missing recent paths are displayed as unavailable. Do not silently remove them during read.
 - Last library restore validates the path and catalog before opening.
 - Selected photo restore validates the photo still exists in the catalog before selection.
+- If a restored mode requires a selected photo and that photo is missing, restore to Library mode instead of a broken Develop, Loupe, or Export state.
 
 ## Top-Level Task Mapping
 
@@ -197,6 +198,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-md-links.py`
   - `scripts/harness/check.sh`
+- **Status:** Completed on 2026-06-11. Added this Phase 11 design gate, documented persistence boundaries, atomic task order, stop gates, validation strategy, and linked it from the post-alpha roadmap before implementation work.
 
 ### Task 11.1.2: App Session Schema and Core Types
 
@@ -210,6 +212,7 @@ Demo/Validation:
   - Atomic write leaves old state intact on write failure.
 - **Validation:**
   - `cargo test -p silica-core app_session`
+- **Status:** Completed on 2026-06-11. Added app session v1 core types, defaults, validation, clamping, safe missing/corrupt/newer handling, JSON round-trip helpers, and temp-file plus rename writes with caller-injected paths. This does not add desktop Tauri commands, recents recording, restore behavior, frontend persistence, catalog storage, or sidecar storage.
 
 ### Task 11.1.3: Desktop Session Path and Commands
 
@@ -222,6 +225,7 @@ Demo/Validation:
   - Desktop tests can use a temp app-session path.
 - **Validation:**
   - `cargo test -p silica-desktop app_session`
+- **Status:** Completed on 2026-06-11. Added desktop app-session DTOs, app-config path resolution through Tauri `BaseDirectory::AppConfig`, and read/write/reset/inspect command handlers with temp-path test helpers. This does not record real recents, restore last state on launch, or persist frontend layout interactions.
 
 ### Task 11.2.1: Record Real Recent Libraries
 
@@ -236,6 +240,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core recent`
   - `cargo test -p silica-desktop recent`
+- **Status:** Completed on 2026-06-11. Added app-session recent recording after successful core library sessions, with dedupe, a documented cap, last-library update, and desktop create/open integration. Failed create/open paths do not update the app-session file. Welcome rendering remains Task 11.2.2.
 
 ### Task 11.2.2: Welcome Recent Libraries UI
 
@@ -250,6 +255,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-static-ui.py`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. Welcome now reads real app-session recents, renders an honest first-launch empty state, disables unavailable library paths, and opens available recent libraries through the existing desktop command path. The desktop DTO marks recent availability from the real catalog file; relaunch restore remains Task 11.3.
 
 ### Task 11.3.1: Relaunch Restore State Machine
 
@@ -264,6 +270,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core app_session_restore`
   - `python3 scripts/harness/check-connected-runtime-smoke.py`
+- **Status:** Completed on 2026-06-11. Added a read-only launch restore resolver that validates the last library directory and `catalog.db` without creating support directories, migrating, importing, rescanning, sidecar-syncing, or backup/restore. Desktop exposes the decision through `resolve_launch_restore`, and the UI applies Welcome vs Library state on boot without calling `open_library`. Requested Develop/Export mode is preserved in the response but resolves to Library until Task 11.3.2 verifies selected-photo restore.
 
 ### Task 11.3.2: Selected Photo Restore
 
@@ -277,6 +284,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core selected_photo_restore`
   - connected runtime smoke update
+- **Status:** Completed on 2026-06-11. Added read-only selected-photo validation for launch restore, app-session selection/mode recording through `record_app_session_selection`, and UI restore wiring that applies the saved selected photo before mode restore. Existing selected photos restore, missing selected photos clear selection and resolve mode back to Library, and launch restore still avoids normal open/migrate/write-side workflows.
 
 ## Sprint 2: Layout Preferences
 
@@ -291,7 +299,7 @@ Demo/Validation:
 ### Task 11.4.1: Layout Preference Model
 
 - **Location:** `crates/silica-core`, `docs/wiki/topics/ui-mvp-baseline.md`
-- **Description:** Add defaults, validation, and reset behavior for layout preferences inside the app session schema.
+- **Description:** Document and expose reset behavior for layout preferences already defined by the app session v1 schema.
 - **Dependencies:** Task 11.1.2
 - **Acceptance Criteria:**
   - Defaults are documented.
@@ -300,6 +308,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-core layout_preferences`
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. Added core default/reset helpers for `AppSession.layout`, verified reset preserves non-layout app-session state, and documented the layout defaults plus invalid-value behavior in the UI MVP wiki. Desktop command and UI wiring remain Task 11.4.2.
 
 ### Task 11.4.2: Persist Layout Interactions
 
@@ -313,6 +322,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-static-ui.py`
   - targeted visual responsive QA
+- **Status:** Completed on 2026-06-11. Added desktop layout record/reset commands, wired sidebar, inspector, filmstrip, thumbnail size, sort, and filter controls to app-session layout state, and restored saved layout preferences on launch/app-session reads. The static UI and workflow smoke checks cover the interaction contract; dedicated layout screenshots remain Task 11.4.3.
 
 ### Task 11.4.3: Layout Visual QA States
 
@@ -325,6 +335,7 @@ Demo/Validation:
   - No horizontal overflow or clipped controls.
 - **Validation:**
   - visual responsive QA runner
+- **Status:** Completed on 2026-06-11. Extended `scripts/harness/run-final-visual-qa.py` with sidebar-collapsed, inspector-collapsed, and layout-reset states across `1280x800`, `1440x900`, and `1728x965`. The runner now asserts the expected layout state metrics and passed with 33 screenshots, zero horizontal overflow, zero toolbar overlap, and zero clipped controls.
 
 ## Sprint 3: Paged Queries and Scalable Grid
 
@@ -335,6 +346,7 @@ Demo/Validation:
 - A large catalog can be queried in bounded pages.
 - Sort and filter inputs are typed and whitelisted.
 - The grid consumes pages without loading every row or every thumbnail at once.
+- Thumbnail hydration is page- or viewport-scoped before virtualization depends on it.
 
 ### Task 11.5.1: Paged Query Contract
 
@@ -342,12 +354,15 @@ Demo/Validation:
 - **Description:** Define typed request and response contracts for paged library queries.
 - **Dependencies:** Task 11.4.1
 - **Acceptance Criteria:**
-  - Request includes page size, cursor or offset, sort enum, and filter struct.
+  - Request uses bounded offset pagination, sort enum, and filter struct.
   - Page size is bounded.
   - Sort and filter options are whitelisted enums and structs.
+  - Ordering is deterministic with explicit tie breakers.
+  - Cursor pagination is deferred until benchmark evidence requires it.
   - No arbitrary SQL, column names, or raw predicates can cross from UI to storage.
 - **Validation:**
   - `cargo test -p silica-catalog library_query`
+- **Status:** Completed on 2026-06-11. Added typed `silica-catalog` request/response contracts for bounded offset library queries, whitelisted sort and filter enums, deterministic order fields with explicit tie breakers, and a cursor-pagination deferral marker. Storage indexes and storage/core query execution were later completed by Task 11.5.2 and Task 11.5.3.
 
 ### Task 11.5.2: Query Index and Migration Plan
 
@@ -361,6 +376,7 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage query_index`
   - `cargo test -p silica-catalog`
+- **Status:** Completed on 2026-06-11. Raised the catalog schema contract to version 3, added a normalized `photos.file_type` migration/backfill for `jpeg`, `raw`, and `unsupported`, and added the accepted paged-query indexes for imported-time sorting, filename/path sorting, file-type filtering, and rating sorting. Storage/core query execution was later completed by Task 11.5.3.
 
 ### Task 11.5.3: Storage and Core Paged Query API
 
@@ -375,6 +391,7 @@ Demo/Validation:
   - Query does not mutate originals, catalog state, sidecars, caches, or thumbnails.
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core library_query`
+- **Status:** Completed on 2026-06-11. Added read-only `silica-storage` paged library queries with bounded rows, total-count metadata, deterministic empty pages, normalized `photos.file_type` filtering, fixed enum-backed sort clauses, and a `silica-core` wrapper that does not hydrate thumbnails or mutate cache/catalog state. Desktop command wiring was later completed by Task 11.5.4.
 
 ### Task 11.5.4: Desktop Paged Grid Command
 
@@ -387,18 +404,35 @@ Demo/Validation:
   - Error context remains structured.
 - **Validation:**
   - `cargo test -p silica-desktop paged_grid`
+- **Status:** Completed on 2026-06-11. Added the `query_library_photos` desktop command with a typed page/sort/filter request DTO, whitelist parsing for sort and file-type filters, a `photoGridPage` response carrying page metadata and deterministic order fields, and structured error context for invalid request values. Page-scoped thumbnail hydration was later completed by Task 11.5.5.
+
+### Task 11.5.5: Page-Scoped Thumbnail Hydration
+
+- **Location:** `crates/silica-storage`, `crates/silica-core`, `apps/desktop/src-tauri`, `apps/desktop/static/`
+- **Description:** Stop paged grid behavior from generating or returning thumbnails for the whole catalog.
+- **Dependencies:** Task 11.5.4
+- **Acceptance Criteria:**
+  - Only requested page or viewport photo IDs hydrate thumbnails.
+  - RAW, unsupported, and missing rows remain honest unavailable states.
+  - No original files are mutated.
+  - The old eager all-catalog thumbnail path is not used by the product grid.
+- **Validation:**
+  - `cargo test -p silica-storage -p silica-core thumbnail`
+  - UI smoke marker for page-scoped thumbnail requests
+- **Status:** Completed on 2026-06-11. Added a core page-scoped thumbnail hydration query that hydrates JPEG thumbnails only for rows in the requested page, leaves RAW/unsupported rows without thumbnails, preserves original files, and updates the desktop paged grid command/static product grid to use `query_library_photos` instead of the old full-list product grid path. Full page UI states were completed by Task 11.6.1.
 
 ### Task 11.6.1: Page-Driven Grid UI
 
 - **Location:** `apps/desktop/static/`, `scripts/harness/`
 - **Description:** Move the grid UI from full-list rendering to page-driven rendering.
-- **Dependencies:** Task 11.5.4
+- **Dependencies:** Task 11.5.5
 - **Acceptance Criteria:**
   - Loading, empty, page, and error states are visible.
   - Selected photo remains coherent across page changes.
   - Grid does not claim unavailable rows exist.
 - **Validation:**
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. The grid shell now renders explicit loading, empty, page, and error states, exposes previous/next page controls backed by `query_library_photos` metadata, keeps selection coherent when page contents change, and reports total vs visible page rows without implying unavailable rows are loaded.
 
 ### Task 11.6.2: Virtualized Grid Window
 
@@ -413,6 +447,7 @@ Demo/Validation:
 - **Validation:**
   - targeted visual responsive QA
   - UI smoke markers for virtualization
+- **Status:** Completed on 2026-06-11. The product grid now renders a page-local virtual window with overscan spacer rows, preserves stable card aspect ratios through the existing grid layout, revokes grid-owned thumbnail object URLs when rows leave the rendered window, and keeps backend access bounded to the existing paged `query_library_photos` request.
 
 ### Task 11.6.3: Keyboard Grid Navigation
 
@@ -425,6 +460,7 @@ Demo/Validation:
   - Keyboard navigation does not lose selection when pages load.
 - **Validation:**
   - browser automation or focused UI harness
+- **Status:** Completed on 2026-06-11. The grid now exposes a roving-focus keyboard contract for the current page: Arrow keys move by item or row, Home/End jump to page bounds, PageUp/PageDown jump by viewport rows, and Enter opens the loupe for the selected photo. Rendered cards keep visible focus styling and page reloads retain a coherent selected photo.
 
 ### Task 11.6.4: Multi-Select Semantics
 
@@ -440,6 +476,7 @@ Demo/Validation:
 - **Validation:**
   - focused UI harness
   - visual QA for selected and multi-selected states
+- **Status:** Completed on 2026-06-11. The grid now tracks an explicit primary photo plus current-page multi-selection state, supports Shift range selection with a stable anchor, Cmd/Ctrl or Space toggle selection, Escape/clear-button collapse back to the primary selection, and shows primary vs multi-selection count in the inspector while keeping batch edits out of scope.
 
 ## Sprint 4: Metadata
 
@@ -464,12 +501,28 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-cargo-deps.py`
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. `silica-catalog` now records the Task 11.7 metadata field contract and explicit no-parser dependency gate. The wiki, schema reference, and dependency policy document that camera make/model, lens, orientation, and EXIF capture time remain unavailable until a parser is selected and documented.
 
-### Task 11.7.2: Metadata Migration and Extraction
+### Task 11.7.2: Metadata Backfill and JPEG-Only Extraction Policy
+
+- **Location:** `docs/wiki/topics/catalog.md`, `crates/silica-storage`, `crates/silica-core`
+- **Description:** Define how existing imports without metadata behave and what metadata can be extracted without adding RAW decode.
+- **Dependencies:** Task 11.7.1
+- **Acceptance Criteria:**
+  - No automatic metadata backfill runs on launch or session restore.
+  - Existing imports without metadata stay unknown until import or an explicit scoped backfill task populates them.
+  - JPEG/JPG dimensions may use the existing raster path.
+  - RAW metadata does not imply RAW decode support.
+  - Camera and lens remain unavailable unless a documented parser dependency is added.
+- **Validation:**
+  - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. `silica-storage` and `silica-core` now expose a metadata extraction policy without running backfill: library open/session restore do not populate `photo_metadata`, existing unknown metadata remains unknown until explicit import/backfill work, JPEG/JPG dimensions may use the existing raster path, and RAW/camera/lens metadata does not imply RAW decode or parser support.
+
+### Task 11.7.3: Metadata Migration and Extraction
 
 - **Location:** `crates/silica-storage`, `crates/silica-core`
 - **Description:** Extract and persist basic metadata for imported image files.
-- **Dependencies:** Task 11.7.1
+- **Dependencies:** Task 11.7.2
 - **Acceptance Criteria:**
   - Originals remain unchanged.
   - Missing metadata is stored as null or explicit unavailable state.
@@ -478,24 +531,26 @@ Demo/Validation:
 - **Validation:**
   - `cargo test -p silica-storage -p silica-core metadata`
   - original hash safety checks
+- **Status:** Completed on 2026-06-11. Migration 4 now adds nullable `photo_metadata.width`, `photo_metadata.height`, and `photo_metadata.orientation`; storage can upsert normalized metadata by original path for imported, supported photos only. Core import persists JPEG/JPG width and height via the existing JPEG-only image path, keeps missing RAW/camera/lens/orientation/capture metadata unavailable, skips unsupported files, and verifies original hashes remain unchanged.
 
-### Task 11.7.3: Metadata Query API
+### Task 11.7.4: Metadata Query API
 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `apps/desktop/src-tauri`
 - **Description:** Expose metadata through typed core and desktop APIs.
-- **Dependencies:** Task 11.7.2
+- **Dependencies:** Task 11.7.3
 - **Acceptance Criteria:**
   - Metadata responses distinguish known, unknown, and unavailable.
   - Query APIs do not read original files during inspector display unless explicitly scoped.
 - **Validation:**
   - `cargo test -p silica-core metadata`
   - `cargo test -p silica-desktop metadata`
+- **Status:** Completed on 2026-06-11. Storage, core, and desktop now expose a typed `get_photo_metadata` path that reads catalog data only and returns explicit `known`, `unknown`, or `unavailable` field states. Tests remove originals before metadata query to verify inspector-style reads do not reopen source files.
 
 ### Task 11.8.1: Metadata Inspector UI
 
 - **Location:** `apps/desktop/static/`, `scripts/harness/`
 - **Description:** Replace placeholder metadata rows with real Library and Loupe metadata sections.
-- **Dependencies:** Task 11.7.3
+- **Dependencies:** Task 11.7.4
 - **Acceptance Criteria:**
   - Inspector displays real metadata only.
   - Missing metadata uses `Unavailable` or equivalent honest state.
@@ -503,56 +558,60 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-static-ui.py`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. The shared Library/Loupe inspector now calls `get_photo_metadata`, displays stored file facts and metadata with honest `Unavailable` states, and reports multi-selection as primary-photo-only instead of aggregating fields. Static UI and workflow smoke harnesses now cover the metadata rows and command wiring.
 
 ### Task 11.8.2: Metadata Search and Filters
 
-- **Location:** `apps/desktop/static/`, `crates/silica-core`
+- **Location:** `apps/desktop/static/`, `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`
 - **Description:** Enable search and filter behavior only for fields backed by stored metadata and query APIs.
 - **Dependencies:** Task 11.8.1
 - **Acceptance Criteria:**
-  - Search/filter controls are disabled until their backing query exists.
+  - Search/filter controls are disabled until their backing indexed query exists.
   - Enabled filters produce real query results.
   - Empty and missing states are clear.
 - **Validation:**
   - `cargo test -p silica-core metadata_filter`
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. Added an indexed `has_dimensions` metadata query filter backed only by stored `photo_metadata.width` and `photo_metadata.height`, wired through core, desktop DTOs, persisted layout state, and the static Library toolbar. Camera/lens filters stay disabled until parser and index support exists.
 
-## Sprint 5: Recursive Import and Reviewable Errors
+## Sprint 5: Reviewable Import Errors and Recursive Import
 
 Goal: Make import broader without making it silent, unsafe, or hard to recover from.
 
 Demo/Validation:
 
-- Recursive import is opt-in.
 - Import errors and unsupported files are reviewable.
+- Recursive import is opt-in after error review exists.
 - Browsing continues after recoverable import errors.
 
-### Task 11.9.1: Recursive Import Policy
+### Task 11.9.1: Import Error and Recursive Import Policy
 
 - **Location:** `docs/wiki/topics/catalog.md`, `docs/wiki/roadmaps/post-alpha-product-roadmap.md`
-- **Description:** Document recursive import behavior before implementation.
+- **Description:** Document structured import error categories and recursive import behavior before implementation.
 - **Dependencies:** Task 11.8.2
 - **Acceptance Criteria:**
+  - Recoverable failures and unsupported files have reviewable categories.
   - Recursive import defaults off.
   - Symlink directory behavior is explicit.
   - Hidden files, packages, max depth, permissions errors, and unsupported files are explicit.
   - Originals remain referenced by path only.
 - **Validation:**
   - `python3 scripts/harness/check-md-links.py`
+- **Status:** Completed on 2026-06-11. The catalog wiki and post-alpha roadmap now define import issue categories, non-recursive default behavior, opt-in recursive behavior, symlink skip policy, hidden/package/max-depth/permission handling, and the rule that originals remain referenced by path only.
 
-### Task 11.9.2: Recursive Scanner and Import Error Model
+### Task 11.9.2: Structured Import Error Model
 
 - **Location:** `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`
-- **Description:** Implement opt-in recursive scanning and structured import errors.
+- **Description:** Implement structured recoverable import errors for the existing non-recursive import path.
 - **Dependencies:** Task 11.9.1
 - **Acceptance Criteria:**
-  - Non-recursive behavior remains the default.
   - Recoverable errors are returned in a reviewable list.
   - Unsupported files are visible.
   - Browsing can continue after recoverable errors.
-  - Symlink directory handling follows policy.
+  - Non-recursive behavior remains the default.
 - **Validation:**
-  - `cargo test -p silica-storage -p silica-core recursive_import`
+  - `cargo test -p silica-storage -p silica-core import_error`
+- **Status:** Completed on 2026-06-11. The catalog/storage/core boundary now exposes structured `ImportIssue` records through `FolderImportSummary.issues` for the current non-recursive import path, and the desktop command response carries the same list for the later review UI. Unsupported files, hidden entries, package directories, symlink entries, and per-entry metadata/read failures are recoverable review entries while accepted rows remain browseable.
 
 ### Task 11.9.3: Import Error Review UI
 
@@ -562,16 +621,33 @@ Demo/Validation:
 - **Acceptance Criteria:**
   - Error review shows failed and unsupported entries.
   - The library remains browseable while errors are visible.
-  - Recursive toggle is explicit and defaults off.
+  - The review surface does not require recursive scanning to exist.
 - **Validation:**
   - `python3 scripts/harness/check-ui-workflow-smoke.py`
   - visual QA for import-error state
+- **Status:** Completed on 2026-06-11. The desktop import panel now has a real import issue review surface backed by the structured `issues` response. It shows unsupported, skipped, and failed entries from the latest import without enabling recursive scanning or hiding the Library grid. Static UI and workflow smoke checks enforce the review surface, and final visual QA now includes an import-issue-review surface.
 
-### Task 11.9.4: Connected Runtime Smoke for Phase 11
+### Task 11.9.4: Opt-In Recursive Scanner
+
+- **Location:** `crates/silica-catalog`, `crates/silica-storage`, `crates/silica-core`, `apps/desktop/src-tauri`, `apps/desktop/static/`
+- **Description:** Implement explicit recursive scanning after structured errors and review UI exist.
+- **Dependencies:** Task 11.9.3
+- **Acceptance Criteria:**
+  - Recursive import is user-selected and defaults off.
+  - Recoverable recursive errors are returned in the same reviewable model.
+  - Unsupported files are visible.
+  - Browsing can continue after recoverable errors.
+  - Symlink directory handling follows policy.
+- **Validation:**
+  - `cargo test -p silica-storage -p silica-core recursive_import`
+  - `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-11. Recursive import is now an explicit opt-in checkbox in the import panel and remains off by default. Storage/core expose `FolderImportOptions { recursive }`; recursive scans use the same structured issue model for unsupported, hidden, package, symlink, directory-read, entry-metadata, and max-depth outcomes while accepted nested rows remain browseable. Symlinks are skipped rather than followed.
+
+### Task 11.9.5: Connected Runtime Smoke for Phase 11
 
 - **Location:** `scripts/harness/`, `apps/desktop/src-tauri`
 - **Description:** Extend connected runtime smoke for the completed Phase 11 user path.
-- **Dependencies:** Task 11.9.3
+- **Dependencies:** Task 11.9.4
 - **Acceptance Criteria:**
   - Create/open records recents.
   - Relaunch restores valid last state.
@@ -583,6 +659,7 @@ Demo/Validation:
 - **Validation:**
   - `python3 scripts/harness/check-connected-runtime-smoke.py`
   - `scripts/harness/check.sh`
+- **Status:** Completed on 2026-06-11. The connected runtime smoke now covers Phase 11 recents, relaunch restore, missing-library fallback, paged grid query, stored metadata display, recursive import issue reporting, and original-file hash preservation using generated legal fixtures. The smoke emits a Phase 11 completion marker that `scripts/harness/check-connected-runtime-smoke.py` requires.
 
 ## Validation Strategy
 
@@ -597,7 +674,7 @@ Use smallest useful verification while developing each atomic task.
 - Integrated runtime changes: `python3 scripts/harness/check-connected-runtime-smoke.py`
 - PR completion: always run `scripts/harness/check.sh`
 
-Do not add broad fallback systems or large test matrices before evidence requires them.
+Do not add broad fallback systems or large test matrices before evidence requires them. Phase 11 fallback behavior should stay limited to safe defaults, warnings, disabled/unavailable UI states, and documented stop gates.
 
 ## Stop Gates
 
@@ -615,6 +692,7 @@ Stop and redesign if any Phase 11 task would:
 - follow symlink directories without explicit policy
 - keep loading every catalog row after the paged query API is introduced
 - show fake metadata, fake recents, fake errors, or fake aggregate multi-select state
+- add broad fallback systems or large test matrices without evidence
 
 ## Rollback Plan
 
@@ -652,3 +730,10 @@ Test agent conclusion:
 - Keep `scripts/harness/check.sh` as the merge gate.
 - Use narrow task-specific checks during development.
 - Avoid broad fallback systems and unnecessary test bloat.
+
+Re-audit tightening:
+
+- Use bounded offset pagination for Phase 11; defer cursor pagination until measurements justify it.
+- Add page-scoped thumbnail hydration before virtualized grid work depends on it.
+- Treat metadata backfill as an explicit policy, not an automatic launch or restore side effect.
+- Model and review import errors before enabling recursive scanning.

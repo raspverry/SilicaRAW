@@ -10,14 +10,14 @@
     <link rel="stylesheet" href="./styles/app-frame.css">
   </head>
   <body>
-    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome">
+    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome" data-sidebar-collapsed="false" data-inspector-collapsed="false" data-filmstrip-visible="true">
       <header class="sr-toolbar" id="appToolbar" role="banner">
         <div class="sr-window-cluster" aria-hidden="true">
           <span class="sr-window-dot sr-window-dot-red"></span>
           <span class="sr-window-dot sr-window-dot-yellow"></span>
           <span class="sr-window-dot sr-window-dot-green"></span>
         </div>
-        <button class="sr-icon-button" type="button" aria-label="Toggle sidebar" data-status-action="Sidebar layout controls">
+        <button class="sr-icon-button" id="toggleSidebar" type="button" aria-label="Toggle sidebar" aria-pressed="false">
           <span class="sr-glyph sr-glyph-sidebar" aria-hidden="true"></span>
         </button>
         <div class="sr-toolbar-title">SilicaRAW</div>
@@ -27,11 +27,11 @@
           <button id="modeExport" type="button" data-mode="export" aria-pressed="false">Export</button>
         </nav>
         <div class="sr-toolbar-actions" aria-label="Toolbar actions">
-          <input class="sr-search" type="search" aria-label="Search photos" placeholder="Search" disabled title="Search is deferred until real recents and filters are implemented.">
+          <input class="sr-search" id="librarySearch" type="search" aria-label="Search photos" placeholder="Search" title="Search preference is saved; catalog query filtering starts with the paged query API.">
           <button class="sr-icon-button" type="button" aria-label="Grid view" data-status-action="Grid view options">
             <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
           </button>
-          <button class="sr-icon-button" type="button" aria-label="Inspector" data-status-action="Inspector layout controls">
+          <button class="sr-icon-button" id="toggleInspector" type="button" aria-label="Toggle inspector" aria-pressed="false">
             <span class="sr-glyph sr-glyph-panel" aria-hidden="true"></span>
           </button>
           <button class="sr-fit-action" type="button" data-status-action="Fit zoom controls">Fit</button>
@@ -54,9 +54,9 @@
         </section>
         <section class="sr-sidebar-section" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Presets</div>
-          <button class="sr-preset-row is-active" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
-          <button class="sr-preset-row" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
-          <button class="sr-preset-row" type="button" disabled title="Preset application is deferred for the local alpha."><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
+          <button class="sr-preset-row is-active" id="presetSilicaNeutral" type="button" data-basic-preset="silica_neutral" aria-pressed="true"><span class="sr-preset-thumb"></span><span>Silica Neutral</span></button>
+          <button class="sr-preset-row" id="presetWarmContrast" type="button" data-basic-preset="warm_contrast" aria-pressed="false"><span class="sr-preset-thumb"></span><span>Warm Contrast</span></button>
+          <button class="sr-preset-row" id="presetSoftMatte" type="button" data-basic-preset="soft_matte" aria-pressed="false"><span class="sr-preset-thumb"></span><span>Soft Matte</span></button>
         </section>
         <section class="sr-sidebar-section" data-mode-panel="export" hidden>
           <div class="sr-panel-heading">Export</div>
@@ -98,6 +98,7 @@
                 <div class="sr-recent-header">
                   <h2>Recent Libraries</h2>
                 </div>
+                <div class="sr-recent-list" id="recentLibraryList" aria-label="Recent library list" hidden></div>
                 <div class="sr-recent-empty" id="recentEmptyState">
                   <span class="sr-glyph sr-glyph-folder" aria-hidden="true"></span>
                   <span><strong>No recent libraries yet</strong><small>Open or create a local library to begin.</small></span>
@@ -142,6 +143,11 @@
                     <button class="sr-path-picker-button" id="chooseImportFolderPath" type="button">Choose Folder</button>
                     <button class="primary" id="startImport" type="button">Import by Reference</button>
                   </div>
+                  <label class="sr-import-recursive-option" for="importRecursive">
+                    <input id="importRecursive" name="importRecursive" type="checkbox">
+                    <span>Include subfolders</span>
+                    <small>Recursive import stays off unless selected.</small>
+                  </label>
                 </form>
 
                 <div class="sr-import-overall">
@@ -175,8 +181,19 @@
                   <div><span>Imported</span><strong id="importedCount">0</strong></div>
                   <div><span>Unsupported</span><strong id="unsupportedCount">0</strong></div>
                   <div><span>Errors</span><strong id="importErrorCount">0</strong></div>
-                  <button id="viewImportErrors" type="button">View Errors</button>
+                  <button id="viewImportErrors" type="button" aria-controls="importIssueReview" aria-expanded="false" disabled>Review Issues</button>
                 </div>
+                <section class="sr-import-review" id="importIssueReview" aria-labelledby="importIssueReviewTitle" hidden>
+                  <div class="sr-import-review-header">
+                    <div>
+                      <h3 id="importIssueReviewTitle">Import issue review</h3>
+                      <p>Unsupported file, Skipped entry, and Failed entry details from the latest import.</p>
+                    </div>
+                    <button id="closeImportIssues" type="button">Close</button>
+                  </div>
+                  <output class="sr-import-review-summary" id="importIssueReviewSummary" aria-live="polite">No import issues to review.</output>
+                  <div class="sr-import-issue-list" id="importIssueList" role="list"></div>
+                </section>
               </div>
             </section>
             <section class="sr-cache-maintenance" id="cacheMaintenance" aria-labelledby="cacheMaintenanceTitle">
@@ -197,9 +214,42 @@
                   <span id="gridPhotoSubtitle">Preview catalog rows</span>
                 </div>
                 <div class="sr-grid-tools">
-                  <button type="button" disabled title="File filters are deferred for the local alpha.">All Files</button>
-                  <button type="button" aria-label="Minimum rating" disabled title="Rating filters are deferred for the local alpha.">*****</button>
-                  <button type="button" disabled title="Sort controls are deferred for the local alpha.">Capture Time</button>
+                  <select id="fileTypeFilter" aria-label="File type filter">
+                    <option value="">All Files</option>
+                    <option value="jpeg">JPEG</option>
+                    <option value="raw">RAW</option>
+                    <option value="unsupported">Unsupported</option>
+                  </select>
+                  <select id="metadataFilter" aria-label="Metadata filter">
+                    <option value="">Any Metadata</option>
+                    <option value="has_dimensions">Has Dimensions</option>
+                    <option value="" disabled>Camera/lens unavailable</option>
+                  </select>
+                  <select id="minRatingFilter" aria-label="Minimum rating">
+                    <option value="">Any Rating</option>
+                    <option value="1">1+ Stars</option>
+                    <option value="2">2+ Stars</option>
+                    <option value="3">3+ Stars</option>
+                    <option value="4">4+ Stars</option>
+                    <option value="5">5 Stars</option>
+                  </select>
+                  <select id="cullingFilter" aria-label="Culling filter">
+                    <option value="">All Culling</option>
+                    <option value="picked">Picked</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <select id="librarySort" aria-label="Library sort">
+                    <option value="imported_at_desc">Imported</option>
+                    <option value="file_name_asc">File Name</option>
+                    <option value="rating_desc">Rating</option>
+                  </select>
+                </div>
+              </div>
+              <div class="sr-grid-page-bar" id="gridPageState" data-grid-page-state="idle">
+                <output id="gridPageStatus">Page 1</output>
+                <div class="sr-grid-page-actions">
+                  <button id="gridPreviousPage" type="button" aria-label="Previous grid page" disabled>Previous</button>
+                  <button id="gridNextPage" type="button" aria-label="Next grid page" disabled>Next</button>
                 </div>
               </div>
               <div class="sr-grid-state" id="gridLoadingState" hidden>
@@ -210,7 +260,11 @@
                 <strong>No imported photos</strong>
                 <span>Import a folder by reference to populate this grid.</span>
               </div>
-              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite"></div>
+              <div class="sr-grid-state" id="gridErrorState" hidden>
+                <strong>Grid page unavailable</strong>
+                <span id="gridErrorMessage">Library grid failed to load.</span>
+              </div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" tabindex="0" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0" data-grid-keyboard-navigation="roving-focus"></div>
             </div>
             <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
               <div class="sr-loupe-header">
@@ -228,7 +282,7 @@
                   <button type="button" disabled title="Next navigation is deferred for the local alpha.">Next</button>
                 </div>
               </div>
-              <div class="sr-loupe-viewer" id="loupeViewer" data-preview-status="blocked">
+              <div class="sr-loupe-viewer" id="loupeViewer" data-preview-status="blocked" data-native-viewer-host="reserved" data-native-viewer-surface="loupe" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
                 <div class="sr-loupe-art" aria-hidden="true"></div>
                 <div class="sr-loupe-status">
                   <strong id="loupePreviewStatus">No Preview</strong>
@@ -248,12 +302,11 @@
                 <p id="developPhotoName">No photo selected</p>
               </div>
               <div class="sr-view-controls" aria-label="Develop preview controls">
-                <button type="button">Before</button>
-                <button type="button" class="is-active">After</button>
-                <button type="button">Split</button>
+                <button id="developBeforeView" type="button" data-before-after-mode="before" aria-pressed="false">Before</button>
+                <button id="developAfterView" type="button" class="is-active" data-before-after-mode="after" aria-pressed="true">After</button>
               </div>
             </div>
-            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false">
+            <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false" data-before-after-mode="after" data-native-viewer-host="reserved" data-native-viewer-surface="develop" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
               <div class="sr-develop-art sr-thumb-art-a" id="developPreviewArt" aria-hidden="true"></div>
               <div class="sr-develop-status">
                 <strong id="developPreviewStatus">No Preview</strong>
@@ -291,10 +344,19 @@
 
       <aside class="sr-inspector" id="rightInspector" aria-label="Right inspector">
         <section class="sr-inspector-section">
-          <div class="sr-histogram" aria-label="Histogram placeholder"></div>
+          <div class="sr-histogram" id="photoHistogram" data-histogram-state="empty" aria-label="Photo histogram">
+            <div class="sr-histogram-bars" id="photoHistogramBars" aria-hidden="true"></div>
+            <output class="sr-histogram-status" id="photoHistogramStatus" aria-live="polite">No histogram</output>
+          </div>
         </section>
         <section class="sr-inspector-section" data-mode-panel="library">
           <div class="sr-panel-heading">Quick Review</div>
+          <div class="sr-selection-summary" id="selectionSummary" data-multi-selection-state="single">
+            <span>Primary</span>
+            <strong id="primarySelectedPhotoName">None</strong>
+            <output id="multiSelectionCount">1 selected</output>
+            <button id="clearMultiSelection" type="button" disabled>Clear Multi-Select</button>
+          </div>
           <div class="sr-rating-row" id="selectedPhotoRating" aria-label="Selected photo rating">-----</div>
           <div class="sr-rating-control-group" id="ratingControlGroup" aria-label="Rating">
             <button id="ratePhoto0" type="button" data-rating-value="0" aria-label="Set rating 0" aria-pressed="true">0</button>
@@ -331,9 +393,117 @@
               <button id="developContrastReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-adjustment-slider" data-adjustment="white-balance">
+            <div class="sr-adjustment-header">
+              <label for="developWhiteBalanceMode">White Balance</label>
+              <select id="developWhiteBalanceMode" aria-label="White balance mode">
+                <option value="as_shot">As Shot</option>
+                <option value="auto">Auto</option>
+                <option value="daylight">Daylight</option>
+                <option value="cloudy">Cloudy</option>
+                <option value="shade">Shade</option>
+                <option value="tungsten">Tungsten</option>
+                <option value="fluorescent">Fluorescent</option>
+                <option value="flash">Flash</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="temperature">
+            <div class="sr-adjustment-header">
+              <label for="developTemperatureSlider">Temperature</label>
+              <input id="developTemperatureValue" type="number" min="1000" max="50000" step="50" value="5200" aria-label="Temperature value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developTemperatureSlider" type="range" min="1000" max="50000" step="50" value="5200" aria-label="Temperature">
+              <button id="developTemperatureReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="tint">
+            <div class="sr-adjustment-header">
+              <label for="developTintSlider">Tint</label>
+              <input id="developTintValue" type="number" min="-150" max="150" step="1" value="0" aria-label="Tint value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developTintSlider" type="range" min="-150" max="150" step="1" value="0" aria-label="Tint">
+              <button id="developTintReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="highlights">
+            <div class="sr-adjustment-header">
+              <label for="developHighlightsSlider">Highlights</label>
+              <input id="developHighlightsValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Highlights value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developHighlightsSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Highlights">
+              <button id="developHighlightsReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="shadows">
+            <div class="sr-adjustment-header">
+              <label for="developShadowsSlider">Shadows</label>
+              <input id="developShadowsValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Shadows value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developShadowsSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Shadows">
+              <button id="developShadowsReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="whites">
+            <div class="sr-adjustment-header">
+              <label for="developWhitesSlider">Whites</label>
+              <input id="developWhitesValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Whites value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developWhitesSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Whites">
+              <button id="developWhitesReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="blacks">
+            <div class="sr-adjustment-header">
+              <label for="developBlacksSlider">Blacks</label>
+              <input id="developBlacksValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Blacks value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developBlacksSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Blacks">
+              <button id="developBlacksReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="vibrance">
+            <div class="sr-adjustment-header">
+              <label for="developVibranceSlider">Vibrance</label>
+              <input id="developVibranceValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Vibrance value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developVibranceSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Vibrance">
+              <button id="developVibranceReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-adjustment-slider" data-adjustment="saturation">
+            <div class="sr-adjustment-header">
+              <label for="developSaturationSlider">Saturation</label>
+              <input id="developSaturationValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Saturation value">
+            </div>
+            <div class="sr-adjustment-control">
+              <input id="developSaturationSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Saturation">
+              <button id="developSaturationReset" type="button">Reset</button>
+            </div>
+          </div>
+          <div class="sr-develop-reset-row">
+            <button id="developResetBasic" type="button" title="Preset/reset applies one undoable edit checkpoint.">Reset All</button>
+          </div>
           <div class="sr-develop-commit-row">
             <button class="primary" id="developCommitEdit" type="button">Commit Edit</button>
             <button id="developRevertEdit" type="button">Revert Draft</button>
+          </div>
+          <div class="sr-history-panel" id="developHistoryPanel" data-history-state="empty">
+            <div class="sr-panel-heading">History</div>
+            <div class="sr-history-command-row" role="group" aria-label="Develop history commands">
+              <button id="developUndoHistory" type="button" disabled>Undo</button>
+              <button id="developRedoHistory" type="button" disabled>Redo</button>
+            </div>
+            <output class="sr-history-status" id="developHistoryStatus" aria-live="polite">No committed history yet.</output>
+            <ol class="sr-history-list" id="developHistoryList" aria-live="polite"></ol>
           </div>
           <button class="sr-collapse-row" type="button">Tone</button>
           <button class="sr-collapse-row" type="button">Color</button>
@@ -350,7 +520,14 @@
         <section class="sr-inspector-section">
           <div class="sr-panel-heading">Metadata</div>
           <div class="sr-metadata-row"><span>File</span><span id="selectedPhotoName">None</span></div>
-          <div class="sr-metadata-row"><span>Type</span><span>Catalog</span></div>
+          <div class="sr-metadata-row"><span>Type</span><strong id="metadataFileType" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Dimensions</span><strong id="metadataDimensions" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Captured</span><strong id="metadataCaptureTime" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Camera</span><strong id="metadataCamera" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Lens</span><strong id="metadataLens" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Modified</span><strong id="metadataModifiedAt" data-metadata-state="unavailable">Unavailable</strong></div>
+          <div class="sr-metadata-row"><span>Size</span><strong id="metadataFileSize" data-metadata-state="unavailable">Unavailable</strong></div>
+          <output class="sr-metadata-status" id="metadataStatus" aria-live="polite">Select a photo to inspect stored metadata.</output>
         </section>
       </aside>
 
@@ -360,7 +537,8 @@
           <button class="sr-icon-button" type="button" aria-label="Grid">
             <span class="sr-glyph sr-glyph-grid" aria-hidden="true"></span>
           </button>
-          <button class="sr-icon-button" type="button" aria-label="Loupe">1:1</button>
+          <button class="sr-icon-button" id="toggleFilmstrip" type="button" aria-label="Toggle filmstrip" aria-pressed="true">Film</button>
+          <button class="sr-icon-button" id="resetLayout" type="button" aria-label="Reset layout">Reset</button>
         </div>
         <div class="sr-status-right">
           <output id="appStatus" aria-live="polite">No library open</output>
@@ -389,13 +567,28 @@
                   <button class="sr-path-picker-button" id="chooseExportOutputPath" type="button">Choose...</button>
                 </div>
               </div>
-              <div class="sr-export-fixed-grid" aria-label="JPEG sRGB settings">
+              <div class="sr-export-fixed-grid" aria-label="JPEG settings">
                 <label for="exportFormat">Format</label>
                 <input id="exportFormat" type="text" value="JPEG" readonly>
-                <label for="exportColorSpace">Color Space</label>
-                <input id="exportColorSpace" type="text" value="sRGB" readonly>
                 <label for="exportQuality">Quality</label>
                 <input id="exportQuality" type="number" value="90" min="90" max="90" readonly>
+              </div>
+              <div class="sr-export-setting-row sr-export-color-options">
+                <label for="exportColorSpace">Color Space</label>
+                <div class="sr-export-color-control">
+                  <input id="exportColorSpace" type="text" value="sRGB" readonly>
+                  <div class="sr-export-color-choices" role="group" aria-label="JPEG color space">
+                    <button class="sr-export-color-choice is-selected" id="exportColorSrgb" type="button" data-export-color="srgb" aria-pressed="true">
+                      <span>sRGB</span>
+                      <small>Default</small>
+                    </button>
+                    <button class="sr-export-color-choice" id="exportColorDisplayP3" type="button" data-export-color="display_p3" aria-pressed="false">
+                      <span>Display P3</span>
+                      <small>Explicit ICC</small>
+                    </button>
+                  </div>
+                  <p class="sr-export-color-proof" id="exportColorProof">sRGB is the default export path. Display P3 requires explicit selection and writes ICC metadata.</p>
+                </div>
               </div>
               <div class="sr-export-safety" id="exportSafetyNote">
                 Original files will not be modified. SilicaRAW writes a separate JPEG sRGB file to the output path.
@@ -425,11 +618,11 @@
       const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
       const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
       const libraryStatePanels = Array.from(document.querySelectorAll("[data-library-state-panel]"));
-      const recentButtons = Array.from(document.querySelectorAll("[data-recent-path]"));
       const welcomeActionButtons = Array.from(document.querySelectorAll("[data-welcome-action]"));
       const statusActionButtons = Array.from(document.querySelectorAll("[data-status-action]"));
       const pathInput = document.querySelector("#libraryPath");
       const importPathInput = document.querySelector("#importFolderPath");
+      const importRecursiveInput = document.querySelector("#importRecursive");
       const statusOutput = document.querySelector("#appStatus");
       const welcomeStatus = document.querySelector("#welcomeStatus");
       const importStatus = document.querySelector("#importStatus");
@@ -440,9 +633,18 @@
       const importedCount = document.querySelector("#importedCount");
       const unsupportedCount = document.querySelector("#unsupportedCount");
       const importErrorCount = document.querySelector("#importErrorCount");
+      const importIssueReview = document.querySelector("#importIssueReview");
+      const importIssueReviewSummary = document.querySelector("#importIssueReviewSummary");
+      const importIssueList = document.querySelector("#importIssueList");
       const libraryGrid = document.querySelector("#libraryGrid");
       const gridEmptyState = document.querySelector("#gridEmptyState");
       const gridLoadingState = document.querySelector("#gridLoadingState");
+      const gridErrorState = document.querySelector("#gridErrorState");
+      const gridErrorMessage = document.querySelector("#gridErrorMessage");
+      const gridPageState = document.querySelector("#gridPageState");
+      const gridPageStatus = document.querySelector("#gridPageStatus");
+      const gridPreviousPageButton = document.querySelector("#gridPreviousPage");
+      const gridNextPageButton = document.querySelector("#gridNextPage");
       const gridStateNote = document.querySelector("#gridStateNote");
       const gridPhotoSubtitle = document.querySelector("#gridPhotoSubtitle");
       const libraryGridShell = document.querySelector(".sr-library-grid-shell");
@@ -460,18 +662,31 @@
       const developPreviewMessage = document.querySelector("#developPreviewMessage");
       const developFilmstrip = document.querySelector("#developFilmstrip");
       const developEditState = document.querySelector("#developEditState");
+      const developBeforeView = document.querySelector("#developBeforeView");
+      const developAfterView = document.querySelector("#developAfterView");
       const libraryPhotoCount = document.querySelector("#libraryPhotoCount");
       const allPhotosCount = document.querySelector("#allPhotosCount");
       const selectedPhotoName = document.querySelector("#selectedPhotoName");
       const selectedPhotoRating = document.querySelector("#selectedPhotoRating");
+      const metadataFileType = document.querySelector("#metadataFileType");
+      const metadataDimensions = document.querySelector("#metadataDimensions");
+      const metadataCaptureTime = document.querySelector("#metadataCaptureTime");
+      const metadataCamera = document.querySelector("#metadataCamera");
+      const metadataLens = document.querySelector("#metadataLens");
+      const metadataModifiedAt = document.querySelector("#metadataModifiedAt");
+      const metadataFileSize = document.querySelector("#metadataFileSize");
+      const metadataStatus = document.querySelector("#metadataStatus");
       const recentImportCount = document.querySelector("#recentImportCount");
       const createButton = document.querySelector("#createLibrary");
       const openButton = document.querySelector("#openLibrary");
       const openRecentButton = document.querySelector("#openRecent");
+      const recentLibraryList = document.querySelector("#recentLibraryList");
+      const recentEmptyState = document.querySelector("#recentEmptyState");
       const chooseLibraryPathButton = document.querySelector("#chooseLibraryPath");
       const chooseImportFolderPathButton = document.querySelector("#chooseImportFolderPath");
       const startImportButton = document.querySelector("#startImport");
       const viewImportErrorsButton = document.querySelector("#viewImportErrors");
+      const closeImportIssuesButton = document.querySelector("#closeImportIssues");
       const showImportPanelButton = document.querySelector("#showImportPanel");
       const minimizeImportButton = document.querySelector("#minimizeImport");
       const clearLibraryCacheButton = document.querySelector("#clearLibraryCache");
@@ -481,6 +696,13 @@
       const rejectSelectedButton = document.querySelector("#rejectSelectedPhoto");
       const clearCullingFlagsButton = document.querySelector("#clearCullingFlags");
       const cullingStatus = document.querySelector("#cullingStatus");
+      const photoHistogram = document.querySelector("#photoHistogram");
+      const photoHistogramBars = document.querySelector("#photoHistogramBars");
+      const photoHistogramStatus = document.querySelector("#photoHistogramStatus");
+      const selectionSummary = document.querySelector("#selectionSummary");
+      const primarySelectedPhotoName = document.querySelector("#primarySelectedPhotoName");
+      const multiSelectionCount = document.querySelector("#multiSelectionCount");
+      const clearMultiSelectionButton = document.querySelector("#clearMultiSelection");
       const openLoupeButton = document.querySelector("#openLoupe");
       const loupeButtons = Array.from(document.querySelectorAll('[aria-label="Loupe"]'));
       const closeLoupeButton = document.querySelector("#closeLoupe");
@@ -490,8 +712,40 @@
       const developContrastSlider = document.querySelector("#developContrastSlider");
       const developContrastValue = document.querySelector("#developContrastValue");
       const developContrastReset = document.querySelector("#developContrastReset");
+      const developWhiteBalanceMode = document.querySelector("#developWhiteBalanceMode");
+      const developTemperatureSlider = document.querySelector("#developTemperatureSlider");
+      const developTemperatureValue = document.querySelector("#developTemperatureValue");
+      const developTemperatureReset = document.querySelector("#developTemperatureReset");
+      const developTintSlider = document.querySelector("#developTintSlider");
+      const developTintValue = document.querySelector("#developTintValue");
+      const developTintReset = document.querySelector("#developTintReset");
+      const developHighlightsSlider = document.querySelector("#developHighlightsSlider");
+      const developHighlightsValue = document.querySelector("#developHighlightsValue");
+      const developHighlightsReset = document.querySelector("#developHighlightsReset");
+      const developShadowsSlider = document.querySelector("#developShadowsSlider");
+      const developShadowsValue = document.querySelector("#developShadowsValue");
+      const developShadowsReset = document.querySelector("#developShadowsReset");
+      const developWhitesSlider = document.querySelector("#developWhitesSlider");
+      const developWhitesValue = document.querySelector("#developWhitesValue");
+      const developWhitesReset = document.querySelector("#developWhitesReset");
+      const developBlacksSlider = document.querySelector("#developBlacksSlider");
+      const developBlacksValue = document.querySelector("#developBlacksValue");
+      const developBlacksReset = document.querySelector("#developBlacksReset");
+      const developVibranceSlider = document.querySelector("#developVibranceSlider");
+      const developVibranceValue = document.querySelector("#developVibranceValue");
+      const developVibranceReset = document.querySelector("#developVibranceReset");
+      const developSaturationSlider = document.querySelector("#developSaturationSlider");
+      const developSaturationValue = document.querySelector("#developSaturationValue");
+      const developSaturationReset = document.querySelector("#developSaturationReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
+      const developResetBasic = document.querySelector("#developResetBasic");
+      const basicPresetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
+      const developHistoryPanel = document.querySelector("#developHistoryPanel");
+      const developHistoryStatus = document.querySelector("#developHistoryStatus");
+      const developHistoryList = document.querySelector("#developHistoryList");
+      const developUndoHistory = document.querySelector("#developUndoHistory");
+      const developRedoHistory = document.querySelector("#developRedoHistory");
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -501,25 +755,140 @@
       const exportSelectedPhotoName = document.querySelector("#exportSelectedPhotoName");
       const exportSelectedInline = document.querySelector("#exportSelectedInline");
       const exportOutputPath = document.querySelector("#exportOutputPath");
+      const exportColorSpace = document.querySelector("#exportColorSpace");
+      const exportColorOptionButtons = Array.from(document.querySelectorAll("[data-export-color]"));
       const chooseExportOutputPathButton = document.querySelector("#chooseExportOutputPath");
       const exportStatus = document.querySelector("#exportStatus");
+      const exportSafetyNote = document.querySelector("#exportSafetyNote");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
+      const exportSummaryColor = document.querySelector("#exportSummaryColor");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
+      const toggleSidebarButton = document.querySelector("#toggleSidebar");
+      const toggleInspectorButton = document.querySelector("#toggleInspector");
+      const toggleFilmstripButton = document.querySelector("#toggleFilmstrip");
+      const resetLayoutButton = document.querySelector("#resetLayout");
+      const librarySearchInput = document.querySelector("#librarySearch");
+      const fileTypeFilterInput = document.querySelector("#fileTypeFilter");
+      const metadataFilterInput = document.querySelector("#metadataFilter");
+      const minRatingFilterInput = document.querySelector("#minRatingFilter");
+      const cullingFilterInput = document.querySelector("#cullingFilter");
+      const librarySortInput = document.querySelector("#librarySort");
 
       const invoke = window.__TAURI__?.core?.invoke;
       const dialogApi = window.__TAURI__?.dialog;
       const initialGridPhotos = Array.from(document.querySelectorAll(".sr-photo-card")).map(photoFromCard);
+      const LIBRARY_GRID_PAGE_LIMIT = 100;
+      const GRID_OVERSCAN_ROWS = 2;
+      const IMPORT_ERROR_ISSUE_KINDS = new Set([
+        "directory_read_failed",
+        "entry_metadata_failed",
+      ]);
       let libraryPhotos = initialGridPhotos;
       let selectedPhotoId = initialGridPhotos[0]?.photoId ?? "";
+      let selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
+      let selectionAnchorPhotoId = selectedPhotoId;
       let activeLibraryPath = "";
+      let selectedExportColorProfile = "srgb";
+      let libraryGridPage = {
+        offset: 0,
+        limit: LIBRARY_GRID_PAGE_LIMIT,
+        totalCount: initialGridPhotos.length,
+        hasNextPage: false,
+      };
+      let recentLibraries = [];
       let developPreviewSequence = 0;
+      let developBeforeAfterMode = "after";
+      let lastDevelopPreviewState = null;
       let controlsBusy = false;
+      let layoutHydrating = false;
+      let layoutSaveTimer = 0;
+      let gridVirtualRenderFrame = 0;
+      let gridVirtualWindow = { start: 0, end: 0 };
+      let metadataRequestSequence = 0;
+      let historyRequestSequence = 0;
+      let lastImportIssues = [];
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
+      const pageThumbnailObjectUrls = new Map();
       const loupeObjectUrls = new Map();
       const developObjectUrls = new Map();
+      const nativeViewerHosts = {
+        loupe: loupeViewer,
+        develop: developPreviewSurface,
+      };
+
+      function roundedGeometryValue(value) {
+        return Math.round(Number(value || 0) * 100) / 100;
+      }
+
+      function unavailableViewerHostGeometry(surface, reason) {
+        const scaleFactor = window.devicePixelRatio || 1;
+        return {
+          available: false,
+          surface,
+          state: "web-fallback",
+          reason,
+          controls: "external",
+          logicalRect: { x: 0, y: 0, width: 0, height: 0 },
+          scaleFactor,
+          drawableSize: { width: 0, height: 0 },
+        };
+      }
+
+      function viewerHostGeometry(element) {
+        if (!element) {
+          return unavailableViewerHostGeometry("none", "missing-host");
+        }
+        const surface = element.dataset.nativeViewerSurface || "unknown";
+        if (element.dataset.nativeViewerHost !== "reserved") {
+          return unavailableViewerHostGeometry(surface, "not-reserved-host");
+        }
+        const rect = element.getBoundingClientRect();
+        const width = roundedGeometryValue(rect.width);
+        const height = roundedGeometryValue(rect.height);
+        const scaleFactor = window.devicePixelRatio || 1;
+        const available = element.isConnected && width > 0 && height > 0;
+
+        return {
+          available,
+          surface,
+          state: element.dataset.nativeViewerState || "web-fallback",
+          reason: available ? "" : "empty-host-rect",
+          controls: element.dataset.nativeViewerControls || "external",
+          logicalRect: {
+            x: roundedGeometryValue(rect.left),
+            y: roundedGeometryValue(rect.top),
+            width,
+            height,
+          },
+          scaleFactor,
+          drawableSize: {
+            width: Math.round(width * scaleFactor),
+            height: Math.round(height * scaleFactor),
+          },
+        };
+      }
+
+      function currentNativeViewerHostGeometry() {
+        if (appFrame.dataset.activeMode === "develop") {
+          return viewerHostGeometry(developPreviewSurface);
+        }
+        if (!loupeSurface.hidden) {
+          return viewerHostGeometry(loupeViewer);
+        }
+        return unavailableViewerHostGeometry("none", "no-active-viewer");
+      }
+
+      window.SilicaRAWViewerHost = Object.freeze({
+        enabled: false,
+        surfaces: Object.freeze(["loupe", "develop"]),
+        currentGeometry: currentNativeViewerHostGeometry,
+        geometryFor(surface) {
+          return viewerHostGeometry(nativeViewerHosts[surface]);
+        },
+      });
 
       function setStatus(message) {
         statusOutput.value = message;
@@ -559,6 +928,450 @@
 
       function commandFailed(response) {
         return !response || response.ok === false;
+      }
+
+      function normalizeImportIssues(issues = []) {
+        if (!Array.isArray(issues)) {
+          return [];
+        }
+        return issues
+          .filter((issue) => issue && typeof issue === "object")
+          .map((issue) => ({
+            kind: typeof issue.kind === "string" ? issue.kind : "entry_metadata_failed",
+            path: typeof issue.path === "string" ? issue.path : "",
+            fileName: typeof issue.fileName === "string" ? issue.fileName : "",
+            message: typeof issue.message === "string" ? issue.message : "Import issue recorded.",
+          }));
+      }
+
+      function importIssueCategory(kind) {
+        if (kind === "unsupported_file") {
+          return { label: "Unsupported file", tone: "unsupported" };
+        }
+        if (IMPORT_ERROR_ISSUE_KINDS.has(kind)) {
+          return { label: "Failed entry", tone: "error" };
+        }
+        return { label: "Skipped entry", tone: "skipped" };
+      }
+
+      function countImportErrorIssues(issues = []) {
+        if (!Array.isArray(issues)) {
+          return 0;
+        }
+        return issues.filter((issue) => IMPORT_ERROR_ISSUE_KINDS.has(issue?.kind)).length;
+      }
+
+      function renderImportIssueReview() {
+        importIssueList.replaceChildren();
+        viewImportErrorsButton.disabled = lastImportIssues.length === 0;
+
+        if (lastImportIssues.length === 0) {
+          importIssueReviewSummary.value = "No import issues to review.";
+          importIssueReview.hidden = true;
+          viewImportErrorsButton.setAttribute("aria-expanded", "false");
+          return;
+        }
+
+        const unsupported = lastImportIssues.filter((issue) => issue.kind === "unsupported_file").length;
+        const failed = countImportErrorIssues(lastImportIssues);
+        const skipped = lastImportIssues.length - unsupported - failed;
+        importIssueReviewSummary.value = `${lastImportIssues.length} issue(s): ${unsupported} unsupported, ${skipped} skipped, ${failed} failed.`;
+
+        lastImportIssues.forEach((issue) => {
+          const category = importIssueCategory(issue.kind);
+          const row = document.createElement("article");
+          row.className = "sr-import-issue-row";
+          row.dataset.issueTone = category.tone;
+          row.setAttribute("role", "listitem");
+
+          const badge = document.createElement("span");
+          badge.className = "sr-import-issue-badge";
+          badge.textContent = category.label;
+
+          const body = document.createElement("div");
+          body.className = "sr-import-issue-body";
+
+          const title = document.createElement("strong");
+          title.textContent = issue.fileName || issue.path || "Import entry";
+
+          const path = document.createElement("span");
+          path.textContent = issue.path || "Path unavailable";
+
+          const message = document.createElement("small");
+          message.textContent = issue.message;
+
+          body.append(title, path, message);
+          row.append(badge, body);
+          importIssueList.append(row);
+        });
+      }
+
+      function setImportIssues(issues = []) {
+        lastImportIssues = normalizeImportIssues(issues);
+        renderImportIssueReview();
+      }
+
+      function openImportIssueReview() {
+        if (lastImportIssues.length === 0) {
+          setStatus("No import issues to review.");
+          return;
+        }
+        importIssueReview.hidden = false;
+        viewImportErrorsButton.setAttribute("aria-expanded", "true");
+        setStatus(importIssueReviewSummary.value);
+      }
+
+      function closeImportIssueReview() {
+        importIssueReview.hidden = true;
+        viewImportErrorsButton.setAttribute("aria-expanded", "false");
+      }
+
+      function clampThumbnailSize(value) {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isNaN(parsed)) {
+          return 168;
+        }
+        return Math.min(220, Math.max(132, parsed));
+      }
+
+      function normalizeLayoutPreferences(layout = {}) {
+        const filters = layout.filters ?? {};
+        return {
+          sidebarCollapsed: Boolean(layout.sidebarCollapsed),
+          inspectorCollapsed: Boolean(layout.inspectorCollapsed),
+          filmstripVisible: layout.filmstripVisible !== false,
+          thumbnailSize: clampThumbnailSize(layout.thumbnailSize ?? 168),
+          sort: ["imported_at_desc", "file_name_asc", "rating_desc"].includes(layout.sort)
+            ? layout.sort
+            : "imported_at_desc",
+          filters: {
+            minRating: [1, 2, 3, 4, 5].includes(Number(filters.minRating)) ? Number(filters.minRating) : null,
+            picked: typeof filters.picked === "boolean" ? filters.picked : null,
+            rejected: typeof filters.rejected === "boolean" ? filters.rejected : null,
+            fileType: ["jpeg", "raw", "unsupported"].includes(filters.fileType) ? filters.fileType : null,
+            metadata: filters.metadata === "has_dimensions" ? "has_dimensions" : null,
+            search: typeof filters.search === "string" ? filters.search : "",
+          },
+        };
+      }
+
+      function currentLayoutPreferences() {
+        const cullingFilter = cullingFilterInput.value;
+        return normalizeLayoutPreferences({
+          sidebarCollapsed: appFrame.dataset.sidebarCollapsed === "true",
+          inspectorCollapsed: appFrame.dataset.inspectorCollapsed === "true",
+          filmstripVisible: appFrame.dataset.filmstripVisible !== "false",
+          thumbnailSize: thumbnailSizeInput.value,
+          sort: librarySortInput.value,
+          filters: {
+            minRating: minRatingFilterInput.value ? Number(minRatingFilterInput.value) : null,
+            picked: cullingFilter === "picked" ? true : null,
+            rejected: cullingFilter === "rejected" ? true : null,
+            fileType: fileTypeFilterInput.value || null,
+            metadata: metadataFilterInput.value || null,
+            search: librarySearchInput.value,
+          },
+        });
+      }
+
+      function libraryGridPageRequest(options = {}) {
+        const layout = currentLayoutPreferences();
+        const offset = Math.max(0, Math.floor(Number(options.offset) || 0));
+        return {
+          offset,
+          limit: LIBRARY_GRID_PAGE_LIMIT,
+          sort: layout.sort,
+          filters: layout.filters,
+        };
+      }
+
+      function normalizedGridPage(page = {}, visibleCount = libraryPhotos.length) {
+        const limit = Math.max(1, Number(page.limit || LIBRARY_GRID_PAGE_LIMIT));
+        const offset = Math.max(0, Number(page.offset || 0));
+        const totalCount = Math.max(0, Number(page.totalCount ?? visibleCount));
+        return {
+          offset,
+          limit,
+          totalCount,
+          hasNextPage: Boolean(page.hasNextPage),
+        };
+      }
+
+      function updateGridPageControls(state = "page") {
+        const page = libraryGridPage;
+        const pageNumber = Math.floor(page.offset / page.limit) + 1;
+        const pageCount = Math.max(1, Math.ceil(page.totalCount / page.limit));
+        const firstRow = page.totalCount === 0 ? 0 : page.offset + 1;
+        const lastRow = Math.min(page.totalCount, page.offset + libraryPhotos.length);
+        const range = page.totalCount === 0
+          ? "0 rows"
+          : `${firstRow}-${lastRow} of ${page.totalCount}`;
+
+        gridPageState.dataset.gridPageState = state;
+        const statusText = state === "loading"
+          ? "Loading page..."
+          : `Page ${pageNumber} of ${pageCount} · ${range}`;
+        gridPageStatus.value = statusText;
+        gridPageStatus.textContent = statusText;
+        gridPreviousPageButton.disabled = state === "loading" || state === "error" || page.offset === 0;
+        gridNextPageButton.disabled = state === "loading" || state === "error" || !page.hasNextPage;
+      }
+
+      function renderGridError(message) {
+        gridLoadingState.hidden = true;
+        gridEmptyState.hidden = true;
+        gridErrorState.hidden = false;
+        libraryGrid.hidden = true;
+        gridErrorMessage.textContent = message;
+        updateGridPageControls("error");
+      }
+
+      function applyLayoutPreferences(layout = {}, options = {}) {
+        const normalized = normalizeLayoutPreferences(layout);
+        layoutHydrating = true;
+        appFrame.dataset.sidebarCollapsed = String(normalized.sidebarCollapsed);
+        appFrame.dataset.inspectorCollapsed = String(normalized.inspectorCollapsed);
+        appFrame.dataset.filmstripVisible = String(normalized.filmstripVisible);
+        toggleSidebarButton.setAttribute("aria-pressed", String(normalized.sidebarCollapsed));
+        toggleInspectorButton.setAttribute("aria-pressed", String(normalized.inspectorCollapsed));
+        toggleFilmstripButton.setAttribute("aria-pressed", String(normalized.filmstripVisible));
+        thumbnailSizeInput.value = String(normalized.thumbnailSize);
+        libraryGrid.style.setProperty("--sr-thumb-min", `${normalized.thumbnailSize}px`);
+        libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${normalized.thumbnailSize}px, 1fr))`;
+        renderVirtualGridWindow({ force: true });
+        librarySortInput.value = normalized.sort;
+        fileTypeFilterInput.value = normalized.filters.fileType ?? "";
+        minRatingFilterInput.value = normalized.filters.minRating ? String(normalized.filters.minRating) : "";
+        cullingFilterInput.value = normalized.filters.picked ? "picked" : normalized.filters.rejected ? "rejected" : "";
+        metadataFilterInput.value = normalized.filters.metadata ?? "";
+        librarySearchInput.value = normalized.filters.search;
+        layoutHydrating = false;
+        if (options.persist) {
+          scheduleLayoutPersistence();
+        }
+      }
+
+      function scheduleLayoutPersistence() {
+        if (layoutHydrating || !invoke) {
+          return;
+        }
+        window.clearTimeout(layoutSaveTimer);
+        layoutSaveTimer = window.setTimeout(() => recordLayoutPreferences(), 180);
+      }
+
+      async function recordLayoutPreferences() {
+        if (!invoke) {
+          return;
+        }
+        try {
+          const response = await invoke("record_app_session_layout", {
+            layout: currentLayoutPreferences(),
+          });
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Layout preferences failed to save."));
+          }
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "Layout preferences failed to save."));
+        }
+      }
+
+      async function resetLayoutPreferences() {
+        if (!invoke) {
+          applyLayoutPreferences({}, { persist: false });
+          setStatus("Layout reset.");
+          return;
+        }
+        try {
+          const response = await invoke("reset_app_session_layout");
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, "Layout reset failed."));
+            return;
+          }
+          applyLayoutPreferences(response.data?.session?.layout ?? {}, { persist: false });
+          setStatus("Layout reset.");
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "Layout reset failed."));
+        }
+      }
+
+      async function recordActiveSessionState(mode = appFrame.dataset.activeMode || "library") {
+        if (!invoke || !activeLibraryPath) {
+          return;
+        }
+        try {
+          await invoke("record_app_session_selection", {
+            libraryPath: activeLibraryPath,
+            selectedPhotoId: selectedPhotoId || null,
+            mode,
+          });
+        } catch (_error) {
+          // Session restore is helpful state, not a blocker for the editor workflow.
+        }
+      }
+
+      function recentDisplayName(recent) {
+        return recent?.displayName || recent?.rootPath?.split(/[\\/]/).filter(Boolean).pop() || "Local Library";
+      }
+
+      function recentStatusText(recent) {
+        if (recent?.available === false) {
+          return "Unavailable";
+        }
+        return recent?.lastOpenedAt || "Ready";
+      }
+
+      function firstAvailableRecent() {
+        return recentLibraries.find((recent) => recent?.rootPath && recent.available !== false);
+      }
+
+      function renderRecentLibraries(recents = []) {
+        recentLibraries = Array.isArray(recents) ? recents.filter((recent) => recent?.rootPath) : [];
+        recentLibraryList.replaceChildren();
+        const hasRecents = recentLibraries.length > 0;
+        recentLibraryList.hidden = !hasRecents;
+        recentEmptyState.hidden = hasRecents;
+
+        const availableRecent = firstAvailableRecent();
+        openRecentButton.disabled = !availableRecent;
+        openRecentButton.title = availableRecent
+          ? "Open the most recent available library."
+          : "Recent libraries are empty or unavailable.";
+
+        recentLibraries.forEach((recent) => {
+          const isAvailable = recent.available !== false;
+          const row = document.createElement("button");
+          row.className = "sr-recent-row";
+          row.type = "button";
+          row.disabled = !isAvailable;
+          row.dataset.recentPath = recent.rootPath;
+          row.setAttribute("aria-label", `${recentDisplayName(recent)} ${recentStatusText(recent)}`);
+          if (!isAvailable) {
+            row.classList.add("is-unavailable");
+            row.title = "This recent library path is unavailable.";
+          }
+
+          const icon = document.createElement("span");
+          icon.className = "sr-glyph sr-glyph-folder";
+          icon.setAttribute("aria-hidden", "true");
+
+          const text = document.createElement("span");
+          const name = document.createElement("strong");
+          name.textContent = recentDisplayName(recent);
+          const path = document.createElement("small");
+          path.textContent = recent.rootPath;
+          text.append(name, path);
+
+          const state = document.createElement("span");
+          state.className = "sr-recent-state";
+          state.textContent = recentStatusText(recent);
+
+          row.append(icon, text, state);
+          if (isAvailable) {
+            row.addEventListener("click", () => openRecentLibrary(recent));
+          }
+          recentLibraryList.append(row);
+        });
+      }
+
+      async function loadAppSession() {
+        if (!invoke) {
+          renderRecentLibraries([]);
+          return;
+        }
+        try {
+          const response = await invoke("read_app_session");
+          if (commandFailed(response)) {
+            renderRecentLibraries([]);
+            return;
+          }
+          const session = response.data?.session ?? {};
+          renderRecentLibraries(session.recents ?? []);
+          applyLayoutPreferences(session.layout ?? {}, { persist: false });
+        } catch (_error) {
+          renderRecentLibraries([]);
+        }
+      }
+
+      function launchRestoreStatus(fallbackReason) {
+        switch (fallbackReason) {
+          case "missingLibrary":
+            return "Last library folder is unavailable.";
+          case "missingCatalog":
+            return "Last library catalog is unavailable.";
+          case "invalidCatalog":
+            return "Last library catalog cannot be restored.";
+          case "noLastLibrary":
+          case "missing":
+          default:
+            return "Choose or create a local library.";
+        }
+      }
+
+      async function resolveLaunchRestore() {
+        if (!invoke) {
+          renderRecentLibraries([]);
+          applyLayoutPreferences({}, { persist: false });
+          renderLibraryGrid(initialGridPhotos);
+          setLibraryState("welcome");
+          setMode("library", { persist: false });
+          return;
+        }
+
+        try {
+          const response = await invoke("resolve_launch_restore");
+          if (commandFailed(response)) {
+            renderRecentLibraries([]);
+            applyLayoutPreferences({}, { persist: false });
+            renderLibraryGrid(initialGridPhotos);
+            setLibraryState("welcome");
+            setMode("library", { persist: false });
+            setStatus(responseErrorMessage(response, "Launch restore failed."));
+            return;
+          }
+
+          const restore = response.data ?? {};
+          renderRecentLibraries(restore.session?.recents ?? []);
+          applyLayoutPreferences(restore.session?.layout ?? {}, { persist: false });
+          if (restore.state !== "library" || !restore.libraryRootPath) {
+            activeLibraryPath = "";
+            setLibraryState("welcome");
+            renderLibraryGrid(initialGridPhotos);
+            setMode("library", { persist: false });
+            setStatus(launchRestoreStatus(restore.fallbackReason));
+            return;
+          }
+
+          activeLibraryPath = restore.libraryRootPath;
+          pathInput.value = restore.libraryRootPath;
+          setLibraryState("open");
+          await loadLibraryGrid({
+            preferredPhotoId: restore.selectedPhotoId || "",
+            allowDefaultSelection: restore.selectedPhotoStatus !== "missing",
+            persistSelection: false,
+          });
+          setMode(restore.resolvedMode || "library", { persist: false });
+          setStatus(
+            restore.selectedPhotoStatus === "missing"
+              ? "Restored last library. Previous photo is unavailable."
+              : "Restored last library.",
+          );
+        } catch (error) {
+          renderRecentLibraries([]);
+          applyLayoutPreferences({}, { persist: false });
+          renderLibraryGrid(initialGridPhotos);
+          setLibraryState("welcome");
+          setMode("library", { persist: false });
+          setStatus(responseErrorMessage(error, "Launch restore failed."));
+        }
+      }
+
+      async function openRecentLibrary(recent = firstAvailableRecent()) {
+        if (!recent?.rootPath || recent.available === false) {
+          setStatus("Recent library is unavailable.");
+          return;
+        }
+        pathInput.value = recent.rootPath;
+        await runLibraryCommand("open_library");
       }
 
       function dialogPathValue(selection) {
@@ -682,6 +1495,128 @@
         return `Rating ${Number(photo.rating) || 0}. ${mark}.`;
       }
 
+      function metadataUnavailableText(field) {
+        return field?.state === "unknown" ? "Unavailable" : "Unavailable";
+      }
+
+      function setMetadataText(element, text, state = "unavailable") {
+        element.textContent = text;
+        element.dataset.metadataState = state;
+      }
+
+      function metadataFieldText(field, formatter = (value) => String(value)) {
+        if (!field || field.state !== "known" || field.value === null || field.value === undefined || field.value === "") {
+          return { text: metadataUnavailableText(field), state: field?.state || "unavailable" };
+        }
+        return { text: formatter(field.value), state: "known" };
+      }
+
+      function applyMetadataField(element, field, formatter) {
+        const rendered = metadataFieldText(field, formatter);
+        setMetadataText(element, rendered.text, rendered.state);
+      }
+
+      function formatFileSize(bytes) {
+        const value = Number(bytes);
+        if (!Number.isFinite(value) || value < 0) {
+          return "Unavailable";
+        }
+        if (value >= 1024 * 1024) {
+          return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+        }
+        if (value >= 1024) {
+          return `${(value / 1024).toFixed(1)} KB`;
+        }
+        return `${value} B`;
+      }
+
+      function formatDimensions(metadata) {
+        const width = metadata?.width;
+        const height = metadata?.height;
+        if (width?.state === "known" && height?.state === "known") {
+          return { text: `${width.value} x ${height.value}`, state: "known" };
+        }
+        const state = width?.state === "unknown" || height?.state === "unknown" ? "unknown" : "unavailable";
+        return { text: "Unavailable", state };
+      }
+
+      function formatCamera(metadata) {
+        const make = metadataFieldText(metadata?.cameraMake).text;
+        const model = metadataFieldText(metadata?.cameraModel).text;
+        if (make === "Unavailable" && model === "Unavailable") {
+          return { text: "Unavailable", state: metadata?.cameraMake?.state || metadata?.cameraModel?.state || "unavailable" };
+        }
+        return { text: [make, model].filter((part) => part !== "Unavailable").join(" "), state: "known" };
+      }
+
+      function renderMetadataFallback(photo, status = "") {
+        selectedPhotoName.textContent = photo?.fileName ?? "None";
+        setMetadataText(metadataFileType, photo?.fileType || "Unavailable", photo ? "known" : "unavailable");
+        setMetadataText(metadataDimensions, "Unavailable");
+        setMetadataText(metadataCaptureTime, "Unavailable");
+        setMetadataText(metadataCamera, "Unavailable");
+        setMetadataText(metadataLens, "Unavailable");
+        setMetadataText(metadataModifiedAt, "Unavailable");
+        setMetadataText(metadataFileSize, "Unavailable");
+        metadataStatus.value = status || (photo ? "Stored metadata unavailable in static preview." : "Select a photo to inspect stored metadata.");
+        metadataStatus.textContent = metadataStatus.value;
+      }
+
+      function renderPhotoMetadata(metadata) {
+        selectedPhotoName.textContent = metadata.fileName || selectedPhoto()?.fileName || "None";
+        setMetadataText(metadataFileType, metadata.fileType || "Unavailable", metadata.fileType ? "known" : "unavailable");
+        const dimensions = formatDimensions(metadata);
+        setMetadataText(metadataDimensions, dimensions.text, dimensions.state);
+        applyMetadataField(metadataCaptureTime, metadata.captureTime);
+        const camera = formatCamera(metadata);
+        setMetadataText(metadataCamera, camera.text, camera.state);
+        applyMetadataField(metadataLens, metadata.lensModel);
+        applyMetadataField(metadataModifiedAt, metadata.modifiedAt);
+        applyMetadataField(metadataFileSize, metadata.fileSize, formatFileSize);
+        const selectionNote = selectedPhotoIds.size > 1 ? ` Primary photo only; ${selectedPhotoIds.size} selected.` : "";
+        metadataStatus.value = `Metadata loaded from catalog.${selectionNote}`;
+        metadataStatus.textContent = metadataStatus.value;
+      }
+
+      async function refreshSelectedMetadata() {
+        const requestId = ++metadataRequestSequence;
+        const photo = selectedPhoto();
+        const selectionNote = selectedPhotoIds.size > 1 ? ` Primary photo only; ${selectedPhotoIds.size} selected.` : "";
+        renderMetadataFallback(photo, photo ? `Metadata waits for catalog query.${selectionNote}` : "");
+        if (!photo) {
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          return;
+        }
+
+        try {
+          const response = await invoke("get_photo_metadata", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+          });
+          if (requestId !== metadataRequestSequence) {
+            return;
+          }
+          if (commandFailed(response)) {
+            metadataStatus.value = responseErrorMessage(response, "Metadata unavailable.");
+            metadataStatus.textContent = metadataStatus.value;
+            return;
+          }
+          if (!response.data) {
+            renderMetadataFallback(photo, "Catalog photo metadata was not found.");
+            return;
+          }
+          renderPhotoMetadata(response.data);
+        } catch (error) {
+          if (requestId !== metadataRequestSequence) {
+            return;
+          }
+          metadataStatus.value = responseErrorMessage(error, "Metadata unavailable.");
+          metadataStatus.textContent = metadataStatus.value;
+        }
+      }
+
       function updateCullingControls(photo = selectedPhoto()) {
         const disabled = controlsBusy || !photo;
         const rating = Number(photo?.rating ?? 0);
@@ -698,6 +1633,9 @@
         pickSelectedButton.textContent = photo?.picked ? "Unpick" : "Pick";
         rejectSelectedButton.textContent = photo?.rejected ? "Unreject" : "Reject";
         cullingStatus.value = cullingStatusText(photo);
+        if (selectedPhotoIds.size > 1) {
+          cullingStatus.value = `${cullingStatus.value} Primary-only controls.`;
+        }
       }
 
       function setSelectedRating(rating) {
@@ -750,8 +1688,58 @@
         return String(Math.round(clamp(value, -100, 100)));
       }
 
+      function formatTemperature(value) {
+        return String(Math.round(clamp(value || 5200, 1000, 50000) / 50) * 50);
+      }
+
+      function formatTint(value) {
+        return String(Math.round(clamp(value, -150, 150)));
+      }
+
+      function formatSignedHundred(value) {
+        return String(Math.round(clamp(value, -100, 100)));
+      }
+
+      function normalizeWhiteBalance(value) {
+        const supported = new Set(["as_shot", "auto", "daylight", "cloudy", "shade", "tungsten", "fluorescent", "flash", "custom"]);
+        return supported.has(value) ? value : "as_shot";
+      }
+
       function selectedPhoto() {
         return libraryPhotos.find((photo) => photo.photoId === selectedPhotoId);
+      }
+
+      function currentPagePhotoIds() {
+        return new Set(libraryPhotos.map((photo) => photo.photoId));
+      }
+
+      function normalizeMultiSelection() {
+        const pageIds = currentPagePhotoIds();
+        selectedPhotoIds = new Set(Array.from(selectedPhotoIds).filter((photoId) => pageIds.has(photoId)));
+        if (selectedPhotoId && pageIds.has(selectedPhotoId)) {
+          selectedPhotoIds.add(selectedPhotoId);
+        }
+        if (!selectionAnchorPhotoId || !pageIds.has(selectionAnchorPhotoId)) {
+          selectionAnchorPhotoId = selectedPhotoId;
+        }
+      }
+
+      function syncSelectionSummary() {
+        normalizeMultiSelection();
+        const selected = selectedPhoto();
+        const count = selectedPhotoIds.size;
+        const state = count > 1 ? "multi" : selected ? "single" : "empty";
+        selectionSummary.dataset.multiSelectionState = state;
+        primarySelectedPhotoName.textContent = selected?.fileName ?? "None";
+        multiSelectionCount.value = count === 1 ? "1 selected" : `${count} selected`;
+        multiSelectionCount.textContent = multiSelectionCount.value;
+        clearMultiSelectionButton.disabled = count <= 1;
+      }
+
+      function clearMultiSelection() {
+        selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
+        selectionAnchorPhotoId = selectedPhotoId;
+        selectPhoto(selectedPhotoId, { persist: false, preserveSelectionSet: true });
       }
 
       function selectedPhotoBaseName(photo) {
@@ -783,8 +1771,26 @@
           developAdjustmentsByPhoto.set(photoId, {
             draftExposure: 0,
             draftContrast: 0,
+            draftWhiteBalance: "as_shot",
+            draftTemperature: 5200,
+            draftTint: 0,
+            draftHighlights: 0,
+            draftShadows: 0,
+            draftWhites: 0,
+            draftBlacks: 0,
+            draftVibrance: 0,
+            draftSaturation: 0,
             committedExposure: 0,
             committedContrast: 0,
+            committedWhiteBalance: "as_shot",
+            committedTemperature: 5200,
+            committedTint: 0,
+            committedHighlights: 0,
+            committedShadows: 0,
+            committedWhites: 0,
+            committedBlacks: 0,
+            committedVibrance: 0,
+            committedSaturation: 0,
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -801,6 +1807,23 @@
         developExposureValue.value = formatExposure(state.draftExposure);
         developContrastSlider.value = formatContrast(state.draftContrast);
         developContrastValue.value = formatContrast(state.draftContrast);
+        developWhiteBalanceMode.value = normalizeWhiteBalance(state.draftWhiteBalance);
+        developTemperatureSlider.value = formatTemperature(state.draftTemperature);
+        developTemperatureValue.value = formatTemperature(state.draftTemperature);
+        developTintSlider.value = formatTint(state.draftTint);
+        developTintValue.value = formatTint(state.draftTint);
+        developHighlightsSlider.value = formatSignedHundred(state.draftHighlights);
+        developHighlightsValue.value = formatSignedHundred(state.draftHighlights);
+        developShadowsSlider.value = formatSignedHundred(state.draftShadows);
+        developShadowsValue.value = formatSignedHundred(state.draftShadows);
+        developWhitesSlider.value = formatSignedHundred(state.draftWhites);
+        developWhitesValue.value = formatSignedHundred(state.draftWhites);
+        developBlacksSlider.value = formatSignedHundred(state.draftBlacks);
+        developBlacksValue.value = formatSignedHundred(state.draftBlacks);
+        developVibranceSlider.value = formatSignedHundred(state.draftVibrance);
+        developVibranceValue.value = formatSignedHundred(state.draftVibrance);
+        developSaturationSlider.value = formatSignedHundred(state.draftSaturation);
+        developSaturationValue.value = formatSignedHundred(state.draftSaturation);
       }
 
       function updateDevelopDirtyState(state) {
@@ -809,6 +1832,15 @@
           && (
             Number(state.draftExposure) !== Number(state.committedExposure)
             || Number(state.draftContrast) !== Number(state.committedContrast)
+            || normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
+            || Number(state.draftTemperature) !== Number(state.committedTemperature)
+            || Number(state.draftTint) !== Number(state.committedTint)
+            || Number(state.draftHighlights) !== Number(state.committedHighlights)
+            || Number(state.draftShadows) !== Number(state.committedShadows)
+            || Number(state.draftWhites) !== Number(state.committedWhites)
+            || Number(state.draftBlacks) !== Number(state.committedBlacks)
+            || Number(state.draftVibrance) !== Number(state.committedVibrance)
+            || Number(state.draftSaturation) !== Number(state.committedSaturation)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -824,8 +1856,26 @@
         const state = developAdjustmentState(photoId);
         state.committedExposure = editStateNumber(editState?.exposure, 0);
         state.committedContrast = editStateNumber(editState?.contrast, 0);
+        state.committedWhiteBalance = normalizeWhiteBalance(editState?.whiteBalance);
+        state.committedTemperature = editStateNumber(editState?.temperature, 5200);
+        state.committedTint = editStateNumber(editState?.tint, 0);
+        state.committedHighlights = editStateNumber(editState?.highlights, 0);
+        state.committedShadows = editStateNumber(editState?.shadows, 0);
+        state.committedWhites = editStateNumber(editState?.whites, 0);
+        state.committedBlacks = editStateNumber(editState?.blacks, 0);
+        state.committedVibrance = editStateNumber(editState?.vibrance, 0);
+        state.committedSaturation = editStateNumber(editState?.saturation, 0);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
+        state.draftWhiteBalance = state.committedWhiteBalance;
+        state.draftTemperature = state.committedTemperature;
+        state.draftTint = state.committedTint;
+        state.draftHighlights = state.committedHighlights;
+        state.draftShadows = state.committedShadows;
+        state.draftWhites = state.committedWhites;
+        state.draftBlacks = state.committedBlacks;
+        state.draftVibrance = state.committedVibrance;
+        state.draftSaturation = state.committedSaturation;
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -833,6 +1883,160 @@
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
           renderDevelopPreviewState(localDevelopPreviewPlan(selectedPhoto(), state));
+        }
+      }
+
+      function setDevelopHistoryButtons(canUndo, canRedo) {
+        developHistoryPanel.dataset.canUndo = String(Boolean(canUndo));
+        developHistoryPanel.dataset.canRedo = String(Boolean(canRedo));
+        developUndoHistory.disabled = controlsBusy || !canUndo;
+        developRedoHistory.disabled = controlsBusy || !canRedo;
+      }
+
+      function renderDevelopHistoryPanel(panel) {
+        const items = Array.isArray(panel?.items) ? panel.items : [];
+        const status = panel?.status || (items.length ? "ready" : "empty");
+        developHistoryPanel.dataset.historyState = status;
+        developHistoryStatus.value = panel?.message || (items.length ? "History checkpoints loaded." : "No committed history yet.");
+        setDevelopHistoryButtons(Boolean(panel?.canUndo), Boolean(panel?.canRedo));
+        developHistoryList.replaceChildren();
+
+        items.forEach((item) => {
+          const row = document.createElement("li");
+          row.className = "sr-history-item";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "sr-history-button";
+          const command = item.canUndo ? "undo" : item.canRedo ? "redo" : "";
+          button.disabled = !command;
+          button.dataset.historyId = item.historyId || "";
+          button.dataset.historyState = item.historyState || "";
+          button.dataset.historyCommand = command;
+          button.setAttribute("aria-label", `${item.label || item.actionKind || "History checkpoint"} ${command || "not selectable"}`);
+
+          const label = document.createElement("span");
+          label.className = "sr-history-label";
+          label.textContent = item.label || item.actionKind || "History checkpoint";
+          const state = document.createElement("span");
+          state.className = "sr-history-state";
+          state.textContent = command === "undo"
+            ? "Next undo"
+            : command === "redo"
+              ? "Next redo"
+              : item.historyState || "Locked";
+          button.append(label, state);
+          if (command) {
+            button.addEventListener("click", () => runDevelopHistoryCommand(command));
+          }
+          row.append(button);
+          developHistoryList.append(row);
+        });
+      }
+
+      function renderDevelopHistoryLoading(photo) {
+        developHistoryPanel.dataset.historyState = "loading";
+        developHistoryStatus.value = photo ? "Loading history checkpoints..." : "No photo selected.";
+        setDevelopHistoryButtons(false, false);
+        developHistoryList.replaceChildren();
+      }
+
+      function renderDevelopHistoryError(message) {
+        developHistoryPanel.dataset.historyState = "error";
+        developHistoryStatus.value = message || "History could not be loaded.";
+        setDevelopHistoryButtons(false, false);
+        developHistoryList.replaceChildren();
+      }
+
+      async function loadDevelopHistory() {
+        const photo = selectedPhoto();
+        if (!photo) {
+          renderDevelopHistoryPanel({
+            status: "empty",
+            message: "No photo selected.",
+            items: [],
+            canUndo: false,
+            canRedo: false,
+          });
+          return;
+        }
+
+        if (!activeLibraryPath || !invoke) {
+          renderDevelopHistoryPanel({
+            status: "empty",
+            message: "Desktop runtime is required to load committed history.",
+            items: [],
+            canUndo: false,
+            canRedo: false,
+          });
+          return;
+        }
+
+        const requestId = ++historyRequestSequence;
+        const historyPhotoId = photo.photoId;
+        renderDevelopHistoryLoading(photo);
+        try {
+          const response = await invoke("get_photo_history", {
+            libraryPath: activeLibraryPath,
+            photoId: historyPhotoId,
+          });
+          if (requestId !== historyRequestSequence || selectedPhotoId !== historyPhotoId) {
+            return;
+          }
+          if (commandFailed(response)) {
+            renderDevelopHistoryError(responseErrorMessage(response, "History failed to load."));
+            return;
+          }
+          renderDevelopHistoryPanel(response.data || {
+            status: "empty",
+            message: "No committed history yet.",
+            items: [],
+            canUndo: false,
+            canRedo: false,
+          });
+        } catch (error) {
+          if (requestId !== historyRequestSequence || selectedPhotoId !== historyPhotoId) {
+            return;
+          }
+          renderDevelopHistoryError(responseErrorMessage(error, "History failed to load."));
+        }
+      }
+
+      async function runDevelopHistoryCommand(command) {
+        const photo = selectedPhoto();
+        if (!photo) {
+          setStatus("Select a photo before using history.");
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          setStatus("Desktop runtime is required for undo and redo.");
+          return;
+        }
+        setBusy(true);
+        try {
+          const response = command === "redo"
+            ? await invoke("redo_last_history_action", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+            })
+            : await invoke("undo_last_history_action", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+            });
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, `${command} failed.`));
+            await loadDevelopHistory();
+            return;
+          }
+          await readPersistedDevelopState(photo, { force: true });
+          await loadDevelopHistory();
+          await previewDevelopEdit();
+          setStatus(responseMessage(response, `${command} applied.`));
+        } catch (error) {
+          setStatus(responseErrorMessage(error, `${command} failed.`));
+          await loadDevelopHistory();
+        } finally {
+          setBusy(false);
+          await loadDevelopHistory();
         }
       }
 
@@ -852,22 +2056,43 @@
         return null;
       }
 
-      function thumbnailBlobUrl(photo) {
+      function thumbnailObjectUrlKey(photo) {
         if (!Array.isArray(photo?.thumbnailBytes) || photo.thumbnailBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${photo.photoId}:${photo.thumbnailPath ?? ""}:${photo.thumbnailBytes.length}`;
-        if (thumbnailObjectUrls.has(cacheKey)) {
-          return thumbnailObjectUrls.get(cacheKey);
+        return `${photo.photoId}:${photo.thumbnailPath ?? ""}:${photo.thumbnailBytes.length}`;
+      }
+
+      function thumbnailBlobUrl(photo, cache = thumbnailObjectUrls) {
+        const cacheKey = thumbnailObjectUrlKey(photo);
+        if (!cacheKey) {
+          return "";
+        }
+        if (cache.has(cacheKey)) {
+          return cache.get(cacheKey);
         }
         const blob = new Blob([new Uint8Array(photo.thumbnailBytes)], { type: "image/jpeg" });
         const url = URL.createObjectURL(blob);
-        thumbnailObjectUrls.set(cacheKey, url);
+        cache.set(cacheKey, url);
         return url;
       }
 
-      function renderThumbnailArt(photo, index) {
-        const thumbnailUrl = thumbnailBlobUrl(photo);
+      function releaseGridThumbnailObjectUrls(retainedKeys = new Set()) {
+        Array.from(thumbnailObjectUrls.entries()).forEach(([cacheKey, url]) => {
+          if (!retainedKeys.has(cacheKey)) {
+            URL.revokeObjectURL(url);
+            thumbnailObjectUrls.delete(cacheKey);
+          }
+        });
+      }
+
+      function releaseObjectUrlMap(cache) {
+        Array.from(cache.values()).forEach((url) => URL.revokeObjectURL(url));
+        cache.clear();
+      }
+
+      function renderThumbnailArt(photo, index, options = {}) {
+        const thumbnailUrl = thumbnailBlobUrl(photo, options.cache ?? thumbnailObjectUrls);
         if (thumbnailUrl) {
           const image = document.createElement("img");
           image.className = "sr-thumb-image";
@@ -918,7 +2143,7 @@
         if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.developPreviewBytes.length}`;
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.vibrance ?? ""}:${preview.saturation ?? ""}:${preview.developPreviewBytes.length}`;
         if (developObjectUrls.has(cacheKey)) {
           return developObjectUrls.get(cacheKey);
         }
@@ -928,9 +2153,15 @@
         return url;
       }
 
+      function developBeforePreviewBlobUrl() {
+        return thumbnailBlobUrl(selectedPhoto(), thumbnailObjectUrls);
+      }
+
       function renderDevelopPreviewImage(preview) {
         developPreviewSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
-        const previewUrl = developPreviewBlobUrl(preview);
+        const previewUrl = developBeforeAfterMode === "before"
+          ? developBeforePreviewBlobUrl()
+          : developPreviewBlobUrl(preview);
         developPreviewSurface.dataset.hasPreviewImage = String(Boolean(previewUrl));
         if (!previewUrl) {
           return;
@@ -947,7 +2178,7 @@
 
       function renderExportPreviewImage(photo) {
         exportPreviewCard.querySelectorAll(".sr-export-preview-image").forEach((image) => image.remove());
-        const previewUrl = thumbnailBlobUrl(photo);
+        const previewUrl = thumbnailBlobUrl(photo, pageThumbnailObjectUrls);
         exportPreviewArt.hidden = Boolean(previewUrl);
         if (!previewUrl) {
           return;
@@ -962,28 +2193,267 @@
         exportPreviewCard.prepend(image);
       }
 
-      function renderLibraryGrid(photos) {
-        libraryPhotos = photos;
+      function renderLibraryGrid(photos, options = {}) {
+        releaseGridThumbnailObjectUrls(new Set());
+        releaseObjectUrlMap(pageThumbnailObjectUrls);
+        libraryPhotos = Array.isArray(photos) ? photos : [];
+        libraryGridPage = normalizedGridPage(options.page, libraryPhotos.length);
+        if (options.preserveScroll !== true) {
+          libraryGrid.scrollTop = 0;
+        }
+        const preferredPhotoId = options.preferredPhotoId || "";
+        const preferredExists = libraryPhotos.some((photo) => photo.photoId === preferredPhotoId);
         const selectedExists = libraryPhotos.some((photo) => photo.photoId === selectedPhotoId);
-        selectedPhotoId = selectedExists ? selectedPhotoId : libraryPhotos[0]?.photoId ?? "";
+        if (preferredExists) {
+          selectedPhotoId = preferredPhotoId;
+        } else if (!selectedExists) {
+          selectedPhotoId = options.allowDefaultSelection === false ? "" : libraryPhotos[0]?.photoId ?? "";
+        }
 
-        libraryPhotoCount.textContent = `${libraryPhotos.length} photos`;
-        allPhotosCount.textContent = String(libraryPhotos.length);
-        recentImportCount.textContent = String(libraryPhotos.length);
+        const totalRows = libraryGridPage.totalCount;
+        const pageRows = libraryPhotos.length;
+        libraryPhotoCount.textContent = `${totalRows} photos`;
+        allPhotosCount.textContent = String(totalRows);
+        recentImportCount.textContent = String(pageRows);
         gridPhotoSubtitle.textContent = libraryPhotos.length
-          ? `${libraryPhotos.length} catalog rows`
+          ? `${pageRows} of ${totalRows} catalog rows`
           : "No catalog rows";
         gridStateNote.textContent = libraryPhotos.length
           ? "Imported photos are displayed by catalog reference."
-          : "Import a folder by reference to populate the grid.";
+          : currentLayoutPreferences().filters.metadata
+            ? "No catalog rows match the active metadata filter."
+            : "Import a folder by reference to populate the grid.";
         gridLoadingState.hidden = true;
         gridEmptyState.hidden = libraryPhotos.length !== 0;
+        gridErrorState.hidden = true;
         libraryGrid.hidden = libraryPhotos.length === 0;
+        updateGridPageControls(libraryPhotos.length ? "page" : "empty");
 
-        libraryGrid.replaceChildren(...libraryPhotos.map(createPhotoCard));
+        renderVirtualGridWindow({ force: true });
         renderLoupeFilmstrip();
         renderDevelopFilmstrip();
-        selectPhoto(selectedPhotoId);
+        selectPhoto(selectedPhotoId, { persist: options.persistSelection === true });
+      }
+
+      function virtualGridMetrics() {
+        const styles = window.getComputedStyle(libraryGrid);
+        const columns = styles.gridTemplateColumns
+          .split(" ")
+          .filter((column) => column && column !== "none")
+          .length || 1;
+        const columnGap = Number.parseFloat(styles.columnGap) || 0;
+        const rowGap = Number.parseFloat(styles.rowGap) || 0;
+        const gridWidth = Math.max(1, libraryGrid.clientWidth);
+        const cardWidth = Math.max(1, (gridWidth - columnGap * (columns - 1)) / columns);
+        const cardHeight = cardWidth * 0.75;
+        const rowHeight = Math.max(1, cardHeight + rowGap);
+        const totalRows = Math.ceil(libraryPhotos.length / columns);
+        const viewportRows = Math.max(1, Math.ceil(Math.max(libraryGrid.clientHeight, rowHeight) / rowHeight));
+        const maxFirstRow = Math.max(0, totalRows - 1);
+        const firstVisibleRow = Math.min(maxFirstRow, Math.floor(libraryGrid.scrollTop / rowHeight));
+        const firstRenderedRow = Math.max(0, firstVisibleRow - GRID_OVERSCAN_ROWS);
+        const renderedRows = viewportRows + GRID_OVERSCAN_ROWS * 2;
+        const start = Math.min(libraryPhotos.length, firstRenderedRow * columns);
+        const end = Math.min(libraryPhotos.length, (firstRenderedRow + renderedRows) * columns);
+        const renderedEndRow = Math.ceil(end / columns);
+        return {
+          columns,
+          rowHeight,
+          viewportRows,
+          start,
+          end,
+          topSpacerHeight: firstRenderedRow * rowHeight,
+          bottomSpacerHeight: Math.max(0, (totalRows - renderedEndRow) * rowHeight),
+        };
+      }
+
+      function createGridSpacer(className, height) {
+        const spacer = document.createElement("div");
+        spacer.className = `sr-grid-spacer ${className}`;
+        spacer.dataset.gridSpacer = className;
+        spacer.style.height = `${Math.round(height)}px`;
+        return spacer;
+      }
+
+      function renderVirtualGridWindow(options = {}) {
+        if (libraryGrid.hidden || libraryPhotos.length === 0) {
+          libraryGrid.replaceChildren();
+          releaseGridThumbnailObjectUrls(new Set());
+          libraryGrid.dataset.virtualGridWindow = "0-0";
+          gridVirtualWindow = { start: 0, end: 0 };
+          return;
+        }
+
+        const metrics = virtualGridMetrics();
+        if (
+          options.force !== true
+          && gridVirtualWindow.start === metrics.start
+          && gridVirtualWindow.end === metrics.end
+        ) {
+          return;
+        }
+
+        const visiblePhotos = libraryPhotos.slice(metrics.start, metrics.end);
+        const retainedKeys = new Set(visiblePhotos.map(thumbnailObjectUrlKey).filter(Boolean));
+        const nodes = [];
+        if (metrics.topSpacerHeight > 0) {
+          nodes.push(createGridSpacer("sr-grid-spacer-before", metrics.topSpacerHeight));
+        }
+        nodes.push(...visiblePhotos.map((photo, index) => {
+          return createPhotoCard(photo, metrics.start + index);
+        }));
+        if (metrics.bottomSpacerHeight > 0) {
+          nodes.push(createGridSpacer("sr-grid-spacer-after", metrics.bottomSpacerHeight));
+        }
+
+        libraryGrid.replaceChildren(...nodes);
+        releaseGridThumbnailObjectUrls(retainedKeys);
+        gridVirtualWindow = { start: metrics.start, end: metrics.end };
+        libraryGrid.dataset.virtualGridWindow = `${metrics.start}-${metrics.end}`;
+      }
+
+      function scheduleVirtualGridWindowRender() {
+        if (gridVirtualRenderFrame) {
+          return;
+        }
+        const schedule = window.requestAnimationFrame
+          ? (callback) => window.requestAnimationFrame(callback)
+          : (callback) => window.setTimeout(callback, 16);
+        gridVirtualRenderFrame = schedule(() => {
+          gridVirtualRenderFrame = 0;
+          renderVirtualGridWindow();
+        });
+      }
+
+      function selectedPhotoIndex() {
+        return libraryPhotos.findIndex((photo) => photo.photoId === selectedPhotoId);
+      }
+
+      function photoIndexById(photoId) {
+        return libraryPhotos.findIndex((photo) => photo.photoId === photoId);
+      }
+
+      function selectedGridCard() {
+        return Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).find((card) => {
+          return card.dataset.photoId === selectedPhotoId;
+        });
+      }
+
+      function focusSelectedGridCard() {
+        selectedGridCard()?.focus({ preventScroll: true });
+      }
+
+      function scrollGridIndexIntoView(index) {
+        if (index < 0 || libraryPhotos.length === 0) {
+          return;
+        }
+        const metrics = virtualGridMetrics();
+        const row = Math.floor(index / metrics.columns);
+        const top = row * metrics.rowHeight;
+        const bottom = top + metrics.rowHeight;
+        const viewportTop = libraryGrid.scrollTop;
+        const viewportBottom = viewportTop + libraryGrid.clientHeight;
+
+        if (top < viewportTop) {
+          libraryGrid.scrollTop = top;
+        } else if (bottom > viewportBottom) {
+          libraryGrid.scrollTop = Math.max(0, bottom - libraryGrid.clientHeight);
+        }
+        renderVirtualGridWindow({ force: true });
+      }
+
+      function moveGridSelectionToIndex(index, options = {}) {
+        if (libraryPhotos.length === 0) {
+          return;
+        }
+        const nextIndex = Math.min(Math.max(0, index), libraryPhotos.length - 1);
+        const nextPhoto = libraryPhotos[nextIndex];
+        if (!nextPhoto) {
+          return;
+        }
+        selectPhoto(nextPhoto.photoId);
+        scrollGridIndexIntoView(nextIndex);
+        if (options.focus !== false) {
+          focusSelectedGridCard();
+        }
+      }
+
+      function selectPhotoRange(photoId) {
+        const targetIndex = photoIndexById(photoId);
+        if (targetIndex < 0) {
+          return;
+        }
+        const anchorIndex = photoIndexById(selectionAnchorPhotoId);
+        const start = Math.min(anchorIndex >= 0 ? anchorIndex : targetIndex, targetIndex);
+        const end = Math.max(anchorIndex >= 0 ? anchorIndex : targetIndex, targetIndex);
+        selectedPhotoIds = new Set(libraryPhotos.slice(start, end + 1).map((photo) => photo.photoId));
+        selectPhoto(photoId, { preserveSelectionSet: true });
+      }
+
+      function togglePhotoSelection(photoId) {
+        if (!photoId || !currentPagePhotoIds().has(photoId)) {
+          return;
+        }
+        if (selectedPhotoIds.has(photoId) && selectedPhotoIds.size > 1) {
+          selectedPhotoIds.delete(photoId);
+          const nextPrimary = photoId === selectedPhotoId
+            ? Array.from(selectedPhotoIds).at(-1) ?? ""
+            : selectedPhotoId;
+          selectPhoto(nextPrimary, { preserveSelectionSet: true });
+          return;
+        }
+
+        selectedPhotoIds.add(photoId);
+        selectionAnchorPhotoId = photoId;
+        selectPhoto(photoId, { preserveSelectionSet: true });
+      }
+
+      function handleLibraryGridKeydown(event) {
+        const navigationKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"];
+        if (event.key === " ") {
+          event.preventDefault();
+          togglePhotoSelection(selectedPhotoId);
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          clearMultiSelection();
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void openLoupeView();
+          return;
+        }
+        if (!navigationKeys.includes(event.key)) {
+          return;
+        }
+
+        event.preventDefault();
+        const metrics = virtualGridMetrics();
+        const currentIndex = selectedPhotoIndex() >= 0 ? selectedPhotoIndex() : 0;
+        const pageStep = Math.max(1, metrics.columns * metrics.viewportRows);
+        const nextIndexByKey = {
+          ArrowLeft: currentIndex - 1,
+          ArrowRight: currentIndex + 1,
+          ArrowUp: currentIndex - metrics.columns,
+          ArrowDown: currentIndex + metrics.columns,
+          Home: 0,
+          End: libraryPhotos.length - 1,
+          PageUp: currentIndex - pageStep,
+          PageDown: currentIndex + pageStep,
+        };
+        const nextIndex = nextIndexByKey[event.key];
+        if (event.shiftKey) {
+          const nextPhoto = libraryPhotos[Math.min(Math.max(0, nextIndex), libraryPhotos.length - 1)];
+          if (nextPhoto) {
+            selectPhotoRange(nextPhoto.photoId);
+            scrollGridIndexIntoView(photoIndexById(nextPhoto.photoId));
+            focusSelectedGridCard();
+          }
+          return;
+        }
+        moveGridSelectionToIndex(nextIndex);
       }
 
       function createPhotoCard(photo, index) {
@@ -992,11 +2462,25 @@
         card.className = "sr-photo-card";
         card.type = "button";
         card.dataset.photoId = photo.photoId;
+        card.tabIndex = photo.photoId === selectedPhotoId ? 0 : -1;
+        card.setAttribute("aria-selected", String(photo.photoId === selectedPhotoId));
         card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
+        card.classList.toggle("is-multi-selected", selectedPhotoIds.has(photo.photoId) && photo.photoId !== selectedPhotoId);
         card.classList.toggle("is-rejected", photo.rejected);
         card.classList.toggle("is-missing", photo.missing);
         card.classList.toggle("is-unsupported", photo.unsupported);
-        card.addEventListener("click", () => selectPhoto(photo.photoId));
+        card.addEventListener("click", (event) => {
+          if (event.shiftKey) {
+            selectPhotoRange(photo.photoId);
+          } else if (event.metaKey || event.ctrlKey) {
+            togglePhotoSelection(photo.photoId);
+          } else {
+            selectedPhotoIds = new Set([photo.photoId]);
+            selectionAnchorPhotoId = photo.photoId;
+            selectPhoto(photo.photoId, { preserveSelectionSet: true });
+          }
+          focusSelectedGridCard();
+        });
 
         card.append(renderThumbnailArt(photo, index));
 
@@ -1024,11 +2508,22 @@
         return card;
       }
 
-      function selectPhoto(photoId) {
+      function selectPhoto(photoId, options = {}) {
         selectedPhotoId = photoId;
+        if (options.preserveSelectionSet !== true) {
+          selectedPhotoIds = new Set(photoId ? [photoId] : []);
+          selectionAnchorPhotoId = photoId;
+        } else {
+          normalizeMultiSelection();
+        }
         const selected = selectedPhoto();
         Array.from(libraryGrid.querySelectorAll(".sr-photo-card")).forEach((card) => {
-          card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
+          const isSelected = card.dataset.photoId === selectedPhotoId;
+          const isMultiSelected = selectedPhotoIds.has(card.dataset.photoId) && !isSelected;
+          card.classList.toggle("is-selected", isSelected);
+          card.classList.toggle("is-multi-selected", isMultiSelected);
+          card.tabIndex = isSelected ? 0 : -1;
+          card.setAttribute("aria-selected", String(isSelected));
         });
         Array.from(loupeFilmstrip.querySelectorAll(".sr-filmstrip-card")).forEach((card) => {
           card.classList.toggle("is-selected", card.dataset.photoId === selectedPhotoId);
@@ -1038,16 +2533,86 @@
         });
         selectedPhotoName.textContent = selected?.fileName ?? "None";
         selectedPhotoRating.textContent = selected ? stars(selected.rating) : "-----";
+        syncSelectionSummary();
+        void refreshSelectedMetadata();
         loupePhotoName.textContent = selected?.fileName ?? "No photo selected";
         loupePhotoRating.textContent = selected ? stars(selected.rating) : "-----";
         updateCullingControls(selected);
         syncDevelopSelection();
+        void loadPhotoHistogram();
         syncExportDialog();
         if (!loupeSurface.hidden) {
           previewSelectedPhoto();
         }
         if (appFrame.dataset.activeMode === "develop") {
           readPersistedDevelopState(selected).then(() => previewDevelopEdit());
+          void loadDevelopHistory();
+        }
+        if (options.persist !== false) {
+          void recordActiveSessionState();
+        }
+      }
+
+      function renderPhotoHistogram(histogram) {
+        const status = histogram?.status || "No Histogram";
+        photoHistogram.dataset.histogramState = status === "Ready" ? "ready" : "blocked";
+        photoHistogramStatus.value = histogram?.message || "No histogram";
+        photoHistogramBars.replaceChildren();
+
+        const luminance = Array.isArray(histogram?.luminance) ? histogram.luminance : [];
+        if (status !== "Ready" || luminance.length === 0) {
+          return;
+        }
+
+        const bucketCount = 32;
+        const buckets = Array.from({ length: bucketCount }, () => 0);
+        luminance.forEach((value, index) => {
+          const bucket = Math.min(bucketCount - 1, Math.floor(index / (256 / bucketCount)));
+          buckets[bucket] += Number(value) || 0;
+        });
+        const maxBucket = Math.max(1, ...buckets);
+        buckets.forEach((value) => {
+          const bar = document.createElement("span");
+          bar.className = "sr-histogram-bar";
+          bar.style.height = `${Math.max(2, Math.round((value / maxBucket) * 100))}%`;
+          photoHistogramBars.append(bar);
+        });
+      }
+
+      async function loadPhotoHistogram() {
+        const photo = selectedPhoto();
+        if (!photo) {
+          renderPhotoHistogram({ status: "No Histogram", message: "No photo selected." });
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          renderPhotoHistogram({
+            status: "Unavailable",
+            message: "Desktop runtime is required to load real histogram data.",
+          });
+          return;
+        }
+        try {
+          const response = await invoke("get_photo_histogram", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+          });
+          if (commandFailed(response)) {
+            renderPhotoHistogram({
+              status: "Blocked",
+              message: responseErrorMessage(response, "Histogram unavailable."),
+            });
+            return;
+          }
+          renderPhotoHistogram(response.data || {
+            status: "No Histogram",
+            message: "Histogram unavailable for the selected photo.",
+          });
+        } catch (error) {
+          renderPhotoHistogram({
+            status: "Blocked",
+            message: responseErrorMessage(error, "Histogram unavailable."),
+          });
         }
       }
 
@@ -1059,7 +2624,7 @@
           card.dataset.photoId = photo.photoId;
           card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
           card.classList.toggle("is-rejected", photo.rejected);
-          const art = renderThumbnailArt(photo, index);
+          const art = renderThumbnailArt(photo, index, { cache: pageThumbnailObjectUrls });
           const name = document.createElement("span");
           name.textContent = photo.fileName;
           card.append(art, name);
@@ -1076,7 +2641,7 @@
           card.dataset.photoId = photo.photoId;
           card.classList.toggle("is-selected", photo.photoId === selectedPhotoId);
           card.classList.toggle("is-rejected", photo.rejected);
-          const art = renderThumbnailArt(photo, index);
+          const art = renderThumbnailArt(photo, index, { cache: pageThumbnailObjectUrls });
           const name = document.createElement("span");
           name.textContent = photo.fileName;
           card.append(art, name);
@@ -1085,9 +2650,32 @@
         }));
       }
 
+      function exportColorProfileLabel(profile) {
+        return profile === "display_p3" ? "Display P3" : "sRGB";
+      }
+
+      function exportColorSafetyText(profile) {
+        const label = exportColorProfileLabel(profile);
+        return `Original files will not be modified. SilicaRAW writes a separate JPEG ${label} file to the output path.`;
+      }
+
+      function setExportColorProfile(profile) {
+        selectedExportColorProfile = profile === "display_p3" ? "display_p3" : "srgb";
+        const label = exportColorProfileLabel(selectedExportColorProfile);
+        exportColorSpace.value = label;
+        exportSummaryColor.textContent = label;
+        exportSafetyNote.textContent = exportColorSafetyText(selectedExportColorProfile);
+        exportColorOptionButtons.forEach((button) => {
+          const selected = button.dataset.exportColor === selectedExportColorProfile;
+          button.classList.toggle("is-selected", selected);
+          button.setAttribute("aria-pressed", String(selected));
+        });
+      }
+
       function syncExportDialog() {
         const photo = selectedPhoto();
         const hasPhoto = Boolean(photo);
+        setExportColorProfile(selectedExportColorProfile);
         exportSelectedPhotoName.textContent = photo?.fileName ?? "No photo selected";
         exportSelectedInline.textContent = photo?.fileName ?? "None";
         exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg` : "None";
@@ -1130,6 +2718,8 @@
       async function runJpegExport() {
         const photo = selectedPhoto();
         const outputPath = exportOutputPath.value.trim();
+        const exportColorProfile = selectedExportColorProfile;
+        const exportColorLabel = exportColorProfileLabel(exportColorProfile);
         if (!isRasterExportCandidate(photo)) {
           syncExportDialog();
           setStatus(exportStatus.value);
@@ -1153,16 +2743,17 @@
         }
 
         setBusy(true);
-        exportStatus.value = "Exporting JPEG sRGB...";
+        exportStatus.value = `Exporting JPEG ${exportColorLabel}...`;
         setStatus(exportStatus.value);
         try {
-          const response = await invoke("export_photo_jpeg_srgb", {
+          const response = await invoke("export_photo_jpeg", {
             libraryPath: activeLibraryPath,
             photoId: photo.photoId,
             outputPath,
+            colorProfile: exportColorProfile === "srgb" ? null : exportColorProfile,
           });
           if (commandFailed(response)) {
-            exportStatus.value = responseErrorMessage(response, "JPEG sRGB export failed.");
+            exportStatus.value = responseErrorMessage(response, `JPEG ${exportColorLabel} export failed.`);
             setStatus(exportStatus.value);
             return;
           }
@@ -1173,10 +2764,10 @@
           }
           const exportedPath = response.data.outputPath;
           exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
-          exportStatus.value = response.data.message || responseMessage(response, "JPEG sRGB export completed.");
+          exportStatus.value = response.data.message || responseMessage(response, `JPEG ${exportColorLabel} export completed.`);
           setStatus(responseMessage(response));
         } catch (error) {
-          exportStatus.value = responseErrorMessage(error, "JPEG sRGB export failed.");
+          exportStatus.value = responseErrorMessage(error, `JPEG ${exportColorLabel} export failed.`);
           setStatus(exportStatus.value);
         } finally {
           setBusy(false);
@@ -1193,7 +2784,7 @@
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}.`;
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}.`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return { status: "Ready", message: `Draft preview updated locally. ${summary}` };
         }
@@ -1204,19 +2795,45 @@
       }
 
       function renderDevelopPreviewState(preview) {
+        lastDevelopPreviewState = preview;
         const normalized = preview.status === "Ready"
           ? "ready"
           : preview.status === "Unsupported"
             ? "unsupported"
             : "blocked";
         developPreviewSurface.dataset.previewStatus = normalized;
-        developPreviewStatus.textContent = preview.status === "BlockedByDecode"
+        developPreviewSurface.dataset.beforeAfterMode = developBeforeAfterMode;
+        developPreviewStatus.textContent = developBeforeAfterMode === "before" && preview.status === "Ready"
+          ? "Before Preview"
+          : preview.status === "BlockedByDecode"
           ? "Blocked by Decode"
           : preview.status === "Ready"
             ? "Preview Ready"
             : preview.status || "No Preview";
-        developPreviewMessage.textContent = preview.message || "No preview session.";
+        developPreviewMessage.textContent = developBeforeAfterMode === "before" && preview.status === "Ready"
+          ? "Before view is display-only and writes no edit history."
+          : preview.message || "No preview session.";
         renderDevelopPreviewImage(preview);
+      }
+
+      function setDevelopBeforeAfterMode(mode) {
+        developBeforeAfterMode = mode === "before" ? "before" : "after";
+        developPreviewSurface.dataset.beforeAfterMode = developBeforeAfterMode;
+        [
+          [developBeforeView, "before"],
+          [developAfterView, "after"],
+        ].forEach(([button, buttonMode]) => {
+          const active = developBeforeAfterMode === buttonMode;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        renderDevelopPreviewState(lastDevelopPreviewState || localDevelopPreviewPlan(
+          selectedPhoto(),
+          selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null,
+        ));
+        setStatus(developBeforeAfterMode === "before"
+          ? "Before view is display-only; no edit history is written."
+          : "After view shows the current Develop preview.");
       }
 
       function syncDevelopSelection() {
@@ -1231,16 +2848,65 @@
           developContrastSlider,
           developContrastValue,
           developContrastReset,
+          developWhiteBalanceMode,
+          developTemperatureSlider,
+          developTemperatureValue,
+          developTemperatureReset,
+          developTintSlider,
+          developTintValue,
+          developTintReset,
+          developHighlightsSlider,
+          developHighlightsValue,
+          developHighlightsReset,
+          developShadowsSlider,
+          developShadowsValue,
+          developShadowsReset,
+          developWhitesSlider,
+          developWhitesValue,
+          developWhitesReset,
+          developBlacksSlider,
+          developBlacksValue,
+          developBlacksReset,
+          developVibranceSlider,
+          developVibranceValue,
+          developVibranceReset,
+          developSaturationSlider,
+          developSaturationValue,
+          developSaturationReset,
           developCommitEdit,
           developRevertEdit,
+          developResetBasic,
         ].forEach((control) => {
           control.disabled = disabled;
         });
+        basicPresetButtons.forEach((button) => {
+          button.disabled = disabled;
+        });
+        developBeforeView.disabled = !photo;
+        developAfterView.disabled = !photo;
         const state = photo ? developAdjustmentState(photo.photoId) : {
           draftExposure: 0,
           draftContrast: 0,
+          draftWhiteBalance: "as_shot",
+          draftTemperature: 5200,
+          draftTint: 0,
+          draftHighlights: 0,
+          draftShadows: 0,
+          draftWhites: 0,
+          draftBlacks: 0,
+          draftVibrance: 0,
+          draftSaturation: 0,
           committedExposure: 0,
           committedContrast: 0,
+          committedWhiteBalance: "as_shot",
+          committedTemperature: 5200,
+          committedTint: 0,
+          committedHighlights: 0,
+          committedShadows: 0,
+          committedWhites: 0,
+          committedBlacks: 0,
+          committedVibrance: 0,
+          committedSaturation: 0,
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -1284,6 +2950,15 @@
           applyPersistedDevelopState(readbackPhotoId, {
             exposure: response.data.exposure,
             contrast: response.data.contrast,
+            whiteBalance: response.data.whiteBalance,
+            temperature: response.data.temperature,
+            tint: response.data.tint,
+            highlights: response.data.highlights,
+            shadows: response.data.shadows,
+            whites: response.data.whites,
+            blacks: response.data.blacks,
+            vibrance: response.data.vibrance,
+            saturation: response.data.saturation,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -1295,7 +2970,7 @@
         }
       }
 
-      async function previewDevelopEdit() {
+      async function previewDevelopEdit(family = "exposureContrast") {
         const photo = selectedPhoto();
         if (!photo) {
           syncDevelopSelection();
@@ -1318,12 +2993,36 @@
 
         const sequence = ++developPreviewSequence;
         try {
-          const response = await invoke("preview_exposure_contrast_edit", {
-            libraryPath: activeLibraryPath,
-            photoId: photo.photoId,
-            exposure: state.draftExposure,
-            contrast: state.draftContrast,
-          });
+          const response = family === "whiteBalance"
+            ? await invoke("preview_white_balance_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              whiteBalance: normalizeWhiteBalance(state.draftWhiteBalance),
+              temperature: state.draftTemperature,
+              tint: state.draftTint,
+            })
+            : family === "toneRecovery"
+              ? await invoke("preview_tone_recovery_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                highlights: state.draftHighlights,
+                shadows: state.draftShadows,
+                whites: state.draftWhites,
+                blacks: state.draftBlacks,
+              })
+              : family === "colorPresence"
+                ? await invoke("preview_color_presence_edit", {
+                  libraryPath: activeLibraryPath,
+                  photoId: photo.photoId,
+                  vibrance: state.draftVibrance,
+                  saturation: state.draftSaturation,
+                })
+              : await invoke("preview_exposure_contrast_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              exposure: state.draftExposure,
+              contrast: state.draftContrast,
+            });
           if (sequence !== developPreviewSequence) {
             return;
           }
@@ -1344,6 +3043,15 @@
             status: response.data.status,
             exposure: response.data.exposure,
             contrast: response.data.contrast,
+            whiteBalance: response.data.whiteBalance,
+            temperature: response.data.temperature,
+            tint: response.data.tint,
+            highlights: response.data.highlights,
+            shadows: response.data.shadows,
+            whites: response.data.whites,
+            blacks: response.data.blacks,
+            vibrance: response.data.vibrance,
+            saturation: response.data.saturation,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -1362,10 +3070,36 @@
           return;
         }
         const state = developAdjustmentState(photo.photoId);
+        const whiteBalanceDirty = normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
+          || Number(state.draftTemperature) !== Number(state.committedTemperature)
+          || Number(state.draftTint) !== Number(state.committedTint);
+        const toneRecoveryDirty = Number(state.draftHighlights) !== Number(state.committedHighlights)
+          || Number(state.draftShadows) !== Number(state.committedShadows)
+          || Number(state.draftWhites) !== Number(state.committedWhites)
+          || Number(state.draftBlacks) !== Number(state.committedBlacks);
+        const colorPresenceDirty = Number(state.draftVibrance) !== Number(state.committedVibrance)
+          || Number(state.draftSaturation) !== Number(state.committedSaturation);
+        const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
+          || Number(state.draftContrast) !== Number(state.committedContrast);
+
+        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !exposureContrastDirty) {
+          updateDevelopDirtyState(state);
+          setStatus("No Develop draft changes to commit.");
+          return;
+        }
 
         if (!activeLibraryPath || !invoke) {
           state.committedExposure = state.draftExposure;
           state.committedContrast = state.draftContrast;
+          state.committedWhiteBalance = normalizeWhiteBalance(state.draftWhiteBalance);
+          state.committedTemperature = state.draftTemperature;
+          state.committedTint = state.draftTint;
+          state.committedHighlights = state.draftHighlights;
+          state.committedShadows = state.draftShadows;
+          state.committedWhites = state.draftWhites;
+          state.committedBlacks = state.draftBlacks;
+          state.committedVibrance = state.draftVibrance;
+          state.committedSaturation = state.draftSaturation;
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -1375,12 +3109,36 @@
 
         setBusy(true);
         try {
-          const response = await invoke("commit_exposure_contrast_edit", {
-            libraryPath: activeLibraryPath,
-            photoId: photo.photoId,
-            exposure: state.draftExposure,
-            contrast: state.draftContrast,
-          });
+          const response = whiteBalanceDirty
+            ? await invoke("commit_white_balance_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              whiteBalance: normalizeWhiteBalance(state.draftWhiteBalance),
+              temperature: state.draftTemperature,
+              tint: state.draftTint,
+            })
+            : toneRecoveryDirty
+              ? await invoke("commit_tone_recovery_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                highlights: state.draftHighlights,
+                shadows: state.draftShadows,
+                whites: state.draftWhites,
+                blacks: state.draftBlacks,
+              })
+            : colorPresenceDirty
+              ? await invoke("commit_color_presence_edit", {
+                libraryPath: activeLibraryPath,
+                photoId: photo.photoId,
+                vibrance: state.draftVibrance,
+                saturation: state.draftSaturation,
+              })
+            : await invoke("commit_exposure_contrast_edit", {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              exposure: state.draftExposure,
+              contrast: state.draftContrast,
+            });
           if (commandFailed(response)) {
             setStatus(responseErrorMessage(response, "Develop edit commit failed."));
             return;
@@ -1391,13 +3149,61 @@
           }
           state.committedExposure = editStateNumber(response.data.exposure, state.draftExposure);
           state.committedContrast = editStateNumber(response.data.contrast, state.draftContrast);
-          state.draftExposure = state.committedExposure;
-          state.draftContrast = state.committedContrast;
+          state.committedWhiteBalance = normalizeWhiteBalance(response.data.whiteBalance);
+          state.committedTemperature = editStateNumber(response.data.temperature, state.draftTemperature);
+          state.committedTint = editStateNumber(response.data.tint, state.draftTint);
+          state.committedHighlights = editStateNumber(response.data.highlights, state.draftHighlights);
+          state.committedShadows = editStateNumber(response.data.shadows, state.draftShadows);
+          state.committedWhites = editStateNumber(response.data.whites, state.draftWhites);
+          state.committedBlacks = editStateNumber(response.data.blacks, state.draftBlacks);
+          state.committedVibrance = editStateNumber(response.data.vibrance, state.draftVibrance);
+          state.committedSaturation = editStateNumber(response.data.saturation, state.draftSaturation);
+          if (whiteBalanceDirty) {
+            state.draftWhiteBalance = state.committedWhiteBalance;
+            state.draftTemperature = state.committedTemperature;
+            state.draftTint = state.committedTint;
+          } else if (toneRecoveryDirty) {
+            state.draftHighlights = state.committedHighlights;
+            state.draftShadows = state.committedShadows;
+            state.draftWhites = state.committedWhites;
+            state.draftBlacks = state.committedBlacks;
+          } else if (colorPresenceDirty) {
+            state.draftVibrance = state.committedVibrance;
+            state.draftSaturation = state.committedSaturation;
+          } else {
+            state.draftExposure = state.committedExposure;
+            state.draftContrast = state.committedContrast;
+          }
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           syncAdjustmentControls(state);
           updateDevelopDirtyState(state);
-          setStatus(responseMessage(response));
+          await loadDevelopHistory();
+          await loadPhotoHistogram();
+          const remainingFamilies = [];
+          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || exposureContrastDirty)) {
+            if (toneRecoveryDirty) {
+              remainingFamilies.push("tone recovery");
+            }
+            if (colorPresenceDirty) {
+              remainingFamilies.push("color presence");
+            }
+            if (exposureContrastDirty) {
+              remainingFamilies.push("exposure/contrast");
+            }
+          } else if (toneRecoveryDirty && (colorPresenceDirty || exposureContrastDirty)) {
+            if (colorPresenceDirty) {
+              remainingFamilies.push("color presence");
+            }
+            if (exposureContrastDirty) {
+              remainingFamilies.push("exposure/contrast");
+            }
+          } else if (colorPresenceDirty && exposureContrastDirty) {
+            remainingFamilies.push("exposure/contrast");
+          }
+          setStatus(remainingFamilies.length
+            ? `${responseMessage(response)} ${remainingFamilies.join(" and ")} draft remains uncommitted.`
+            : responseMessage(response));
         } catch (error) {
           setStatus(responseErrorMessage(error, "Develop edit commit failed."));
         } finally {
@@ -1413,6 +3219,15 @@
         const state = developAdjustmentState(photo.photoId);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
+        state.draftWhiteBalance = state.committedWhiteBalance;
+        state.draftTemperature = state.committedTemperature;
+        state.draftTint = state.committedTint;
+        state.draftHighlights = state.committedHighlights;
+        state.draftShadows = state.committedShadows;
+        state.draftWhites = state.committedWhites;
+        state.draftBlacks = state.committedBlacks;
+        state.draftVibrance = state.committedVibrance;
+        state.draftSaturation = state.committedSaturation;
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -1426,14 +3241,143 @@
         const state = developAdjustmentState(photo.photoId);
         if (kind === "exposure") {
           state.draftExposure = clamp(value, -5, 5);
-        } else {
+          previewDevelopEdit("exposureContrast");
+        } else if (kind === "contrast") {
           state.draftContrast = Math.round(clamp(value, -100, 100));
+          previewDevelopEdit("exposureContrast");
+        } else if (kind === "whiteBalance") {
+          state.draftWhiteBalance = normalizeWhiteBalance(value);
+          previewDevelopEdit("whiteBalance");
+        } else if (kind === "temperature") {
+          state.draftTemperature = Number(formatTemperature(value));
+          previewDevelopEdit("whiteBalance");
+        } else if (kind === "tint") {
+          state.draftTint = Number(formatTint(value));
+          previewDevelopEdit("whiteBalance");
+        } else if (kind === "highlights") {
+          state.draftHighlights = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "shadows") {
+          state.draftShadows = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "whites") {
+          state.draftWhites = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "blacks") {
+          state.draftBlacks = Number(formatSignedHundred(value));
+          previewDevelopEdit("toneRecovery");
+        } else if (kind === "vibrance") {
+          state.draftVibrance = Number(formatSignedHundred(value));
+          previewDevelopEdit("colorPresence");
+        } else if (kind === "saturation") {
+          state.draftSaturation = Number(formatSignedHundred(value));
+          previewDevelopEdit("colorPresence");
         }
-        previewDevelopEdit();
       }
 
       function resetDevelopAdjustment(kind) {
-        updateDevelopAdjustment(kind, 0);
+        if (kind === "whiteBalance") {
+          updateDevelopAdjustment(kind, "as_shot");
+        } else if (kind === "temperature") {
+          updateDevelopAdjustment(kind, 5200);
+        } else {
+          updateDevelopAdjustment(kind, 0);
+        }
+      }
+
+      function applyCommittedP0BasicState(state, editState) {
+        state.committedExposure = editStateNumber(editState?.exposure, 0);
+        state.committedContrast = editStateNumber(editState?.contrast, 0);
+        state.committedWhiteBalance = normalizeWhiteBalance(editState?.whiteBalance);
+        state.committedTemperature = editStateNumber(editState?.temperature, 5200);
+        state.committedTint = editStateNumber(editState?.tint, 0);
+        state.committedHighlights = editStateNumber(editState?.highlights, 0);
+        state.committedShadows = editStateNumber(editState?.shadows, 0);
+        state.committedWhites = editStateNumber(editState?.whites, 0);
+        state.committedBlacks = editStateNumber(editState?.blacks, 0);
+        state.committedVibrance = editStateNumber(editState?.vibrance, 0);
+        state.committedSaturation = editStateNumber(editState?.saturation, 0);
+        state.draftExposure = state.committedExposure;
+        state.draftContrast = state.committedContrast;
+        state.draftWhiteBalance = state.committedWhiteBalance;
+        state.draftTemperature = state.committedTemperature;
+        state.draftTint = state.committedTint;
+        state.draftHighlights = state.committedHighlights;
+        state.draftShadows = state.committedShadows;
+        state.draftWhites = state.committedWhites;
+        state.draftBlacks = state.committedBlacks;
+        state.draftVibrance = state.committedVibrance;
+        state.draftSaturation = state.committedSaturation;
+        state.readbackLoaded = true;
+        state.readbackLibraryPath = activeLibraryPath || "";
+      }
+
+      function setActiveBasicPreset(preset) {
+        basicPresetButtons.forEach((button) => {
+          const active = button.dataset.basicPreset === preset;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+      }
+
+      async function persistP0BasicResponse(activePreset, fallbackMessage, invokeRequest) {
+        const photo = selectedPhoto();
+        if (!isDevelopable(photo)) {
+          setStatus("Select a supported catalog photo before applying Develop reset or preset.");
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          setStatus("Desktop runtime is required for undoable preset/reset commits.");
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        setBusy(true);
+        try {
+          const response = await invokeRequest(photo);
+          if (commandFailed(response)) {
+            setStatus(responseErrorMessage(response, fallbackMessage));
+            return;
+          }
+          if (!response.data) {
+            setStatus("Develop reset or preset was not committed because the catalog photo was not found.");
+            return;
+          }
+          applyCommittedP0BasicState(state, response.data);
+          syncAdjustmentControls(state);
+          updateDevelopDirtyState(state);
+          setActiveBasicPreset(activePreset);
+          await loadDevelopHistory();
+          await loadPhotoHistogram();
+          await previewDevelopEdit();
+          setStatus(responseMessage(response, fallbackMessage));
+        } catch (error) {
+          setStatus(responseErrorMessage(error, fallbackMessage));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function resetP0BasicControls() {
+        await persistP0BasicResponse(
+          "silica_neutral",
+          "P0 Basic reset failed.",
+          (photo) => invoke("commit_p0_basic_reset", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+          }),
+        );
+      }
+
+      async function applyBasicPreset(preset) {
+        await persistP0BasicResponse(
+          preset,
+          "Basic preset failed.",
+          (photo) => invoke("commit_basic_preset_edit", {
+            libraryPath: activeLibraryPath,
+            photoId: photo.photoId,
+            preset,
+          }),
+        );
       }
 
       function stepDevelopAdjustment(kind, event) {
@@ -1452,8 +3396,28 @@
         const direction = ["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1;
         const step = kind === "exposure"
           ? event.shiftKey ? 0.25 : 0.01
-          : event.shiftKey ? 10 : 1;
-        const current = kind === "exposure" ? state.draftExposure : state.draftContrast;
+          : kind === "temperature"
+            ? event.shiftKey ? 500 : 50
+            : event.shiftKey ? 10 : 1;
+        const current = kind === "exposure"
+          ? state.draftExposure
+          : kind === "temperature"
+            ? state.draftTemperature
+            : kind === "tint"
+              ? state.draftTint
+              : kind === "highlights"
+                ? state.draftHighlights
+                : kind === "shadows"
+                  ? state.draftShadows
+                  : kind === "whites"
+                    ? state.draftWhites
+                    : kind === "blacks"
+                      ? state.draftBlacks
+                      : kind === "vibrance"
+                        ? state.draftVibrance
+                        : kind === "saturation"
+                          ? state.draftSaturation
+                      : state.draftContrast;
         updateDevelopAdjustment(kind, current + direction * step);
       }
 
@@ -1568,27 +3532,58 @@
         setStatus("Library grid loaded.");
       }
 
-      async function loadLibraryGrid() {
+      async function loadLibraryGrid(options = {}) {
         if (!activeLibraryPath || !invoke) {
-          renderLibraryGrid(libraryPhotos);
+          renderLibraryGrid(libraryPhotos, options);
           return;
         }
 
+        libraryGridPage = normalizedGridPage({ ...libraryGridPage, offset: options.offset ?? libraryGridPage.offset }, libraryPhotos.length);
         gridLoadingState.hidden = false;
         gridEmptyState.hidden = true;
+        gridErrorState.hidden = true;
+        updateGridPageControls("loading");
         setStatus("Loading catalog photos...");
         try {
-          const response = await invoke("list_library_photos", { libraryPath: activeLibraryPath });
+          const request = libraryGridPageRequest(options);
+          const response = await invoke("query_library_photos", {
+            libraryPath: activeLibraryPath,
+            request,
+          });
           if (commandFailed(response)) {
-            setStatus(responseErrorMessage(response, "Library grid failed to load."));
+            const message = responseErrorMessage(response, "Library grid failed to load.");
+            renderGridError(message);
+            setStatus(message);
             return;
           }
-          renderLibraryGrid(response.data?.photos ?? []);
-          setStatus(responseMessage(response, "Library grid loaded."));
+          renderLibraryGrid(response.data?.photos ?? [], {
+            ...options,
+            page: response.data,
+          });
+          setStatus(responseMessage(response, "Library grid page loaded."));
         } catch (error) {
-          gridLoadingState.hidden = true;
-          setStatus(responseErrorMessage(error, "Library grid failed to load."));
+          const message = responseErrorMessage(error, "Library grid failed to load.");
+          renderGridError(message);
+          setStatus(message);
         }
+      }
+
+      async function loadPreviousLibraryPage() {
+        if (gridPreviousPageButton.disabled) {
+          return;
+        }
+        await loadLibraryGrid({
+          offset: Math.max(0, libraryGridPage.offset - libraryGridPage.limit),
+        });
+      }
+
+      async function loadNextLibraryPage() {
+        if (gridNextPageButton.disabled || !libraryGridPage.hasNextPage) {
+          return;
+        }
+        await loadLibraryGrid({
+          offset: libraryGridPage.offset + libraryGridPage.limit,
+        });
       }
 
       async function applySelectedFlags(patch) {
@@ -1644,7 +3639,7 @@
 
         renderLibraryGrid(libraryPhotos.map((photo) => {
           return photo.photoId === next.photoId ? next : photo;
-        }));
+        }), { page: libraryGridPage });
       }
 
       async function runCacheClearCommand() {
@@ -1685,7 +3680,7 @@
         }
       }
 
-      function setMode(mode) {
+      function setMode(mode, options = {}) {
         appFrame.dataset.activeMode = mode;
         modeButtons.forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
@@ -1699,9 +3694,14 @@
         if (mode === "develop") {
           syncDevelopSelection();
           readPersistedDevelopState(selectedPhoto()).then(() => previewDevelopEdit());
+          void loadDevelopHistory();
+          void loadPhotoHistogram();
         }
         if (mode === "export") {
           openExportDialog();
+        }
+        if (options.persist !== false) {
+          void recordActiveSessionState(mode);
         }
       }
 
@@ -1719,6 +3719,7 @@
         chooseLibraryPathButton.disabled = isBusy;
         chooseImportFolderPathButton.disabled = isBusy;
         startImportButton.disabled = isBusy;
+        importRecursiveInput.disabled = isBusy;
         openLoupeButton.disabled = isBusy;
         clearLibraryCacheButton.disabled = isBusy || !activeLibraryPath;
         updateCullingControls(selectedPhoto());
@@ -1730,13 +3731,51 @@
           developContrastSlider,
           developContrastValue,
           developContrastReset,
+          developWhiteBalanceMode,
+          developTemperatureSlider,
+          developTemperatureValue,
+          developTemperatureReset,
+          developTintSlider,
+          developTintValue,
+          developTintReset,
+          developHighlightsSlider,
+          developHighlightsValue,
+          developHighlightsReset,
+          developShadowsSlider,
+          developShadowsValue,
+          developShadowsReset,
+          developWhitesSlider,
+          developWhitesValue,
+          developWhitesReset,
+          developBlacksSlider,
+          developBlacksValue,
+          developBlacksReset,
+          developVibranceSlider,
+          developVibranceValue,
+          developVibranceReset,
+          developSaturationSlider,
+          developSaturationValue,
+          developSaturationReset,
           developCommitEdit,
           developRevertEdit,
+          developResetBasic,
         ].forEach((control) => {
           control.disabled = developDisabled;
         });
+        basicPresetButtons.forEach((button) => {
+          button.disabled = developDisabled;
+        });
+        developBeforeView.disabled = isBusy || !selectedPhoto();
+        developAfterView.disabled = isBusy || !selectedPhoto();
+        setDevelopHistoryButtons(
+          developHistoryPanel.dataset.canUndo === "true",
+          developHistoryPanel.dataset.canRedo === "true",
+        );
         runJpegExportButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
         chooseExportOutputPathButton.disabled = isBusy || !isRasterExportCandidate(selectedPhoto());
+        exportColorOptionButtons.forEach((button) => {
+          button.disabled = isBusy;
+        });
       }
 
       async function runLibraryCommand(command) {
@@ -1764,6 +3803,7 @@
           cacheClearStatus.value = "Ready to clear disposable caches.";
           setStatus(responseMessage(response));
           await loadLibraryGrid();
+          await loadAppSession();
         } catch (error) {
           setStatus(responseErrorMessage(error, "Library command failed."));
         } finally {
@@ -1798,29 +3838,45 @@
         setStatus("Importing by reference...");
         setImportProgress(45, "Scanning");
         setImportStepState(45, "Scanning");
+        closeImportIssueReview();
+        setImportIssues([]);
         try {
           const response = await invoke("import_folder", {
             libraryPath: activeLibraryPath,
             folderPath,
+            recursive: importRecursiveInput.checked,
           });
           if (commandFailed(response)) {
+            setImportIssues([{
+              kind: "directory_read_failed",
+              path: folderPath,
+              message: responseErrorMessage(response, "Import failed."),
+            }]);
             importErrorCount.textContent = "1";
             setImportProgress(100, "Needs Review");
             setImportStepState(100, "Needs Review");
+            openImportIssueReview();
             setStatus(responseErrorMessage(response, "Import failed."));
             return;
           }
+          setImportIssues(response.data?.issues);
           importedCount.textContent = String(response.data?.supportedFiles ?? 0);
           unsupportedCount.textContent = String(response.data?.unsupportedFiles ?? 0);
-          importErrorCount.textContent = "0";
+          importErrorCount.textContent = String(countImportErrorIssues(lastImportIssues));
           setImportProgress(100, "Completed");
           setImportStepState(100, "Completed");
           setStatus(responseMessage(response));
           await loadLibraryGrid();
         } catch (error) {
+          setImportIssues([{
+            kind: "directory_read_failed",
+            path: folderPath,
+            message: responseErrorMessage(error, "Import failed."),
+          }]);
           importErrorCount.textContent = "1";
           setImportProgress(100, "Needs Review");
           setImportStepState(100, "Needs Review");
+          openImportIssueReview();
           setStatus(responseErrorMessage(error, "Import failed."));
         } finally {
           setBusy(false);
@@ -1835,13 +3891,21 @@
       openButton.addEventListener("click", () => runLibraryCommand("open_library"));
       chooseImportFolderPathButton.addEventListener("click", () => chooseDirectoryPath("import"));
       startImportButton.addEventListener("click", runImportCommand);
+      viewImportErrorsButton.addEventListener("click", openImportIssueReview);
+      closeImportIssuesButton.addEventListener("click", closeImportIssueReview);
       clearLibraryCacheButton.addEventListener("click", runCacheClearCommand);
+      gridPreviousPageButton.addEventListener("click", () => void loadPreviousLibraryPage());
+      gridNextPageButton.addEventListener("click", () => void loadNextLibraryPage());
+      libraryGrid.addEventListener("scroll", scheduleVirtualGridWindowRender);
+      libraryGrid.addEventListener("keydown", handleLibraryGridKeydown);
+      window.addEventListener("resize", () => renderVirtualGridWindow({ force: true }));
       ratingButtons.forEach((button) => {
         button.addEventListener("click", () => setSelectedRating(Number(button.dataset.ratingValue)));
       });
       pickSelectedButton.addEventListener("click", toggleSelectedPick);
       rejectSelectedButton.addEventListener("click", toggleSelectedReject);
       clearCullingFlagsButton.addEventListener("click", clearSelectedCullingFlags);
+      clearMultiSelectionButton.addEventListener("click", clearMultiSelection);
       loupeButtons.forEach((button) => {
         button.addEventListener("click", openLoupeView);
       });
@@ -1866,8 +3930,95 @@
       developContrastValue.addEventListener("dblclick", () => resetDevelopAdjustment("contrast"));
       developExposureReset.addEventListener("click", () => resetDevelopAdjustment("exposure"));
       developContrastReset.addEventListener("click", () => resetDevelopAdjustment("contrast"));
+      developWhiteBalanceMode.addEventListener("change", () => updateDevelopAdjustment("whiteBalance", developWhiteBalanceMode.value));
+      developTemperatureSlider.addEventListener("input", () => updateDevelopAdjustment("temperature", developTemperatureSlider.value));
+      developTemperatureSlider.addEventListener("dblclick", () => resetDevelopAdjustment("temperature"));
+      developTemperatureSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("temperature", event));
+      developTemperatureValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developTemperatureValue.value)) {
+          updateDevelopAdjustment("temperature", developTemperatureValue.value);
+        }
+      });
+      developTemperatureValue.addEventListener("dblclick", () => resetDevelopAdjustment("temperature"));
+      developTintSlider.addEventListener("input", () => updateDevelopAdjustment("tint", developTintSlider.value));
+      developTintSlider.addEventListener("dblclick", () => resetDevelopAdjustment("tint"));
+      developTintSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("tint", event));
+      developTintValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developTintValue.value)) {
+          updateDevelopAdjustment("tint", developTintValue.value);
+        }
+      });
+      developTintValue.addEventListener("dblclick", () => resetDevelopAdjustment("tint"));
+      developTemperatureReset.addEventListener("click", () => resetDevelopAdjustment("temperature"));
+      developTintReset.addEventListener("click", () => resetDevelopAdjustment("tint"));
+      developHighlightsSlider.addEventListener("input", () => updateDevelopAdjustment("highlights", developHighlightsSlider.value));
+      developHighlightsSlider.addEventListener("dblclick", () => resetDevelopAdjustment("highlights"));
+      developHighlightsSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("highlights", event));
+      developHighlightsValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developHighlightsValue.value)) {
+          updateDevelopAdjustment("highlights", developHighlightsValue.value);
+        }
+      });
+      developHighlightsValue.addEventListener("dblclick", () => resetDevelopAdjustment("highlights"));
+      developHighlightsReset.addEventListener("click", () => resetDevelopAdjustment("highlights"));
+      developShadowsSlider.addEventListener("input", () => updateDevelopAdjustment("shadows", developShadowsSlider.value));
+      developShadowsSlider.addEventListener("dblclick", () => resetDevelopAdjustment("shadows"));
+      developShadowsSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("shadows", event));
+      developShadowsValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developShadowsValue.value)) {
+          updateDevelopAdjustment("shadows", developShadowsValue.value);
+        }
+      });
+      developShadowsValue.addEventListener("dblclick", () => resetDevelopAdjustment("shadows"));
+      developShadowsReset.addEventListener("click", () => resetDevelopAdjustment("shadows"));
+      developWhitesSlider.addEventListener("input", () => updateDevelopAdjustment("whites", developWhitesSlider.value));
+      developWhitesSlider.addEventListener("dblclick", () => resetDevelopAdjustment("whites"));
+      developWhitesSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("whites", event));
+      developWhitesValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developWhitesValue.value)) {
+          updateDevelopAdjustment("whites", developWhitesValue.value);
+        }
+      });
+      developWhitesValue.addEventListener("dblclick", () => resetDevelopAdjustment("whites"));
+      developWhitesReset.addEventListener("click", () => resetDevelopAdjustment("whites"));
+      developBlacksSlider.addEventListener("input", () => updateDevelopAdjustment("blacks", developBlacksSlider.value));
+      developBlacksSlider.addEventListener("dblclick", () => resetDevelopAdjustment("blacks"));
+      developBlacksSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("blacks", event));
+      developBlacksValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developBlacksValue.value)) {
+          updateDevelopAdjustment("blacks", developBlacksValue.value);
+        }
+      });
+      developBlacksValue.addEventListener("dblclick", () => resetDevelopAdjustment("blacks"));
+      developBlacksReset.addEventListener("click", () => resetDevelopAdjustment("blacks"));
+      developVibranceSlider.addEventListener("input", () => updateDevelopAdjustment("vibrance", developVibranceSlider.value));
+      developVibranceSlider.addEventListener("dblclick", () => resetDevelopAdjustment("vibrance"));
+      developVibranceSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("vibrance", event));
+      developVibranceValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developVibranceValue.value)) {
+          updateDevelopAdjustment("vibrance", developVibranceValue.value);
+        }
+      });
+      developVibranceValue.addEventListener("dblclick", () => resetDevelopAdjustment("vibrance"));
+      developVibranceReset.addEventListener("click", () => resetDevelopAdjustment("vibrance"));
+      developSaturationSlider.addEventListener("input", () => updateDevelopAdjustment("saturation", developSaturationSlider.value));
+      developSaturationSlider.addEventListener("dblclick", () => resetDevelopAdjustment("saturation"));
+      developSaturationSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("saturation", event));
+      developSaturationValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developSaturationValue.value)) {
+          updateDevelopAdjustment("saturation", developSaturationValue.value);
+        }
+      });
+      developSaturationValue.addEventListener("dblclick", () => resetDevelopAdjustment("saturation"));
+      developSaturationReset.addEventListener("click", () => resetDevelopAdjustment("saturation"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
+      developResetBasic.addEventListener("click", resetP0BasicControls);
+      developBeforeView.addEventListener("click", () => setDevelopBeforeAfterMode("before"));
+      developAfterView.addEventListener("click", () => setDevelopBeforeAfterMode("after"));
+      basicPresetButtons.forEach((button) => {
+        button.addEventListener("click", () => applyBasicPreset(button.dataset.basicPreset));
+      });
       openExportDialogButton.addEventListener("click", openExportDialog);
       exportDialogButtons.forEach((button) => {
         button.addEventListener("click", openExportDialog);
@@ -1876,16 +4027,37 @@
       cancelExportButton.addEventListener("click", closeExportDialog);
       chooseExportOutputPathButton.addEventListener("click", () => chooseExportPath());
       runJpegExportButton.addEventListener("click", runJpegExport);
+      exportColorOptionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          setExportColorProfile(button.dataset.exportColor);
+          syncExportDialog();
+        });
+      });
       exportOutputPath.addEventListener("input", () => {
         exportOutputPath.dataset.autofilled = "false";
         syncExportDialog();
       });
-      thumbnailSizeInput.addEventListener("input", () => {
-        libraryGrid.style.setProperty("--sr-thumb-min", `${thumbnailSizeInput.value}px`);
-        libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${thumbnailSizeInput.value}px, 1fr))`;
+      toggleSidebarButton.addEventListener("click", () => {
+        appFrame.dataset.sidebarCollapsed = String(appFrame.dataset.sidebarCollapsed !== "true");
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
       });
-      viewImportErrorsButton.addEventListener("click", () => {
-        setStatus("Unsupported and failed files will be reviewable after import.");
+      toggleInspectorButton.addEventListener("click", () => {
+        appFrame.dataset.inspectorCollapsed = String(appFrame.dataset.inspectorCollapsed !== "true");
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      toggleFilmstripButton.addEventListener("click", () => {
+        appFrame.dataset.filmstripVisible = String(appFrame.dataset.filmstripVisible === "false");
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      resetLayoutButton.addEventListener("click", resetLayoutPreferences);
+      thumbnailSizeInput.addEventListener("input", () => {
+        applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+      });
+      [librarySearchInput, fileTypeFilterInput, metadataFilterInput, minRatingFilterInput, cullingFilterInput, librarySortInput].forEach((control) => {
+        control.addEventListener("input", () => {
+          applyLayoutPreferences(currentLayoutPreferences(), { persist: true });
+          void loadLibraryGrid({ offset: 0 });
+        });
       });
       showImportPanelButton.addEventListener("click", () => {
         document.querySelector("#importPanel").hidden = false;
@@ -1895,7 +4067,7 @@
         document.querySelector("#importPanel").hidden = true;
         setStatus("Import panel minimized.");
       });
-      openRecentButton.addEventListener("click", () => setStatus("No recent libraries yet."));
+      openRecentButton.addEventListener("click", () => openRecentLibrary());
       welcomeActionButtons.forEach((button) => {
         button.addEventListener("click", () => {
           setStatus(`${button.dataset.welcomeAction} will be wired after the local alpha runtime loop is complete.`);
@@ -1906,13 +4078,7 @@
           setStatus(`${button.dataset.statusAction} are deferred for this local alpha.`);
         });
       });
-      recentButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          pathInput.value = button.dataset.recentPath;
-          setStatus("Recent library path selected.");
-        });
-      });
-      renderLibraryGrid(initialGridPhotos);
+      resolveLaunchRestore();
     </script>
   </body>
 </html>

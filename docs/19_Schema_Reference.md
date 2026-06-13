@@ -67,6 +67,144 @@ metadata
 extensions
 ```
 
+## Edit Graph `profile`
+
+The edit graph `profile` object is the authoritative color metadata contract for edit state.
+
+```txt
+profile.input_profile -> explicit input profile evidence, or "unknown" when unavailable
+profile.working_space -> working color space, currently "linear_display_p3"
+profile.camera_profile -> optional camera/profile identifier, null when unavailable
+profile.decoder_backend -> core_image_raw | libraw | embedded_preview | raster | null
+```
+
+Agents must not invent parser-owned or color-profile fields outside `profile`. Experimental data still belongs under `extensions`, but current profile state belongs in the schema-owned `profile` object.
+
+## Export Record Color Metadata
+
+The existing `exports.export_settings_json` field records export color metadata for local alpha proof work.
+
+Required color metadata keys for JPEG exports:
+
+```txt
+color_profile
+output_sha256
+icc_profile_embedded
+icc_profile_sha256
+profile_metadata_source
+```
+
+These fields are export evidence. They do not prove visual color correctness.
+
+## Undo, History, and Action Trust
+
+Task 16.0 defines action trust before runtime undo/history changes.
+
+Schema ownership:
+
+```txt
+edit graph JSON shape -> schemas/edit_graph.schema.json and silica-edit
+catalog action tables -> silica-catalog contract and silica-storage migrations
+product mutation policy -> silica-core typed commands
+desktop UI -> presentation only, no raw SQL or schema ownership
+```
+
+Action class rules:
+
+```txt
+- Committed edit graph changes and photo flag changes are undoable catalog transactions.
+- Redo replays only previously undone undoable catalog actions.
+- Export creation, sidecar write, import by reference, backup creation, and restore attempt records are logged-only.
+- Cache clear is non-reversible; cache bytes are disposable and must not be reconstructed by undo.
+- Original photo mutation, original overwrite export paths, sidecar path escape, and direct extension DB writes are blocked.
+```
+
+Existing tables used by Phase 16:
+
+```txt
+edit_states
+edit_history
+photo_flags
+exports
+sidecar_status
+cache_records
+action_log
+```
+
+Task 16.0 does not change schemas or migrations. Task 16.1 owns the typed action semantics contract before persistence and command implementation.
+
+Task 16.1 action payload contract:
+
+```txt
+schema: silica.action
+version: 1
+class: undoable | logged_only | non_reversible | blocked
+kind: edit_commit | flag_change | export | import_reference | sidecar_write | backup | restore_attempt | cache_clear
+photo_id or subject
+before and after for undoable actions
+side_effect and evidence_ref for logged-only actions
+created_by: core
+```
+
+Undoable `before` and `after` values must be catalog state snapshots. They must not rely on export files, cache bytes, sidecar files, original files, or live decoder output to restore state.
+
+Task 16.2 storage status:
+
+```txt
+catalog schema version -> 6
+edit_history.sequence -> per-photo checkpoint order
+edit_history.action_class -> undoable for edit checkpoints
+edit_history.action_kind -> edit_commit for exposure/contrast commits
+idx_edit_history_photo_sequence -> ordered per-photo history lookup
+```
+
+Committed exposure/contrast edits write one active `edit_states` row and one `edit_history` row in the same transaction. The history `action_json` stores schema-valid before/after edit graphs. Slider drafts still write no `edit_states` or `edit_history` rows.
+
+Task 16.3 storage status:
+
+```txt
+catalog schema version -> 7
+edit_history.history_state -> applied | undone | invalidated
+idx_edit_history_photo_state_sequence -> per-photo undo/redo lookup
+```
+
+Undo restores the latest applied undoable row for a photo. Redo reapplies the earliest undone row for a photo. New undoable checkpoints invalidate undone rows for that photo. Runtime support currently covers `edit_commit` and `flag_change`; logged-only actions remain outside undo/redo mutation.
+
+Task 16.4 runtime query status:
+
+```txt
+list_photo_history -> reads edit_history rows for one photo
+get_photo_history -> desktop command envelope for the Develop history panel
+visible row states -> applied | undone
+invalidated rows -> hidden from the product history panel
+selectable row -> latest applied row for undo or earliest undone row for redo only
+```
+
+The Develop history panel is presentation only. It must not own raw SQL, schema shape, or arbitrary checkpoint jumps. Selecting a row calls the same core undo/redo command path used by toolbar/buttons.
+
+Task 16.5 action log status:
+
+```txt
+catalog schema version -> 8
+action_log.side_effect_category -> required side-effect class
+action_log.evidence_ref -> optional durable evidence pointer
+idx_action_log_action_type_created_at -> action timeline lookup
+idx_action_log_subject -> target lookup
+```
+
+Core now exposes append/read action-log APIs and records local alpha sensitive actions for import by reference, sidecar write, JPEG export, RAW-derived export, and disposable cache clear. The action log is append-only through Core-facing APIs; it is not an undo stack and must not be used to authorize direct plugin/MCP database writes.
+
+Task 16.6 sidecar status runtime:
+
+```txt
+sidecar_status.conflict_state -> clean | catalog_newer | sidecar_newer | conflict | missing | disabled
+get_photo_sidecar_status -> reads catalog-side status for one photo
+history commit/undo/redo -> clean or in_sync becomes catalog_newer
+conflict and sidecar_newer -> preserved by history commits
+```
+
+No schema migration is required for Task 16.6. Sidecar status changes are catalog metadata only: edit commits, flag commits, undo, and redo must not write sidecar files or add catalog-only fields such as `edited` or `exported` to `sidecar.flags`.
+
 ## Migration Policy
 
 ```txt
@@ -109,6 +247,7 @@ Rating/reject/pick display
 Smart collections
 Culling workflows
 Fast queries
+Metadata-backed `has_dimensions` filtering when indexed
 ```
 
 ### Edit Graph `metadata`
@@ -143,6 +282,21 @@ When rebuilding a catalog from sidecars:
 ```
 
 This prevents Codex from inventing a separate meaning for `flags`.
+
+---
+
+## Catalog Photo Metadata
+
+Task 11.7 records the local alpha metadata contract without adding a parser dependency.
+
+- `photo_metadata` normalized fields: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
+- `photos.file_size` and `photos.modified_at` are file-system metadata captured during import and are not duplicated into `photo_metadata`.
+- Task 11.7.3 adds physical catalog columns for `width`, `height`, and `orientation`; JPEG/JPG import may store width and height from the existing raster path.
+- Camera make, camera model, lens model, orientation, and EXIF capture time remain unavailable until a parser dependency is selected and documented in `docs/DEPENDENCIES.md`.
+- `photo_metadata.raw_json` is parser-owned untrusted data and defaults to `{}`.
+- Unsupported files must not receive fake metadata rows. Existing imports are not backfilled on library open or session restore.
+- Metadata read APIs serialize each displayed field with an explicit `known`, `unknown`, or `unavailable` state and must not read original files during query.
+- The first metadata-backed grid filter is `has_dimensions`, defined as stored `photo_metadata.width IS NOT NULL AND photo_metadata.height IS NOT NULL`. It must not infer dimensions from original files during query.
 
 ---
 

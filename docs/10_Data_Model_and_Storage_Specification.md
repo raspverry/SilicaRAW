@@ -125,7 +125,9 @@ Phase 5.3 adds active edit graph storage wiring for exposure/contrast commits. D
 
 Task 10.3 adds library-local sidecar read/write foundations. Task 10.4 adds sidecar rebuild dry-run reports. Task 10.5.1 records backup/checkpoint/restore policy. Task 10.5.2 adds checkpointed backup artifact creation for `catalog.db`, `sidecars/`, and `backup-manifest.json`. Task 10.5.3 adds staged restore with existing-target rollback copies and newer-schema rejection before target mutation.
 
-Still needed: broader edit graph storage workflows, automatic sidecar synchronization, sidecar conflict UX, cache size policy, user-facing backup/restore commands and UI, recursive import policy, and original full-hash protection behavior.
+Task 16.6 adds catalog-side sidecar status after history changes. Edit commits, flag commits, undo, and redo mark clean sidecar rows as `catalog_newer` without writing sidecar files. Existing `conflict` and `sidecar_newer` rows are preserved.
+
+Still needed: broader edit graph storage workflows, automatic sidecar write synchronization beyond status marking, sidecar conflict UX, cache size policy, user-facing backup/restore commands and UI, recursive import policy, and original full-hash protection behavior.
 
 ---
 
@@ -198,6 +200,12 @@ CREATE INDEX IF NOT EXISTS idx_edit_states_photo_active
 CREATE INDEX IF NOT EXISTS idx_edit_history_photo_id
   ON edit_history(photo_id);
 
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_sequence
+  ON edit_history(photo_id, sequence);
+
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_state_sequence
+  ON edit_history(photo_id, history_state, sequence);
+
 CREATE INDEX IF NOT EXISTS idx_cache_records_photo_type
   ON cache_records(photo_id, cache_type);
 
@@ -218,6 +226,12 @@ CREATE INDEX IF NOT EXISTS idx_action_log_actor
 
 CREATE INDEX IF NOT EXISTS idx_action_log_created_at
   ON action_log(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_action_type_created_at
+  ON action_log(action_type, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_subject
+  ON action_log(subject_type, subject_id);
 ```
 
 ## Index Rules

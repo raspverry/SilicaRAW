@@ -8,4 +8,12 @@ Phase 5.1 adds a preview render readiness contract that wraps decode readiness w
 
 Phase 5.3 adds a render request contract for draft exposure/contrast preview updates. This records the requested adjustment values and preview readiness, but still does not render pixels.
 
-No Metal viewer, shader, Core Image context, ColorSync transform, ICC embedding, or image processing implementation is present yet.
+Phase 13.3 adds a non-default `color-probe` feature that reads JPEG marker/profile metadata for fixture proof and records source hashes. This is probe evidence only; it does not render pixels or apply transforms.
+
+Task 17.2.1 carries white-balance-family values through preview/export request planning. It still does not create a Metal viewer, shader, Core Image context, ColorSync transform, ICC embedding, or render pixels.
+
+Task 17.2.2 carries tone recovery values through preview/export request planning under the same boundary. Pixel adjustment remains owned by `silica-export` for supported JPEG/JPG paths.
+
+Task 17.2.3 carries color presence values through preview/export request planning under the same boundary.
+
+Task 17.3 computes 256-bin RGB and luminance histograms from real RGB pixel buffers. It does not decode files or own cache persistence.

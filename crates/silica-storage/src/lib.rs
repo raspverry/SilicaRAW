@@ -16,12 +16,16 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use rusqlite::{params, Connection, OptionalExtension};
-pub use silica_catalog::PhotoFlags;
+use rusqlite::{named_params, params, Connection, OpenFlags, OptionalExtension, Transaction};
 use silica_catalog::{
     is_supported_photo_extension, CatalogFlagError, ImportCandidate,
     ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
     ALPHA_MAX_RATING,
+};
+pub use silica_catalog::{ImportIssue, ImportIssueKind};
+pub use silica_catalog::{
+    LibraryQueryFileType, LibraryQueryFilters, LibraryQueryMetadataFilter, LibraryQueryOrderField,
+    LibraryQueryPage, LibraryQueryRequest, LibraryQuerySort, PhotoFlags,
 };
 
 /// Stable crate name used by scaffold verification.
@@ -123,6 +127,139 @@ pub const REQUIRED_LIBRARY_DIRECTORIES: &[&str] = &[
 pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
 /// Cache record type used for disposable Loupe preview images.
 pub const PREVIEW_CACHE_TYPE: &str = "preview";
+/// Cache record type used for disposable Develop histogram data.
+pub const HISTOGRAM_CACHE_TYPE: &str = "histogram";
+
+/// Stable action payload schema marker for undo/history records.
+pub const ACTION_SCHEMA: &str = "silica.action";
+
+/// Stable action payload version for Phase 16 history records.
+pub const ACTION_VERSION: i64 = 1;
+
+/// Task 11.7.2 policy: no metadata scan runs during library open or session restore.
+pub const METADATA_BACKFILL_ON_OPEN_OR_RESTORE: bool = false;
+/// Existing imports remain unknown until import-time extraction or explicit scoped backfill.
+pub const EXISTING_IMPORTS_WITHOUT_METADATA_STAY_UNKNOWN: bool = true;
+
+/// Source allowed for dimension metadata in the current metadata policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetadataDimensionSource {
+    ExistingRasterPath,
+    Unavailable,
+}
+
+/// File-level metadata extraction policy selected before the migration task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MetadataExtractionPolicy {
+    pub dimension_source: MetadataDimensionSource,
+    pub raw_decode_supported: bool,
+    pub camera_lens_available: bool,
+}
+
+/// Normalized metadata values to persist for one imported photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMetadataUpdate {
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub orientation: Option<String>,
+    pub capture_time: Option<String>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens_model: Option<String>,
+    pub raw_json: String,
+}
+
+impl PhotoMetadataUpdate {
+    pub fn unavailable() -> Self {
+        Self {
+            width: None,
+            height: None,
+            orientation: None,
+            capture_time: None,
+            camera_make: None,
+            camera_model: None,
+            lens_model: None,
+            raw_json: "{}".to_string(),
+        }
+    }
+}
+
+/// State of one metadata field in a read API response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoMetadataFieldState {
+    Known,
+    Unknown,
+    Unavailable,
+}
+
+/// One typed metadata field plus its truth state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMetadataField<T> {
+    pub state: PhotoMetadataFieldState,
+    pub value: Option<T>,
+}
+
+impl<T> PhotoMetadataField<T> {
+    pub fn known(value: T) -> Self {
+        Self {
+            state: PhotoMetadataFieldState::Known,
+            value: Some(value),
+        }
+    }
+
+    pub fn unknown() -> Self {
+        Self {
+            state: PhotoMetadataFieldState::Unknown,
+            value: None,
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self {
+            state: PhotoMetadataFieldState::Unavailable,
+            value: None,
+        }
+    }
+}
+
+/// Stored metadata and file facts for one catalog photo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoMetadata {
+    pub photo_id: String,
+    pub file_name: String,
+    pub source_path: String,
+    pub file_type: String,
+    pub unsupported: bool,
+    pub file_size: PhotoMetadataField<i64>,
+    pub modified_at: PhotoMetadataField<String>,
+    pub width: PhotoMetadataField<i64>,
+    pub height: PhotoMetadataField<i64>,
+    pub orientation: PhotoMetadataField<String>,
+    pub capture_time: PhotoMetadataField<String>,
+    pub camera_make: PhotoMetadataField<String>,
+    pub camera_model: PhotoMetadataField<String>,
+    pub lens_model: PhotoMetadataField<String>,
+}
+
+/// Return the metadata extraction policy for one original path.
+pub fn metadata_extraction_policy_for_path(path: &Path) -> MetadataExtractionPolicy {
+    let is_jpeg = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
+        });
+
+    MetadataExtractionPolicy {
+        dimension_source: if is_jpeg {
+            MetadataDimensionSource::ExistingRasterPath
+        } else {
+            MetadataDimensionSource::Unavailable
+        },
+        raw_decode_supported: false,
+        camera_lens_available: false,
+    }
+}
 
 /// Opened or newly created local library paths and schema state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,6 +277,13 @@ pub struct FolderImportSummary {
     pub supported_files: usize,
     pub unsupported_files: usize,
     pub candidates: Vec<ImportCandidate>,
+    pub issues: Vec<ImportIssue>,
+}
+
+/// Options for folder import scanning.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FolderImportOptions {
+    pub recursive: bool,
 }
 
 /// Catalog row data needed to open a preview for one photo.
@@ -225,6 +369,15 @@ pub struct SidecarWriteResult {
     pub sidecar_relative_path: String,
     pub written_at: String,
     pub bytes_written: u64,
+}
+
+/// Current catalog-side sync state for one library-local sidecar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoSidecarStatus {
+    pub photo_id: String,
+    pub sidecar_path: Option<String>,
+    pub last_written_at: Option<String>,
+    pub conflict_state: String,
 }
 
 /// Sidecar payload that has passed the v1 sidecar and nested edit graph checks.
@@ -320,6 +473,72 @@ struct BackupManifest {
     files: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryCommandResult {
+    pub photo_id: String,
+    pub command: String,
+    pub applied: bool,
+    pub action_kind: Option<String>,
+    pub history_id: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoHistoryPanel {
+    pub photo_id: String,
+    pub items: Vec<PhotoHistoryItem>,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoHistoryItem {
+    pub history_id: String,
+    pub photo_id: String,
+    pub sequence: i64,
+    pub action_kind: String,
+    pub label: String,
+    pub history_state: String,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewActionLogEntry {
+    pub actor_type: String,
+    pub actor_id: Option<String>,
+    pub action_type: String,
+    pub subject_type: Option<String>,
+    pub subject_id: Option<String>,
+    pub side_effect_category: String,
+    pub evidence_ref: Option<String>,
+    pub payload_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionLogEntry {
+    pub id: String,
+    pub actor_type: String,
+    pub actor_id: Option<String>,
+    pub action_type: String,
+    pub subject_type: Option<String>,
+    pub subject_id: Option<String>,
+    pub side_effect_category: String,
+    pub evidence_ref: Option<String>,
+    pub payload_json: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HistoryActionRow {
+    id: String,
+    action_kind: String,
+    action_json: String,
+}
+
 /// Errors returned by local library create/open operations.
 #[derive(Debug)]
 pub enum LibraryStorageError {
@@ -330,11 +549,15 @@ pub enum LibraryStorageError {
     EditGraph(silica_edit::EditGraphValidationError),
     MissingCatalog(PathBuf),
     MissingPhoto(String),
+    CatalogSchemaVersion { expected: i64, found: i64 },
     NotDirectory(PathBuf),
     InvalidPath(PathBuf),
     InvalidSidecarPhotoId(String),
+    CacheValidation(String),
     SidecarValidation(String),
     BackupValidation(String),
+    HistoryValidation(String),
+    ActionLogValidation(String),
 }
 
 impl fmt::Display for LibraryStorageError {
@@ -349,6 +572,10 @@ impl fmt::Display for LibraryStorageError {
                 write!(formatter, "missing catalog database at {}", path.display())
             }
             Self::MissingPhoto(photo_id) => write!(formatter, "missing catalog photo: {photo_id}"),
+            Self::CatalogSchemaVersion { expected, found } => write!(
+                formatter,
+                "catalog schema version mismatch: expected {expected}, found {found}"
+            ),
             Self::NotDirectory(path) => write!(formatter, "not a directory: {}", path.display()),
             Self::InvalidPath(path) => {
                 write!(formatter, "path is not valid UTF-8: {}", path.display())
@@ -356,11 +583,20 @@ impl fmt::Display for LibraryStorageError {
             Self::InvalidSidecarPhotoId(photo_id) => {
                 write!(formatter, "invalid sidecar photo id: {photo_id:?}")
             }
+            Self::CacheValidation(message) => {
+                write!(formatter, "cache validation error: {message}")
+            }
             Self::SidecarValidation(message) => {
                 write!(formatter, "sidecar validation error: {message}")
             }
             Self::BackupValidation(message) => {
                 write!(formatter, "backup validation error: {message}")
+            }
+            Self::HistoryValidation(message) => {
+                write!(formatter, "history validation error: {message}")
+            }
+            Self::ActionLogValidation(message) => {
+                write!(formatter, "action log validation error: {message}")
             }
         }
     }
@@ -376,11 +612,15 @@ impl Error for LibraryStorageError {
             Self::EditGraph(error) => Some(error),
             Self::MissingCatalog(_)
             | Self::MissingPhoto(_)
+            | Self::CatalogSchemaVersion { .. }
             | Self::NotDirectory(_)
             | Self::InvalidPath(_)
             | Self::InvalidSidecarPhotoId(_)
+            | Self::CacheValidation(_)
             | Self::SidecarValidation(_)
-            | Self::BackupValidation(_) => None,
+            | Self::BackupValidation(_)
+            | Self::HistoryValidation(_)
+            | Self::ActionLogValidation(_) => None,
         }
     }
 }
@@ -433,6 +673,36 @@ const MIGRATIONS: &[Migration] = &[
         name: "required_catalog_indexes",
         sql: REQUIRED_INDEXES_SQL,
     },
+    Migration {
+        version: 3,
+        name: "paged_library_query_indexes",
+        sql: PAGED_LIBRARY_QUERY_INDEXES_SQL,
+    },
+    Migration {
+        version: 4,
+        name: "photo_metadata_normalized_fields",
+        sql: PHOTO_METADATA_NORMALIZED_FIELDS_SQL,
+    },
+    Migration {
+        version: 5,
+        name: "photo_metadata_query_indexes",
+        sql: PHOTO_METADATA_QUERY_INDEXES_SQL,
+    },
+    Migration {
+        version: 6,
+        name: "edit_history_checkpoint_columns",
+        sql: EDIT_HISTORY_CHECKPOINT_COLUMNS_SQL,
+    },
+    Migration {
+        version: 7,
+        name: "edit_history_state_columns",
+        sql: EDIT_HISTORY_STATE_COLUMNS_SQL,
+    },
+    Migration {
+        version: 8,
+        name: "action_log_side_effect_columns",
+        sql: ACTION_LOG_SIDE_EFFECT_COLUMNS_SQL,
+    },
 ];
 
 /// Open a catalog database and apply all embedded migrations.
@@ -471,6 +741,61 @@ pub fn open_local_library(
 
     ensure_library_directories(root_path)?;
     open_library_catalog(root_path, &catalog_path)
+}
+
+/// Inspect an existing local library for relaunch restore without migrations or repair.
+pub fn inspect_local_library_for_restore(
+    root_path: impl AsRef<Path>,
+) -> Result<LocalLibrary, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let schema_version = connection.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |row| row.get(0),
+    )?;
+
+    Ok(LocalLibrary {
+        root_path: root_path.to_path_buf(),
+        catalog_path,
+        schema_version,
+    })
+}
+
+/// Check catalog photo existence for relaunch restore without migrations or repair.
+pub fn catalog_photo_exists_for_restore(
+    root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<bool, LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection
+        .query_row(
+            "SELECT 1 FROM photos WHERE id = ?1 LIMIT 1",
+            [photo_id],
+            |_| Ok(()),
+        )
+        .optional()
+        .map(|result| result.is_some())
+        .map_err(LibraryStorageError::from)
 }
 
 /// Resolve the library-local sidecar path for a catalog photo id.
@@ -565,6 +890,34 @@ pub fn read_photo_sidecar(
         edit_graph,
         json,
     }))
+}
+
+/// Read catalog-side sidecar sync status without touching sidecar files.
+pub fn get_photo_sidecar_status(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoSidecarStatus>, LibraryStorageError> {
+    validate_sidecar_photo_id(photo_id)?;
+    let (_library, connection) = open_existing_library_for_read_only_query(library_root_path)?;
+    connection
+        .query_row(
+            r#"
+            SELECT photo_id, sidecar_path, last_written_at, conflict_state
+            FROM sidecar_status
+            WHERE photo_id = ?1
+            "#,
+            params![photo_id],
+            |row| {
+                Ok(PhotoSidecarStatus {
+                    photo_id: row.get(0)?,
+                    sidecar_path: row.get(1)?,
+                    last_written_at: row.get(2)?,
+                    conflict_state: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
 }
 
 /// Preview how the live catalog would rebuild portable flag state from sidecars.
@@ -727,14 +1080,36 @@ pub fn import_folder(
     library_root_path: impl AsRef<Path>,
     folder_path: impl AsRef<Path>,
 ) -> Result<FolderImportSummary, LibraryStorageError> {
+    import_folder_with_options(
+        library_root_path,
+        folder_path,
+        FolderImportOptions::default(),
+    )
+}
+
+/// Scan a selected folder and record file candidates by reference.
+pub fn import_folder_with_options(
+    library_root_path: impl AsRef<Path>,
+    folder_path: impl AsRef<Path>,
+    options: FolderImportOptions,
+) -> Result<FolderImportSummary, LibraryStorageError> {
     let library = open_existing_library_for_read(library_root_path)?;
     let folder_path = folder_path.as_ref();
+    let root_policy_issue = import_root_policy_issue(folder_path)?;
+    if let Some(issue) = root_policy_issue {
+        return Ok(empty_import_summary(folder_path.to_path_buf(), vec![issue]));
+    }
     if !folder_path.is_dir() {
         return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
     }
 
-    let mut candidates = scan_import_candidates(folder_path)?;
+    let (mut candidates, mut issues) = scan_import_candidates(folder_path, options)?;
     candidates.sort_by(|left, right| left.path.cmp(&right.path));
+    issues.sort_by(|left, right| {
+        left.path
+            .cmp(&right.path)
+            .then(left.kind.as_str().cmp(right.kind.as_str()))
+    });
 
     let mut connection = open_catalog(&library.catalog_path)?;
     record_import_candidates(&mut connection, folder_path, &candidates)?;
@@ -751,7 +1126,119 @@ pub fn import_folder(
         supported_files: scanned_files - unsupported_files,
         unsupported_files,
         candidates,
+        issues,
     })
+}
+
+fn empty_import_summary(folder_path: PathBuf, issues: Vec<ImportIssue>) -> FolderImportSummary {
+    FolderImportSummary {
+        folder_path,
+        scanned_files: 0,
+        supported_files: 0,
+        unsupported_files: 0,
+        candidates: Vec::new(),
+        issues,
+    }
+}
+
+/// Insert or update normalized metadata for an imported photo by original path.
+pub fn upsert_photo_metadata_by_path(
+    library_root_path: impl AsRef<Path>,
+    original_path: impl AsRef<Path>,
+    metadata: PhotoMetadataUpdate,
+) -> Result<(), LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let original_path = path_to_string(original_path.as_ref())?;
+    let connection = open_catalog(&library.catalog_path)?;
+    connection.execute(
+        r#"
+        INSERT INTO photo_metadata(
+          photo_id,
+          camera_make,
+          camera_model,
+          lens_model,
+          capture_time,
+          raw_json,
+          width,
+          height,
+          orientation
+        )
+        SELECT
+          photos.id,
+          ?2,
+          ?3,
+          ?4,
+          ?5,
+          ?6,
+          ?7,
+          ?8,
+          ?9
+        FROM photos
+        WHERE photos.library_id = ?1
+          AND photos.path = ?10
+          AND photos.unsupported = 0
+        ON CONFLICT(photo_id) DO UPDATE SET
+          camera_make = excluded.camera_make,
+          camera_model = excluded.camera_model,
+          lens_model = excluded.lens_model,
+          capture_time = excluded.capture_time,
+          raw_json = excluded.raw_json,
+          width = excluded.width,
+          height = excluded.height,
+          orientation = excluded.orientation
+        "#,
+        params![
+            LOCAL_LIBRARY_ID,
+            metadata.camera_make,
+            metadata.camera_model,
+            metadata.lens_model,
+            metadata.capture_time,
+            metadata.raw_json,
+            metadata.width,
+            metadata.height,
+            metadata.orientation,
+            original_path,
+        ],
+    )?;
+
+    Ok(())
+}
+
+/// Read stored metadata for one photo without touching original files.
+pub fn get_photo_metadata(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoMetadata>, LibraryStorageError> {
+    let (_library, connection) = open_existing_library_for_read_only_query(library_root_path)?;
+    connection
+        .query_row(
+            r#"
+            SELECT
+              photos.id,
+              photos.file_name,
+              photos.path,
+              photos.file_type,
+              photos.unsupported,
+              photos.file_size,
+              photos.modified_at,
+              photo_metadata.photo_id IS NOT NULL,
+              photo_metadata.width,
+              photo_metadata.height,
+              photo_metadata.orientation,
+              photo_metadata.capture_time,
+              photo_metadata.camera_make,
+              photo_metadata.camera_model,
+              photo_metadata.lens_model
+            FROM photos
+            LEFT JOIN photo_metadata ON photo_metadata.photo_id = photos.id
+            WHERE photos.library_id = ?1
+              AND photos.id = ?2
+            "#,
+            params![LOCAL_LIBRARY_ID, photo_id],
+            photo_metadata_from_row,
+        )
+        .optional()
+        .map_err(LibraryStorageError::from)
 }
 
 /// List imported catalog photos for the Library grid without touching originals.
@@ -788,6 +1275,55 @@ pub fn list_library_photos(
         .map_err(LibraryStorageError::from)
 }
 
+/// Query imported catalog photos by bounded page without mutating catalog state.
+pub fn query_library_photos(
+    library_root_path: impl AsRef<Path>,
+    request: LibraryQueryRequest,
+) -> Result<LibraryQueryPage<LibraryPhotoGridItem>, LibraryStorageError> {
+    let request = LibraryQueryRequest::new(
+        request.offset,
+        request.limit,
+        request.sort,
+        request.filters.clone(),
+    );
+    let (_library, connection) = open_existing_library_for_read_only_query(library_root_path)?;
+    let filter = LibraryQuerySqlFilter::from(&request.filters);
+    let order_clause = library_query_order_clause(request.sort);
+
+    let total_count = query_library_photo_count(&connection, &filter)?;
+    let limit = i64::from(request.limit);
+    let offset = i64::try_from(request.offset).unwrap_or(i64::MAX);
+    let query_sql =
+        format!("{LIBRARY_QUERY_SELECT_SQL}\n{order_clause}\nLIMIT :limit OFFSET :offset");
+    let mut statement = connection.prepare(&query_sql)?;
+    let rows = statement.query_map(
+        named_params! {
+            ":thumbnail_cache_type": THUMBNAIL_CACHE_TYPE,
+            ":library_id": LOCAL_LIBRARY_ID,
+            ":min_rating": filter.min_rating,
+            ":picked": filter.picked,
+            ":rejected": filter.rejected,
+            ":file_type": filter.file_type,
+            ":metadata_filter": filter.metadata,
+            ":search": filter.search.as_deref(),
+            ":limit": limit,
+            ":offset": offset,
+        },
+        library_photo_grid_item_from_row,
+    )?;
+    let items = rows.collect::<Result<Vec<_>, _>>()?;
+    let has_next_page = request.offset.saturating_add(u64::from(request.limit)) < total_count;
+
+    Ok(LibraryQueryPage {
+        items,
+        offset: request.offset,
+        limit: request.limit,
+        total_count,
+        has_next_page,
+        order_fields: request.order_fields(),
+    })
+}
+
 /// Record a disposable JPEG thumbnail cache file for a catalog photo.
 pub fn record_thumbnail_cache(
     library_root_path: impl AsRef<Path>,
@@ -820,6 +1356,25 @@ pub fn record_preview_cache(
         "cache-preview",
         photo_id,
         PREVIEW_CACHE_TYPE,
+        cache_key,
+        path,
+        byte_size,
+    )
+}
+
+/// Record disposable histogram cache data for a catalog photo.
+pub fn record_histogram_cache(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    cache_key: impl AsRef<str>,
+    path: impl AsRef<Path>,
+    byte_size: i64,
+) -> Result<CacheRecord, LibraryStorageError> {
+    record_photo_cache(
+        library_root_path,
+        "cache-histogram",
+        photo_id,
+        HISTOGRAM_CACHE_TYPE,
         cache_key,
         path,
         byte_size,
@@ -906,6 +1461,7 @@ fn record_photo_cache(
     }
 
     let library = open_existing_library_for_read(library_root_path)?;
+    validate_cache_path(&library.root_path, cache_type, path.as_ref())?;
     let connection = open_catalog(&library.catalog_path)?;
     let cache_id = stable_catalog_id(cache_id_namespace, photo_id);
     let cache_key = cache_key.as_ref().to_string();
@@ -945,6 +1501,43 @@ fn record_photo_cache(
     })
 }
 
+fn validate_cache_path(
+    library_root_path: &Path,
+    cache_type: &str,
+    path: &Path,
+) -> Result<(), LibraryStorageError> {
+    let expected_directory = match cache_type {
+        THUMBNAIL_CACHE_TYPE => Some("thumbnails"),
+        PREVIEW_CACHE_TYPE => Some("previews"),
+        HISTOGRAM_CACHE_TYPE => Some("render-cache"),
+        _ => None,
+    };
+    let Some(expected_directory) = expected_directory else {
+        return Ok(());
+    };
+    let expected_root = library_root_path.join(expected_directory);
+    let expected_root = std::fs::canonicalize(&expected_root).map_err(|error| {
+        LibraryStorageError::CacheValidation(format!(
+            "{cache_type} cache root must resolve before recording cache metadata: {} ({error})",
+            expected_root.display()
+        ))
+    })?;
+    let resolved_path = std::fs::canonicalize(path).map_err(|error| {
+        LibraryStorageError::CacheValidation(format!(
+            "{cache_type} cache path must resolve before recording cache metadata: {} ({error})",
+            path.display()
+        ))
+    })?;
+    if resolved_path.starts_with(&expected_root) {
+        return Ok(());
+    }
+
+    Err(LibraryStorageError::CacheValidation(format!(
+        "{cache_type} cache path must stay under disposable {expected_directory}/ cache directory: {}",
+        path.display()
+    )))
+}
+
 /// Persist culling and label flags for a photo in the catalog.
 pub fn set_photo_flags(
     library_root_path: impl AsRef<Path>,
@@ -956,27 +1549,51 @@ pub fn set_photo_flags(
 ) -> Result<PhotoFlags, LibraryStorageError> {
     let flags = PhotoFlags::new(photo_id, rating, picked, rejected, color_label)?;
     let library = open_existing_library_for_read(library_root_path)?;
-    let connection = open_catalog(&library.catalog_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let before_flags = get_photo_flags_from_connection(&connection, &flags.photo_id)?
+        .unwrap_or_else(|| default_rebuild_flags(&flags.photo_id));
+    let action_json = serde_json::to_string(&serde_json::json!({
+        "schema": ACTION_SCHEMA,
+        "version": ACTION_VERSION,
+        "class": "undoable",
+        "kind": "flag_change",
+        "photo_id": flags.photo_id.clone(),
+        "label": "Culling flags",
+        "before": {
+            "flags": photo_flags_action_value(&before_flags),
+        },
+        "after": {
+            "flags": photo_flags_action_value(&flags),
+        },
+        "created_by": "core",
+    }))?;
 
-    connection.execute(
+    let transaction = connection.transaction()?;
+    invalidate_redo_history(&transaction, &flags.photo_id)?;
+    restore_photo_flags_in_transaction(&transaction, &flags)?;
+    let sequence = next_history_sequence(&transaction, &flags.photo_id)?;
+    let edit_history_id = stable_catalog_id(
+        "edit-history",
+        &format!("{}\nflag_change\n{sequence}", flags.photo_id),
+    );
+    transaction.execute(
         r#"
-        INSERT INTO photo_flags(photo_id, rating, picked, rejected, color_label, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
-        ON CONFLICT(photo_id) DO UPDATE SET
-          rating = excluded.rating,
-          picked = excluded.picked,
-          rejected = excluded.rejected,
-          color_label = excluded.color_label,
-          updated_at = CURRENT_TIMESTAMP
+        INSERT INTO edit_history(
+          id,
+          photo_id,
+          edit_state_id,
+          action_json,
+          sequence,
+          action_class,
+          action_kind,
+          history_state
+        )
+        VALUES (?1, ?2, NULL, ?3, ?4, 'undoable', 'flag_change', 'applied')
         "#,
-        params![
-            flags.photo_id,
-            i64::from(flags.rating),
-            bool_to_sql(flags.picked),
-            bool_to_sql(flags.rejected),
-            flags.color_label,
-        ],
+        params![edit_history_id, flags.photo_id, action_json, sequence],
     )?;
+    mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, &flags.photo_id)?;
+    transaction.commit()?;
 
     Ok(flags)
 }
@@ -2160,6 +2777,22 @@ fn update_sidecar_status(
     Ok(())
 }
 
+fn mark_clean_sidecar_catalog_newer_after_history_commit(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+) -> Result<(), LibraryStorageError> {
+    transaction.execute(
+        r#"
+        UPDATE sidecar_status
+        SET conflict_state = 'catalog_newer'
+        WHERE photo_id = ?1
+          AND conflict_state IN ('clean', 'in_sync')
+        "#,
+        params![photo_id],
+    )?;
+    Ok(())
+}
+
 /// Persist the active edit graph for a photo. Draft preview updates should not call this.
 pub fn commit_edit_graph(
     library_root_path: impl AsRef<Path>,
@@ -2168,26 +2801,65 @@ pub fn commit_edit_graph(
     silica_edit::validate_edit_graph(&graph)?;
 
     let library = open_local_library(library_root_path)?;
+    let before_graph =
+        load_active_edit_graph_or_default(&library.root_path, &graph.source.photo_id)?;
     let mut connection = open_catalog(&library.catalog_path)?;
     let photo_id = graph.source.photo_id.clone();
-    let edit_state_id = stable_catalog_id("edit-state", &photo_id);
+    let edit_state_id = unique_catalog_id("edit-state");
+    let edit_history_id = stable_catalog_id("edit-history", &edit_state_id);
     let edit_graph_json = serde_json::to_string(&graph)?;
+    let label = edit_graph_history_label(before_graph.as_ref(), &graph);
+    let action_json = serde_json::to_string(&serde_json::json!({
+        "schema": ACTION_SCHEMA,
+        "version": ACTION_VERSION,
+        "class": "undoable",
+        "kind": "edit_commit",
+        "photo_id": photo_id.clone(),
+        "label": label,
+        "before": {
+            "edit_graph": &before_graph,
+        },
+        "after": {
+            "edit_graph": &graph,
+        },
+        "created_by": "core",
+    }))?;
 
     let transaction = connection.transaction()?;
+    invalidate_redo_history(&transaction, &photo_id)?;
+    let sequence = next_history_sequence(&transaction, &photo_id)?;
     transaction.execute(
-        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1 AND id <> ?2",
-        params![photo_id, edit_state_id],
+        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1",
+        params![photo_id],
     )?;
     transaction.execute(
         r#"
         INSERT INTO edit_states(id, photo_id, active, edit_graph_json, updated_at)
         VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP)
-        ON CONFLICT(id) DO UPDATE SET
-          active = 1,
-          edit_graph_json = excluded.edit_graph_json,
-          updated_at = CURRENT_TIMESTAMP
         "#,
         params![edit_state_id, photo_id, edit_graph_json],
+    )?;
+    transaction.execute(
+        r#"
+        INSERT INTO edit_history(
+          id,
+          photo_id,
+          edit_state_id,
+          action_json,
+          sequence,
+          action_class,
+          action_kind,
+          history_state
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, 'undoable', 'edit_commit', 'applied')
+        "#,
+        params![
+            edit_history_id,
+            photo_id,
+            edit_state_id,
+            action_json,
+            sequence
+        ],
     )?;
     transaction.execute(
         r#"
@@ -2197,9 +2869,396 @@ pub fn commit_edit_graph(
         "#,
         params![graph.source.photo_id],
     )?;
+    mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, &photo_id)?;
     transaction.commit()?;
 
     Ok(graph)
+}
+
+fn edit_graph_history_label(
+    before_graph: Option<&silica_edit::EditGraph>,
+    after_graph: &silica_edit::EditGraph,
+) -> &'static str {
+    let Some(before_graph) = before_graph else {
+        return "Develop edit";
+    };
+    let before = &before_graph.basic;
+    let after = &after_graph.basic;
+    let exposure_contrast_changed =
+        before.exposure != after.exposure || before.contrast != after.contrast;
+    let white_balance_changed = before.white_balance != after.white_balance
+        || before.temperature != after.temperature
+        || before.tint != after.tint;
+    let tone_recovery_changed = before.highlights != after.highlights
+        || before.shadows != after.shadows
+        || before.whites != after.whites
+        || before.blacks != after.blacks;
+    let color_presence_changed =
+        before.vibrance != after.vibrance || before.saturation != after.saturation;
+
+    match (
+        exposure_contrast_changed,
+        white_balance_changed,
+        tone_recovery_changed,
+        color_presence_changed,
+    ) {
+        (true, false, false, false) => "Exposure / contrast",
+        (false, true, false, false) => "White balance",
+        (false, false, true, false) => "Tone recovery",
+        (false, false, false, true) => "Color presence",
+        _ => "Develop edit",
+    }
+}
+
+pub fn undo_last_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<HistoryCommandResult, LibraryStorageError> {
+    apply_history_action(library_root_path, photo_id, "undo")
+}
+
+pub fn redo_last_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<HistoryCommandResult, LibraryStorageError> {
+    apply_history_action(library_root_path, photo_id, "redo")
+}
+
+pub fn list_photo_history(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<PhotoHistoryPanel, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let mut statement = connection.prepare(
+        r#"
+        SELECT id, sequence, action_kind, action_json, history_state, created_at
+        FROM edit_history
+        WHERE photo_id = ?1
+          AND action_class = 'undoable'
+          AND history_state IN ('applied', 'undone')
+        ORDER BY sequence DESC
+        "#,
+    )?;
+    let mut items = statement
+        .query_map(params![photo_id], |row| {
+            let history_id: String = row.get(0)?;
+            let sequence: i64 = row.get(1)?;
+            let action_kind: String = row.get(2)?;
+            let action_json: String = row.get(3)?;
+            let history_state: String = row.get(4)?;
+            let created_at: String = row.get(5)?;
+            Ok((
+                history_id,
+                sequence,
+                action_kind,
+                action_json,
+                history_state,
+                created_at,
+            ))
+        })?
+        .map(|row| {
+            let (history_id, sequence, action_kind, action_json, history_state, created_at) = row?;
+            let action: serde_json::Value = serde_json::from_str(&action_json)?;
+            validate_history_action_header(&action, photo_id, &action_kind)?;
+            let label = action
+                .get("label")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(&action_kind)
+                .to_string();
+            Ok(PhotoHistoryItem {
+                history_id,
+                photo_id: photo_id.to_string(),
+                sequence,
+                action_kind,
+                label,
+                can_undo: false,
+                can_redo: false,
+                history_state,
+                created_at,
+            })
+        })
+        .collect::<Result<Vec<_>, LibraryStorageError>>()?;
+
+    let undo_sequence = items
+        .iter()
+        .filter(|item| item.history_state == "applied")
+        .map(|item| item.sequence)
+        .max();
+    let redo_sequence = items
+        .iter()
+        .filter(|item| item.history_state == "undone")
+        .map(|item| item.sequence)
+        .min();
+    for item in &mut items {
+        item.can_undo = Some(item.sequence) == undo_sequence && item.history_state == "applied";
+        item.can_redo = Some(item.sequence) == redo_sequence && item.history_state == "undone";
+    }
+
+    let can_undo = undo_sequence.is_some();
+    let can_redo = redo_sequence.is_some();
+    let (status, message) = if items.is_empty() {
+        ("empty", "No committed history yet.")
+    } else {
+        ("ready", "History checkpoints loaded.")
+    };
+
+    Ok(PhotoHistoryPanel {
+        photo_id: photo_id.to_string(),
+        items,
+        can_undo,
+        can_redo,
+        status: status.to_string(),
+        message: message.to_string(),
+    })
+}
+
+pub fn append_action_log_entry(
+    library_root_path: impl AsRef<Path>,
+    entry: NewActionLogEntry,
+) -> Result<ActionLogEntry, LibraryStorageError> {
+    validate_new_action_log_entry(&entry)?;
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let id = action_log_id(&entry);
+    connection.execute(
+        r#"
+        INSERT INTO action_log(
+          id,
+          actor_type,
+          actor_id,
+          action_type,
+          subject_type,
+          subject_id,
+          payload_json,
+          side_effect_category,
+          evidence_ref
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        "#,
+        params![
+            id,
+            entry.actor_type,
+            entry.actor_id,
+            entry.action_type,
+            entry.subject_type,
+            entry.subject_id,
+            entry.payload_json,
+            entry.side_effect_category,
+            entry.evidence_ref,
+        ],
+    )?;
+    action_log_entry_by_id(&connection, &id)
+}
+
+pub fn list_action_log_entries(
+    library_root_path: impl AsRef<Path>,
+    limit: u16,
+) -> Result<Vec<ActionLogEntry>, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let limit = i64::from(limit.clamp(1, 500));
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+          id,
+          actor_type,
+          actor_id,
+          action_type,
+          subject_type,
+          subject_id,
+          side_effect_category,
+          evidence_ref,
+          payload_json,
+          created_at
+        FROM action_log
+        ORDER BY rowid DESC
+        LIMIT ?1
+        "#,
+    )?;
+    let entries = statement
+        .query_map(params![limit], action_log_entry_from_row)?
+        .map(|row| row.map_err(LibraryStorageError::from))
+        .collect();
+    entries
+}
+
+fn apply_history_action(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    command: &str,
+) -> Result<HistoryCommandResult, LibraryStorageError> {
+    if photo_id.is_empty() {
+        return Err(CatalogFlagError::EmptyPhotoId.into());
+    }
+
+    let library = open_local_library(library_root_path)?;
+    let mut connection = open_catalog(&library.catalog_path)?;
+    let transaction = connection.transaction()?;
+    let row = next_history_action_for_command(&transaction, photo_id, command)?;
+    let Some(row) = row else {
+        transaction.commit()?;
+        return Ok(HistoryCommandResult {
+            photo_id: photo_id.to_string(),
+            command: command.to_string(),
+            applied: false,
+            action_kind: None,
+            history_id: None,
+            message: format!("No {command} history is available."),
+        });
+    };
+
+    apply_history_row(&transaction, photo_id, command, &row)?;
+    let next_state = if command == "undo" {
+        "undone"
+    } else {
+        "applied"
+    };
+    transaction.execute(
+        "UPDATE edit_history SET history_state = ?1 WHERE id = ?2",
+        params![next_state, row.id],
+    )?;
+    mark_clean_sidecar_catalog_newer_after_history_commit(&transaction, photo_id)?;
+    transaction.commit()?;
+
+    Ok(HistoryCommandResult {
+        photo_id: photo_id.to_string(),
+        command: command.to_string(),
+        applied: true,
+        action_kind: Some(row.action_kind),
+        history_id: Some(row.id),
+        message: format!("{command} applied."),
+    })
+}
+
+fn next_history_action_for_command(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+    command: &str,
+) -> Result<Option<HistoryActionRow>, LibraryStorageError> {
+    let sql = match command {
+        "undo" => {
+            r#"
+            SELECT id, action_kind, action_json
+            FROM edit_history
+            WHERE photo_id = ?1
+              AND action_class = 'undoable'
+              AND history_state = 'applied'
+            ORDER BY sequence DESC
+            LIMIT 1
+            "#
+        }
+        "redo" => {
+            r#"
+            SELECT id, action_kind, action_json
+            FROM edit_history
+            WHERE photo_id = ?1
+              AND action_class = 'undoable'
+              AND history_state = 'undone'
+            ORDER BY sequence ASC
+            LIMIT 1
+            "#
+        }
+        other => {
+            return Err(LibraryStorageError::HistoryValidation(format!(
+                "unsupported history command: {other}"
+            )));
+        }
+    };
+
+    transaction
+        .query_row(sql, params![photo_id], |row| {
+            Ok(HistoryActionRow {
+                id: row.get(0)?,
+                action_kind: row.get(1)?,
+                action_json: row.get(2)?,
+            })
+        })
+        .optional()
+        .map_err(LibraryStorageError::from)
+}
+
+fn apply_history_row(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+    command: &str,
+    row: &HistoryActionRow,
+) -> Result<(), LibraryStorageError> {
+    let action: serde_json::Value = serde_json::from_str(&row.action_json)?;
+    validate_history_action_header(&action, photo_id, &row.action_kind)?;
+    let snapshot_key = if command == "undo" { "before" } else { "after" };
+
+    match row.action_kind.as_str() {
+        "edit_commit" => {
+            let graph_value = action
+                .get(snapshot_key)
+                .and_then(|snapshot| snapshot.get("edit_graph"))
+                .ok_or_else(|| {
+                    LibraryStorageError::HistoryValidation(format!(
+                        "{snapshot_key}.edit_graph is required"
+                    ))
+                })?;
+            let graph: silica_edit::EditGraph = serde_json::from_value(graph_value.clone())?;
+            silica_edit::validate_edit_graph(&graph)?;
+            restore_edit_graph_in_transaction(transaction, &graph)?;
+        }
+        "flag_change" => {
+            let flags_value = action
+                .get(snapshot_key)
+                .and_then(|snapshot| snapshot.get("flags"))
+                .ok_or_else(|| {
+                    LibraryStorageError::HistoryValidation(format!(
+                        "{snapshot_key}.flags is required"
+                    ))
+                })?;
+            let flags = photo_flags_from_action_value(photo_id, flags_value)?;
+            restore_photo_flags_in_transaction(transaction, &flags)?;
+        }
+        other => {
+            return Err(LibraryStorageError::HistoryValidation(format!(
+                "unsupported history action kind: {other}"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_history_action_header(
+    action: &serde_json::Value,
+    photo_id: &str,
+    action_kind: &str,
+) -> Result<(), LibraryStorageError> {
+    if action.get("schema").and_then(serde_json::Value::as_str) != Some(ACTION_SCHEMA) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action schema mismatch".to_string(),
+        ));
+    }
+    if action.get("version").and_then(serde_json::Value::as_i64) != Some(ACTION_VERSION) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action version mismatch".to_string(),
+        ));
+    }
+    if action.get("class").and_then(serde_json::Value::as_str) != Some("undoable") {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action must be undoable".to_string(),
+        ));
+    }
+    if action.get("kind").and_then(serde_json::Value::as_str) != Some(action_kind) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action kind mismatch".to_string(),
+        ));
+    }
+    if action.get("photo_id").and_then(serde_json::Value::as_str) != Some(photo_id) {
+        return Err(LibraryStorageError::HistoryValidation(
+            "history action photo_id mismatch".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Record a completed export and mark the source photo as exported.
@@ -2380,6 +3439,45 @@ fn open_existing_library_for_read(
     })
 }
 
+fn open_existing_library_for_read_only_query(
+    root_path: impl AsRef<Path>,
+) -> Result<(LocalLibrary, Connection), LibraryStorageError> {
+    let root_path = root_path.as_ref();
+    if !root_path.is_dir() {
+        return Err(LibraryStorageError::NotDirectory(root_path.to_path_buf()));
+    }
+
+    let catalog_path = root_path.join(CATALOG_DATABASE_FILE);
+    if !catalog_path.is_file() {
+        return Err(LibraryStorageError::MissingCatalog(catalog_path));
+    }
+
+    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection.busy_timeout(Duration::from_secs(5))?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    let schema_version = connection.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if schema_version != CURRENT_SCHEMA_VERSION {
+        return Err(LibraryStorageError::CatalogSchemaVersion {
+            expected: CURRENT_SCHEMA_VERSION,
+            found: schema_version,
+        });
+    }
+
+    Ok((
+        LocalLibrary {
+            root_path: root_path.to_path_buf(),
+            catalog_path,
+            schema_version,
+        },
+        connection,
+    ))
+}
+
 fn upsert_local_library_row(
     connection: &Connection,
     root_path: &Path,
@@ -2400,35 +3498,260 @@ fn upsert_local_library_row(
     Ok(())
 }
 
-fn scan_import_candidates(folder_path: &Path) -> Result<Vec<ImportCandidate>, LibraryStorageError> {
-    let mut candidates = Vec::new();
+const IMPORT_RECURSIVE_MAX_DEPTH: usize = 20;
 
-    for entry in fs::read_dir(folder_path)? {
-        let entry = entry?;
+struct ImportScanState {
+    candidates: Vec<ImportCandidate>,
+    issues: Vec<ImportIssue>,
+    recursive: bool,
+}
+
+fn scan_import_candidates(
+    folder_path: &Path,
+    options: FolderImportOptions,
+) -> Result<(Vec<ImportCandidate>, Vec<ImportIssue>), LibraryStorageError> {
+    let mut state = ImportScanState {
+        candidates: Vec::new(),
+        issues: Vec::new(),
+        recursive: options.recursive,
+    };
+    scan_import_directory(folder_path, 0, true, &mut state)?;
+    Ok((state.candidates, state.issues))
+}
+
+fn scan_import_directory(
+    folder_path: &Path,
+    depth: usize,
+    is_root: bool,
+    state: &mut ImportScanState,
+) -> Result<(), LibraryStorageError> {
+    let entries = match fs::read_dir(folder_path) {
+        Ok(entries) => entries,
+        Err(error) if is_root => return Err(LibraryStorageError::from(error)),
+        Err(error) => {
+            state.issues.push(import_issue(
+                ImportIssueKind::DirectoryReadFailed,
+                folder_path,
+                folder_path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(ToOwned::to_owned),
+                format!("failed to read directory: {error}"),
+            ));
+            return Ok(());
+        }
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                state.issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    folder_path,
+                    None,
+                    format!("failed to read directory entry: {error}"),
+                ));
+                continue;
+            }
+        };
         let path = entry.path();
-        if !path.is_file() {
+        let file_name = entry.file_name().to_string_lossy().into_owned();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                state.issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read entry type: {error}"),
+                ));
+                continue;
+            }
+        };
+
+        if file_type.is_symlink() {
+            state.issues.push(import_issue(
+                ImportIssueKind::SymlinkEntrySkipped,
+                &path,
+                Some(file_name),
+                "symbolic links are skipped by import policy",
+            ));
             continue;
         }
 
-        let metadata = entry.metadata()?;
-        let file_name = entry.file_name().to_string_lossy().into_owned();
+        if is_hidden_entry(&file_name) {
+            state.issues.push(import_issue(
+                ImportIssueKind::HiddenEntrySkipped,
+                &path,
+                Some(file_name),
+                "hidden entries are skipped by import policy",
+            ));
+            continue;
+        }
+
+        if file_type.is_dir() {
+            if is_package_directory(&path) {
+                state.issues.push(import_issue(
+                    ImportIssueKind::PackageDirectorySkipped,
+                    &path,
+                    Some(file_name),
+                    "package directories are skipped by import policy",
+                ));
+            } else if state.recursive {
+                if depth >= IMPORT_RECURSIVE_MAX_DEPTH {
+                    state.issues.push(import_issue(
+                        ImportIssueKind::MaxDepthExceeded,
+                        &path,
+                        Some(file_name),
+                        "recursive import reached the local alpha depth limit",
+                    ));
+                } else {
+                    scan_import_directory(&path, depth + 1, false, state)?;
+                }
+            }
+            continue;
+        }
+
+        if !file_type.is_file() {
+            continue;
+        }
+
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                state.issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read file metadata: {error}"),
+                ));
+                continue;
+            }
+        };
         let extension = path
             .extension()
             .and_then(|value| value.to_str())
             .unwrap_or("");
         let unsupported = !is_supported_photo_extension(extension);
+        let partial_hash = match partial_file_hash(&path) {
+            Ok(hash) => hash,
+            Err(error) => {
+                state.issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read file fingerprint: {error}"),
+                ));
+                continue;
+            }
+        };
 
-        candidates.push(ImportCandidate {
+        if unsupported {
+            state.issues.push(import_issue(
+                ImportIssueKind::UnsupportedFile,
+                &path,
+                Some(file_name.clone()),
+                "file extension is unsupported by the local alpha",
+            ));
+        }
+
+        state.candidates.push(ImportCandidate {
             file_name,
             path: path_to_string(&path)?,
             file_size: metadata.len() as i64,
             modified_at: modified_at_string(&metadata),
-            partial_hash: partial_file_hash(&path)?,
+            partial_hash,
             unsupported,
         });
     }
 
-    Ok(candidates)
+    Ok(())
+}
+
+fn import_issue(
+    kind: ImportIssueKind,
+    path: &Path,
+    file_name: Option<String>,
+    message: impl Into<String>,
+) -> ImportIssue {
+    ImportIssue {
+        kind,
+        path: path.display().to_string(),
+        file_name,
+        message: message.into(),
+    }
+}
+
+fn import_root_policy_issue(
+    folder_path: &Path,
+) -> Result<Option<ImportIssue>, LibraryStorageError> {
+    let metadata = match fs::symlink_metadata(folder_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(LibraryStorageError::NotDirectory(folder_path.to_path_buf()));
+        }
+        Err(error) => return Err(LibraryStorageError::from(error)),
+    };
+    let file_name = folder_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .map(ToOwned::to_owned);
+
+    if metadata.file_type().is_symlink() {
+        return Ok(Some(import_issue(
+            ImportIssueKind::SymlinkEntrySkipped,
+            folder_path,
+            file_name,
+            "symbolic links are skipped by import policy",
+        )));
+    }
+
+    if let Some(name) = file_name.as_deref() {
+        if is_hidden_entry(name) {
+            return Ok(Some(import_issue(
+                ImportIssueKind::HiddenEntrySkipped,
+                folder_path,
+                file_name,
+                "hidden entries are skipped by import policy",
+            )));
+        }
+    }
+
+    if metadata.is_dir() && is_package_directory(folder_path) {
+        return Ok(Some(import_issue(
+            ImportIssueKind::PackageDirectorySkipped,
+            folder_path,
+            file_name,
+            "package directories are skipped by import policy",
+        )));
+    }
+
+    Ok(None)
+}
+
+fn is_hidden_entry(file_name: &str) -> bool {
+    file_name.starts_with('.') && file_name != "." && file_name != ".."
+}
+
+fn is_package_directory(path: &Path) -> bool {
+    const PACKAGE_EXTENSIONS: &[&str] = &[
+        "app",
+        "aplibrary",
+        "framework",
+        "library",
+        "lrdata",
+        "photoslibrary",
+        "plugin",
+    ];
+
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|extension| {
+            PACKAGE_EXTENSIONS
+                .iter()
+                .any(|package| extension.eq_ignore_ascii_case(package))
+        })
 }
 
 fn record_import_candidates(
@@ -2465,9 +3788,10 @@ fn record_import_candidates(
               modified_at,
               missing,
               unsupported,
+              file_type,
               partial_hash
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10)
             ON CONFLICT(library_id, path) DO UPDATE SET
               folder_id = excluded.folder_id,
               file_name = excluded.file_name,
@@ -2475,6 +3799,7 @@ fn record_import_candidates(
               modified_at = excluded.modified_at,
               missing = 0,
               unsupported = excluded.unsupported,
+              file_type = excluded.file_type,
               partial_hash = excluded.partial_hash
             "#,
             params![
@@ -2486,6 +3811,7 @@ fn record_import_candidates(
                 candidate.file_size,
                 candidate.modified_at,
                 bool_to_sql(candidate.unsupported),
+                catalog_file_type_for_path(&candidate.path, candidate.unsupported),
                 candidate.partial_hash,
             ],
         )?;
@@ -2502,6 +3828,25 @@ fn record_import_candidates(
 
     transaction.commit()?;
     Ok(())
+}
+
+fn catalog_file_type_for_path(path: &str, unsupported: bool) -> &'static str {
+    if unsupported {
+        return "unsupported";
+    }
+
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+
+    if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
+        "jpeg"
+    } else if is_supported_photo_extension(extension) {
+        "raw"
+    } else {
+        "unsupported"
+    }
 }
 
 fn photo_flags_from_row(
@@ -2553,6 +3898,43 @@ fn library_photo_grid_item_from_row(
     })
 }
 
+fn photo_metadata_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoMetadata> {
+    let unsupported = sql_to_bool(row.get::<_, i64>(4)?);
+    let metadata_present = row.get::<_, i64>(7)? != 0;
+
+    Ok(PhotoMetadata {
+        photo_id: row.get(0)?,
+        file_name: row.get(1)?,
+        source_path: row.get(2)?,
+        file_type: row.get(3)?,
+        unsupported,
+        file_size: PhotoMetadataField::known(row.get(5)?),
+        modified_at: match row.get(6)? {
+            Some(value) => PhotoMetadataField::known(value),
+            None => PhotoMetadataField::unavailable(),
+        },
+        width: stored_metadata_field(row.get(8)?, metadata_present, unsupported),
+        height: stored_metadata_field(row.get(9)?, metadata_present, unsupported),
+        orientation: stored_metadata_field(row.get(10)?, metadata_present, unsupported),
+        capture_time: stored_metadata_field(row.get(11)?, metadata_present, unsupported),
+        camera_make: stored_metadata_field(row.get(12)?, metadata_present, unsupported),
+        camera_model: stored_metadata_field(row.get(13)?, metadata_present, unsupported),
+        lens_model: stored_metadata_field(row.get(14)?, metadata_present, unsupported),
+    })
+}
+
+fn stored_metadata_field<T>(
+    value: Option<T>,
+    metadata_present: bool,
+    unsupported: bool,
+) -> PhotoMetadataField<T> {
+    match value {
+        Some(value) => PhotoMetadataField::known(value),
+        None if metadata_present || unsupported => PhotoMetadataField::unavailable(),
+        None => PhotoMetadataField::unknown(),
+    }
+}
+
 fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRecord> {
     Ok(ExportRecord {
         id: row.get(0)?,
@@ -2560,6 +3942,97 @@ fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRec
         output_path: row.get(2)?,
         export_settings_json: row.get(3)?,
     })
+}
+
+fn action_log_entry_by_id(
+    connection: &Connection,
+    id: &str,
+) -> Result<ActionLogEntry, LibraryStorageError> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+              id,
+              actor_type,
+              actor_id,
+              action_type,
+              subject_type,
+              subject_id,
+              side_effect_category,
+              evidence_ref,
+              payload_json,
+              created_at
+            FROM action_log
+            WHERE id = ?1
+            "#,
+            params![id],
+            action_log_entry_from_row,
+        )
+        .map_err(LibraryStorageError::from)
+}
+
+fn action_log_entry_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActionLogEntry> {
+    Ok(ActionLogEntry {
+        id: row.get(0)?,
+        actor_type: row.get(1)?,
+        actor_id: row.get(2)?,
+        action_type: row.get(3)?,
+        subject_type: row.get(4)?,
+        subject_id: row.get(5)?,
+        side_effect_category: row.get(6)?,
+        evidence_ref: row.get(7)?,
+        payload_json: row.get(8)?,
+        created_at: row.get(9)?,
+    })
+}
+
+fn validate_new_action_log_entry(entry: &NewActionLogEntry) -> Result<(), LibraryStorageError> {
+    if entry.actor_type.trim().is_empty() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "actor_type is required".to_string(),
+        ));
+    }
+    if entry.action_type.trim().is_empty() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "action_type is required".to_string(),
+        ));
+    }
+    if entry.side_effect_category.trim().is_empty() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "side_effect_category is required".to_string(),
+        ));
+    }
+    if entry.action_type == "original_mutation" || entry.side_effect_category == "original_mutation"
+    {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "original mutation action logging is blocked".to_string(),
+        ));
+    }
+    let payload: serde_json::Value = serde_json::from_str(&entry.payload_json)?;
+    if !payload.is_object() {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "payload_json must be a JSON object".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn action_log_id(entry: &NewActionLogEntry) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    stable_catalog_id(
+        "action-log",
+        &format!(
+            "{}\n{}\n{}\n{}\n{}",
+            entry.actor_type,
+            entry.action_type,
+            entry.subject_id.as_deref().unwrap_or(""),
+            entry.evidence_ref.as_deref().unwrap_or(""),
+            nanos
+        ),
+    )
 }
 
 fn path_to_string(path: &Path) -> Result<String, LibraryStorageError> {
@@ -2637,6 +4110,149 @@ fn stable_catalog_id(prefix: &str, value: &str) -> String {
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
     format!("{prefix}-{hash:016x}")
+}
+
+fn unique_catalog_id(prefix: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    stable_catalog_id(prefix, &format!("{prefix}\n{nanos}"))
+}
+
+fn next_history_sequence(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+) -> Result<i64, LibraryStorageError> {
+    transaction
+        .query_row(
+            "SELECT COALESCE(MAX(sequence), 0) + 1 FROM edit_history WHERE photo_id = ?1",
+            params![photo_id],
+            |row| row.get(0),
+        )
+        .map_err(LibraryStorageError::from)
+}
+
+fn invalidate_redo_history(
+    transaction: &Transaction<'_>,
+    photo_id: &str,
+) -> Result<(), LibraryStorageError> {
+    transaction.execute(
+        r#"
+        UPDATE edit_history
+        SET history_state = 'invalidated'
+        WHERE photo_id = ?1 AND history_state = 'undone'
+        "#,
+        params![photo_id],
+    )?;
+    Ok(())
+}
+
+fn restore_edit_graph_in_transaction(
+    transaction: &Transaction<'_>,
+    graph: &silica_edit::EditGraph,
+) -> Result<(), LibraryStorageError> {
+    silica_edit::validate_edit_graph(graph)?;
+    let photo_id = graph.source.photo_id.clone();
+    let edit_state_id = unique_catalog_id("edit-state");
+    let edit_graph_json = serde_json::to_string(graph)?;
+
+    transaction.execute(
+        "UPDATE edit_states SET active = 0 WHERE photo_id = ?1",
+        params![photo_id],
+    )?;
+    transaction.execute(
+        r#"
+        INSERT INTO edit_states(id, photo_id, active, edit_graph_json, updated_at)
+        VALUES (?1, ?2, 1, ?3, CURRENT_TIMESTAMP)
+        "#,
+        params![edit_state_id, photo_id, edit_graph_json],
+    )?;
+    transaction.execute(
+        r#"
+        UPDATE photo_flags
+        SET edited = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE photo_id = ?1
+        "#,
+        params![graph.source.photo_id],
+    )?;
+    Ok(())
+}
+
+fn restore_photo_flags_in_transaction(
+    transaction: &Transaction<'_>,
+    flags: &PhotoFlags,
+) -> Result<(), LibraryStorageError> {
+    transaction.execute(
+        r#"
+        INSERT INTO photo_flags(photo_id, rating, picked, rejected, color_label, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
+        ON CONFLICT(photo_id) DO UPDATE SET
+          rating = excluded.rating,
+          picked = excluded.picked,
+          rejected = excluded.rejected,
+          color_label = excluded.color_label,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            flags.photo_id,
+            i64::from(flags.rating),
+            bool_to_sql(flags.picked),
+            bool_to_sql(flags.rejected),
+            flags.color_label,
+        ],
+    )?;
+    Ok(())
+}
+
+fn photo_flags_action_value(flags: &PhotoFlags) -> serde_json::Value {
+    serde_json::json!({
+        "rating": flags.rating,
+        "picked": flags.picked,
+        "rejected": flags.rejected,
+        "color_label": flags.color_label,
+    })
+}
+
+fn photo_flags_from_action_value(
+    photo_id: &str,
+    value: &serde_json::Value,
+) -> Result<PhotoFlags, LibraryStorageError> {
+    let rating = value
+        .get("rating")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| {
+            LibraryStorageError::HistoryValidation("history flags.rating is required".to_string())
+        })?;
+    let picked = value
+        .get("picked")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            LibraryStorageError::HistoryValidation("history flags.picked is required".to_string())
+        })?;
+    let rejected = value
+        .get("rejected")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            LibraryStorageError::HistoryValidation("history flags.rejected is required".to_string())
+        })?;
+    let color_label = match value.get("color_label") {
+        Some(serde_json::Value::Null) | None => None,
+        Some(serde_json::Value::String(label)) => Some(label.clone()),
+        _ => {
+            return Err(LibraryStorageError::HistoryValidation(
+                "history flags.color_label must be string or null".to_string(),
+            ));
+        }
+    };
+    PhotoFlags::new(
+        photo_id.to_string(),
+        rating as u8,
+        picked,
+        rejected,
+        color_label,
+    )
+    .map_err(LibraryStorageError::from)
 }
 
 fn bool_to_sql(value: bool) -> i64 {
@@ -2898,6 +4514,267 @@ CREATE INDEX IF NOT EXISTS idx_action_log_created_at
   ON action_log(created_at);
 "#;
 
+const PAGED_LIBRARY_QUERY_INDEXES_SQL: &str = r#"
+ALTER TABLE photos
+  ADD COLUMN file_type TEXT NOT NULL DEFAULT 'unsupported'
+  CHECK (file_type IN ('jpeg', 'raw', 'unsupported'));
+
+UPDATE photos
+SET file_type = CASE
+  WHEN unsupported = 1 THEN 'unsupported'
+  WHEN lower(file_name) GLOB '*.jpg'
+    OR lower(file_name) GLOB '*.jpeg'
+    OR lower(path) GLOB '*.jpg'
+    OR lower(path) GLOB '*.jpeg'
+    THEN 'jpeg'
+  WHEN lower(file_name) GLOB '*.dng'
+    OR lower(file_name) GLOB '*.cr2'
+    OR lower(file_name) GLOB '*.cr3'
+    OR lower(file_name) GLOB '*.nef'
+    OR lower(file_name) GLOB '*.arw'
+    OR lower(file_name) GLOB '*.raf'
+    OR lower(file_name) GLOB '*.orf'
+    OR lower(file_name) GLOB '*.rw2'
+    OR lower(file_name) GLOB '*.pef'
+    OR lower(file_name) GLOB '*.srw'
+    OR lower(file_name) GLOB '*.raw'
+    OR lower(file_name) GLOB '*.tif'
+    OR lower(file_name) GLOB '*.tiff'
+    OR lower(file_name) GLOB '*.heic'
+    OR lower(path) GLOB '*.dng'
+    OR lower(path) GLOB '*.cr2'
+    OR lower(path) GLOB '*.cr3'
+    OR lower(path) GLOB '*.nef'
+    OR lower(path) GLOB '*.arw'
+    OR lower(path) GLOB '*.raf'
+    OR lower(path) GLOB '*.orf'
+    OR lower(path) GLOB '*.rw2'
+    OR lower(path) GLOB '*.pef'
+    OR lower(path) GLOB '*.srw'
+    OR lower(path) GLOB '*.raw'
+    OR lower(path) GLOB '*.tif'
+    OR lower(path) GLOB '*.tiff'
+    OR lower(path) GLOB '*.heic'
+    THEN 'raw'
+  ELSE 'unsupported'
+END;
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_imported_id
+  ON photos(library_id, imported_at DESC, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_file_name_path_id
+  ON photos(library_id, file_name ASC, path ASC, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_file_type_id
+  ON photos(library_id, file_type, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photo_flags_rating_photo_id
+  ON photo_flags(rating DESC, photo_id ASC);
+"#;
+
+const PHOTO_METADATA_NORMALIZED_FIELDS_SQL: &str = r#"
+ALTER TABLE photo_metadata
+  ADD COLUMN width INTEGER;
+
+ALTER TABLE photo_metadata
+  ADD COLUMN height INTEGER;
+
+ALTER TABLE photo_metadata
+  ADD COLUMN orientation TEXT;
+"#;
+
+const PHOTO_METADATA_QUERY_INDEXES_SQL: &str = r#"
+CREATE INDEX IF NOT EXISTS idx_photo_metadata_dimensions_photo_id
+  ON photo_metadata(width, height, photo_id);
+"#;
+
+const EDIT_HISTORY_CHECKPOINT_COLUMNS_SQL: &str = r#"
+ALTER TABLE edit_history
+  ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE edit_history
+  ADD COLUMN action_class TEXT NOT NULL DEFAULT 'undoable';
+
+ALTER TABLE edit_history
+  ADD COLUMN action_kind TEXT NOT NULL DEFAULT 'edit_commit';
+
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_sequence
+  ON edit_history(photo_id, sequence);
+"#;
+
+const EDIT_HISTORY_STATE_COLUMNS_SQL: &str = r#"
+ALTER TABLE edit_history
+  ADD COLUMN history_state TEXT NOT NULL DEFAULT 'applied';
+
+CREATE INDEX IF NOT EXISTS idx_edit_history_photo_state_sequence
+  ON edit_history(photo_id, history_state, sequence);
+"#;
+
+const ACTION_LOG_SIDE_EFFECT_COLUMNS_SQL: &str = r#"
+ALTER TABLE action_log
+  ADD COLUMN side_effect_category TEXT NOT NULL DEFAULT 'unspecified';
+
+ALTER TABLE action_log
+  ADD COLUMN evidence_ref TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_action_log_action_type_created_at
+  ON action_log(action_type, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_action_log_subject
+  ON action_log(subject_type, subject_id);
+"#;
+
+const LIBRARY_QUERY_COUNT_SQL: &str = r#"
+SELECT COUNT(*)
+FROM photos
+LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+LEFT JOIN photo_metadata ON photo_metadata.photo_id = photos.id
+WHERE photos.library_id = :library_id
+  AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
+  AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
+  AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
+  AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :metadata_filter IS NULL
+    OR (
+      :metadata_filter = 'has_dimensions'
+      AND photo_metadata.width IS NOT NULL
+      AND photo_metadata.height IS NOT NULL
+    )
+  )
+  AND (
+    :search IS NULL
+    OR lower(photos.file_name) LIKE :search ESCAPE '\'
+    OR lower(photos.path) LIKE :search ESCAPE '\'
+  )
+"#;
+
+const LIBRARY_QUERY_SELECT_SQL: &str = r#"
+SELECT
+  photos.id,
+  photos.file_name,
+  photos.path,
+  photos.missing,
+  photos.unsupported,
+  photo_flags.rating,
+  photo_flags.picked,
+  photo_flags.rejected,
+  photo_flags.color_label,
+  thumbnail_cache.path,
+  thumbnail_cache.cache_key
+FROM photos
+LEFT JOIN photo_flags ON photo_flags.photo_id = photos.id
+LEFT JOIN photo_metadata ON photo_metadata.photo_id = photos.id
+LEFT JOIN cache_records AS thumbnail_cache
+  ON thumbnail_cache.photo_id = photos.id
+  AND thumbnail_cache.cache_type = :thumbnail_cache_type
+WHERE photos.library_id = :library_id
+  AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
+  AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
+  AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
+  AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :metadata_filter IS NULL
+    OR (
+      :metadata_filter = 'has_dimensions'
+      AND photo_metadata.width IS NOT NULL
+      AND photo_metadata.height IS NOT NULL
+    )
+  )
+  AND (
+    :search IS NULL
+    OR lower(photos.file_name) LIKE :search ESCAPE '\'
+    OR lower(photos.path) LIKE :search ESCAPE '\'
+  )
+"#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LibraryQuerySqlFilter {
+    min_rating: Option<i64>,
+    picked: Option<i64>,
+    rejected: Option<i64>,
+    file_type: Option<&'static str>,
+    metadata: Option<&'static str>,
+    search: Option<String>,
+}
+
+impl From<&LibraryQueryFilters> for LibraryQuerySqlFilter {
+    fn from(filters: &LibraryQueryFilters) -> Self {
+        Self {
+            min_rating: filters.min_rating.map(i64::from),
+            picked: filters.picked.map(bool_to_sql),
+            rejected: filters.rejected.map(bool_to_sql),
+            file_type: filters.file_type.map(library_query_file_type_value),
+            metadata: filters.metadata.map(library_query_metadata_filter_value),
+            search: library_query_search_pattern(&filters.search),
+        }
+    }
+}
+
+fn query_library_photo_count(
+    connection: &Connection,
+    filter: &LibraryQuerySqlFilter,
+) -> rusqlite::Result<u64> {
+    let count: i64 = connection.query_row(
+        LIBRARY_QUERY_COUNT_SQL,
+        named_params! {
+            ":library_id": LOCAL_LIBRARY_ID,
+            ":min_rating": filter.min_rating,
+            ":picked": filter.picked,
+            ":rejected": filter.rejected,
+            ":file_type": filter.file_type,
+            ":metadata_filter": filter.metadata,
+            ":search": filter.search.as_deref(),
+        },
+        |row| row.get(0),
+    )?;
+
+    Ok(u64::try_from(count).unwrap_or(0))
+}
+
+fn library_query_order_clause(sort: LibraryQuerySort) -> &'static str {
+    match sort {
+        LibraryQuerySort::ImportedAtDesc => "ORDER BY photos.imported_at DESC, photos.id ASC",
+        LibraryQuerySort::FileNameAsc => {
+            "ORDER BY photos.file_name ASC, photos.path ASC, photos.id ASC"
+        }
+        LibraryQuerySort::RatingDesc => {
+            "ORDER BY COALESCE(photo_flags.rating, 0) DESC, photos.id ASC"
+        }
+    }
+}
+
+fn library_query_file_type_value(file_type: LibraryQueryFileType) -> &'static str {
+    match file_type {
+        LibraryQueryFileType::Jpeg => "jpeg",
+        LibraryQueryFileType::Raw => "raw",
+        LibraryQueryFileType::Unsupported => "unsupported",
+    }
+}
+
+fn library_query_metadata_filter_value(metadata: LibraryQueryMetadataFilter) -> &'static str {
+    match metadata {
+        LibraryQueryMetadataFilter::HasDimensions => "has_dimensions",
+    }
+}
+
+fn library_query_search_pattern(search: &str) -> Option<String> {
+    let search = search.trim();
+    if search.is_empty() {
+        return None;
+    }
+
+    let mut pattern = String::from("%");
+    for character in search.to_ascii_lowercase().chars() {
+        if matches!(character, '\\' | '%' | '_') {
+            pattern.push('\\');
+        }
+        pattern.push(character);
+    }
+    pattern.push('%');
+    Some(pattern)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2924,6 +4801,248 @@ mod tests {
             SPIKE_004_STORAGE_GATE.current_schema_version,
             CURRENT_SCHEMA_VERSION
         );
+    }
+
+    #[test]
+    fn records_metadata_backfill_policy_without_automatic_open_work() {
+        assert!(!METADATA_BACKFILL_ON_OPEN_OR_RESTORE);
+        assert!(EXISTING_IMPORTS_WITHOUT_METADATA_STAY_UNKNOWN);
+
+        let jpeg_policy = metadata_extraction_policy_for_path(Path::new("sample.jpg"));
+        assert_eq!(
+            jpeg_policy.dimension_source,
+            MetadataDimensionSource::ExistingRasterPath
+        );
+        assert!(!jpeg_policy.raw_decode_supported);
+
+        let raw_policy = metadata_extraction_policy_for_path(Path::new("sample.DNG"));
+        assert_eq!(
+            raw_policy.dimension_source,
+            MetadataDimensionSource::Unavailable
+        );
+        assert!(!raw_policy.raw_decode_supported);
+        assert!(!raw_policy.camera_lens_available);
+
+        let workspace = unique_library_root("metadata-policy");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let before_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_metadata", [], |row| row.get(0))
+            .expect("count metadata before reopen");
+        assert_eq!(before_count, 0);
+        drop(connection);
+
+        open_local_library(&library.root_path).expect("reopen library");
+        let connection = open_catalog(&library.catalog_path).expect("open reopened catalog");
+        let after_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_metadata", [], |row| row.get(0))
+            .expect("count metadata after reopen");
+        assert_eq!(after_count, 0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_migration_adds_normalized_columns_and_upsert() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations(&mut connection).expect("run migrations");
+
+        let columns: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT name FROM pragma_table_info('photo_metadata')")
+                .expect("prepare metadata column query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query metadata columns")
+                .map(|row| row.expect("metadata column"))
+                .collect()
+        };
+        for column in ["width", "height", "orientation"] {
+            assert!(
+                columns.contains(&column.to_string()),
+                "missing metadata column {column}"
+            );
+        }
+
+        let workspace = unique_library_root("metadata-upsert");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&jpeg_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        upsert_photo_metadata_by_path(
+            &library.root_path,
+            &jpeg_file,
+            PhotoMetadataUpdate {
+                width: Some(2),
+                height: Some(3),
+                ..PhotoMetadataUpdate::unavailable()
+            },
+        )
+        .expect("upsert metadata");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let (width, height, camera_make): (Option<i64>, Option<i64>, Option<String>) = connection
+            .query_row(
+                r#"
+                SELECT photo_metadata.width, photo_metadata.height, photo_metadata.camera_make
+                FROM photo_metadata
+                JOIN photos ON photos.id = photo_metadata.photo_id
+                WHERE photos.file_name = 'sample.jpg'
+                "#,
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("read metadata row");
+        assert_eq!(width, Some(2));
+        assert_eq!(height, Some(3));
+        assert_eq!(camera_make, None);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_filter_index_and_query_use_stored_dimensions_only() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations(&mut connection).expect("run migrations");
+        assert!(
+            catalog_object_exists(&connection, "idx_photo_metadata_dimensions_photo_id")
+                .expect("index lookup"),
+            "missing metadata dimension filter index"
+        );
+
+        let workspace = unique_library_root("metadata-filter");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let known_file = import_root.join("known.jpg");
+        let unknown_file = import_root.join("unknown.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&known_file, b"known jpeg bytes").expect("write known");
+        std::fs::write(&unknown_file, b"unknown jpeg bytes").expect("write unknown");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        upsert_photo_metadata_by_path(
+            &library.root_path,
+            &known_file,
+            PhotoMetadataUpdate {
+                width: Some(24),
+                height: Some(36),
+                ..PhotoMetadataUpdate::unavailable()
+            },
+        )
+        .expect("upsert known metadata");
+        std::fs::remove_file(&known_file).expect("remove original after metadata persist");
+
+        let page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                0,
+                100,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters {
+                    metadata: Some(LibraryQueryMetadataFilter::HasDimensions),
+                    ..LibraryQueryFilters::default()
+                },
+            ),
+        )
+        .expect("query metadata-backed filter");
+
+        assert_eq!(page.total_count, 1);
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].file_name, "known.jpg");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn metadata_query_returns_stored_states_without_original_reads() {
+        let workspace = unique_library_root("metadata-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let known_file = import_root.join("known.jpg");
+        let unknown_file = import_root.join("unknown.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&known_file, b"known jpeg bytes").expect("write known");
+        std::fs::write(&unknown_file, b"unknown jpeg bytes").expect("write unknown");
+        std::fs::write(&unsupported_file, b"unsupported").expect("write unsupported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        upsert_photo_metadata_by_path(
+            &library.root_path,
+            &known_file,
+            PhotoMetadataUpdate {
+                width: Some(24),
+                height: Some(36),
+                ..PhotoMetadataUpdate::unavailable()
+            },
+        )
+        .expect("upsert known metadata");
+
+        std::fs::remove_file(&known_file).expect("remove original after metadata persist");
+
+        let known_id = stable_catalog_id("photo", &known_file.display().to_string());
+        let known = get_photo_metadata(&library.root_path, &known_id)
+            .expect("query known metadata")
+            .expect("known photo metadata");
+        assert_eq!(known.width.state, PhotoMetadataFieldState::Known);
+        assert_eq!(known.width.value, Some(24));
+        assert_eq!(known.height.state, PhotoMetadataFieldState::Known);
+        assert_eq!(known.height.value, Some(36));
+        assert_eq!(
+            known.camera_make.state,
+            PhotoMetadataFieldState::Unavailable
+        );
+        assert_eq!(known.camera_make.value, None);
+        assert_eq!(known.file_size.state, PhotoMetadataFieldState::Known);
+
+        let unknown_id = stable_catalog_id("photo", &unknown_file.display().to_string());
+        let unknown = get_photo_metadata(&library.root_path, &unknown_id)
+            .expect("query unknown metadata")
+            .expect("unknown photo metadata");
+        assert_eq!(unknown.width.state, PhotoMetadataFieldState::Unknown);
+        assert_eq!(unknown.width.value, None);
+        assert_eq!(unknown.camera_model.state, PhotoMetadataFieldState::Unknown);
+
+        let unsupported_id = stable_catalog_id("photo", &unsupported_file.display().to_string());
+        let unsupported = get_photo_metadata(&library.root_path, &unsupported_id)
+            .expect("query unsupported metadata")
+            .expect("unsupported photo metadata");
+        assert!(unsupported.unsupported);
+        assert_eq!(
+            unsupported.width.state,
+            PhotoMetadataFieldState::Unavailable
+        );
+        assert_eq!(
+            unsupported.lens_model.state,
+            PhotoMetadataFieldState::Unavailable
+        );
+
+        assert!(get_photo_metadata(&library.root_path, "missing-photo")
+            .expect("query missing metadata")
+            .is_none());
+
+        remove_library_root(&workspace);
     }
 
     #[test]
@@ -2973,6 +5092,235 @@ mod tests {
             CURRENT_SCHEMA_VERSION
         );
         assert!(catalog_object_exists(&connection, "idx_photos_library_id").expect("index lookup"));
+        assert!(
+            catalog_object_exists(&connection, "idx_edit_history_photo_sequence")
+                .expect("history sequence index lookup")
+        );
+        assert!(
+            catalog_object_exists(&connection, "idx_edit_history_photo_state_sequence")
+                .expect("history state index lookup")
+        );
+        let history_columns: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT name FROM pragma_table_info('edit_history')")
+                .expect("prepare history column query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query history columns")
+                .map(|row| row.expect("history column"))
+                .collect()
+        };
+        for column in ["sequence", "action_class", "action_kind", "history_state"] {
+            assert!(
+                history_columns.contains(&column.to_string()),
+                "missing edit_history column {column}"
+            );
+        }
+        let action_log_columns: Vec<String> = {
+            let mut statement = connection
+                .prepare("SELECT name FROM pragma_table_info('action_log')")
+                .expect("prepare action log column query");
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .expect("query action log columns")
+                .map(|row| row.expect("action log column"))
+                .collect()
+        };
+        for column in ["side_effect_category", "evidence_ref"] {
+            assert!(
+                action_log_columns.contains(&column.to_string()),
+                "missing action_log column {column}"
+            );
+        }
+        assert!(
+            catalog_object_exists(&connection, "idx_action_log_action_type_created_at")
+                .expect("action log action index lookup")
+        );
+        assert!(catalog_object_exists(&connection, "idx_action_log_subject")
+            .expect("action log subject index lookup"));
+        run_migrations(&mut connection).expect("re-run migrations idempotently");
+        assert_eq!(
+            current_schema_version(&connection).expect("version after rerun"),
+            CURRENT_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn query_index_migration_adds_normalized_file_type_and_indexes() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations(&mut connection).expect("run migrations");
+
+        let file_type_columns: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('photos') WHERE name = 'file_type'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("file_type column count");
+        assert_eq!(file_type_columns, 1);
+
+        for index_name in [
+            "idx_photos_library_imported_id",
+            "idx_photos_library_file_name_path_id",
+            "idx_photos_library_file_type_id",
+            "idx_photo_flags_rating_photo_id",
+        ] {
+            assert!(
+                catalog_object_exists(&connection, index_name).expect("index lookup"),
+                "missing paged query index {index_name}"
+            );
+        }
+
+        run_migrations(&mut connection).expect("rerun migrations");
+        assert_eq!(
+            current_schema_version(&connection).expect("schema version"),
+            CURRENT_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn query_index_migration_backfills_photo_file_type() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+        run_migrations_through(&mut connection, 2).expect("run v2 migrations");
+
+        connection
+            .execute(
+                "INSERT INTO libraries(id, root_path) VALUES ('local', '/tmp/library')",
+                [],
+            )
+            .expect("insert library");
+        connection
+            .execute(
+                "INSERT INTO folders(id, library_id, path) VALUES ('folder', 'local', '/tmp/import')",
+                [],
+            )
+            .expect("insert folder");
+        for (id, file_name, unsupported) in [
+            ("photo-jpeg", "portrait.JPG", 0_i64),
+            ("photo-raw", "sample.DNG", 0_i64),
+            ("photo-unsupported", "notes.txt", 1_i64),
+        ] {
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO photos(
+                      id, library_id, folder_id, file_name, path, unsupported
+                    )
+                    VALUES (?1, 'local', 'folder', ?2, ?3, ?4)
+                    "#,
+                    params![
+                        id,
+                        file_name,
+                        format!("/tmp/import/{file_name}"),
+                        unsupported
+                    ],
+                )
+                .expect("insert v2 photo");
+        }
+
+        run_migrations(&mut connection).expect("upgrade to current");
+
+        for (id, expected) in [
+            ("photo-jpeg", "jpeg"),
+            ("photo-raw", "raw"),
+            ("photo-unsupported", "unsupported"),
+        ] {
+            let actual: String = connection
+                .query_row(
+                    "SELECT file_type FROM photos WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .expect("file type");
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn library_query_returns_bounded_pages_and_normalized_filters() {
+        let workspace = unique_library_root("library-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("portrait.jpg");
+        let raw_file = import_root.join("sample.DNG");
+        let unsupported_file = import_root.join("notes.txt");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&jpeg_file, b"jpeg candidate").expect("write jpeg");
+        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+        std::fs::write(&unsupported_file, b"unsupported").expect("write unsupported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let raw_id = stable_catalog_id("photo", &raw_file.display().to_string());
+        set_photo_flags(&library.root_path, raw_id.clone(), 4, true, false, None)
+            .expect("set raw flags");
+
+        let first_page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                0,
+                2,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query first page");
+
+        assert_eq!(first_page.offset, 0);
+        assert_eq!(first_page.limit, 2);
+        assert_eq!(first_page.total_count, 3);
+        assert!(first_page.has_next_page);
+        assert_eq!(
+            first_page.order_fields,
+            LibraryQuerySort::FileNameAsc.order_fields()
+        );
+        assert_eq!(first_page.items.len(), 2);
+        assert_eq!(first_page.items[0].file_name, "notes.txt");
+        assert_eq!(first_page.items[1].file_name, "portrait.jpg");
+
+        let raw_page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                0,
+                10,
+                LibraryQuerySort::RatingDesc,
+                LibraryQueryFilters {
+                    min_rating: Some(4),
+                    picked: Some(true),
+                    rejected: Some(false),
+                    file_type: Some(LibraryQueryFileType::Raw),
+                    search: "sample".to_string(),
+                    ..LibraryQueryFilters::default()
+                },
+            ),
+        )
+        .expect("query filtered page");
+        assert_eq!(raw_page.total_count, 1);
+        assert_eq!(raw_page.items.len(), 1);
+        assert_eq!(raw_page.items[0].photo_id, raw_id);
+        assert_eq!(raw_page.items[0].rating, 4);
+        assert!(raw_page.items[0].picked);
+        assert!(!raw_page.has_next_page);
+
+        let empty_page = query_library_photos(
+            &library.root_path,
+            LibraryQueryRequest::new(
+                99,
+                10,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query empty page");
+        assert!(empty_page.items.is_empty());
+        assert_eq!(empty_page.offset, 99);
+        assert_eq!(empty_page.total_count, 3);
+        assert!(!empty_page.has_next_page);
+
+        remove_library_root(&workspace);
     }
 
     #[test]
@@ -3211,6 +5559,191 @@ mod tests {
             .expect("sidecar status");
         assert_eq!(sidecar_path, result.sidecar_relative_path);
         assert_eq!(conflict_state, "clean");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn history_commits_mark_clean_sidecar_catalog_newer_without_rewriting_sidecar() {
+        let workspace = unique_library_root("sidecar-history-commit");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let first_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write first sidecar");
+        let first_bytes = std::fs::read(&first_sidecar.sidecar_path).expect("read first sidecar");
+        let first_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read first sidecar status")
+            .expect("first sidecar status");
+        assert_eq!(first_status.conflict_state, "clean");
+
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            5,
+            true,
+            false,
+            Some("purple".to_string()),
+        )
+        .expect("commit flag history");
+        let flag_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read flag sidecar status")
+            .expect("flag sidecar status");
+        assert_eq!(flag_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&first_sidecar.sidecar_path).expect("read sidecar after flags"),
+            first_bytes,
+            "history commit must not rewrite the sidecar file"
+        );
+
+        let second_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write refreshed sidecar");
+        let second_bytes =
+            std::fs::read(&second_sidecar.sidecar_path).expect("read refreshed sidecar");
+        let clean_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read clean sidecar status")
+            .expect("clean sidecar status");
+        assert_eq!(clean_status.conflict_state, "clean");
+
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit history");
+        let edit_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read edit sidecar status")
+            .expect("edit sidecar status");
+        assert_eq!(edit_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&second_sidecar.sidecar_path).expect("read sidecar after edit"),
+            second_bytes,
+            "edit history commit must not rewrite the sidecar file"
+        );
+
+        let reopened = open_local_library(&library_root).expect("reopen library");
+        let reopened_status = get_photo_sidecar_status(&reopened.root_path, &photo_id)
+            .expect("read reopened sidecar status")
+            .expect("reopened sidecar status");
+        assert_eq!(reopened_status.conflict_state, "catalog_newer");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn undo_redo_history_marks_clean_sidecar_catalog_newer_without_file_effects() {
+        let workspace = unique_library_root("sidecar-history-undo-redo");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+
+        let undo_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write undo baseline sidecar");
+        let undo_bytes = std::fs::read(&undo_sidecar.sidecar_path).expect("read undo sidecar");
+        undo_last_history_action(&library.root_path, &photo_id).expect("undo history");
+        let undo_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read undo sidecar status")
+            .expect("undo sidecar status");
+        assert_eq!(undo_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&undo_sidecar.sidecar_path).expect("read sidecar after undo"),
+            undo_bytes,
+            "undo must not rewrite or delete the sidecar file"
+        );
+
+        let redo_sidecar = write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1")
+            .expect("write redo baseline sidecar");
+        let redo_bytes = std::fs::read(&redo_sidecar.sidecar_path).expect("read redo sidecar");
+        redo_last_history_action(&library.root_path, &photo_id).expect("redo history");
+        let redo_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read redo sidecar status")
+            .expect("redo sidecar status");
+        assert_eq!(redo_status.conflict_state, "catalog_newer");
+        assert_eq!(
+            std::fs::read(&redo_sidecar.sidecar_path).expect("read sidecar after redo"),
+            redo_bytes,
+            "redo must not rewrite or delete the sidecar file"
+        );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn history_updates_preserve_conflict_and_sidecar_newer_statuses() {
+        let workspace = unique_library_root("sidecar-history-preserve-conflict");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        write_photo_sidecar(&library.root_path, &photo_id, "0.1.0-alpha.1").expect("write sidecar");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        connection
+            .execute(
+                "UPDATE sidecar_status SET conflict_state = 'conflict' WHERE photo_id = ?1",
+                params![photo_id.clone()],
+            )
+            .expect("mark conflict");
+        drop(connection);
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            3,
+            false,
+            true,
+            Some("red".to_string()),
+        )
+        .expect("commit flags over conflict");
+        let conflict_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read conflict status")
+            .expect("conflict status");
+        assert_eq!(conflict_status.conflict_state, "conflict");
+
+        let connection = open_catalog(&library.catalog_path).expect("reopen catalog");
+        connection
+            .execute(
+                "UPDATE sidecar_status SET conflict_state = 'sidecar_newer' WHERE photo_id = ?1",
+                params![photo_id.clone()],
+            )
+            .expect("mark sidecar newer");
+        drop(connection);
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 1.0, 3.0, "unix:4").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit over sidecar_newer");
+        let sidecar_newer_status = get_photo_sidecar_status(&library.root_path, &photo_id)
+            .expect("read sidecar newer status")
+            .expect("sidecar newer status");
+        assert_eq!(sidecar_newer_status.conflict_state, "sidecar_newer");
 
         remove_library_root(&workspace);
     }
@@ -4136,26 +6669,42 @@ mod tests {
             .expect("count photos");
         assert_eq!(imported_count, 2);
 
-        let (path, file_size, unsupported, partial_hash): (String, i64, i64, String) = connection
+        let (path, file_size, unsupported, file_type, partial_hash): (
+            String,
+            i64,
+            i64,
+            String,
+            String,
+        ) = connection
             .query_row(
-                "SELECT path, file_size, unsupported, partial_hash FROM photos WHERE file_name = 'sample.DNG'",
+                "SELECT path, file_size, unsupported, file_type, partial_hash FROM photos WHERE file_name = 'sample.DNG'",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
             )
             .expect("supported row");
         assert_eq!(path, supported_file.display().to_string());
         assert_eq!(file_size, supported_before.len() as i64);
         assert_eq!(unsupported, 0);
+        assert_eq!(file_type, "raw");
         assert!(!partial_hash.is_empty());
 
-        let unsupported: i64 = connection
+        let (unsupported, file_type): (i64, String) = connection
             .query_row(
-                "SELECT unsupported FROM photos WHERE file_name = 'notes.txt'",
+                "SELECT unsupported, file_type FROM photos WHERE file_name = 'notes.txt'",
                 [],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .expect("unsupported row");
         assert_eq!(unsupported, 1);
+        assert_eq!(file_type, "unsupported");
 
         assert_eq!(
             std::fs::read(&supported_file).expect("read supported after"),
@@ -4167,6 +6716,195 @@ mod tests {
         );
         assert!(!library_root.join("sample.DNG").exists());
         assert!(!library_root.join("notes.txt").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn import_error_summary_reports_recoverable_issues_without_blocking_browse() {
+        let workspace = unique_library_root("import-errors");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("notes.txt");
+        let hidden_file = import_root.join(".hidden.jpg");
+        let package_dir = import_root.join("Archive.photoslibrary");
+        let symlink_path = import_root.join("linked");
+
+        std::fs::create_dir_all(&package_dir).expect("create package directory");
+        std::fs::write(&supported_file, b"supported jpeg candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        std::fs::write(&hidden_file, b"hidden jpeg candidate").expect("write hidden");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&supported_file, &symlink_path).expect("create symlink");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let summary = import_folder(&library.root_path, &import_root).expect("import folder");
+
+        assert_eq!(summary.scanned_files, 2);
+        assert_eq!(summary.supported_files, 1);
+        assert_eq!(summary.unsupported_files, 1);
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::UnsupportedFile,
+            "notes.txt",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::HiddenEntrySkipped,
+            ".hidden.jpg",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::PackageDirectorySkipped,
+            "Archive.photoslibrary",
+        );
+        #[cfg(unix)]
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::SymlinkEntrySkipped,
+            "linked",
+        );
+
+        let items = list_library_photos(&library.root_path).expect("list imported rows");
+        assert!(items.iter().any(|item| item.file_name == "sample.jpg"));
+        assert!(items
+            .iter()
+            .any(|item| item.file_name == "notes.txt" && item.unsupported));
+        assert!(!items.iter().any(|item| item.file_name == ".hidden.jpg"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recursive_import_opt_in_scans_nested_entries_and_reports_issues() {
+        let workspace = unique_library_root("recursive-import");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let root_file = import_root.join("root.jpg");
+        let nested_root = import_root.join("Nested");
+        let nested_file = nested_root.join("child.jpg");
+        let nested_unsupported = nested_root.join("notes.txt");
+        let hidden_file = nested_root.join(".hidden.jpg");
+        let package_dir = nested_root.join("Archive.photoslibrary");
+        let symlink_path = nested_root.join("linked");
+
+        std::fs::create_dir_all(&package_dir).expect("create nested package directory");
+        std::fs::write(&root_file, b"root jpeg candidate").expect("write root");
+        std::fs::write(&nested_file, b"nested jpeg candidate").expect("write nested");
+        std::fs::write(&nested_unsupported, b"unsupported note").expect("write unsupported");
+        std::fs::write(&hidden_file, b"hidden jpeg candidate").expect("write hidden");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&nested_file, &symlink_path).expect("create symlink");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let default_summary =
+            import_folder(&library.root_path, &import_root).expect("default import");
+        assert_eq!(default_summary.scanned_files, 1);
+        assert!(!default_summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "child.jpg"));
+
+        let summary = import_folder_with_options(
+            &library.root_path,
+            &import_root,
+            FolderImportOptions { recursive: true },
+        )
+        .expect("recursive import");
+
+        assert_eq!(summary.scanned_files, 3);
+        assert_eq!(summary.supported_files, 2);
+        assert_eq!(summary.unsupported_files, 1);
+        assert!(summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "child.jpg"));
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::UnsupportedFile,
+            "notes.txt",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::HiddenEntrySkipped,
+            ".hidden.jpg",
+        );
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::PackageDirectorySkipped,
+            "Archive.photoslibrary",
+        );
+        #[cfg(unix)]
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::SymlinkEntrySkipped,
+            "linked",
+        );
+
+        let items = list_library_photos(&library.root_path).expect("list recursive rows");
+        assert!(items.iter().any(|item| item.file_name == "root.jpg"));
+        assert!(items.iter().any(|item| item.file_name == "child.jpg"));
+        assert!(items
+            .iter()
+            .any(|item| item.file_name == "notes.txt" && item.unsupported));
+        assert!(!items.iter().any(|item| item.file_name == ".hidden.jpg"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recursive_import_skips_policy_rejected_selected_root_without_descending() {
+        let workspace = unique_library_root("recursive-root-policy");
+        let library_root = workspace.join("SilicaRAW Library");
+        let package_root = workspace.join("Archive.photoslibrary");
+        let package_file = package_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&package_root).expect("create package root");
+        std::fs::write(&package_file, b"package jpeg candidate").expect("write package file");
+
+        let library = create_local_library(&library_root).expect("create library");
+        let summary = import_folder_with_options(
+            &library.root_path,
+            &package_root,
+            FolderImportOptions { recursive: true },
+        )
+        .expect("skip package root");
+
+        assert_eq!(summary.scanned_files, 0);
+        assert_issue_kind(
+            &summary.issues,
+            ImportIssueKind::PackageDirectorySkipped,
+            "Archive.photoslibrary",
+        );
+        let items = list_library_photos(&library.root_path).expect("list package skip rows");
+        assert!(items.is_empty());
+
+        #[cfg(unix)]
+        {
+            let real_root = workspace.join("RealOriginals");
+            let real_file = real_root.join("linked.jpg");
+            let symlink_root = workspace.join("LinkedOriginals");
+            std::fs::create_dir_all(&real_root).expect("create real root");
+            std::fs::write(&real_file, b"linked jpeg candidate").expect("write linked file");
+            std::os::unix::fs::symlink(&real_root, &symlink_root).expect("create root symlink");
+
+            let symlink_summary = import_folder_with_options(
+                &library.root_path,
+                &symlink_root,
+                FolderImportOptions { recursive: true },
+            )
+            .expect("skip symlink root");
+
+            assert_eq!(symlink_summary.scanned_files, 0);
+            assert_issue_kind(
+                &symlink_summary.issues,
+                ImportIssueKind::SymlinkEntrySkipped,
+                "LinkedOriginals",
+            );
+            let items = list_library_photos(&library.root_path).expect("list symlink skip rows");
+            assert!(items.is_empty());
+        }
 
         remove_library_root(&workspace);
     }
@@ -4327,6 +7065,140 @@ mod tests {
             )
             .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn records_histogram_cache_under_render_cache_only() {
+        let workspace = unique_library_root("histogram-cache");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let histogram_path = library
+            .root_path
+            .join("render-cache")
+            .join("sample-histogram.json");
+        std::fs::write(&histogram_path, br#"{"pixel_count":2}"#).expect("write histogram");
+
+        let record = record_histogram_cache(
+            &library.root_path,
+            &photo_id,
+            "histogram-key",
+            &histogram_path,
+            17,
+        )
+        .expect("record histogram cache");
+        assert_eq!(record.cache_type, HISTOGRAM_CACHE_TYPE);
+
+        let cached = get_photo_cache_record(&library.root_path, &photo_id, HISTOGRAM_CACHE_TYPE)
+            .expect("read histogram cache")
+            .expect("histogram cache row");
+        assert_eq!(cached.path, histogram_path.display().to_string());
+        assert_eq!(cached.cache_key, "histogram-key");
+        assert_eq!(cached.byte_size, 17);
+
+        let outside_path = workspace.join("outside-histogram.json");
+        std::fs::write(&outside_path, br#"{"pixel_count":2}"#).expect("write outside histogram");
+        let error = record_histogram_cache(
+            &library.root_path,
+            &photo_id,
+            "histogram-key",
+            &outside_path,
+            17,
+        )
+        .expect_err("histogram cache path outside render-cache/ must be rejected");
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("render-cache")
+        ));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rejects_preview_cache_records_outside_disposable_preview_directory() {
+        let workspace = unique_library_root("preview-cache-outside-root");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let outside_path = workspace.join("outside-preview.jpg");
+        std::fs::write(&outside_path, b"preview bytes").expect("write outside preview");
+
+        let error = record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &outside_path,
+            13,
+        )
+        .expect_err("preview cache path outside previews/ must be rejected");
+
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("previews")
+        ));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn rejects_preview_cache_records_that_escape_preview_directory() {
+        let workspace = unique_library_root("preview-cache-parent-escape");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let escaped_path = library
+            .root_path
+            .join("previews")
+            .join("..")
+            .join("escaped-preview.jpg");
+        std::fs::write(
+            library.root_path.join("escaped-preview.jpg"),
+            b"preview bytes",
+        )
+        .expect("write escaped preview");
+
+        let error = record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &escaped_path,
+            13,
+        )
+        .expect_err("preview cache path cannot escape previews/");
+
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("previews")
+        ));
 
         remove_library_root(&workspace);
     }
@@ -4576,6 +7448,7 @@ mod tests {
             )
             .expect("photo id");
         assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
         drop(connection);
 
         let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
@@ -4590,6 +7463,11 @@ mod tests {
             0,
             "draft slider update must not write edit_states"
         );
+        assert_eq!(
+            count_edit_history(&connection),
+            0,
+            "draft slider update must not write edit_history"
+        );
         drop(connection);
 
         commit_edit_graph(&library.root_path, edited).expect("commit edit graph");
@@ -4603,6 +7481,63 @@ mod tests {
 
         let connection = open_catalog(&reopened.catalog_path).expect("open reopened catalog");
         assert_eq!(count_edit_states(&connection), 1);
+        assert_eq!(count_edit_history(&connection), 1);
+        let action_json: String = connection
+            .query_row(
+                "SELECT action_json FROM edit_history WHERE photo_id = ?1 AND sequence = 1",
+                params![photo_id],
+                |row| row.get(0),
+            )
+            .expect("history action json");
+        let action: serde_json::Value =
+            serde_json::from_str(&action_json).expect("parse history action json");
+        assert_eq!(action["schema"], "silica.action");
+        assert_eq!(action["version"], 1);
+        assert_eq!(action["class"], "undoable");
+        assert_eq!(action["kind"], "edit_commit");
+        assert_eq!(action["photo_id"], photo_id);
+
+        let before_graph: silica_edit::EditGraph =
+            serde_json::from_value(action["before"]["edit_graph"].clone())
+                .expect("before edit graph");
+        silica_edit::validate_edit_graph(&before_graph).expect("before graph validates");
+        assert_eq!(before_graph.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(before_graph.basic.contrast.as_f64(), Some(0.0));
+
+        let after_graph: silica_edit::EditGraph =
+            serde_json::from_value(action["after"]["edit_graph"].clone())
+                .expect("after edit graph");
+        silica_edit::validate_edit_graph(&after_graph).expect("after graph validates");
+        assert_eq!(after_graph.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(after_graph.basic.contrast.as_f64(), Some(-8.0));
+        drop(connection);
+
+        let second_edit = silica_edit::apply_exposure_contrast(&persisted, 1.0, 3.0, "unix:4")
+            .expect("apply second edit");
+        commit_edit_graph(&reopened.root_path, second_edit).expect("commit second edit graph");
+
+        let connection = open_catalog(&reopened.catalog_path).expect("open catalog after second");
+        assert_eq!(count_edit_states(&connection), 2);
+        assert_eq!(count_edit_history(&connection), 2);
+        let active_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM edit_states WHERE photo_id = ?1 AND active = 1",
+                params![photo_id],
+                |row| row.get(0),
+            )
+            .expect("count active states");
+        assert_eq!(active_count, 1);
+        let sequences: Vec<i64> = {
+            let mut statement = connection
+                .prepare("SELECT sequence FROM edit_history WHERE photo_id = ?1 ORDER BY sequence")
+                .expect("prepare history sequence query");
+            statement
+                .query_map(params![photo_id], |row| row.get::<_, i64>(0))
+                .expect("query history sequences")
+                .map(|row| row.expect("history sequence"))
+                .collect()
+        };
+        assert_eq!(sequences, vec![1, 2]);
 
         remove_library_root(&workspace);
     }
@@ -4669,6 +7604,285 @@ mod tests {
         remove_library_root(&workspace);
     }
 
+    #[test]
+    fn undo_redo_history_restores_edit_state_and_preserves_exports() {
+        let workspace = unique_library_root("undo-redo-edit");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let output_path = workspace.join("Exports").join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create export directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        std::fs::write(&output_path, b"export bytes").expect("write export output");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+        record_export(
+            &library.root_path,
+            &photo_id,
+            &output_path,
+            r#"{"format":"jpeg","color_profile":"srgb"}"#,
+        )
+        .expect("record export");
+
+        let undo = undo_last_history_action(&library.root_path, &photo_id).expect("undo edit");
+        assert!(undo.applied);
+        assert_eq!(undo.action_kind.as_deref(), Some("edit_commit"));
+        assert!(output_path.exists(), "undo must not delete export output");
+        let undone = load_active_edit_graph(&library.root_path, &photo_id)
+            .expect("load undone edit")
+            .expect("undone edit graph");
+        assert_eq!(undone.basic.exposure.as_f64(), Some(0.0));
+        assert_eq!(undone.basic.contrast.as_f64(), Some(0.0));
+
+        let redo = redo_last_history_action(&library.root_path, &photo_id).expect("redo edit");
+        assert!(redo.applied);
+        let redone = load_active_edit_graph(&library.root_path, &photo_id)
+            .expect("load redone edit")
+            .expect("redone edit graph");
+        assert_eq!(redone.basic.exposure.as_f64(), Some(0.5));
+        assert_eq!(redone.basic.contrast.as_f64(), Some(-8.0));
+        assert!(output_path.exists(), "redo must not delete export output");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn undo_redo_history_restores_photo_flags() {
+        let workspace = unique_library_root("undo-redo-flags");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("blue".into()),
+        )
+        .expect("set flags");
+
+        let undo = undo_last_history_action(&library.root_path, &photo_id).expect("undo flags");
+        assert!(undo.applied);
+        assert_eq!(undo.action_kind.as_deref(), Some("flag_change"));
+        let undone = get_photo_flags(&library.root_path, &photo_id)
+            .expect("read undone flags")
+            .expect("flags row");
+        assert_eq!(undone.rating, 0);
+        assert!(!undone.picked);
+        assert!(!undone.rejected);
+        assert_eq!(undone.color_label, None);
+
+        let redo = redo_last_history_action(&library.root_path, &photo_id).expect("redo flags");
+        assert!(redo.applied);
+        let redone = get_photo_flags(&library.root_path, &photo_id)
+            .expect("read redone flags")
+            .expect("flags row");
+        assert_eq!(redone.rating, 4);
+        assert!(redone.picked);
+        assert!(!redone.rejected);
+        assert_eq!(redone.color_label.as_deref(), Some("blue"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn new_undoable_action_invalidates_redo_history() {
+        let workspace = unique_library_root("redo-invalidated");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft")
+            .expect("draft graph");
+        let first =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("first edit");
+        commit_edit_graph(&library.root_path, first).expect("commit first edit");
+        undo_last_history_action(&library.root_path, &photo_id).expect("undo first edit");
+
+        let current = load_active_edit_graph(&library.root_path, &photo_id)
+            .expect("load current graph")
+            .expect("current graph");
+        let second = silica_edit::apply_exposure_contrast(&current, 1.0, 3.0, "unix:4")
+            .expect("second edit");
+        commit_edit_graph(&library.root_path, second).expect("commit second edit");
+
+        let redo = redo_last_history_action(&library.root_path, &photo_id).expect("redo command");
+        assert!(!redo.applied);
+        assert_eq!(redo.action_kind, None);
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let invalidated_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM edit_history WHERE photo_id = ?1 AND history_state = 'invalidated'",
+                params![photo_id],
+                |row| row.get(0),
+            )
+            .expect("count invalidated history");
+        assert_eq!(invalidated_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn lists_real_history_checkpoints_with_command_state() {
+        let workspace = unique_library_root("history-panel");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let empty = list_photo_history(&library.root_path, &photo_id).expect("read empty history");
+        assert_eq!(empty.photo_id, photo_id);
+        assert_eq!(empty.status, "empty");
+        assert_eq!(empty.message, "No committed history yet.");
+        assert!(!empty.can_undo);
+        assert!(!empty.can_redo);
+        assert!(empty.items.is_empty());
+
+        let draft = load_active_edit_graph_or_default(&library.root_path, &photo_id)
+            .expect("load draft edit graph")
+            .expect("draft edit graph");
+        let edited =
+            silica_edit::apply_exposure_contrast(&draft, 0.5, -8.0, "unix:3").expect("apply edit");
+        commit_edit_graph(&library.root_path, edited).expect("commit edit");
+        set_photo_flags(
+            &library.root_path,
+            photo_id.clone(),
+            4,
+            true,
+            false,
+            Some("blue".to_string()),
+        )
+        .expect("set flags");
+        undo_last_history_action(&library.root_path, &photo_id).expect("undo latest flags");
+
+        let history = list_photo_history(&library.root_path, &photo_id).expect("read history");
+        assert_eq!(history.status, "ready");
+        assert_eq!(history.message, "History checkpoints loaded.");
+        assert!(history.can_undo);
+        assert!(history.can_redo);
+        assert_eq!(history.items.len(), 2);
+        assert_eq!(history.items[0].sequence, 2);
+        assert_eq!(history.items[0].action_kind, "flag_change");
+        assert_eq!(history.items[0].label, "Culling flags");
+        assert_eq!(history.items[0].history_state, "undone");
+        assert!(history.items[0].can_redo);
+        assert!(!history.items[0].can_undo);
+        assert_eq!(history.items[1].sequence, 1);
+        assert_eq!(history.items[1].action_kind, "edit_commit");
+        assert_eq!(history.items[1].label, "Exposure / contrast");
+        assert_eq!(history.items[1].history_state, "applied");
+        assert!(history.items[1].can_undo);
+        assert!(!history.items[1].can_redo);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn appends_action_log_entries_without_replacing_prior_rows() {
+        let workspace = unique_library_root("action-log");
+        let library_root = workspace.join("SilicaRAW Library");
+        let library = create_local_library(&library_root).expect("create library");
+
+        let first = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "core".to_string(),
+                actor_id: Some("local-alpha".to_string()),
+                action_type: "export".to_string(),
+                subject_type: Some("photo".to_string()),
+                subject_id: Some("photo-1".to_string()),
+                side_effect_category: "file_write".to_string(),
+                evidence_ref: Some("export-1".to_string()),
+                payload_json: "{\"ok\":true}".to_string(),
+            },
+        )
+        .expect("append first action");
+        let second = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "core".to_string(),
+                actor_id: Some("local-alpha".to_string()),
+                action_type: "cache_clear".to_string(),
+                subject_type: Some("library".to_string()),
+                subject_id: Some(library.root_path.display().to_string()),
+                side_effect_category: "cache_delete".to_string(),
+                evidence_ref: Some("cache-clear".to_string()),
+                payload_json: "{\"removedCacheRecords\":0}".to_string(),
+            },
+        )
+        .expect("append second action");
+
+        assert_ne!(first.id, second.id);
+        let entries = list_action_log_entries(&library.root_path, 20).expect("list action log");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].action_type, "cache_clear");
+        assert_eq!(entries[0].side_effect_category, "cache_delete");
+        assert_eq!(entries[0].evidence_ref.as_deref(), Some("cache-clear"));
+        assert_eq!(entries[1].action_type, "export");
+        assert_eq!(entries[1].side_effect_category, "file_write");
+        assert_eq!(entries[1].evidence_ref.as_deref(), Some("export-1"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn action_log_rejects_original_mutation_claims() {
+        let workspace = unique_library_root("action-log-original-mutation");
+        let library_root = workspace.join("SilicaRAW Library");
+        let library = create_local_library(&library_root).expect("create library");
+
+        let error = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "core".to_string(),
+                actor_id: Some("local-alpha".to_string()),
+                action_type: "original_mutation".to_string(),
+                subject_type: Some("original".to_string()),
+                subject_id: Some("/tmp/original.jpg".to_string()),
+                side_effect_category: "original_mutation".to_string(),
+                evidence_ref: None,
+                payload_json: "{}".to_string(),
+            },
+        )
+        .expect_err("original mutation action log must be blocked");
+        assert!(error.to_string().contains("original mutation"));
+
+        remove_library_root(&workspace);
+    }
+
     fn unique_catalog_path(label: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -4701,9 +7915,24 @@ mod tests {
         let _ = std::fs::remove_dir_all(path);
     }
 
+    fn assert_issue_kind(issues: &[ImportIssue], kind: ImportIssueKind, file_name: &str) {
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.kind == kind && issue.file_name.as_deref() == Some(file_name)),
+            "missing {kind:?} for {file_name}: {issues:?}"
+        );
+    }
+
     fn count_edit_states(connection: &Connection) -> i64 {
         connection
             .query_row("SELECT COUNT(*) FROM edit_states", [], |row| row.get(0))
             .expect("count edit states")
+    }
+
+    fn count_edit_history(connection: &Connection) -> i64 {
+        connection
+            .query_row("SELECT COUNT(*) FROM edit_history", [], |row| row.get(0))
+            .expect("count edit history")
     }
 }

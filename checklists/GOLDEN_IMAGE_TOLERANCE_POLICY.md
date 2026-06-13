@@ -18,6 +18,8 @@ The repository currently has:
 - synthetic local-alpha JPEG/JPG smoke fixtures
 - original-file hash safety checks
 - JPEG sRGB export smoke coverage
+- fixture-backed profile probe evidence for local ignored Color Class F fixtures
+- JPEG export ICC embedding proof for default sRGB and explicit Display P3 API paths
 ```
 
 The repository does not yet have:
@@ -25,10 +27,9 @@ The repository does not yet have:
 ```txt
 - legal committed RAW fixture corpus
 - fixture-backed Core Image RAW probe results
-- fixture-backed ICC/profile inspection
 - approved golden image outputs
 - approved pixel tolerance thresholds
-- manual Preview.app or Photos review records
+- executed manual Preview.app or Photos review records
 ```
 
 ## Comparison Classes
@@ -107,6 +108,7 @@ Allowed now:
 The fixture manifest records RAW/color expectations.
 The local alpha preserves original files in the covered workflow.
 JPEG sRGB export smoke coverage exists for synthetic local-alpha fixtures.
+JPEG export ICC embedding proof exists for default sRGB and explicit Display P3 API paths.
 RAW and color correctness proof remains pending.
 ```
 

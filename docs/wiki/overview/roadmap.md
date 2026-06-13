@@ -2,7 +2,7 @@
 title: Roadmap Overview
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-13
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -36,7 +36,7 @@ The current implementation order starts with:
 18. Establish UI MVP baseline and then implement the connected UI vertical slice.
 19. Complete the product alpha runtime loop before clean-Mac install QA: real JPEG/JPG pixels, native/selectable paths, persisted UI readback, cache clear, fixture generation, and installed/runtime smoke.
 20. Complete local DMG install, signing, notarization, GitHub Release, and release hardening.
-21. Follow the post-alpha product roadmap for fixture-backed RAW, color, Metal, Library, Develop, masks, export, permissions, MLX, plugins, MCP, public beta, and v1.0.
+21. Follow the post-alpha product roadmap and master execution plan for fixture-backed RAW, color, Metal, Library, Develop, masks, export, permissions, MLX, plugins, MCP, public beta, and v1.0.
 
 ## Gate Logic
 
@@ -65,8 +65,22 @@ The current implementation order starts with:
 - Phase 5.5 completed the UI MVP vertical slice as screen structure plus command wiring. It is not the final installed-app readiness gate because several surfaces still use placeholder pixels, typed paths, string command parsing, and static/demo state.
 - Phase 5.6 is now the required Product Alpha Runtime Completion pass before Phase 6 clean-Mac install QA. Its first task records the runtime gap audit and narrows the installed-alpha guaranteed visible photo path to JPEG/JPG until additional codecs are explicitly implemented and tested.
 - The local DMG distribution plan runs through Phase 9. After that, the post-alpha product roadmap continues with evidence and trust gates before broad RAW, Metal, Develop, MLX, plugin, or MCP work.
-- Phase 10 has completed fixture manifest, golden tolerance policy, sidecar v1, rebuild dry-run, and backup/restore boundaries through Task 10.5.3.
-- Task 10.6.1 selected the MIT project license and added public trust docs. Task 10.6.2 still needs contribution/security templates and static trust regression checks.
+- Phase 10 has completed fixture manifest, golden tolerance policy, sidecar v1, rebuild dry-run, backup/restore boundaries, project license, contribution/security templates, and public trust regression checks.
+- Phase 11 is complete: app session, real recents, relaunch restore, layout persistence, paged grid queries, grid interaction behavior, stored metadata display/filtering, structured import issues, opt-in recursive import, and connected runtime smoke.
+- Phase 12 RAW proof and Phase 13 color proof are complete.
+- Phase 14 product Metal viewer bridge proof is complete.
+- Phase 15 task cards now route the RAW/color/Metal vertical slice.
+- Task 15.0, the vertical slice evidence gate, is complete.
+- Task 15.1, the decoded image handoff contract, is complete.
+- Task 15.2, RAW decode to preview artifact, is complete.
+- Task 15.3, Metal preview display, is complete.
+- Task 15.4, exposure/contrast Metal draft path, is complete.
+- Task 15.5, RAW-derived JPEG sRGB export, is complete.
+- Task 15.6, RAW export manual color QA, is complete.
+- Phase 15 is complete.
+- Phase 16 is complete: action trust, semantics, edit history, undo/redo, Develop history panel data, append-only action log, and sidecar status after history commits are implemented.
+- Phase 17 is complete. Next roadmap step is to create the Phase 18 brief and atomic task cards, then start Task 18.1 Tone Curve Panel.
+- The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
 
@@ -83,6 +97,13 @@ The current implementation order starts with:
 - [UI MVP Baseline](../topics/ui-mvp-baseline.md)
 - [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md)
+- [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
+- [LLM Routing Index](../llm/index.md)
+- [Phase 11 Summary](../phases/phase-11-summary.md)
+- [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)
+- [Phase 13 Color Pipeline Proof Brief](../phases/phase-13-color-pipeline-proof.md)
+- [Phase 14 Product Metal Viewer Bridge Brief](../phases/phase-14-product-metal-viewer-bridge.md)
+- [Phase 15 RAW Color Metal Vertical Slice Brief](../phases/phase-15-raw-color-metal-vertical-slice.md)
 - [Public Trust](../topics/public-trust.md)
 
 ## Notes for LLM Agents
