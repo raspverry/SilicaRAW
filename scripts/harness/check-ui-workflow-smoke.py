@@ -27,11 +27,13 @@ ALLOWED_COMMANDS = {
     "preview_tone_recovery_edit",
     "preview_color_presence_edit",
     "preview_tone_curve_edit",
+    "preview_hsl_color_mixer_edit",
     "commit_exposure_contrast_edit",
     "commit_white_balance_edit",
     "commit_tone_recovery_edit",
     "commit_color_presence_edit",
     "commit_tone_curve_edit",
+    "commit_hsl_color_mixer_edit",
     "commit_p0_basic_reset",
     "commit_basic_preset_edit",
     "get_photo_edit_state",
@@ -172,6 +174,25 @@ WORKFLOW_STEPS = [
             "developToneCurveChannelGreen",
             "developToneCurveChannelBlue",
             "developToneCurveParametric",
+            "developHslPanel",
+            "developHslSupportStatus",
+            "developHslChannelRed",
+            "developHslChannelOrange",
+            "developHslChannelYellow",
+            "developHslChannelGreen",
+            "developHslChannelAqua",
+            "developHslChannelBlue",
+            "developHslChannelPurple",
+            "developHslChannelMagenta",
+            "developHslHueSlider",
+            "developHslHueValue",
+            "developHslHueReset",
+            "developHslSaturationSlider",
+            "developHslSaturationValue",
+            "developHslSaturationReset",
+            "developHslLuminanceSlider",
+            "developHslLuminanceValue",
+            "developHslLuminanceReset",
             "developCommitEdit",
             "developRevertEdit",
             "developResetBasic",
@@ -199,11 +220,13 @@ WORKFLOW_STEPS = [
             "preview_tone_recovery_edit",
             "preview_color_presence_edit",
             "preview_tone_curve_edit",
+            "preview_hsl_color_mixer_edit",
             "commit_exposure_contrast_edit",
             "commit_white_balance_edit",
             "commit_tone_recovery_edit",
             "commit_color_presence_edit",
             "commit_tone_curve_edit",
+            "commit_hsl_color_mixer_edit",
             "commit_p0_basic_reset",
             "commit_basic_preset_edit",
         ],
@@ -217,6 +240,9 @@ WORKFLOW_STEPS = [
             "Tone Curve",
             "RGB Midpoint",
             "Point RGB",
+            "HSL Mixer",
+            "Hue",
+            "Luminance",
             "History",
             "No committed history yet.",
         ],
@@ -596,6 +622,19 @@ def main():
             f"#{control_id} must stay disabled until end-to-end support exists",
             failures,
         )
+    require(
+        parser.ids.get("developHslHueSlider", {}).get("min") == "-100"
+        and parser.ids.get("developHslHueSlider", {}).get("max") == "100"
+        and parser.ids.get("developHslHueSlider", {}).get("step") == "1"
+        and parser.ids.get("developHslSaturationSlider", {}).get("min") == "-100"
+        and parser.ids.get("developHslSaturationSlider", {}).get("max") == "100"
+        and parser.ids.get("developHslSaturationSlider", {}).get("step") == "1"
+        and parser.ids.get("developHslLuminanceSlider", {}).get("min") == "-100"
+        and parser.ids.get("developHslLuminanceSlider", {}).get("max") == "100"
+        and parser.ids.get("developHslLuminanceSlider", {}).get("step") == "1",
+        "HSL hue/saturation/luminance sliders must use edit graph bounds -100..100 step 1",
+        failures,
+    )
     require(
         parser.ids.get("exportFormat", {}).get("value") == "JPEG"
         and parser.ids.get("exportColorSpace", {}).get("value") == "sRGB"

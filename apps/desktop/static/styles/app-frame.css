@@ -2177,6 +2177,101 @@ progress::-webkit-progress-value {
   font-size: var(--sr-type-caption);
 }
 
+.sr-hsl-panel {
+  display: grid;
+  gap: var(--sr-space-sm);
+  padding-block: var(--sr-space-sm) var(--sr-space-md);
+  border-block-end: 1px solid var(--sr-border-subtle);
+}
+
+.sr-hsl-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sr-space-sm);
+}
+
+.sr-hsl-title-row .sr-panel-heading {
+  margin: 0;
+}
+
+#developHslSupportStatus {
+  min-height: auto;
+  padding: 2px var(--sr-space-xs);
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-xs);
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
+  white-space: nowrap;
+}
+
+.sr-hsl-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sr-space-xs);
+}
+
+.sr-hsl-channel-grid button {
+  min-width: 0;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sr-space-2xs);
+  padding: var(--sr-space-xs);
+  border: 1px solid var(--sr-border-subtle);
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
+}
+
+.sr-hsl-channel-grid button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--sr-accent-system) 72%, transparent);
+  color: var(--sr-text-primary);
+  background: color-mix(in srgb, var(--sr-accent-system) 14%, transparent);
+}
+
+.sr-hsl-swatch {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--sr-border-subtle);
+}
+
+[data-hsl-channel="red"] .sr-hsl-swatch {
+  background: hsl(0 78% 55%);
+}
+
+[data-hsl-channel="orange"] .sr-hsl-swatch {
+  background: hsl(30 88% 55%);
+}
+
+[data-hsl-channel="yellow"] .sr-hsl-swatch {
+  background: hsl(54 84% 56%);
+}
+
+[data-hsl-channel="green"] .sr-hsl-swatch {
+  background: hsl(132 58% 48%);
+}
+
+[data-hsl-channel="aqua"] .sr-hsl-swatch {
+  background: hsl(184 72% 48%);
+}
+
+[data-hsl-channel="blue"] .sr-hsl-swatch {
+  background: hsl(218 78% 58%);
+}
+
+[data-hsl-channel="purple"] .sr-hsl-swatch {
+  background: hsl(264 72% 62%);
+}
+
+[data-hsl-channel="magenta"] .sr-hsl-swatch {
+  background: hsl(316 78% 58%);
+}
+
 .sr-develop-reset-row button {
   min-width: 0;
   min-height: 32px;

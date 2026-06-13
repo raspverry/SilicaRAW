@@ -185,6 +185,25 @@ def main():
         "developToneCurveChannelGreen",
         "developToneCurveChannelBlue",
         "developToneCurveParametric",
+        "developHslPanel",
+        "developHslSupportStatus",
+        "developHslChannelRed",
+        "developHslChannelOrange",
+        "developHslChannelYellow",
+        "developHslChannelGreen",
+        "developHslChannelAqua",
+        "developHslChannelBlue",
+        "developHslChannelPurple",
+        "developHslChannelMagenta",
+        "developHslHueSlider",
+        "developHslHueValue",
+        "developHslHueReset",
+        "developHslSaturationSlider",
+        "developHslSaturationValue",
+        "developHslSaturationReset",
+        "developHslLuminanceSlider",
+        "developHslLuminanceValue",
+        "developHslLuminanceReset",
         "developCommitEdit",
         "developRevertEdit",
         "developHistoryPanel",
@@ -334,6 +353,31 @@ def main():
             failures,
         )
 
+    hsl_channels = {
+        "developHslChannelRed": "red",
+        "developHslChannelOrange": "orange",
+        "developHslChannelYellow": "yellow",
+        "developHslChannelGreen": "green",
+        "developHslChannelAqua": "aqua",
+        "developHslChannelBlue": "blue",
+        "developHslChannelPurple": "purple",
+        "developHslChannelMagenta": "magenta",
+    }
+    for control_id, channel in hsl_channels.items():
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("data-hsl-channel") == channel, f"#{control_id} must declare data-hsl-channel={channel}", failures)
+        require(attrs.get("type") == "button", f"#{control_id} must be a button", failures)
+    for control_id in [
+        "developHslHueSlider",
+        "developHslSaturationSlider",
+        "developHslLuminanceSlider",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "range", f"#{control_id} must be a range input", failures)
+        require(attrs.get("min") == "-100", f"#{control_id} min must match HSL edit graph bounds", failures)
+        require(attrs.get("max") == "100", f"#{control_id} max must match HSL edit graph bounds", failures)
+        require(attrs.get("step") == "1", f"#{control_id} step must support integer HSL edits", failures)
+
     expected_native_hosts = {
         "loupeViewer": "loupe",
         "developPreviewSurface": "develop",
@@ -373,6 +417,15 @@ def main():
         "developToneCurveMidpointSlider",
         "developToneCurveMidpointValue",
         "developToneCurveReset",
+        "developHslHueSlider",
+        "developHslHueValue",
+        "developHslHueReset",
+        "developHslSaturationSlider",
+        "developHslSaturationValue",
+        "developHslSaturationReset",
+        "developHslLuminanceSlider",
+        "developHslLuminanceValue",
+        "developHslLuminanceReset",
         "developCommitEdit",
         "developRevertEdit",
         "openExportDialog",

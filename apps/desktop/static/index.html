@@ -426,6 +426,52 @@
               <button id="developToneCurveParametric" type="button" disabled>Parametric</button>
             </div>
           </div>
+          <div class="sr-hsl-panel" id="developHslPanel" data-hsl-state="enabled">
+            <div class="sr-hsl-title-row">
+              <div class="sr-panel-heading">HSL Mixer</div>
+              <output id="developHslSupportStatus" aria-live="polite">JPEG/JPG</output>
+            </div>
+            <div class="sr-hsl-channel-grid" role="group" aria-label="HSL color channels">
+              <button id="developHslChannelRed" type="button" data-hsl-channel="red" aria-pressed="true"><span class="sr-hsl-swatch" aria-hidden="true"></span>Red</button>
+              <button id="developHslChannelOrange" type="button" data-hsl-channel="orange" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Orange</button>
+              <button id="developHslChannelYellow" type="button" data-hsl-channel="yellow" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Yellow</button>
+              <button id="developHslChannelGreen" type="button" data-hsl-channel="green" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Green</button>
+              <button id="developHslChannelAqua" type="button" data-hsl-channel="aqua" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Aqua</button>
+              <button id="developHslChannelBlue" type="button" data-hsl-channel="blue" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Blue</button>
+              <button id="developHslChannelPurple" type="button" data-hsl-channel="purple" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Purple</button>
+              <button id="developHslChannelMagenta" type="button" data-hsl-channel="magenta" aria-pressed="false"><span class="sr-hsl-swatch" aria-hidden="true"></span>Magenta</button>
+            </div>
+            <div class="sr-adjustment-slider" data-adjustment="hsl-hue">
+              <div class="sr-adjustment-header">
+                <label for="developHslHueSlider">Hue</label>
+                <input id="developHslHueValue" type="number" min="-100" max="100" step="1" value="0" aria-label="HSL hue value">
+              </div>
+              <div class="sr-adjustment-control">
+                <input id="developHslHueSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="HSL hue">
+                <button id="developHslHueReset" type="button">Reset</button>
+              </div>
+            </div>
+            <div class="sr-adjustment-slider" data-adjustment="hsl-saturation">
+              <div class="sr-adjustment-header">
+                <label for="developHslSaturationSlider">Saturation</label>
+                <input id="developHslSaturationValue" type="number" min="-100" max="100" step="1" value="0" aria-label="HSL saturation value">
+              </div>
+              <div class="sr-adjustment-control">
+                <input id="developHslSaturationSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="HSL saturation">
+                <button id="developHslSaturationReset" type="button">Reset</button>
+              </div>
+            </div>
+            <div class="sr-adjustment-slider" data-adjustment="hsl-luminance">
+              <div class="sr-adjustment-header">
+                <label for="developHslLuminanceSlider">Luminance</label>
+                <input id="developHslLuminanceValue" type="number" min="-100" max="100" step="1" value="0" aria-label="HSL luminance value">
+              </div>
+              <div class="sr-adjustment-control">
+                <input id="developHslLuminanceSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="HSL luminance">
+                <button id="developHslLuminanceReset" type="button">Reset</button>
+              </div>
+            </div>
+          </div>
           <div class="sr-adjustment-slider" data-adjustment="white-balance">
             <div class="sr-adjustment-header">
               <label for="developWhiteBalanceMode">White Balance</label>
@@ -780,6 +826,18 @@
       const developToneCurveChannelGreen = document.querySelector("#developToneCurveChannelGreen");
       const developToneCurveChannelBlue = document.querySelector("#developToneCurveChannelBlue");
       const developToneCurveParametric = document.querySelector("#developToneCurveParametric");
+      const developHslPanel = document.querySelector("#developHslPanel");
+      const developHslSupportStatus = document.querySelector("#developHslSupportStatus");
+      const developHslChannelButtons = Array.from(document.querySelectorAll("[data-hsl-channel]"));
+      const developHslHueSlider = document.querySelector("#developHslHueSlider");
+      const developHslHueValue = document.querySelector("#developHslHueValue");
+      const developHslHueReset = document.querySelector("#developHslHueReset");
+      const developHslSaturationSlider = document.querySelector("#developHslSaturationSlider");
+      const developHslSaturationValue = document.querySelector("#developHslSaturationValue");
+      const developHslSaturationReset = document.querySelector("#developHslSaturationReset");
+      const developHslLuminanceSlider = document.querySelector("#developHslLuminanceSlider");
+      const developHslLuminanceValue = document.querySelector("#developHslLuminanceValue");
+      const developHslLuminanceReset = document.querySelector("#developHslLuminanceReset");
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developResetBasic = document.querySelector("#developResetBasic");
@@ -1743,6 +1801,81 @@
         return String(Math.round(clamp(value, -100, 100)));
       }
 
+      const HSL_CHANNELS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"];
+
+      function neutralHslChannel() {
+        return { hue: 0, saturation: 0, luminance: 0 };
+      }
+
+      function neutralHslMixer() {
+        return HSL_CHANNELS.reduce((mixer, channel) => {
+          mixer[channel] = neutralHslChannel();
+          return mixer;
+        }, {});
+      }
+
+      function normalizeHslChannel(channel) {
+        return {
+          hue: Number(formatSignedHundred(channel?.hue)),
+          saturation: Number(formatSignedHundred(channel?.saturation)),
+          luminance: Number(formatSignedHundred(channel?.luminance)),
+        };
+      }
+
+      function normalizeHslMixer(value) {
+        const mixer = neutralHslMixer();
+        HSL_CHANNELS.forEach((channel) => {
+          mixer[channel] = normalizeHslChannel(value?.[channel]);
+        });
+        return mixer;
+      }
+
+      function cloneHslMixer(value) {
+        return normalizeHslMixer(value);
+      }
+
+      function hslChannelsEqual(left, right, channel) {
+        const leftChannel = normalizeHslChannel(left?.[channel]);
+        const rightChannel = normalizeHslChannel(right?.[channel]);
+        return leftChannel.hue === rightChannel.hue
+          && leftChannel.saturation === rightChannel.saturation
+          && leftChannel.luminance === rightChannel.luminance;
+      }
+
+      function hslMixersEqual(left, right) {
+        return HSL_CHANNELS.every((channel) => hslChannelsEqual(left, right, channel));
+      }
+
+      function firstDirtyHslChannel(state) {
+        if (hslChannelsEqual(state.draftHslMixer, state.committedHslMixer, state.activeHslChannel)) {
+          return HSL_CHANNELS.find((channel) => !hslChannelsEqual(state.draftHslMixer, state.committedHslMixer, channel)) || state.activeHslChannel;
+        }
+        return state.activeHslChannel;
+      }
+
+      function hslPayload(state, channel = state.activeHslChannel) {
+        const activeChannel = HSL_CHANNELS.includes(channel) ? channel : "red";
+        const values = normalizeHslChannel(state.draftHslMixer?.[activeChannel]);
+        return {
+          channel: activeChannel,
+          hue: values.hue,
+          saturation: values.saturation,
+          luminance: values.luminance,
+        };
+      }
+
+      function hslChannelFromEditState(hslMixer, channel) {
+        return normalizeHslChannel(hslMixer?.[channel]);
+      }
+
+      function hslMixerCacheKey(value) {
+        const mixer = normalizeHslMixer(value);
+        return HSL_CHANNELS.map((channel) => {
+          const values = mixer[channel];
+          return `${channel}:${values.hue}:${values.saturation}:${values.luminance}`;
+        }).join("|");
+      }
+
       function formatToneCurvePoint(value) {
         return clamp(value, 0, 1).toFixed(2);
       }
@@ -1888,6 +2021,8 @@
             draftVibrance: 0,
             draftSaturation: 0,
             draftToneCurveMidpoint: 0.5,
+            activeHslChannel: "red",
+            draftHslMixer: neutralHslMixer(),
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
@@ -1900,6 +2035,7 @@
             committedVibrance: 0,
             committedSaturation: 0,
             committedToneCurveMidpoint: 0.5,
+            committedHslMixer: neutralHslMixer(),
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -1917,6 +2053,25 @@
         developToneCurvePanel.dataset.toneCurveState = isDevelopable(selectedPhoto()) ? "enabled" : "blocked";
         developToneCurveSupportStatus.value = "Point RGB";
         developToneCurveSupportStatus.textContent = "Point RGB";
+      }
+
+      function renderHslControlState(state) {
+        const activeChannel = HSL_CHANNELS.includes(state?.activeHslChannel) ? state.activeHslChannel : "red";
+        const values = normalizeHslChannel(state?.draftHslMixer?.[activeChannel]);
+        developHslPanel.dataset.hslState = isDevelopable(selectedPhoto()) ? "enabled" : "blocked";
+        developHslSupportStatus.value = "JPEG/JPG";
+        developHslSupportStatus.textContent = "JPEG/JPG";
+        developHslChannelButtons.forEach((button) => {
+          const active = button.dataset.hslChannel === activeChannel;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        developHslHueSlider.value = formatSignedHundred(values.hue);
+        developHslHueValue.value = formatSignedHundred(values.hue);
+        developHslSaturationSlider.value = formatSignedHundred(values.saturation);
+        developHslSaturationValue.value = formatSignedHundred(values.saturation);
+        developHslLuminanceSlider.value = formatSignedHundred(values.luminance);
+        developHslLuminanceValue.value = formatSignedHundred(values.luminance);
       }
 
       function syncAdjustmentControls(state) {
@@ -1944,6 +2099,7 @@
         developToneCurveMidpointSlider.value = formatToneCurvePoint(state.draftToneCurveMidpoint);
         developToneCurveMidpointValue.value = formatToneCurvePoint(state.draftToneCurveMidpoint);
         renderToneCurveControlState(state);
+        renderHslControlState(state);
       }
 
       function updateDevelopDirtyState(state) {
@@ -1962,6 +2118,7 @@
             || Number(state.draftVibrance) !== Number(state.committedVibrance)
             || Number(state.draftSaturation) !== Number(state.committedSaturation)
             || Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint)
+            || !hslMixersEqual(state.draftHslMixer, state.committedHslMixer)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -1987,6 +2144,7 @@
         state.committedVibrance = editStateNumber(editState?.vibrance, 0);
         state.committedSaturation = editStateNumber(editState?.saturation, 0);
         state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
+        state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -1999,6 +2157,7 @@
         state.draftVibrance = state.committedVibrance;
         state.draftSaturation = state.committedSaturation;
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
+        state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -2266,7 +2425,7 @@
         if (!Array.isArray(preview?.developPreviewBytes) || preview.developPreviewBytes.length === 0) {
           return "";
         }
-        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.vibrance ?? ""}:${preview.saturation ?? ""}:${preview.toneCurveMidpoint ?? ""}:${preview.developPreviewBytes.length}`;
+        const cacheKey = `${preview.photoId ?? ""}:${preview.sourcePath ?? ""}:${preview.exposure ?? ""}:${preview.contrast ?? ""}:${preview.whiteBalance ?? ""}:${preview.temperature ?? ""}:${preview.tint ?? ""}:${preview.highlights ?? ""}:${preview.shadows ?? ""}:${preview.whites ?? ""}:${preview.blacks ?? ""}:${preview.vibrance ?? ""}:${preview.saturation ?? ""}:${preview.toneCurveMidpoint ?? ""}:${hslMixerCacheKey(preview.hslColorMixer)}:${preview.developPreviewBytes.length}`;
         if (developObjectUrls.has(cacheKey)) {
           return developObjectUrls.get(cacheKey);
         }
@@ -2907,17 +3066,21 @@
         if (photo.unsupported) {
           return { status: "Unsupported", message: "Unsupported files cannot receive Develop edits." };
         }
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}, curve ${formatToneCurvePoint(state.draftToneCurveMidpoint)}.`;
+        const activeHslChannel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
+        const activeHslValues = normalizeHslChannel(state.draftHslMixer?.[activeHslChannel]);
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}, curve ${formatToneCurvePoint(state.draftToneCurveMidpoint)}, HSL ${activeHslChannel} ${formatSignedHundred(activeHslValues.hue)}/${formatSignedHundred(activeHslValues.saturation)}/${formatSignedHundred(activeHslValues.luminance)}.`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return {
             status: "Ready",
             toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
+            hslColorMixer: cloneHslMixer(state.draftHslMixer),
             message: `Draft preview updated locally. ${summary}`,
           };
         }
         return {
           status: "BlockedByDecode",
           toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
+          hslColorMixer: cloneHslMixer(state.draftHslMixer),
           message: `Edit graph draft is valid, but RAW preview pixels are blocked until decode is implemented. ${summary}`,
         };
       }
@@ -3001,6 +3164,16 @@
           developSaturationSlider,
           developSaturationValue,
           developSaturationReset,
+          ...developHslChannelButtons,
+          developHslHueSlider,
+          developHslHueValue,
+          developHslHueReset,
+          developHslSaturationSlider,
+          developHslSaturationValue,
+          developHslSaturationReset,
+          developHslLuminanceSlider,
+          developHslLuminanceValue,
+          developHslLuminanceReset,
           developCommitEdit,
           developRevertEdit,
           developResetBasic,
@@ -3024,6 +3197,9 @@
           draftBlacks: 0,
           draftVibrance: 0,
           draftSaturation: 0,
+          draftToneCurveMidpoint: 0.5,
+          activeHslChannel: "red",
+          draftHslMixer: neutralHslMixer(),
           committedExposure: 0,
           committedContrast: 0,
           committedWhiteBalance: "as_shot",
@@ -3035,6 +3211,8 @@
           committedBlacks: 0,
           committedVibrance: 0,
           committedSaturation: 0,
+          committedToneCurveMidpoint: 0.5,
+          committedHslMixer: neutralHslMixer(),
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -3088,6 +3266,7 @@
             vibrance: response.data.vibrance,
             saturation: response.data.saturation,
             toneCurve: response.data.toneCurve,
+            hslColorMixer: response.data.hslColorMixer,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -3152,12 +3331,18 @@
                     photoId: photo.photoId,
                     ...toneCurvePayload(state),
                   })
-              : await invoke("preview_exposure_contrast_edit", {
-              libraryPath: activeLibraryPath,
-              photoId: photo.photoId,
-              exposure: state.draftExposure,
-              contrast: state.draftContrast,
-            });
+                  : family === "hslColorMixer"
+                    ? await invoke("preview_hsl_color_mixer_edit", {
+                      libraryPath: activeLibraryPath,
+                      photoId: photo.photoId,
+                      ...hslPayload(state),
+                    })
+                    : await invoke("preview_exposure_contrast_edit", {
+                      libraryPath: activeLibraryPath,
+                      photoId: photo.photoId,
+                      exposure: state.draftExposure,
+                      contrast: state.draftContrast,
+                    });
           if (sequence !== developPreviewSequence) {
             return;
           }
@@ -3188,6 +3373,7 @@
             vibrance: response.data.vibrance,
             saturation: response.data.saturation,
             toneCurveMidpoint: toneCurveMidpointFromEditState(response.data.toneCurve),
+            hslColorMixer: response.data.hslColorMixer,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -3216,10 +3402,12 @@
         const colorPresenceDirty = Number(state.draftVibrance) !== Number(state.committedVibrance)
           || Number(state.draftSaturation) !== Number(state.committedSaturation);
         const toneCurveDirty = Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint);
+        const hslDirty = !hslMixersEqual(state.draftHslMixer, state.committedHslMixer);
+        const hslCommitChannel = hslDirty ? firstDirtyHslChannel(state) : state.activeHslChannel;
         const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
           || Number(state.draftContrast) !== Number(state.committedContrast);
 
-        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !toneCurveDirty && !exposureContrastDirty) {
+        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !toneCurveDirty && !hslDirty && !exposureContrastDirty) {
           updateDevelopDirtyState(state);
           setStatus("No Develop draft changes to commit.");
           return;
@@ -3238,6 +3426,7 @@
           state.committedVibrance = state.draftVibrance;
           state.committedSaturation = state.draftSaturation;
           state.committedToneCurveMidpoint = state.draftToneCurveMidpoint;
+          state.committedHslMixer = cloneHslMixer(state.draftHslMixer);
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -3277,12 +3466,18 @@
                 photoId: photo.photoId,
                 ...toneCurvePayload(state),
               })
-            : await invoke("commit_exposure_contrast_edit", {
-              libraryPath: activeLibraryPath,
-              photoId: photo.photoId,
-              exposure: state.draftExposure,
-              contrast: state.draftContrast,
-            });
+              : hslDirty
+                ? await invoke("commit_hsl_color_mixer_edit", {
+                  libraryPath: activeLibraryPath,
+                  photoId: photo.photoId,
+                  ...hslPayload(state, hslCommitChannel),
+                })
+                : await invoke("commit_exposure_contrast_edit", {
+                  libraryPath: activeLibraryPath,
+                  photoId: photo.photoId,
+                  exposure: state.draftExposure,
+                  contrast: state.draftContrast,
+                });
           if (commandFailed(response)) {
             setStatus(responseErrorMessage(response, "Develop edit commit failed."));
             return;
@@ -3303,6 +3498,7 @@
           state.committedVibrance = editStateNumber(response.data.vibrance, state.draftVibrance);
           state.committedSaturation = editStateNumber(response.data.saturation, state.draftSaturation);
           state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(response.data.toneCurve);
+          state.committedHslMixer = normalizeHslMixer(response.data.hslColorMixer);
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
             state.draftTemperature = state.committedTemperature;
@@ -3317,6 +3513,8 @@
             state.draftSaturation = state.committedSaturation;
           } else if (toneCurveDirty) {
             state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
+          } else if (hslDirty) {
+            state.draftHslMixer[hslCommitChannel] = hslChannelFromEditState(state.committedHslMixer, hslCommitChannel);
           } else {
             state.draftExposure = state.committedExposure;
             state.draftContrast = state.committedContrast;
@@ -3328,7 +3526,8 @@
           await loadDevelopHistory();
           await loadPhotoHistogram();
           const remainingFamilies = [];
-          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || toneCurveDirty || exposureContrastDirty)) {
+          const remainingHslDirty = !hslMixersEqual(state.draftHslMixer, state.committedHslMixer);
+          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || toneCurveDirty || remainingHslDirty || exposureContrastDirty)) {
             if (toneRecoveryDirty) {
               remainingFamilies.push("tone recovery");
             }
@@ -3338,27 +3537,43 @@
             if (toneCurveDirty) {
               remainingFamilies.push("tone curve");
             }
+            if (remainingHslDirty) {
+              remainingFamilies.push("HSL color mixer");
+            }
             if (exposureContrastDirty) {
               remainingFamilies.push("exposure/contrast");
             }
-          } else if (toneRecoveryDirty && (colorPresenceDirty || toneCurveDirty || exposureContrastDirty)) {
+          } else if (toneRecoveryDirty && (colorPresenceDirty || toneCurveDirty || remainingHslDirty || exposureContrastDirty)) {
             if (colorPresenceDirty) {
               remainingFamilies.push("color presence");
             }
             if (toneCurveDirty) {
               remainingFamilies.push("tone curve");
             }
+            if (remainingHslDirty) {
+              remainingFamilies.push("HSL color mixer");
+            }
             if (exposureContrastDirty) {
               remainingFamilies.push("exposure/contrast");
             }
-          } else if (colorPresenceDirty && (toneCurveDirty || exposureContrastDirty)) {
+          } else if (colorPresenceDirty && (toneCurveDirty || remainingHslDirty || exposureContrastDirty)) {
             if (toneCurveDirty) {
               remainingFamilies.push("tone curve");
             }
+            if (remainingHslDirty) {
+              remainingFamilies.push("HSL color mixer");
+            }
             if (exposureContrastDirty) {
               remainingFamilies.push("exposure/contrast");
             }
-          } else if (toneCurveDirty && exposureContrastDirty) {
+          } else if (toneCurveDirty && (remainingHslDirty || exposureContrastDirty)) {
+            if (remainingHslDirty) {
+              remainingFamilies.push("HSL color mixer");
+            }
+            if (exposureContrastDirty) {
+              remainingFamilies.push("exposure/contrast");
+            }
+          } else if (remainingHslDirty && exposureContrastDirty) {
             remainingFamilies.push("exposure/contrast");
           }
           setStatus(remainingFamilies.length
@@ -3389,9 +3604,20 @@
         state.draftVibrance = state.committedVibrance;
         state.draftSaturation = state.committedSaturation;
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
+        state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
+      }
+
+      function setActiveHslChannel(channel) {
+        const photo = selectedPhoto();
+        if (!photo || !HSL_CHANNELS.includes(channel)) {
+          return;
+        }
+        const state = developAdjustmentState(photo.photoId);
+        state.activeHslChannel = channel;
+        syncAdjustmentControls(state);
       }
 
       function updateDevelopAdjustment(kind, value) {
@@ -3436,6 +3662,30 @@
         } else if (kind === "toneCurveMidpoint") {
           state.draftToneCurveMidpoint = toneCurvePoint(value);
           previewDevelopEdit("toneCurve");
+        } else if (kind === "hslHue") {
+          const channel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
+          state.activeHslChannel = channel;
+          state.draftHslMixer[channel] = {
+            ...normalizeHslChannel(state.draftHslMixer?.[channel]),
+            hue: Number(formatSignedHundred(value)),
+          };
+          previewDevelopEdit("hslColorMixer");
+        } else if (kind === "hslSaturation") {
+          const channel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
+          state.activeHslChannel = channel;
+          state.draftHslMixer[channel] = {
+            ...normalizeHslChannel(state.draftHslMixer?.[channel]),
+            saturation: Number(formatSignedHundred(value)),
+          };
+          previewDevelopEdit("hslColorMixer");
+        } else if (kind === "hslLuminance") {
+          const channel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
+          state.activeHslChannel = channel;
+          state.draftHslMixer[channel] = {
+            ...normalizeHslChannel(state.draftHslMixer?.[channel]),
+            luminance: Number(formatSignedHundred(value)),
+          };
+          previewDevelopEdit("hslColorMixer");
         }
       }
 
@@ -3446,6 +3696,8 @@
           updateDevelopAdjustment(kind, 5200);
         } else if (kind === "toneCurveMidpoint") {
           updateDevelopAdjustment(kind, 0.5);
+        } else if (["hslHue", "hslSaturation", "hslLuminance"].includes(kind)) {
+          updateDevelopAdjustment(kind, 0);
         } else {
           updateDevelopAdjustment(kind, 0);
         }
@@ -3464,6 +3716,7 @@
         state.committedVibrance = editStateNumber(editState?.vibrance, 0);
         state.committedSaturation = editStateNumber(editState?.saturation, 0);
         state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
+        state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -3476,6 +3729,7 @@
         state.draftVibrance = state.committedVibrance;
         state.draftSaturation = state.committedSaturation;
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
+        state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
       }
@@ -3585,11 +3839,17 @@
                       ? state.draftBlacks
                       : kind === "vibrance"
                         ? state.draftVibrance
-                        : kind === "saturation"
-                          ? state.draftSaturation
-                          : kind === "toneCurveMidpoint"
-                            ? state.draftToneCurveMidpoint
-                            : state.draftContrast;
+                          : kind === "saturation"
+                            ? state.draftSaturation
+                            : kind === "toneCurveMidpoint"
+                              ? state.draftToneCurveMidpoint
+                              : kind === "hslHue"
+                                ? normalizeHslChannel(state.draftHslMixer?.[state.activeHslChannel]).hue
+                                : kind === "hslSaturation"
+                                  ? normalizeHslChannel(state.draftHslMixer?.[state.activeHslChannel]).saturation
+                                  : kind === "hslLuminance"
+                                    ? normalizeHslChannel(state.draftHslMixer?.[state.activeHslChannel]).luminance
+                                    : state.draftContrast;
         updateDevelopAdjustment(kind, current + direction * step);
       }
 
@@ -3928,6 +4188,16 @@
           developSaturationSlider,
           developSaturationValue,
           developSaturationReset,
+          ...developHslChannelButtons,
+          developHslHueSlider,
+          developHslHueValue,
+          developHslHueReset,
+          developHslSaturationSlider,
+          developHslSaturationValue,
+          developHslSaturationReset,
+          developHslLuminanceSlider,
+          developHslLuminanceValue,
+          developHslLuminanceReset,
           developToneCurveMidpointSlider,
           developToneCurveMidpointValue,
           developToneCurveReset,
@@ -3946,6 +4216,7 @@
           control.disabled = true;
         });
         renderToneCurveControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
+        renderHslControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         basicPresetButtons.forEach((button) => {
           button.disabled = developDisabled;
         });
@@ -4205,6 +4476,39 @@
       });
       developToneCurveMidpointValue.addEventListener("dblclick", () => resetDevelopAdjustment("toneCurveMidpoint"));
       developToneCurveReset.addEventListener("click", () => resetDevelopAdjustment("toneCurveMidpoint"));
+      developHslChannelButtons.forEach((button) => {
+        button.addEventListener("click", () => setActiveHslChannel(button.dataset.hslChannel));
+      });
+      developHslHueSlider.addEventListener("input", () => updateDevelopAdjustment("hslHue", developHslHueSlider.value));
+      developHslHueSlider.addEventListener("dblclick", () => resetDevelopAdjustment("hslHue"));
+      developHslHueSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("hslHue", event));
+      developHslHueValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developHslHueValue.value)) {
+          updateDevelopAdjustment("hslHue", developHslHueValue.value);
+        }
+      });
+      developHslHueValue.addEventListener("dblclick", () => resetDevelopAdjustment("hslHue"));
+      developHslHueReset.addEventListener("click", () => resetDevelopAdjustment("hslHue"));
+      developHslSaturationSlider.addEventListener("input", () => updateDevelopAdjustment("hslSaturation", developHslSaturationSlider.value));
+      developHslSaturationSlider.addEventListener("dblclick", () => resetDevelopAdjustment("hslSaturation"));
+      developHslSaturationSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("hslSaturation", event));
+      developHslSaturationValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developHslSaturationValue.value)) {
+          updateDevelopAdjustment("hslSaturation", developHslSaturationValue.value);
+        }
+      });
+      developHslSaturationValue.addEventListener("dblclick", () => resetDevelopAdjustment("hslSaturation"));
+      developHslSaturationReset.addEventListener("click", () => resetDevelopAdjustment("hslSaturation"));
+      developHslLuminanceSlider.addEventListener("input", () => updateDevelopAdjustment("hslLuminance", developHslLuminanceSlider.value));
+      developHslLuminanceSlider.addEventListener("dblclick", () => resetDevelopAdjustment("hslLuminance"));
+      developHslLuminanceSlider.addEventListener("keydown", (event) => stepDevelopAdjustment("hslLuminance", event));
+      developHslLuminanceValue.addEventListener("input", () => {
+        if (!["", "-"].includes(developHslLuminanceValue.value)) {
+          updateDevelopAdjustment("hslLuminance", developHslLuminanceValue.value);
+        }
+      });
+      developHslLuminanceValue.addEventListener("dblclick", () => resetDevelopAdjustment("hslLuminance"));
+      developHslLuminanceReset.addEventListener("click", () => resetDevelopAdjustment("hslLuminance"));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       developResetBasic.addEventListener("click", resetP0BasicControls);

@@ -678,6 +678,16 @@ def state_script(state):
     document.querySelector("#developToneCurveSupportStatus").textContent = "Point RGB";
     document.querySelector("#developToneCurvePanel").dataset.toneCurveState = "enabled";
     document.querySelector("#developToneCurveLine").setAttribute("points", "0,100 50,38 100,0");
+    document.querySelector("#developHslPanel").dataset.hslState = "enabled";
+    document.querySelector("#developHslSupportStatus").value = "JPEG/JPG";
+    document.querySelector("#developHslSupportStatus").textContent = "JPEG/JPG";
+    document.querySelector("#developHslChannelBlue").setAttribute("aria-pressed", "true");
+    document.querySelector("#developHslHueSlider").value = "-12";
+    document.querySelector("#developHslHueValue").value = "-12";
+    document.querySelector("#developHslSaturationSlider").value = "24";
+    document.querySelector("#developHslSaturationValue").value = "24";
+    document.querySelector("#developHslLuminanceSlider").value = "-8";
+    document.querySelector("#developHslLuminanceValue").value = "-8";
     document.querySelector("#developEditState").textContent = "Clean";
     document.querySelector("#developBeforeView").disabled = false;
     document.querySelector("#developAfterView").disabled = false;
@@ -716,6 +726,15 @@ def state_script(state):
       "#developToneCurveMidpointSlider",
       "#developToneCurveMidpointValue",
       "#developToneCurveReset",
+      "#developHslHueSlider",
+      "#developHslHueValue",
+      "#developHslHueReset",
+      "#developHslSaturationSlider",
+      "#developHslSaturationValue",
+      "#developHslSaturationReset",
+      "#developHslLuminanceSlider",
+      "#developHslLuminanceValue",
+      "#developHslLuminanceReset",
       "#developResetBasic",
       "#developCommitEdit",
       "#developRevertEdit",
@@ -817,6 +836,12 @@ def metric_script(surface):
         "#developToneCurveChannelBlue",
         "#developToneCurveParametric",
       ].every((selector) => disabled(selector)),
+      hslVisible: Boolean(box("#developHslPanel")),
+      hslStatus: text("#developHslSupportStatus"),
+      hslBlueActive: document.querySelector("#developHslChannelBlue")?.getAttribute("aria-pressed") === "true",
+      hslHue: document.querySelector("#developHslHueSlider")?.value || "",
+      hslSaturation: document.querySelector("#developHslSaturationSlider")?.value || "",
+      hslLuminance: document.querySelector("#developHslLuminanceSlider")?.value || "",
     }},
   }};
 }})()
@@ -886,6 +911,10 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: tone curve support status wrong")
                     if not develop_state["toneCurveUnsupportedDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: unsupported tone curve controls enabled")
+                    if not develop_state["hslVisible"] or develop_state["hslStatus"] != "JPEG/JPG":
+                        failures.append(f"{viewport_name} {surface_name}: HSL panel support state not visible")
+                    if not develop_state["hslBlueActive"] or develop_state["hslHue"] != "-12" or develop_state["hslSaturation"] != "24" or develop_state["hslLuminance"] != "-8":
+                        failures.append(f"{viewport_name} {surface_name}: HSL seeded blue channel state not visible")
     return results, failures
 
 

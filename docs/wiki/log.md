@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | HSL panel UI completed
+
+- Completed Task 18.2.3 with a compact Develop HSL Mixer panel for all eight schema-owned color channels.
+- Wired hue, saturation, and luminance controls to the existing HSL preview and commit desktop commands while preserving non-persistent draft preview behavior.
+- Extended static UI, workflow smoke, and final visual QA checks for HSL command wiring, control bounds, and seeded blue-channel state; routed Phase 18 to Task 18.3.1.
+
 ## [2026-06-13] phase-18 | HSL runtime parity added
 
 - Completed Task 18.2.2 with HSL color mixer preview, commit, desktop command, histogram, and JPEG export parity for supported local paths.
