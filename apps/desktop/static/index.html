@@ -569,6 +569,106 @@
               <button class="sr-detail-disabled-action" id="developDetailMlxDenoise" type="button" disabled>MLX Denoise</button>
             </div>
           </div>
+          <div class="sr-geometry-panel" id="developLensGeometryPanel" data-geometry-state="enabled">
+            <div class="sr-geometry-title-row">
+              <div class="sr-panel-heading">Lens &amp; Geometry</div>
+              <output id="developGeometrySupportStatus" aria-live="polite">Geometry Ready</output>
+            </div>
+            <output class="sr-geometry-status" id="developGeometryCropStatus" aria-live="polite">Full frame, rotation 0, no flips.</output>
+            <div class="sr-geometry-section" aria-label="Geometry crop controls">
+              <div class="sr-geometry-section-heading">Crop</div>
+              <div class="sr-adjustment-slider" data-geometry-control="crop.x">
+                <div class="sr-adjustment-header">
+                  <label for="developGeometryCropXSlider">X</label>
+                  <input id="developGeometryCropXValue" type="number" min="0" max="1" step="0.01" value="0.00" aria-label="Crop X value">
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developGeometryCropXSlider" type="range" min="0" max="1" step="0.01" value="0" aria-label="Crop X">
+                </div>
+              </div>
+              <div class="sr-adjustment-slider" data-geometry-control="crop.y">
+                <div class="sr-adjustment-header">
+                  <label for="developGeometryCropYSlider">Y</label>
+                  <input id="developGeometryCropYValue" type="number" min="0" max="1" step="0.01" value="0.00" aria-label="Crop Y value">
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developGeometryCropYSlider" type="range" min="0" max="1" step="0.01" value="0" aria-label="Crop Y">
+                </div>
+              </div>
+              <div class="sr-adjustment-slider" data-geometry-control="crop.width">
+                <div class="sr-adjustment-header">
+                  <label for="developGeometryCropWidthSlider">Width</label>
+                  <input id="developGeometryCropWidthValue" type="number" min="0.01" max="1" step="0.01" value="1.00" aria-label="Crop width value">
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developGeometryCropWidthSlider" type="range" min="0.01" max="1" step="0.01" value="1" aria-label="Crop width">
+                </div>
+              </div>
+              <div class="sr-adjustment-slider" data-geometry-control="crop.height">
+                <div class="sr-adjustment-header">
+                  <label for="developGeometryCropHeightSlider">Height</label>
+                  <input id="developGeometryCropHeightValue" type="number" min="0.01" max="1" step="0.01" value="1.00" aria-label="Crop height value">
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developGeometryCropHeightSlider" type="range" min="0.01" max="1" step="0.01" value="1" aria-label="Crop height">
+                </div>
+              </div>
+              <button class="sr-geometry-secondary-action" id="developGeometryCropClear" type="button">Clear Crop</button>
+            </div>
+            <div class="sr-geometry-section" aria-label="Geometry orientation controls">
+              <div class="sr-geometry-section-heading">Rotate</div>
+              <div class="sr-geometry-button-grid" role="group" aria-label="Supported quarter-turn rotation">
+                <button id="developGeometryRotateLeft" type="button" data-geometry-rotate="-90">Left 90</button>
+                <button id="developGeometryRotateRight" type="button" data-geometry-rotate="90">Right 90</button>
+                <button id="developGeometryOrientationReset" type="button">Reset</button>
+              </div>
+              <div class="sr-geometry-section-heading">Flip</div>
+              <div class="sr-geometry-button-grid" role="group" aria-label="Supported flip controls">
+                <button id="developGeometryFlipHorizontal" type="button" data-geometry-flip="horizontal" aria-pressed="false">Horizontal</button>
+                <button id="developGeometryFlipVertical" type="button" data-geometry-flip="vertical" aria-pressed="false">Vertical</button>
+              </div>
+            </div>
+            <div class="sr-geometry-section sr-geometry-disabled-section" aria-label="Unavailable lens and transform controls">
+              <div class="sr-geometry-section-heading">Lens</div>
+              <output class="sr-geometry-status" id="developLensSupportStatus" aria-live="polite">Lens correction unavailable.</output>
+              <label class="sr-geometry-disabled-toggle" for="developLensProfileCorrection">
+                <input id="developLensProfileCorrection" type="checkbox" disabled>
+                Profile Correction
+              </label>
+              <label class="sr-geometry-disabled-toggle" for="developLensChromaticAberration">
+                <input id="developLensChromaticAberration" type="checkbox" disabled>
+                Chromatic Aberration
+              </label>
+              <div class="sr-adjustment-slider" data-lens-control="distortion">
+                <div class="sr-adjustment-header">
+                  <label for="developLensDistortionSlider">Distortion</label>
+                  <span>0</span>
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developLensDistortionSlider" type="range" min="-100" max="100" step="1" value="0" disabled aria-label="Lens distortion">
+                </div>
+              </div>
+              <div class="sr-adjustment-slider" data-lens-control="vignetting">
+                <div class="sr-adjustment-header">
+                  <label for="developLensVignettingSlider">Vignetting</label>
+                  <span>0</span>
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developLensVignettingSlider" type="range" min="-100" max="100" step="1" value="0" disabled aria-label="Lens vignetting">
+                </div>
+              </div>
+              <div class="sr-geometry-section-heading">Transform</div>
+              <output class="sr-geometry-status" id="developGeometryTransformStatus" aria-live="polite">Transform unsupported.</output>
+              <div class="sr-geometry-transform-grid">
+                <label for="developGeometryTransformScaleSlider">Scale</label>
+                <input id="developGeometryTransformScaleSlider" type="range" min="1" max="500" step="1" value="100" disabled aria-label="Transform scale">
+                <label for="developGeometryTransformVerticalSlider">Vertical</label>
+                <input id="developGeometryTransformVerticalSlider" type="range" min="-100" max="100" step="1" value="0" disabled aria-label="Transform vertical">
+                <label for="developGeometryTransformHorizontalSlider">Horizontal</label>
+                <input id="developGeometryTransformHorizontalSlider" type="range" min="-100" max="100" step="1" value="0" disabled aria-label="Transform horizontal">
+              </div>
+            </div>
+          </div>
           <div class="sr-adjustment-slider" data-adjustment="white-balance">
             <div class="sr-adjustment-header">
               <label for="developWhiteBalanceMode">White Balance</label>
@@ -956,6 +1056,60 @@
         field,
         format,
       }));
+      const developLensGeometryPanel = document.querySelector("#developLensGeometryPanel");
+      const developGeometrySupportStatus = document.querySelector("#developGeometrySupportStatus");
+      const developGeometryCropStatus = document.querySelector("#developGeometryCropStatus");
+      const developLensSupportStatus = document.querySelector("#developLensSupportStatus");
+      const developLensProfileCorrection = document.querySelector("#developLensProfileCorrection");
+      const developLensChromaticAberration = document.querySelector("#developLensChromaticAberration");
+      const developLensDistortionSlider = document.querySelector("#developLensDistortionSlider");
+      const developLensVignettingSlider = document.querySelector("#developLensVignettingSlider");
+      const developGeometryCropXSlider = document.querySelector("#developGeometryCropXSlider");
+      const developGeometryCropXValue = document.querySelector("#developGeometryCropXValue");
+      const developGeometryCropYSlider = document.querySelector("#developGeometryCropYSlider");
+      const developGeometryCropYValue = document.querySelector("#developGeometryCropYValue");
+      const developGeometryCropWidthSlider = document.querySelector("#developGeometryCropWidthSlider");
+      const developGeometryCropWidthValue = document.querySelector("#developGeometryCropWidthValue");
+      const developGeometryCropHeightSlider = document.querySelector("#developGeometryCropHeightSlider");
+      const developGeometryCropHeightValue = document.querySelector("#developGeometryCropHeightValue");
+      const developGeometryCropClear = document.querySelector("#developGeometryCropClear");
+      const developGeometryRotateLeft = document.querySelector("#developGeometryRotateLeft");
+      const developGeometryRotateRight = document.querySelector("#developGeometryRotateRight");
+      const developGeometryOrientationReset = document.querySelector("#developGeometryOrientationReset");
+      const developGeometryFlipHorizontal = document.querySelector("#developGeometryFlipHorizontal");
+      const developGeometryFlipVertical = document.querySelector("#developGeometryFlipVertical");
+      const developGeometryTransformStatus = document.querySelector("#developGeometryTransformStatus");
+      const developGeometryTransformScaleSlider = document.querySelector("#developGeometryTransformScaleSlider");
+      const developGeometryTransformVerticalSlider = document.querySelector("#developGeometryTransformVerticalSlider");
+      const developGeometryTransformHorizontalSlider = document.querySelector("#developGeometryTransformHorizontalSlider");
+      const developGeometryCropControlPairs = [
+        ["developGeometryCropXSlider", "developGeometryCropXValue", "x"],
+        ["developGeometryCropYSlider", "developGeometryCropYValue", "y"],
+        ["developGeometryCropWidthSlider", "developGeometryCropWidthValue", "width"],
+        ["developGeometryCropHeightSlider", "developGeometryCropHeightValue", "height"],
+      ].map(([sliderId, valueId, field]) => ({
+        slider: document.querySelector(`#${sliderId}`),
+        value: document.querySelector(`#${valueId}`),
+        field,
+      }));
+      const developGeometryControls = [
+        ...developGeometryCropControlPairs.flatMap(({ slider, value }) => [slider, value]),
+        developGeometryCropClear,
+        developGeometryRotateLeft,
+        developGeometryRotateRight,
+        developGeometryOrientationReset,
+        developGeometryFlipHorizontal,
+        developGeometryFlipVertical,
+      ];
+      const developUnsupportedLensGeometryControls = [
+        developLensProfileCorrection,
+        developLensChromaticAberration,
+        developLensDistortionSlider,
+        developLensVignettingSlider,
+        developGeometryTransformScaleSlider,
+        developGeometryTransformVerticalSlider,
+        developGeometryTransformHorizontalSlider,
+      ];
       const developCommitEdit = document.querySelector("#developCommitEdit");
       const developRevertEdit = document.querySelector("#developRevertEdit");
       const developResetBasic = document.querySelector("#developResetBasic");
@@ -2070,6 +2224,176 @@
         return Boolean(state && !detailIsNeutral(state.committedDetail));
       }
 
+      function normalizedUnit(value, min = 0, max = 1, fallback = 0) {
+        const numeric = Number(value);
+        const base = Number.isFinite(numeric) ? numeric : fallback;
+        return Number(clamp(base, min, max).toFixed(2));
+      }
+
+      function neutralGeometryTransform() {
+        return {
+          vertical: 0,
+          horizontal: 0,
+          aspect: 0,
+          scale: 100,
+          xOffset: 0,
+          yOffset: 0,
+        };
+      }
+
+      function neutralGeometryState() {
+        return {
+          crop: null,
+          rotation: 0,
+          flipHorizontal: false,
+          flipVertical: false,
+          transform: neutralGeometryTransform(),
+        };
+      }
+
+      function normalizeGeometryCrop(value) {
+        if (!value) {
+          return null;
+        }
+        const width = normalizedUnit(value.width, 0.01, 1, 1);
+        const height = normalizedUnit(value.height, 0.01, 1, 1);
+        return {
+          x: normalizedUnit(value.x, 0, 1 - width, 0),
+          y: normalizedUnit(value.y, 0, 1 - height, 0),
+          width,
+          height,
+          angle: normalizedUnit(value.angle, -45, 45, 0),
+          aspect: value.aspect ?? null,
+        };
+      }
+
+      function normalizeGeometryState(value) {
+        const transform = value?.transform || {};
+        return {
+          crop: normalizeGeometryCrop(value?.crop),
+          rotation: Number(formatRotation(value?.rotation)),
+          flipHorizontal: Boolean(value?.flipHorizontal ?? value?.flip_horizontal),
+          flipVertical: Boolean(value?.flipVertical ?? value?.flip_vertical),
+          transform: {
+            vertical: Number(formatSignedHundred(transform.vertical)),
+            horizontal: Number(formatSignedHundred(transform.horizontal)),
+            aspect: Number(formatSignedHundred(transform.aspect)),
+            scale: Math.round(clamp(Number(transform.scale ?? 100), 1, 500)),
+            xOffset: Number(formatSignedHundred(transform.xOffset ?? transform.x_offset)),
+            yOffset: Number(formatSignedHundred(transform.yOffset ?? transform.y_offset)),
+          },
+        };
+      }
+
+      function cloneGeometryState(value) {
+        return normalizeGeometryState(value);
+      }
+
+      function formatRotation(value) {
+        const supported = [-180, -90, 0, 90, 180];
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+          return "0";
+        }
+        const rounded = Math.round(clamp(numeric, -180, 180) / 90) * 90;
+        const normalized = rounded === -180 ? 180 : rounded;
+        return String(supported.includes(normalized) ? normalized : 0);
+      }
+
+      function geometryCropsEqual(left, right) {
+        const normalizedLeft = normalizeGeometryCrop(left);
+        const normalizedRight = normalizeGeometryCrop(right);
+        if (!normalizedLeft || !normalizedRight) {
+          return normalizedLeft === normalizedRight;
+        }
+        return normalizedLeft.x === normalizedRight.x
+          && normalizedLeft.y === normalizedRight.y
+          && normalizedLeft.width === normalizedRight.width
+          && normalizedLeft.height === normalizedRight.height
+          && normalizedLeft.angle === normalizedRight.angle
+          && normalizedLeft.aspect === normalizedRight.aspect;
+      }
+
+      function geometryOrientationEqual(left, right) {
+        const normalizedLeft = normalizeGeometryState(left);
+        const normalizedRight = normalizeGeometryState(right);
+        return normalizedLeft.rotation === normalizedRight.rotation
+          && normalizedLeft.flipHorizontal === normalizedRight.flipHorizontal
+          && normalizedLeft.flipVertical === normalizedRight.flipVertical;
+      }
+
+      function geometryStatesEqual(left, right) {
+        const normalizedLeft = normalizeGeometryState(left);
+        const normalizedRight = normalizeGeometryState(right);
+        const leftTransform = normalizedLeft.transform;
+        const rightTransform = normalizedRight.transform;
+        return geometryCropsEqual(normalizedLeft.crop, normalizedRight.crop)
+          && geometryOrientationEqual(normalizedLeft, normalizedRight)
+          && leftTransform.vertical === rightTransform.vertical
+          && leftTransform.horizontal === rightTransform.horizontal
+          && leftTransform.aspect === rightTransform.aspect
+          && leftTransform.scale === rightTransform.scale
+          && leftTransform.xOffset === rightTransform.xOffset
+          && leftTransform.yOffset === rightTransform.yOffset;
+      }
+
+      function geometryCropDirty(state) {
+        return Boolean(state && !geometryCropsEqual(state.draftGeometry?.crop, state.committedGeometry?.crop));
+      }
+
+      function geometryOrientationDirty(state) {
+        return Boolean(state && !geometryOrientationEqual(state.draftGeometry, state.committedGeometry));
+      }
+
+      function geometryDirty(state) {
+        return Boolean(state && !geometryStatesEqual(state.draftGeometry, state.committedGeometry));
+      }
+
+      function geometryCropSummary(crop) {
+        const normalized = normalizeGeometryCrop(crop);
+        if (!normalized) {
+          return "Full frame";
+        }
+        return `Crop ${Math.round(normalized.width * 100)}% x ${Math.round(normalized.height * 100)}% at ${Math.round(normalized.x * 100)}%, ${Math.round(normalized.y * 100)}%`;
+      }
+
+      function geometrySummary(value) {
+        const geometry = normalizeGeometryState(value);
+        const flips = [
+          geometry.flipHorizontal ? "horizontal flip" : "",
+          geometry.flipVertical ? "vertical flip" : "",
+        ].filter(Boolean).join(", ") || "no flips";
+        return `${geometryCropSummary(geometry.crop)}, rotation ${geometry.rotation}, ${flips}.`;
+      }
+
+      function cropPayload(state) {
+        const crop = normalizeGeometryCrop(state.draftGeometry?.crop) || normalizeGeometryCrop({
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          angle: 0,
+          aspect: null,
+        });
+        return {
+          x: crop.x,
+          y: crop.y,
+          width: crop.width,
+          height: crop.height,
+          angle: crop.angle,
+          aspect: crop.aspect,
+        };
+      }
+
+      function orientationPayload(state) {
+        const geometry = normalizeGeometryState(state.draftGeometry);
+        return {
+          rotation: geometry.rotation,
+          flipHorizontal: geometry.flipHorizontal,
+          flipVertical: geometry.flipVertical,
+        };
+      }
+
       function hslMixerCacheKey(value) {
         const mixer = normalizeHslMixer(value);
         return HSL_CHANNELS.map((channel) => {
@@ -2226,6 +2550,7 @@
             activeHslChannel: "red",
             draftHslMixer: neutralHslMixer(),
             draftDetail: neutralDetailState(),
+            draftGeometry: neutralGeometryState(),
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
@@ -2240,6 +2565,7 @@
             committedToneCurveMidpoint: 0.5,
             committedHslMixer: neutralHslMixer(),
             committedDetail: neutralDetailState(),
+            committedGeometry: neutralGeometryState(),
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -2303,6 +2629,49 @@
         developDetailMlxDenoise.disabled = true;
       }
 
+      function renderGeometryControlState(state) {
+        const geometry = normalizeGeometryState(state?.draftGeometry || state?.committedGeometry);
+        const crop = normalizeGeometryCrop(geometry.crop) || {
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          angle: 0,
+          aspect: null,
+        };
+        const developable = isDevelopable(selectedPhoto());
+        developLensGeometryPanel.dataset.geometryState = developable ? "enabled" : "blocked";
+        developGeometrySupportStatus.value = developable ? "Geometry Ready" : "Blocked";
+        developGeometrySupportStatus.textContent = developGeometrySupportStatus.value;
+        developGeometryCropStatus.value = geometrySummary(geometry);
+        developGeometryCropStatus.textContent = developGeometryCropStatus.value;
+        developLensSupportStatus.value = "Lens correction unavailable.";
+        developLensSupportStatus.textContent = developLensSupportStatus.value;
+        developGeometryTransformStatus.value = "Transform unsupported.";
+        developGeometryTransformStatus.textContent = developGeometryTransformStatus.value;
+
+        developGeometryCropControlPairs.forEach(({ slider, value, field }) => {
+          const display = normalizedUnit(crop[field], field === "width" || field === "height" ? 0.01 : 0, 1, field === "width" || field === "height" ? 1 : 0).toFixed(2);
+          slider.value = display;
+          value.value = display;
+        });
+        developGeometryFlipHorizontal.setAttribute("aria-pressed", String(geometry.flipHorizontal));
+        developGeometryFlipVertical.setAttribute("aria-pressed", String(geometry.flipVertical));
+        developGeometryFlipHorizontal.classList.toggle("is-active", geometry.flipHorizontal);
+        developGeometryFlipVertical.classList.toggle("is-active", geometry.flipVertical);
+
+        developUnsupportedLensGeometryControls.forEach((control) => {
+          control.disabled = true;
+        });
+        developLensProfileCorrection.checked = false;
+        developLensChromaticAberration.checked = false;
+        developLensDistortionSlider.value = "0";
+        developLensVignettingSlider.value = "0";
+        developGeometryTransformScaleSlider.value = "100";
+        developGeometryTransformVerticalSlider.value = "0";
+        developGeometryTransformHorizontalSlider.value = "0";
+      }
+
       function syncAdjustmentControls(state) {
         developExposureSlider.value = formatExposure(state.draftExposure);
         developExposureValue.value = formatExposure(state.draftExposure);
@@ -2330,6 +2699,7 @@
         renderToneCurveControlState(state);
         renderHslControlState(state);
         renderDetailControlState(state);
+        renderGeometryControlState(state);
       }
 
       function updateDevelopDirtyState(state) {
@@ -2349,6 +2719,7 @@
             || Number(state.draftSaturation) !== Number(state.committedSaturation)
             || Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint)
             || !hslMixersEqual(state.draftHslMixer, state.committedHslMixer)
+            || geometryDirty(state)
           )
         );
         developPreviewSurface.dataset.dirty = String(isDirty);
@@ -2376,6 +2747,7 @@
         state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
         state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
         state.committedDetail = normalizeDetailState(editState?.detail);
+        state.committedGeometry = normalizeGeometryState(editState?.geometry);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -2390,6 +2762,7 @@
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.draftDetail = cloneDetailState(state.committedDetail);
+        state.draftGeometry = cloneGeometryState(state.committedGeometry);
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -3318,12 +3691,13 @@
         }
         const activeHslChannel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
         const activeHslValues = normalizeHslChannel(state.draftHslMixer?.[activeHslChannel]);
-        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}, curve ${formatToneCurvePoint(state.draftToneCurveMidpoint)}, HSL ${activeHslChannel} ${formatSignedHundred(activeHslValues.hue)}/${formatSignedHundred(activeHslValues.saturation)}/${formatSignedHundred(activeHslValues.luminance)}.`;
+        const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}, curve ${formatToneCurvePoint(state.draftToneCurveMidpoint)}, HSL ${activeHslChannel} ${formatSignedHundred(activeHslValues.hue)}/${formatSignedHundred(activeHslValues.saturation)}/${formatSignedHundred(activeHslValues.luminance)}, geometry ${geometrySummary(state.draftGeometry)}`;
         if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
           return {
             status: "Ready",
             toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
             hslColorMixer: cloneHslMixer(state.draftHslMixer),
+            geometry: cloneGeometryState(state.draftGeometry),
             message: `Draft preview updated locally. ${summary}`,
           };
         }
@@ -3331,6 +3705,7 @@
           status: "BlockedByDecode",
           toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
           hslColorMixer: cloneHslMixer(state.draftHslMixer),
+          geometry: cloneGeometryState(state.draftGeometry),
           message: `Edit graph draft is valid, but RAW preview pixels are blocked until decode is implemented. ${summary}`,
         };
       }
@@ -3424,6 +3799,7 @@
           developHslLuminanceSlider,
           developHslLuminanceValue,
           developHslLuminanceReset,
+          ...developGeometryControls,
           developCommitEdit,
           developRevertEdit,
           developResetBasic,
@@ -3433,6 +3809,7 @@
         [
           ...developDetailControls,
           developDetailMlxDenoise,
+          ...developUnsupportedLensGeometryControls,
         ].forEach((control) => {
           control.disabled = true;
         });
@@ -3457,6 +3834,7 @@
           activeHslChannel: "red",
           draftHslMixer: neutralHslMixer(),
           draftDetail: neutralDetailState(),
+          draftGeometry: neutralGeometryState(),
           committedExposure: 0,
           committedContrast: 0,
           committedWhiteBalance: "as_shot",
@@ -3471,6 +3849,7 @@
           committedToneCurveMidpoint: 0.5,
           committedHslMixer: neutralHslMixer(),
           committedDetail: neutralDetailState(),
+          committedGeometry: neutralGeometryState(),
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -3526,6 +3905,7 @@
             toneCurve: response.data.toneCurve,
             hslColorMixer: response.data.hslColorMixer,
             detail: response.data.detail,
+            geometry: response.data.geometry,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -3596,6 +3976,23 @@
                       photoId: photo.photoId,
                       ...hslPayload(state),
                     })
+                    : family === "geometryCrop"
+                      ? state.draftGeometry?.crop
+                        ? await invoke("preview_geometry_crop_edit", {
+                          libraryPath: activeLibraryPath,
+                          photoId: photo.photoId,
+                          ...cropPayload(state),
+                        })
+                        : await invoke("preview_clear_geometry_crop", {
+                          libraryPath: activeLibraryPath,
+                          photoId: photo.photoId,
+                        })
+                      : family === "geometryOrientation"
+                        ? await invoke("preview_geometry_orientation_edit", {
+                          libraryPath: activeLibraryPath,
+                          photoId: photo.photoId,
+                          ...orientationPayload(state),
+                        })
                     : await invoke("preview_exposure_contrast_edit", {
                       libraryPath: activeLibraryPath,
                       photoId: photo.photoId,
@@ -3633,6 +4030,7 @@
             saturation: response.data.saturation,
             toneCurveMidpoint: toneCurveMidpointFromEditState(response.data.toneCurve),
             hslColorMixer: response.data.hslColorMixer,
+            geometry: response.data.geometry,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -3663,10 +4061,13 @@
         const toneCurveDirty = Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint);
         const hslDirty = !hslMixersEqual(state.draftHslMixer, state.committedHslMixer);
         const hslCommitChannel = hslDirty ? firstDirtyHslChannel(state) : state.activeHslChannel;
+        const geometryCropIsDirty = geometryCropDirty(state);
+        const geometryOrientationIsDirty = geometryOrientationDirty(state);
+        const geometryIsDirty = geometryCropIsDirty || geometryOrientationIsDirty;
         const exposureContrastDirty = Number(state.draftExposure) !== Number(state.committedExposure)
           || Number(state.draftContrast) !== Number(state.committedContrast);
 
-        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !toneCurveDirty && !hslDirty && !exposureContrastDirty) {
+        if (!whiteBalanceDirty && !toneRecoveryDirty && !colorPresenceDirty && !toneCurveDirty && !hslDirty && !geometryIsDirty && !exposureContrastDirty) {
           updateDevelopDirtyState(state);
           setStatus("No Develop draft changes to commit.");
           return;
@@ -3686,6 +4087,7 @@
           state.committedSaturation = state.draftSaturation;
           state.committedToneCurveMidpoint = state.draftToneCurveMidpoint;
           state.committedHslMixer = cloneHslMixer(state.draftHslMixer);
+          state.committedGeometry = cloneGeometryState(state.draftGeometry);
           state.readbackLoaded = true;
           state.readbackLibraryPath = activeLibraryPath || "";
           updateDevelopDirtyState(state);
@@ -3731,6 +4133,23 @@
                   photoId: photo.photoId,
                   ...hslPayload(state, hslCommitChannel),
                 })
+                : geometryCropIsDirty
+                  ? state.draftGeometry?.crop
+                    ? await invoke("commit_geometry_crop_edit", {
+                      libraryPath: activeLibraryPath,
+                      photoId: photo.photoId,
+                      ...cropPayload(state),
+                    })
+                    : await invoke("commit_clear_geometry_crop", {
+                      libraryPath: activeLibraryPath,
+                      photoId: photo.photoId,
+                    })
+                  : geometryOrientationIsDirty
+                    ? await invoke("commit_geometry_orientation_edit", {
+                      libraryPath: activeLibraryPath,
+                      photoId: photo.photoId,
+                      ...orientationPayload(state),
+                    })
                 : await invoke("commit_exposure_contrast_edit", {
                   libraryPath: activeLibraryPath,
                   photoId: photo.photoId,
@@ -3759,6 +4178,7 @@
           state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(response.data.toneCurve);
           state.committedHslMixer = normalizeHslMixer(response.data.hslColorMixer);
           state.committedDetail = normalizeDetailState(response.data.detail);
+          state.committedGeometry = normalizeGeometryState(response.data.geometry);
           state.draftDetail = cloneDetailState(state.committedDetail);
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
@@ -3776,6 +4196,18 @@
             state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
           } else if (hslDirty) {
             state.draftHslMixer[hslCommitChannel] = hslChannelFromEditState(state.committedHslMixer, hslCommitChannel);
+          } else if (geometryCropIsDirty) {
+            state.draftGeometry = {
+              ...normalizeGeometryState(state.draftGeometry),
+              crop: normalizeGeometryCrop(state.committedGeometry.crop),
+            };
+          } else if (geometryOrientationIsDirty) {
+            state.draftGeometry = {
+              ...normalizeGeometryState(state.draftGeometry),
+              rotation: state.committedGeometry.rotation,
+              flipHorizontal: state.committedGeometry.flipHorizontal,
+              flipVertical: state.committedGeometry.flipVertical,
+            };
           } else {
             state.draftExposure = state.committedExposure;
             state.draftContrast = state.committedContrast;
@@ -3787,54 +4219,32 @@
           await loadDevelopHistory();
           await loadPhotoHistogram();
           const remainingFamilies = [];
-          const remainingHslDirty = !hslMixersEqual(state.draftHslMixer, state.committedHslMixer);
-          if (whiteBalanceDirty && (toneRecoveryDirty || colorPresenceDirty || toneCurveDirty || remainingHslDirty || exposureContrastDirty)) {
-            if (toneRecoveryDirty) {
-              remainingFamilies.push("tone recovery");
-            }
-            if (colorPresenceDirty) {
-              remainingFamilies.push("color presence");
-            }
-            if (toneCurveDirty) {
-              remainingFamilies.push("tone curve");
-            }
-            if (remainingHslDirty) {
-              remainingFamilies.push("HSL color mixer");
-            }
-            if (exposureContrastDirty) {
-              remainingFamilies.push("exposure/contrast");
-            }
-          } else if (toneRecoveryDirty && (colorPresenceDirty || toneCurveDirty || remainingHslDirty || exposureContrastDirty)) {
-            if (colorPresenceDirty) {
-              remainingFamilies.push("color presence");
-            }
-            if (toneCurveDirty) {
-              remainingFamilies.push("tone curve");
-            }
-            if (remainingHslDirty) {
-              remainingFamilies.push("HSL color mixer");
-            }
-            if (exposureContrastDirty) {
-              remainingFamilies.push("exposure/contrast");
-            }
-          } else if (colorPresenceDirty && (toneCurveDirty || remainingHslDirty || exposureContrastDirty)) {
-            if (toneCurveDirty) {
-              remainingFamilies.push("tone curve");
-            }
-            if (remainingHslDirty) {
-              remainingFamilies.push("HSL color mixer");
-            }
-            if (exposureContrastDirty) {
-              remainingFamilies.push("exposure/contrast");
-            }
-          } else if (toneCurveDirty && (remainingHslDirty || exposureContrastDirty)) {
-            if (remainingHslDirty) {
-              remainingFamilies.push("HSL color mixer");
-            }
-            if (exposureContrastDirty) {
-              remainingFamilies.push("exposure/contrast");
-            }
-          } else if (remainingHslDirty && exposureContrastDirty) {
+          if (normalizeWhiteBalance(state.draftWhiteBalance) !== normalizeWhiteBalance(state.committedWhiteBalance)
+            || Number(state.draftTemperature) !== Number(state.committedTemperature)
+            || Number(state.draftTint) !== Number(state.committedTint)) {
+            remainingFamilies.push("white balance");
+          }
+          if (Number(state.draftHighlights) !== Number(state.committedHighlights)
+            || Number(state.draftShadows) !== Number(state.committedShadows)
+            || Number(state.draftWhites) !== Number(state.committedWhites)
+            || Number(state.draftBlacks) !== Number(state.committedBlacks)) {
+            remainingFamilies.push("tone recovery");
+          }
+          if (Number(state.draftVibrance) !== Number(state.committedVibrance)
+            || Number(state.draftSaturation) !== Number(state.committedSaturation)) {
+            remainingFamilies.push("color presence");
+          }
+          if (Number(state.draftToneCurveMidpoint) !== Number(state.committedToneCurveMidpoint)) {
+            remainingFamilies.push("tone curve");
+          }
+          if (!hslMixersEqual(state.draftHslMixer, state.committedHslMixer)) {
+            remainingFamilies.push("HSL color mixer");
+          }
+          if (geometryDirty(state)) {
+            remainingFamilies.push("geometry");
+          }
+          if (Number(state.draftExposure) !== Number(state.committedExposure)
+            || Number(state.draftContrast) !== Number(state.committedContrast)) {
             remainingFamilies.push("exposure/contrast");
           }
           setStatus(remainingFamilies.length
@@ -3867,6 +4277,7 @@
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.draftDetail = cloneDetailState(state.committedDetail);
+        state.draftGeometry = cloneGeometryState(state.committedGeometry);
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -3880,6 +4291,41 @@
         const state = developAdjustmentState(photo.photoId);
         state.activeHslChannel = channel;
         syncAdjustmentControls(state);
+      }
+
+      function updateDraftGeometryCropField(state, field, value) {
+        const current = normalizeGeometryCrop(state.draftGeometry?.crop) || {
+          x: 0,
+          y: 0,
+          width: 1,
+          height: 1,
+          angle: 0,
+          aspect: null,
+        };
+        const next = { ...current };
+        if (field === "x") {
+          next.x = normalizedUnit(value, 0, 1 - next.width, current.x);
+        } else if (field === "y") {
+          next.y = normalizedUnit(value, 0, 1 - next.height, current.y);
+        } else if (field === "width") {
+          next.width = normalizedUnit(value, 0.01, 1, current.width);
+          next.x = normalizedUnit(next.x, 0, 1 - next.width, 0);
+        } else if (field === "height") {
+          next.height = normalizedUnit(value, 0.01, 1, current.height);
+          next.y = normalizedUnit(next.y, 0, 1 - next.height, 0);
+        }
+        state.draftGeometry = {
+          ...normalizeGeometryState(state.draftGeometry),
+          crop: normalizeGeometryCrop(next),
+        };
+      }
+
+      function nextQuarterTurn(rotation, delta) {
+        const order = [0, 90, 180, -90];
+        const current = Number(formatRotation(rotation));
+        const index = Math.max(0, order.indexOf(current));
+        const offset = delta > 0 ? 1 : -1;
+        return order[(index + offset + order.length) % order.length];
       }
 
       function updateDevelopAdjustment(kind, value) {
@@ -3948,6 +4394,52 @@
             luminance: Number(formatSignedHundred(value)),
           };
           previewDevelopEdit("hslColorMixer");
+        } else if (kind === "geometryCropX") {
+          updateDraftGeometryCropField(state, "x", value);
+          previewDevelopEdit("geometryCrop");
+        } else if (kind === "geometryCropY") {
+          updateDraftGeometryCropField(state, "y", value);
+          previewDevelopEdit("geometryCrop");
+        } else if (kind === "geometryCropWidth") {
+          updateDraftGeometryCropField(state, "width", value);
+          previewDevelopEdit("geometryCrop");
+        } else if (kind === "geometryCropHeight") {
+          updateDraftGeometryCropField(state, "height", value);
+          previewDevelopEdit("geometryCrop");
+        } else if (kind === "geometryClearCrop") {
+          state.draftGeometry = {
+            ...normalizeGeometryState(state.draftGeometry),
+            crop: null,
+          };
+          previewDevelopEdit("geometryCrop");
+        } else if (kind === "geometryRotate") {
+          state.draftGeometry = {
+            ...normalizeGeometryState(state.draftGeometry),
+            rotation: nextQuarterTurn(state.draftGeometry?.rotation, Number(value)),
+          };
+          previewDevelopEdit("geometryOrientation");
+        } else if (kind === "geometryOrientationReset") {
+          state.draftGeometry = {
+            ...normalizeGeometryState(state.draftGeometry),
+            rotation: 0,
+            flipHorizontal: false,
+            flipVertical: false,
+          };
+          previewDevelopEdit("geometryOrientation");
+        } else if (kind === "geometryFlipHorizontal") {
+          const geometry = normalizeGeometryState(state.draftGeometry);
+          state.draftGeometry = {
+            ...geometry,
+            flipHorizontal: !geometry.flipHorizontal,
+          };
+          previewDevelopEdit("geometryOrientation");
+        } else if (kind === "geometryFlipVertical") {
+          const geometry = normalizeGeometryState(state.draftGeometry);
+          state.draftGeometry = {
+            ...geometry,
+            flipVertical: !geometry.flipVertical,
+          };
+          previewDevelopEdit("geometryOrientation");
         }
       }
 
@@ -3980,6 +4472,7 @@
         state.committedToneCurveMidpoint = toneCurveMidpointFromEditState(editState?.toneCurve);
         state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
         state.committedDetail = normalizeDetailState(editState?.detail);
+        state.committedGeometry = normalizeGeometryState(editState?.geometry);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -3994,6 +4487,7 @@
         state.draftToneCurveMidpoint = state.committedToneCurveMidpoint;
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.draftDetail = cloneDetailState(state.committedDetail);
+        state.draftGeometry = cloneGeometryState(state.committedGeometry);
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
       }
@@ -4462,6 +4956,7 @@
           developHslLuminanceSlider,
           developHslLuminanceValue,
           developHslLuminanceReset,
+          ...developGeometryControls,
           developToneCurveMidpointSlider,
           developToneCurveMidpointValue,
           developToneCurveReset,
@@ -4474,6 +4969,7 @@
         [
           ...developDetailControls,
           developDetailMlxDenoise,
+          ...developUnsupportedLensGeometryControls,
         ].forEach((control) => {
           control.disabled = true;
         });
@@ -4488,6 +4984,7 @@
         renderToneCurveControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         renderHslControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         renderDetailControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
+        renderGeometryControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         basicPresetButtons.forEach((button) => {
           button.disabled = developDisabled;
         });
@@ -4783,6 +5280,27 @@
       });
       developHslLuminanceValue.addEventListener("dblclick", () => resetDevelopAdjustment("hslLuminance"));
       developHslLuminanceReset.addEventListener("click", () => resetDevelopAdjustment("hslLuminance"));
+      developGeometryCropControlPairs.forEach(({ slider, value, field }) => {
+        const kind = field === "x"
+          ? "geometryCropX"
+          : field === "y"
+            ? "geometryCropY"
+            : field === "width"
+              ? "geometryCropWidth"
+              : "geometryCropHeight";
+        slider.addEventListener("input", () => updateDevelopAdjustment(kind, slider.value));
+        value.addEventListener("input", () => {
+          if (!["", "."].includes(value.value)) {
+            updateDevelopAdjustment(kind, value.value);
+          }
+        });
+      });
+      developGeometryCropClear.addEventListener("click", () => updateDevelopAdjustment("geometryClearCrop", null));
+      developGeometryRotateLeft.addEventListener("click", () => updateDevelopAdjustment("geometryRotate", developGeometryRotateLeft.dataset.geometryRotate));
+      developGeometryRotateRight.addEventListener("click", () => updateDevelopAdjustment("geometryRotate", developGeometryRotateRight.dataset.geometryRotate));
+      developGeometryOrientationReset.addEventListener("click", () => updateDevelopAdjustment("geometryOrientationReset", null));
+      developGeometryFlipHorizontal.addEventListener("click", () => updateDevelopAdjustment("geometryFlipHorizontal", null));
+      developGeometryFlipVertical.addEventListener("click", () => updateDevelopAdjustment("geometryFlipVertical", null));
       developCommitEdit.addEventListener("click", commitDevelopEdit);
       developRevertEdit.addEventListener("click", revertDevelopDraft);
       developResetBasic.addEventListener("click", resetP0BasicControls);

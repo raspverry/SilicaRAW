@@ -695,6 +695,26 @@ def state_script(state):
     document.querySelector("#developDetailBoundaryStatus").textContent = "Detail preview/export is unsupported until renderer support exists.";
     document.querySelector("#developDetailSharpeningAmountSlider").value = "42";
     document.querySelector("#developDetailSharpeningAmountValue").value = "42";
+    document.querySelector("#developLensGeometryPanel").dataset.geometryState = "enabled";
+    document.querySelector("#developGeometrySupportStatus").value = "Geometry Ready";
+    document.querySelector("#developGeometrySupportStatus").textContent = "Geometry Ready";
+    document.querySelector("#developGeometryCropStatus").value = "Crop 50% x 80% at 10%, 5%, rotation 90, horizontal flip.";
+    document.querySelector("#developGeometryCropStatus").textContent = "Crop 50% x 80% at 10%, 5%, rotation 90, horizontal flip.";
+    document.querySelector("#developLensSupportStatus").value = "Lens correction unavailable.";
+    document.querySelector("#developLensSupportStatus").textContent = "Lens correction unavailable.";
+    document.querySelector("#developGeometryTransformStatus").value = "Transform unsupported.";
+    document.querySelector("#developGeometryTransformStatus").textContent = "Transform unsupported.";
+    document.querySelector("#developGeometryCropXSlider").value = "0.10";
+    document.querySelector("#developGeometryCropXValue").value = "0.10";
+    document.querySelector("#developGeometryCropYSlider").value = "0.05";
+    document.querySelector("#developGeometryCropYValue").value = "0.05";
+    document.querySelector("#developGeometryCropWidthSlider").value = "0.50";
+    document.querySelector("#developGeometryCropWidthValue").value = "0.50";
+    document.querySelector("#developGeometryCropHeightSlider").value = "0.80";
+    document.querySelector("#developGeometryCropHeightValue").value = "0.80";
+    document.querySelector("#developGeometryFlipHorizontal").setAttribute("aria-pressed", "true");
+    document.querySelector("#developGeometryFlipHorizontal").classList.add("is-active");
+    document.querySelector("#developGeometryFlipVertical").setAttribute("aria-pressed", "false");
     [
       "#developDetailSharpeningAmountSlider",
       "#developDetailSharpeningAmountValue",
@@ -715,6 +735,13 @@ def state_script(state):
       "#developDetailNoiseColorDetailSlider",
       "#developDetailNoiseColorDetailValue",
       "#developDetailMlxDenoise",
+      "#developLensProfileCorrection",
+      "#developLensChromaticAberration",
+      "#developLensDistortionSlider",
+      "#developLensVignettingSlider",
+      "#developGeometryTransformScaleSlider",
+      "#developGeometryTransformVerticalSlider",
+      "#developGeometryTransformHorizontalSlider",
     ].forEach((selector) => {{
       const control = document.querySelector(selector);
       if (control) control.disabled = true;
@@ -766,6 +793,20 @@ def state_script(state):
       "#developHslLuminanceSlider",
       "#developHslLuminanceValue",
       "#developHslLuminanceReset",
+      "#developGeometryCropXSlider",
+      "#developGeometryCropXValue",
+      "#developGeometryCropYSlider",
+      "#developGeometryCropYValue",
+      "#developGeometryCropWidthSlider",
+      "#developGeometryCropWidthValue",
+      "#developGeometryCropHeightSlider",
+      "#developGeometryCropHeightValue",
+      "#developGeometryCropClear",
+      "#developGeometryRotateLeft",
+      "#developGeometryRotateRight",
+      "#developGeometryOrientationReset",
+      "#developGeometryFlipHorizontal",
+      "#developGeometryFlipVertical",
       "#developResetBasic",
       "#developCommitEdit",
       "#developRevertEdit",
@@ -777,6 +818,7 @@ def state_script(state):
     developSurface.dataset.hasPreviewImage = "true";
     developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
     developSurface.prepend(thumb(imagePath, "sr-develop-image"));
+    document.querySelector("#developLensGeometryPanel").scrollIntoView({{ block: "center" }});
   }} else if (state === "export") {{
     openLibraryBase(true);
     setMode("export");
@@ -898,6 +940,23 @@ def metric_script(surface):
         "#developDetailNoiseColorDetailValue",
         "#developDetailMlxDenoise",
       ].every((selector) => disabled(selector)),
+      geometryVisible: Boolean(box("#developLensGeometryPanel")),
+      geometryStatus: text("#developGeometrySupportStatus"),
+      geometryCropStatus: text("#developGeometryCropStatus"),
+      geometryCropWidth: document.querySelector("#developGeometryCropWidthSlider")?.value || "",
+      geometryCropHeight: document.querySelector("#developGeometryCropHeightSlider")?.value || "",
+      geometryFlipHorizontal: document.querySelector("#developGeometryFlipHorizontal")?.getAttribute("aria-pressed") === "true",
+      geometryLensStatus: text("#developLensSupportStatus"),
+      geometryTransformStatus: text("#developGeometryTransformStatus"),
+      geometryUnsupportedDisabled: [
+        "#developLensProfileCorrection",
+        "#developLensChromaticAberration",
+        "#developLensDistortionSlider",
+        "#developLensVignettingSlider",
+        "#developGeometryTransformScaleSlider",
+        "#developGeometryTransformVerticalSlider",
+        "#developGeometryTransformHorizontalSlider",
+      ].every((selector) => disabled(selector)),
     }},
   }};
 }})()
@@ -977,6 +1036,16 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: Detail renderer boundary copy wrong")
                     if develop_state["detailAmount"] != "42" or not develop_state["detailControlsDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: Detail disabled readback state not preserved")
+                    if not develop_state["geometryVisible"] or develop_state["geometryStatus"] != "Geometry Ready":
+                        failures.append(f"{viewport_name} {surface_name}: geometry panel support state not visible")
+                    if develop_state["geometryCropWidth"] != "0.5" or develop_state["geometryCropHeight"] != "0.8":
+                        failures.append(f"{viewport_name} {surface_name}: geometry seeded crop state not visible")
+                    if not develop_state["geometryFlipHorizontal"]:
+                        failures.append(f"{viewport_name} {surface_name}: geometry flip state not visible")
+                    if develop_state["geometryLensStatus"] != "Lens correction unavailable.":
+                        failures.append(f"{viewport_name} {surface_name}: lens unsupported state copy wrong")
+                    if develop_state["geometryTransformStatus"] != "Transform unsupported." or not develop_state["geometryUnsupportedDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: unsupported geometry/lens controls enabled")
     return results, failures
 
 

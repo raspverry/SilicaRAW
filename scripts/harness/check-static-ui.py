@@ -226,6 +226,32 @@ def main():
         "developDetailNoiseColorDetailSlider",
         "developDetailNoiseColorDetailValue",
         "developDetailMlxDenoise",
+        "developLensGeometryPanel",
+        "developGeometrySupportStatus",
+        "developGeometryCropStatus",
+        "developLensSupportStatus",
+        "developLensProfileCorrection",
+        "developLensChromaticAberration",
+        "developLensDistortionSlider",
+        "developLensVignettingSlider",
+        "developGeometryCropXSlider",
+        "developGeometryCropXValue",
+        "developGeometryCropYSlider",
+        "developGeometryCropYValue",
+        "developGeometryCropWidthSlider",
+        "developGeometryCropWidthValue",
+        "developGeometryCropHeightSlider",
+        "developGeometryCropHeightValue",
+        "developGeometryCropClear",
+        "developGeometryRotateLeft",
+        "developGeometryRotateRight",
+        "developGeometryOrientationReset",
+        "developGeometryFlipHorizontal",
+        "developGeometryFlipVertical",
+        "developGeometryTransformStatus",
+        "developGeometryTransformScaleSlider",
+        "developGeometryTransformVerticalSlider",
+        "developGeometryTransformHorizontalSlider",
         "developCommitEdit",
         "developRevertEdit",
         "developHistoryPanel",
@@ -324,6 +350,7 @@ def main():
             ".sr-adjustment-slider",
             ".sr-tone-curve-panel",
             ".sr-detail-panel",
+            ".sr-geometry-panel",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
         ]:
@@ -445,6 +472,68 @@ def main():
     ]:
         require(marker in source, f"Detail blocked-state marker missing: {marker}", failures)
 
+    geometry_crop_controls = {
+        "developGeometryCropXSlider": ("0", "1", "0.01"),
+        "developGeometryCropYSlider": ("0", "1", "0.01"),
+        "developGeometryCropWidthSlider": ("0.01", "1", "0.01"),
+        "developGeometryCropHeightSlider": ("0.01", "1", "0.01"),
+    }
+    for control_id, (minimum, maximum, step) in geometry_crop_controls.items():
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "range", f"#{control_id} must be a range input", failures)
+        require(attrs.get("min") == minimum, f"#{control_id} min must match normalized crop bounds", failures)
+        require(attrs.get("max") == maximum, f"#{control_id} max must match normalized crop bounds", failures)
+        require(attrs.get("step") == step, f"#{control_id} step must support normalized crop precision", failures)
+    for control_id in [
+        "developGeometryCropXValue",
+        "developGeometryCropYValue",
+        "developGeometryCropWidthValue",
+        "developGeometryCropHeightValue",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "number", f"#{control_id} must be a numeric crop input", failures)
+    for control_id in [
+        "developGeometryCropClear",
+        "developGeometryRotateLeft",
+        "developGeometryRotateRight",
+        "developGeometryOrientationReset",
+        "developGeometryFlipHorizontal",
+        "developGeometryFlipVertical",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "button", f"#{control_id} must be a button", failures)
+    require(
+        parser.ids.get("developGeometryRotateLeft", {}).get("data-geometry-rotate") == "-90",
+        "#developGeometryRotateLeft must declare a supported quarter-turn rotation",
+        failures,
+    )
+    require(
+        parser.ids.get("developGeometryRotateRight", {}).get("data-geometry-rotate") == "90",
+        "#developGeometryRotateRight must declare a supported quarter-turn rotation",
+        failures,
+    )
+    for control_id in [
+        "developLensProfileCorrection",
+        "developLensChromaticAberration",
+        "developLensDistortionSlider",
+        "developLensVignettingSlider",
+        "developGeometryTransformScaleSlider",
+        "developGeometryTransformVerticalSlider",
+        "developGeometryTransformHorizontalSlider",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require("disabled" in attrs, f"#{control_id} must stay disabled until runtime support exists", failures)
+    for marker in [
+        "Lens &amp; Geometry",
+        "Geometry Ready",
+        "Lens correction unavailable.",
+        "Transform unsupported.",
+        "Crop",
+        "Rotate",
+        "Flip",
+    ]:
+        require(marker in source, f"Lens/Geometry panel marker missing: {marker}", failures)
+
     expected_native_hosts = {
         "loupeViewer": "loupe",
         "developPreviewSurface": "develop",
@@ -493,6 +582,20 @@ def main():
         "developHslLuminanceSlider",
         "developHslLuminanceValue",
         "developHslLuminanceReset",
+        "developGeometryCropXSlider",
+        "developGeometryCropXValue",
+        "developGeometryCropYSlider",
+        "developGeometryCropYValue",
+        "developGeometryCropWidthSlider",
+        "developGeometryCropWidthValue",
+        "developGeometryCropHeightSlider",
+        "developGeometryCropHeightValue",
+        "developGeometryCropClear",
+        "developGeometryRotateLeft",
+        "developGeometryRotateRight",
+        "developGeometryOrientationReset",
+        "developGeometryFlipHorizontal",
+        "developGeometryFlipVertical",
         "developCommitEdit",
         "developRevertEdit",
         "openExportDialog",

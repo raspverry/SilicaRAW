@@ -77,6 +77,12 @@ Task 18.3.3 adds a disabled Detail readback panel to the Develop inspector. The 
 
 Visual QA now seeds a blocked non-neutral Detail state and verifies the blocked status, renderer/export boundary copy, readback value, and disabled controls across `1280x800`, `1440x900`, and `1728x965`.
 
+## Phase 18 Lens Geometry Panel Note
+
+Task 18.4.3 adds a Lens & Geometry panel to the Develop inspector. The panel exposes supported normalized crop, clear crop, quarter-turn rotate, and horizontal/vertical flip controls while keeping lens correction and transform controls disabled until runtime support exists.
+
+Visual QA now seeds a supported crop/flip state and verifies geometry readiness, crop values, flip state, lens unavailable copy, transform unsupported copy, and disabled unsupported controls across `1280x800`, `1440x900`, and `1728x965`.
+
 ## Final Phase 5.6.12 Refresh
 
 Final QA command:
