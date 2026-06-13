@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | HSL color mixer mutator added
+
+- Completed Task 18.2.1 with graph-only HSL color mixer mutation for all eight schema-owned channels.
+- Added unsupported channel-name rejection and hue, saturation, and luminance range validation through the existing edit graph validator.
+- Kept preview, export, UI, storage, sidecar, and color-correctness behavior out of scope and routed Phase 18 to Task 18.2.2.
+
 ## [2026-06-13] phase-18 | Tone curve panel UI completed
 
 - Completed Task 18.1.3 with a compact Develop Tone Curve panel for the supported RGB point midpoint control.

@@ -208,6 +208,40 @@ pub struct HslAdjustments {
     pub magenta: HslChannel,
 }
 
+/// Schema-owned HSL color mixer channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HslColorChannel {
+    Red,
+    Orange,
+    Yellow,
+    Green,
+    Aqua,
+    Blue,
+    Purple,
+    Magenta,
+}
+
+impl TryFrom<&str> for HslColorChannel {
+    type Error = EditGraphValidationError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "red" => Ok(Self::Red),
+            "orange" => Ok(Self::Orange),
+            "yellow" => Ok(Self::Yellow),
+            "green" => Ok(Self::Green),
+            "aqua" => Ok(Self::Aqua),
+            "blue" => Ok(Self::Blue),
+            "purple" => Ok(Self::Purple),
+            "magenta" => Ok(Self::Magenta),
+            unsupported => Err(EditGraphValidationError::new(
+                "color.hsl",
+                format!("unsupported HSL color channel: {unsupported}"),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HslChannel {
@@ -619,6 +653,25 @@ pub fn apply_color_presence(
     Ok(edited)
 }
 
+/// Return a draft graph with one HSL color mixer channel adjusted.
+pub fn apply_hsl_color_channel(
+    graph: &EditGraph,
+    channel: HslColorChannel,
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    let hsl_channel = hsl_color_channel_mut(&mut edited.color.hsl, channel);
+    hsl_channel.hue = number_from_f64(&hsl_channel_path(channel, "hue"), hue)?;
+    hsl_channel.saturation = number_from_f64(&hsl_channel_path(channel, "saturation"), saturation)?;
+    hsl_channel.luminance = number_from_f64(&hsl_channel_path(channel, "luminance"), luminance)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Reset P0 Basic controls to schema-valid defaults.
 pub fn reset_p0_basic_controls(
     graph: &EditGraph,
@@ -735,6 +788,33 @@ pub fn validate_edit_graph(graph: &EditGraph) -> Result<(), EditGraphValidationE
     validate_metadata(&graph.metadata)?;
 
     Ok(())
+}
+
+fn hsl_color_channel_mut(hsl: &mut HslAdjustments, channel: HslColorChannel) -> &mut HslChannel {
+    match channel {
+        HslColorChannel::Red => &mut hsl.red,
+        HslColorChannel::Orange => &mut hsl.orange,
+        HslColorChannel::Yellow => &mut hsl.yellow,
+        HslColorChannel::Green => &mut hsl.green,
+        HslColorChannel::Aqua => &mut hsl.aqua,
+        HslColorChannel::Blue => &mut hsl.blue,
+        HslColorChannel::Purple => &mut hsl.purple,
+        HslColorChannel::Magenta => &mut hsl.magenta,
+    }
+}
+
+fn hsl_channel_path(channel: HslColorChannel, field: &str) -> String {
+    let channel_name = match channel {
+        HslColorChannel::Red => "red",
+        HslColorChannel::Orange => "orange",
+        HslColorChannel::Yellow => "yellow",
+        HslColorChannel::Green => "green",
+        HslColorChannel::Aqua => "aqua",
+        HslColorChannel::Blue => "blue",
+        HslColorChannel::Purple => "purple",
+        HslColorChannel::Magenta => "magenta",
+    };
+    format!("color.hsl.{channel_name}.{field}")
 }
 
 fn validate_profile(profile: &Profile) -> Result<(), EditGraphValidationError> {
@@ -1451,6 +1531,120 @@ mod tests {
         assert_eq!(serialized["basic"]["vibrance"].as_f64(), Some(24.0));
         assert_eq!(serialized["basic"]["saturation"].as_f64(), Some(-8.5));
         super::validate_edit_graph_json(&serialized).expect("color presence graph validates");
+    }
+
+    #[test]
+    fn applies_hsl_color_channel_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Blue,
+            -12.0,
+            24.0,
+            -8.5,
+            "unix:3",
+        )
+        .expect("apply HSL color channel");
+        let serialized = serde_json::to_value(&edited).expect("serialize HSL graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip HSL graph");
+
+        assert_eq!(edited.color.hsl.blue.hue.as_f64(), Some(-12.0));
+        assert_eq!(edited.color.hsl.blue.saturation.as_f64(), Some(24.0));
+        assert_eq!(edited.color.hsl.blue.luminance.as_f64(), Some(-8.5));
+        assert_eq!(edited.color.hsl.red.hue.as_f64(), Some(0.0));
+        assert_eq!(edited.basic.vibrance.as_f64(), Some(0.0));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.color.hsl.blue.saturation.as_f64(), Some(24.0));
+        assert_eq!(
+            serialized["color"]["hsl"]["blue"]["hue"].as_f64(),
+            Some(-12.0)
+        );
+        assert_eq!(
+            serialized["color"]["hsl"]["blue"]["luminance"].as_f64(),
+            Some(-8.5)
+        );
+        for (name, expected) in [
+            ("red", super::HslColorChannel::Red),
+            ("orange", super::HslColorChannel::Orange),
+            ("yellow", super::HslColorChannel::Yellow),
+            ("green", super::HslColorChannel::Green),
+            ("aqua", super::HslColorChannel::Aqua),
+            ("blue", super::HslColorChannel::Blue),
+            ("purple", super::HslColorChannel::Purple),
+            ("magenta", super::HslColorChannel::Magenta),
+        ] {
+            assert_eq!(
+                super::HslColorChannel::try_from(name).expect("parse HSL color channel"),
+                expected
+            );
+        }
+        super::validate_edit_graph_json(&serialized).expect("HSL graph validates");
+    }
+
+    #[test]
+    fn rejects_invalid_hsl_color_channel_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let invalid_channel =
+            super::HslColorChannel::try_from("cyan").expect_err("unsupported HSL channel name");
+        let hue_error = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Red,
+            101.0,
+            0.0,
+            0.0,
+            "unix:3",
+        )
+        .expect_err("hue above schema range");
+        let saturation_error = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Orange,
+            0.0,
+            -101.0,
+            0.0,
+            "unix:3",
+        )
+        .expect_err("saturation below schema range");
+        let luminance_error = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Magenta,
+            0.0,
+            0.0,
+            101.0,
+            "unix:3",
+        )
+        .expect_err("luminance above schema range");
+
+        assert!(invalid_channel.to_string().contains("color.hsl"));
+        assert!(hue_error.to_string().contains("color.hsl.red.hue"));
+        assert!(saturation_error
+            .to_string()
+            .contains("color.hsl.orange.saturation"));
+        assert!(luminance_error
+            .to_string()
+            .contains("color.hsl.magenta.luminance"));
     }
 
     #[test]

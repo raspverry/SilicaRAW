@@ -79,7 +79,7 @@ The current implementation order starts with:
 - Task 15.6, RAW export manual color QA, is complete.
 - Phase 15 is complete.
 - Phase 16 is complete: action trust, semantics, edit history, undo/redo, Develop history panel data, append-only action log, and sidecar status after history commits are implemented.
-- Phase 17 is complete. Tasks 18.1.1 through 18.1.3 are complete. Current task is Task 18.2.1 HSL Color Mixer Mutators.
+- Phase 17 is complete. Tasks 18.1.1 through 18.2.1 are complete. Current task is Task 18.2.2 HSL Preview, Commit, and Export Parity.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
