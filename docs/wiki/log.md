@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Detail panel UI completed
+
+- Completed Task 18.3.3 with a disabled Develop Detail readback panel for sharpening and non-MLX noise reduction.
+- Kept all Detail controls and MLX Denoise disabled while showing blocked preview/export messaging for non-neutral Detail state.
+- Extended static UI, workflow smoke, and final visual QA checks for the Detail renderer/export boundary and routed Phase 18 to Task 18.4.1.
+
 ## [2026-06-13] phase-18 | Detail runtime boundary added
 
 - Completed Task 18.3.2 with an explicit no-supported-detail-runtime boundary.
