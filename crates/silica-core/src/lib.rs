@@ -3,6 +3,7 @@
 //! Phase 4.2 starts the local library command surface.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 use std::path::Path;
@@ -658,6 +659,58 @@ impl PhotoEditCommit {
     }
 }
 
+/// Result of applying one edit clipboard payload across multiple catalog photos.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditClipboardSyncResult {
+    pub status: String,
+    pub requested_count: usize,
+    pub applied_count: usize,
+    pub skipped_count: usize,
+    pub blocked_count: usize,
+    pub failed_count: usize,
+    pub commits: Vec<BatchEditClipboardSyncCommit>,
+    pub targets: Vec<BatchEditClipboardSyncTarget>,
+    pub failures: Vec<BatchEditClipboardSyncFailure>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditClipboardSyncCommit {
+    pub photo_id: String,
+    pub history_id: String,
+    pub sequence: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditClipboardSyncFailure {
+    pub photo_id: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditClipboardSyncPlan {
+    pub status: String,
+    pub requested_count: usize,
+    pub ready_count: usize,
+    pub unchanged_count: usize,
+    pub blocked_count: usize,
+    pub targets: Vec<BatchEditClipboardSyncTarget>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchEditClipboardSyncTarget {
+    pub photo_id: String,
+    pub status: String,
+    pub code: Option<String>,
+    pub message: String,
+}
+
+struct PreparedEditClipboardSync {
+    plan: BatchEditClipboardSyncPlan,
+    ready_graphs: Vec<silica_edit::EditGraph>,
+}
+
 /// Current committed exposure/contrast edit state for a catalog photo.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhotoEditState {
@@ -890,6 +943,123 @@ pub fn apply_edit_clipboard_payload_to_graph(
     updated_at: impl Into<String>,
 ) -> Result<silica_edit::EditGraph, CoreError> {
     silica_edit::apply_edit_clipboard_payload(target, payload, updated_at).map_err(CoreError::from)
+}
+
+/// Plan a batch edit clipboard sync without mutating catalog state.
+pub fn plan_edit_clipboard_sync(
+    library_root_path: impl AsRef<Path>,
+    photo_ids: &[String],
+    payload: &silica_edit::EditClipboardPayload,
+) -> Result<BatchEditClipboardSyncPlan, CoreError> {
+    Ok(prepare_edit_clipboard_sync(library_root_path, photo_ids, payload)?.plan)
+}
+
+/// Apply one typed edit clipboard payload to multiple photos with per-photo history checkpoints.
+pub fn apply_edit_clipboard_sync(
+    library_root_path: impl AsRef<Path>,
+    photo_ids: &[String],
+    payload: &silica_edit::EditClipboardPayload,
+) -> Result<BatchEditClipboardSyncResult, CoreError> {
+    let prepared = prepare_edit_clipboard_sync(library_root_path.as_ref(), photo_ids, payload)?;
+    if prepared.plan.status == "empty" {
+        return Ok(BatchEditClipboardSyncResult {
+            status: "empty".to_string(),
+            requested_count: prepared.plan.requested_count,
+            applied_count: 0,
+            skipped_count: 0,
+            blocked_count: 0,
+            failed_count: 0,
+            commits: Vec::new(),
+            targets: prepared.plan.targets,
+            failures: Vec::new(),
+            message: prepared.plan.message,
+        });
+    }
+    if prepared.plan.blocked_count > 0 {
+        let failures = prepared
+            .plan
+            .targets
+            .iter()
+            .filter(|target| target.status == "blocked")
+            .map(|target| BatchEditClipboardSyncFailure {
+                photo_id: target.photo_id.clone(),
+                message: target.message.clone(),
+            })
+            .collect::<Vec<_>>();
+        return Ok(BatchEditClipboardSyncResult {
+            status: "blocked".to_string(),
+            requested_count: prepared.plan.requested_count,
+            applied_count: 0,
+            skipped_count: prepared.plan.unchanged_count,
+            blocked_count: prepared.plan.blocked_count,
+            failed_count: prepared.plan.blocked_count,
+            commits: Vec::new(),
+            targets: prepared.plan.targets,
+            failures,
+            message: format!(
+                "{} target(s) blocked; nothing was written.",
+                prepared.plan.blocked_count
+            ),
+        });
+    }
+    if prepared.ready_graphs.is_empty() {
+        return Ok(BatchEditClipboardSyncResult {
+            status: "skipped".to_string(),
+            requested_count: prepared.plan.requested_count,
+            applied_count: 0,
+            skipped_count: prepared.plan.unchanged_count,
+            blocked_count: 0,
+            failed_count: 0,
+            commits: Vec::new(),
+            targets: prepared.plan.targets,
+            failures: Vec::new(),
+            message: "Batch sync skipped; all targets were unchanged.".to_string(),
+        });
+    }
+
+    let library_root_path = library_root_path.as_ref();
+    let storage_result =
+        silica_storage::commit_edit_graph_batch(library_root_path, prepared.ready_graphs)?;
+    let commits = storage_result
+        .commits
+        .into_iter()
+        .map(|commit| BatchEditClipboardSyncCommit {
+            photo_id: commit.photo_id,
+            history_id: commit.history_id,
+            sequence: commit.sequence,
+        })
+        .collect::<Vec<_>>();
+    let applied_count = commits.len();
+    let skipped_count = prepared.plan.unchanged_count + storage_result.skipped_photo_ids.len();
+    let status = if applied_count == 0 {
+        "skipped"
+    } else {
+        "applied"
+    };
+
+    Ok(BatchEditClipboardSyncResult {
+        status: status.to_string(),
+        requested_count: prepared.plan.requested_count,
+        applied_count,
+        skipped_count,
+        blocked_count: 0,
+        failed_count: 0,
+        commits,
+        targets: prepared.plan.targets,
+        failures: Vec::new(),
+        message: format!(
+            "Batch sync completed: {applied_count} applied, {skipped_count} unchanged."
+        ),
+    })
+}
+
+/// Backward-compatible name for the batch clipboard apply boundary.
+pub fn sync_edit_clipboard_payload_to_photos(
+    library_root_path: impl AsRef<Path>,
+    photo_ids: &[String],
+    payload: &silica_edit::EditClipboardPayload,
+) -> Result<BatchEditClipboardSyncResult, CoreError> {
+    apply_edit_clipboard_sync(library_root_path, photo_ids, payload)
 }
 
 /// Load app-level desktop session state from a caller-provided path.
@@ -4768,6 +4938,198 @@ fn detail_unsupported_message() -> String {
     "Detail preview/export is unsupported until renderer support exists.".to_string()
 }
 
+fn prepare_edit_clipboard_sync(
+    library_root_path: impl AsRef<Path>,
+    photo_ids: &[String],
+    payload: &silica_edit::EditClipboardPayload,
+) -> Result<PreparedEditClipboardSync, CoreError> {
+    silica_edit::validate_edit_clipboard_payload(payload)?;
+    let library_root_path = library_root_path.as_ref();
+    let requested_count = photo_ids.len();
+    if photo_ids.is_empty() {
+        return Ok(PreparedEditClipboardSync {
+            plan: BatchEditClipboardSyncPlan {
+                status: "empty".to_string(),
+                requested_count,
+                ready_count: 0,
+                unchanged_count: 0,
+                blocked_count: 0,
+                targets: Vec::new(),
+                message: "No target photos requested for batch sync.".to_string(),
+            },
+            ready_graphs: Vec::new(),
+        });
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut targets = Vec::new();
+    let mut ready_graphs = Vec::new();
+
+    for photo_id in photo_ids {
+        if photo_id.trim().is_empty() {
+            targets.push(batch_sync_target(
+                photo_id,
+                "blocked",
+                Some("empty_target"),
+                "Photo id must not be empty.",
+            ));
+            continue;
+        }
+        if !seen.insert(photo_id.clone()) {
+            targets.push(batch_sync_target(
+                photo_id,
+                "blocked",
+                Some("duplicate_target"),
+                "Duplicate target photo id.",
+            ));
+            continue;
+        }
+
+        let target =
+            match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+                Some(graph) => graph,
+                None => {
+                    targets.push(batch_sync_target(
+                        photo_id,
+                        "blocked",
+                        Some("missing_photo"),
+                        "Photo not found.",
+                    ));
+                    continue;
+                }
+            };
+        let edited = match silica_edit::apply_edit_clipboard_payload(
+            &target,
+            payload,
+            current_timestamp_string(),
+        ) {
+            Ok(graph) => graph,
+            Err(error) => {
+                targets.push(batch_sync_target(
+                    photo_id,
+                    "blocked",
+                    Some("invalid_payload"),
+                    &error.to_string(),
+                ));
+                continue;
+            }
+        };
+        if let Err((code, message)) = ensure_supported_edit_clipboard_sync(payload, &edited) {
+            targets.push(batch_sync_target(photo_id, "blocked", Some(code), &message));
+            continue;
+        }
+        if edit_graphs_equal_ignoring_updated_at(&target, &edited) {
+            targets.push(batch_sync_target(
+                photo_id,
+                "unchanged",
+                Some("no_effect"),
+                "Clipboard payload does not change this target.",
+            ));
+            continue;
+        }
+
+        targets.push(batch_sync_target(
+            photo_id,
+            "ready",
+            None,
+            "Ready for batch sync.",
+        ));
+        ready_graphs.push(edited);
+    }
+
+    let ready_count = targets
+        .iter()
+        .filter(|target| target.status == "ready")
+        .count();
+    let unchanged_count = targets
+        .iter()
+        .filter(|target| target.status == "unchanged")
+        .count();
+    let blocked_count = targets
+        .iter()
+        .filter(|target| target.status == "blocked")
+        .count();
+    let status = if blocked_count > 0 {
+        "blocked"
+    } else {
+        "ready"
+    };
+    let message = if blocked_count > 0 {
+        format!("{blocked_count} target(s) blocked; nothing will be written.")
+    } else {
+        format!("{ready_count} target(s) ready, {unchanged_count} unchanged.")
+    };
+
+    Ok(PreparedEditClipboardSync {
+        plan: BatchEditClipboardSyncPlan {
+            status: status.to_string(),
+            requested_count,
+            ready_count,
+            unchanged_count,
+            blocked_count,
+            targets,
+            message,
+        },
+        ready_graphs,
+    })
+}
+
+fn batch_sync_target(
+    photo_id: &str,
+    status: &str,
+    code: Option<&str>,
+    message: &str,
+) -> BatchEditClipboardSyncTarget {
+    BatchEditClipboardSyncTarget {
+        photo_id: photo_id.to_string(),
+        status: status.to_string(),
+        code: code.map(str::to_string),
+        message: message.to_string(),
+    }
+}
+
+fn ensure_supported_edit_clipboard_sync(
+    payload: &silica_edit::EditClipboardPayload,
+    graph: &silica_edit::EditGraph,
+) -> Result<(), (&'static str, String)> {
+    if payload.basic.is_some() && has_unsupported_basic_runtime(graph) {
+        return Err((
+            "unsupported_basic_runtime",
+            "Texture, clarity, and dehaze batch sync are unsupported until runtime support exists."
+                .to_string(),
+        ));
+    }
+    if payload.detail.is_some() && !render_detail_from_graph(graph).is_neutral() {
+        return Err(("unsupported_detail", detail_unsupported_message()));
+    }
+    if payload.lens.is_some() || payload.geometry.is_some() {
+        if let Some(message) = lens_unsupported_message(graph) {
+            return Err(("unsupported_lens", message));
+        }
+        if let Some(message) = geometry_unsupported_message(&render_geometry_from_graph(graph)) {
+            return Err(("unsupported_geometry", message));
+        }
+    }
+    Ok(())
+}
+
+fn has_unsupported_basic_runtime(graph: &silica_edit::EditGraph) -> bool {
+    graph.basic.texture.as_f64().unwrap_or(0.0) != 0.0
+        || graph.basic.clarity.as_f64().unwrap_or(0.0) != 0.0
+        || graph.basic.dehaze.as_f64().unwrap_or(0.0) != 0.0
+}
+
+fn edit_graphs_equal_ignoring_updated_at(
+    left: &silica_edit::EditGraph,
+    right: &silica_edit::EditGraph,
+) -> bool {
+    let mut normalized_left = left.clone();
+    let mut normalized_right = right.clone();
+    normalized_left.updated_at.clear();
+    normalized_right.updated_at.clear();
+    normalized_left == normalized_right
+}
+
 fn apply_detail_preview_boundary(
     mut request: silica_render::ExposureContrastPreviewRequest,
     detail: silica_render::DetailRenderAdjustment,
@@ -5092,6 +5454,248 @@ mod tests {
         assert_eq!(pasted.color, target.color);
         assert_eq!(pasted.detail, target.detail);
         assert_eq!(pasted.lens, target.lens);
+    }
+
+    #[test]
+    fn batch_sync_edit_clipboard_applies_payload_with_per_photo_history() {
+        let workspace = unique_library_root("core-batch-sync");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let first_file = import_root.join("first.jpg");
+        let second_file = import_root.join("second.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import root");
+        write_source_jpeg(&first_file);
+        write_source_jpeg(&second_file);
+        let first_hash = file_hash(&first_file);
+        let second_hash = file_hash(&second_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+        let photos = list_library_photos(&created.root_path).expect("list photos");
+        assert_eq!(photos.len(), 2);
+        let target_ids: Vec<String> = photos.iter().map(|photo| photo.photo_id.clone()).collect();
+
+        let source = silica_edit::default_edit_graph(
+            silica_edit::EditGraphSource {
+                photo_id: "source-photo".to_string(),
+                path: "/tmp/source.jpg".to_string(),
+                file_size: 256,
+                modified_at: Some("unix:source".to_string()),
+                partial_hash: Some("source-partial".to_string()),
+                full_hash: None,
+            },
+            "unix:10",
+        );
+        let source = silica_edit::apply_exposure_contrast(&source, 0.9, 16.0, "unix:11")
+            .expect("source basic edit");
+        let payload = copy_edit_clipboard_payload(
+            &source,
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        )
+        .expect("copy clipboard payload");
+
+        let plan = plan_edit_clipboard_sync(&created.root_path, &target_ids, &payload)
+            .expect("plan batch sync payload");
+        assert_eq!(plan.status, "ready");
+        assert_eq!(plan.ready_count, 2);
+        assert_eq!(plan.unchanged_count, 0);
+        assert_eq!(plan.blocked_count, 0);
+
+        let result = apply_edit_clipboard_sync(&created.root_path, &target_ids, &payload)
+            .expect("batch sync payload");
+
+        assert_eq!(result.status, "applied");
+        assert_eq!(result.requested_count, 2);
+        assert_eq!(result.applied_count, 2);
+        assert_eq!(result.failed_count, 0);
+        assert_eq!(result.blocked_count, 0);
+        assert_eq!(result.commits.len(), 2);
+        assert!(result.failures.is_empty());
+
+        for photo in &photos {
+            let graph = silica_storage::load_active_edit_graph(&created.root_path, &photo.photo_id)
+                .expect("load active graph")
+                .expect("active graph");
+            assert_eq!(graph.source.photo_id, photo.photo_id);
+            assert_eq!(graph.source.path, photo.path);
+            assert_eq!(
+                graph.profile.input_profile,
+                silica_edit::INPUT_PROFILE_UNKNOWN
+            );
+            assert_eq!(graph.basic.exposure.as_f64(), Some(0.9));
+            assert_eq!(graph.basic.contrast.as_f64(), Some(16.0));
+
+            let history =
+                list_photo_history(&created.root_path, &photo.photo_id).expect("read history");
+            assert_eq!(history.items.len(), 1);
+            assert_eq!(history.items[0].action_kind, "edit_commit");
+            assert_eq!(history.items[0].sequence, 1);
+        }
+
+        assert_original_hash(&first_file, &first_hash, "batch sync first original");
+        assert_original_hash(&second_file, &second_hash, "batch sync second original");
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn batch_sync_edit_clipboard_preflight_failure_writes_no_history() {
+        let workspace = unique_library_root("core-batch-sync-preflight");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import root");
+        write_source_jpeg(&supported_file);
+        let original_hash = file_hash(&supported_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+        let photo = list_library_photos(&created.root_path)
+            .expect("list photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.jpg")
+            .expect("sample photo");
+
+        let source = silica_edit::default_edit_graph(
+            silica_edit::EditGraphSource {
+                photo_id: "source-photo".to_string(),
+                path: "/tmp/source.jpg".to_string(),
+                file_size: 256,
+                modified_at: Some("unix:source".to_string()),
+                partial_hash: Some("source-partial".to_string()),
+                full_hash: None,
+            },
+            "unix:10",
+        );
+        let source = silica_edit::apply_exposure_contrast(&source, 0.4, 8.0, "unix:11")
+            .expect("source basic edit");
+        let payload = copy_edit_clipboard_payload(
+            &source,
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                ..Default::default()
+            },
+        )
+        .expect("copy clipboard payload");
+
+        let plan = plan_edit_clipboard_sync(
+            &created.root_path,
+            &[photo.photo_id.clone(), "missing-photo".to_string()],
+            &payload,
+        )
+        .expect("plan preflight failure");
+
+        assert_eq!(plan.status, "blocked");
+        assert_eq!(plan.requested_count, 2);
+        assert_eq!(plan.ready_count, 1);
+        assert_eq!(plan.blocked_count, 1);
+        assert_eq!(plan.targets[1].photo_id, "missing-photo");
+        assert_eq!(plan.targets[1].code.as_deref(), Some("missing_photo"));
+
+        let result = apply_edit_clipboard_sync(
+            &created.root_path,
+            &[photo.photo_id.clone(), "missing-photo".to_string()],
+            &payload,
+        )
+        .expect("preflight failure returns result");
+
+        assert_eq!(result.status, "blocked");
+        assert_eq!(result.requested_count, 2);
+        assert_eq!(result.applied_count, 0);
+        assert_eq!(result.blocked_count, 1);
+        assert_eq!(result.failed_count, 1);
+        assert_eq!(result.failures[0].photo_id, "missing-photo");
+        assert_eq!(result.targets[1].code.as_deref(), Some("missing_photo"));
+        assert!(result.failures[0].message.contains("not found"));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo.photo_id)
+                .expect("load active graph")
+                .is_none(),
+            "failed batch must not write active edit graph"
+        );
+        let history = list_photo_history(&created.root_path, &photo.photo_id)
+            .expect("read history after failed batch");
+        assert!(history.items.is_empty());
+        assert_original_hash(
+            &supported_file,
+            &original_hash,
+            "failed batch sync original",
+        );
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn batch_sync_edit_clipboard_blocks_unsupported_detail_without_writes() {
+        let workspace = unique_library_root("core-batch-sync-detail-blocked");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import root");
+        write_source_jpeg(&supported_file);
+        let original_hash = file_hash(&supported_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+        let photo = list_library_photos(&created.root_path)
+            .expect("list photos")
+            .into_iter()
+            .find(|photo| photo.file_name == "sample.jpg")
+            .expect("sample photo");
+
+        let source = silica_edit::default_edit_graph(
+            silica_edit::EditGraphSource {
+                photo_id: "source-photo".to_string(),
+                path: "/tmp/source.jpg".to_string(),
+                file_size: 256,
+                modified_at: Some("unix:source".to_string()),
+                partial_hash: Some("source-partial".to_string()),
+                full_hash: None,
+            },
+            "unix:10",
+        );
+        let source =
+            silica_edit::apply_detail_sharpening(&source, 40.0, 1.2, 35.0, 10.0, "unix:11")
+                .expect("source detail edit");
+        let payload = copy_edit_clipboard_payload(
+            &source,
+            silica_edit::EditClipboardSelection {
+                detail: true,
+                ..Default::default()
+            },
+        )
+        .expect("copy detail clipboard payload");
+
+        let result =
+            apply_edit_clipboard_sync(&created.root_path, &[photo.photo_id.clone()], &payload)
+                .expect("unsupported detail returns blocked result");
+
+        assert_eq!(result.status, "blocked");
+        assert_eq!(result.applied_count, 0);
+        assert_eq!(result.blocked_count, 1);
+        assert_eq!(
+            result.targets[0].code.as_deref(),
+            Some("unsupported_detail")
+        );
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo.photo_id)
+                .expect("load active graph")
+                .is_none(),
+            "blocked detail batch must not write active edit graph"
+        );
+        let history = list_photo_history(&created.root_path, &photo.photo_id)
+            .expect("read history after blocked detail batch");
+        assert!(history.items.is_empty());
+        assert_original_hash(
+            &supported_file,
+            &original_hash,
+            "blocked detail batch original",
+        );
+        remove_library_root(&workspace);
     }
 
     #[test]
