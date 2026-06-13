@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-06-13
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -29,7 +29,9 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ### LLM Routing
 
 - [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
-- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including Phase 18.
+- [Current LLM Route](llm/current-route.md): shortest current work route for agents.
+- [Completed LLM Context](llm/completed-context.md): completed phase routing and read-avoidance notes.
+- [Task Cards](tasks/index.md): compact task-level instructions for current and completed atomic work.
 
 ### Overview
 
@@ -55,6 +57,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Phase 16 Undo History Action Trust Brief](phases/phase-16-undo-history-action-trust.md): completed undo, history, and action trust scope and task order.
 - [Phase 17 Develop P0 Expansion Brief](phases/phase-17-develop-p0-expansion.md): completed Develop P0 control family scope and task order.
 - [Phase 18 Professional Editing Baseline Brief](phases/phase-18-professional-editing-baseline.md): completed P1 Develop control family scope and task order.
+- [Phase 18 Summary](phases/phase-18-summary.md): compact completed Phase 18 context for Phase 19 agents.
 
 ### Decisions
 
