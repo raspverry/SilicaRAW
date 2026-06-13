@@ -672,6 +672,50 @@ pub fn apply_hsl_color_channel(
     Ok(edited)
 }
 
+/// Return a draft graph with schema-owned sharpening controls adjusted.
+pub fn apply_detail_sharpening(
+    graph: &EditGraph,
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.detail.sharpening.amount = number_from_f64("detail.sharpening.amount", amount)?;
+    edited.detail.sharpening.radius = number_from_f64("detail.sharpening.radius", radius)?;
+    edited.detail.sharpening.detail = number_from_f64("detail.sharpening.detail", detail)?;
+    edited.detail.sharpening.masking = number_from_f64("detail.sharpening.masking", masking)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with schema-owned non-MLX noise reduction controls adjusted.
+pub fn apply_detail_noise_reduction(
+    graph: &EditGraph,
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.detail.noise_reduction.luminance =
+        number_from_f64("detail.noise_reduction.luminance", luminance)?;
+    edited.detail.noise_reduction.detail =
+        number_from_f64("detail.noise_reduction.detail", detail)?;
+    edited.detail.noise_reduction.contrast =
+        number_from_f64("detail.noise_reduction.contrast", contrast)?;
+    edited.detail.noise_reduction.color = number_from_f64("detail.noise_reduction.color", color)?;
+    edited.detail.noise_reduction.color_detail =
+        number_from_f64("detail.noise_reduction.color_detail", color_detail)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Reset P0 Basic controls to schema-valid defaults.
 pub fn reset_p0_basic_controls(
     graph: &EditGraph,
@@ -1645,6 +1689,94 @@ mod tests {
         assert!(luminance_error
             .to_string()
             .contains("color.hsl.magenta.luminance"));
+    }
+
+    #[test]
+    fn applies_detail_sharpening_and_noise_reduction_and_round_trips_json() {
+        let mut graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        graph.detail.mlx_denoise = Some(json!({ "status": "deferred" }));
+
+        let sharpened = super::apply_detail_sharpening(&graph, 82.0, 1.4, 58.0, 22.0, "unix:3")
+            .expect("apply detail sharpening");
+        let edited =
+            super::apply_detail_noise_reduction(&sharpened, 32.0, 44.0, 18.0, 26.0, 64.0, "unix:4")
+                .expect("apply detail noise reduction");
+        let serialized = serde_json::to_value(&edited).expect("serialize detail graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip detail graph");
+
+        assert_eq!(edited.detail.sharpening.amount.as_f64(), Some(82.0));
+        assert_eq!(edited.detail.sharpening.radius.as_f64(), Some(1.4));
+        assert_eq!(edited.detail.sharpening.detail.as_f64(), Some(58.0));
+        assert_eq!(edited.detail.sharpening.masking.as_f64(), Some(22.0));
+        assert_eq!(edited.detail.noise_reduction.luminance.as_f64(), Some(32.0));
+        assert_eq!(edited.detail.noise_reduction.detail.as_f64(), Some(44.0));
+        assert_eq!(edited.detail.noise_reduction.contrast.as_f64(), Some(18.0));
+        assert_eq!(edited.detail.noise_reduction.color.as_f64(), Some(26.0));
+        assert_eq!(
+            edited.detail.noise_reduction.color_detail.as_f64(),
+            Some(64.0)
+        );
+        assert_eq!(
+            edited.detail.mlx_denoise.as_ref(),
+            Some(&json!({ "status": "deferred" }))
+        );
+        assert_eq!(edited.updated_at, "unix:4");
+        assert_eq!(round_tripped.detail.sharpening.amount.as_f64(), Some(82.0));
+        assert_eq!(
+            serialized["detail"]["noise_reduction"]["color_detail"].as_f64(),
+            Some(64.0)
+        );
+        super::validate_edit_graph_json(&serialized).expect("detail graph validates");
+    }
+
+    #[test]
+    fn rejects_invalid_detail_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let amount_error = super::apply_detail_sharpening(&graph, 151.0, 1.0, 25.0, 0.0, "unix:3")
+            .expect_err("sharpening amount above schema range");
+        let radius_error = super::apply_detail_sharpening(&graph, 40.0, 0.0, 25.0, 0.0, "unix:3")
+            .expect_err("sharpening radius below schema range");
+        let luminance_error =
+            super::apply_detail_noise_reduction(&graph, 101.0, 50.0, 0.0, 25.0, 50.0, "unix:3")
+                .expect_err("luminance noise reduction above schema range");
+        let color_detail_error =
+            super::apply_detail_noise_reduction(&graph, 0.0, 50.0, 0.0, 25.0, -1.0, "unix:3")
+                .expect_err("color detail below schema range");
+
+        assert!(amount_error
+            .to_string()
+            .contains("detail.sharpening.amount"));
+        assert!(radius_error
+            .to_string()
+            .contains("detail.sharpening.radius"));
+        assert!(luminance_error
+            .to_string()
+            .contains("detail.noise_reduction.luminance"));
+        assert!(color_detail_error
+            .to_string()
+            .contains("detail.noise_reduction.color_detail"));
     }
 
     #[test]

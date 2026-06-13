@@ -33,7 +33,7 @@ Phase 18 turns the schema-owned `tone`, `color`, `detail`, `lens`, and `geometry
 | 18.2.1 | HSL Color Mixer Mutators | Complete: per-channel hue/saturation/luminance graph changes validate and round-trip |
 | 18.2.2 | HSL Preview/Commit/Export Parity | Complete: supported JPEG/JPG preview/export paths use committed HSL state |
 | 18.2.3 | HSL Panel UI and QA | Complete: compact color mixer UI follows existing Develop patterns and visual QA covers seeded HSL state |
-| 18.3.1 | Detail Mutators | Sharpening and noise reduction graph values validate; MLX denoise remains untouched |
+| 18.3.1 | Detail Mutators | Complete: sharpening and non-MLX noise reduction graph values validate; MLX denoise remains untouched |
 | 18.3.2 | Detail Preview/Export Boundary | Supported detail behavior is explicit; unsupported preview/export states are honest |
 | 18.3.3 | Detail Panel UI and QA | Detail controls fit Develop layouts and do not imply MLX support |
 | 18.4.1 | Lens and Geometry Mutators | Lens, transform, crop, rotate, and flip graph values validate |

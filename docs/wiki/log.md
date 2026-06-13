@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Detail mutators added
+
+- Completed Task 18.3.1 with graph-only sharpening and non-MLX noise reduction mutators.
+- Added round-trip and invalid-range tests in `silica-edit` while leaving `detail.mlx_denoise` unchanged and inert.
+- Kept preview, export, UI, storage, sidecar, MLX runtime, and model behavior out of scope and routed Phase 18 to Task 18.3.2.
+
 ## [2026-06-13] phase-18 | HSL panel UI completed
 
 - Completed Task 18.2.3 with a compact Develop HSL Mixer panel for all eight schema-owned color channels.
