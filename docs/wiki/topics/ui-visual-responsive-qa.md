@@ -59,6 +59,18 @@ Visual fixes from this pass:
 - Updated Develop visual fixture state so histogram, Before/After, and basic preset controls match the selected-photo screen.
 - Added a small histogram status badge so text remains readable over histogram bars.
 
+## Phase 18 Tone Curve Panel Note
+
+Task 18.1.3 adds a compact Tone Curve panel to the Develop inspector. The panel exposes only the supported RGB point-curve midpoint control and keeps channel and parametric controls hidden and disabled until those modes have end-to-end runtime support.
+
+Visual QA now verifies the tone curve panel at `1280x800`, `1440x900`, and `1728x965` with no horizontal overflow, no toolbar overlap, no clipped controls, the `Point RGB` support state, and unsupported curve controls remaining disabled.
+
+## Phase 18 HSL Panel Note
+
+Task 18.2.3 adds a compact HSL Mixer panel to the Develop inspector. The panel exposes the schema-owned red, orange, yellow, green, aqua, blue, purple, and magenta channels with hue, saturation, and luminance controls bounded to `-100..100`.
+
+Visual QA now seeds the blue channel and verifies the HSL support state plus hue, saturation, and luminance values across `1280x800`, `1440x900`, and `1728x965` with no horizontal overflow, no toolbar overlap, and no clipped controls.
+
 ## Final Phase 5.6.12 Refresh
 
 Final QA command:

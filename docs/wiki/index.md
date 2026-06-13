@@ -29,7 +29,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 ### LLM Routing
 
 - [LLM Routing Index](llm/index.md): smallest useful read sets for agents.
-- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including Phase 16.
+- [Task Cards](tasks/index.md): compact task-level instructions for current atomic work, including Phase 18.
 
 ### Overview
 
@@ -54,6 +54,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Phase 15 RAW Color Metal Vertical Slice Brief](phases/phase-15-raw-color-metal-vertical-slice.md): completed RAW/color/Metal vertical slice scope and task order.
 - [Phase 16 Undo History Action Trust Brief](phases/phase-16-undo-history-action-trust.md): completed undo, history, and action trust scope and task order.
 - [Phase 17 Develop P0 Expansion Brief](phases/phase-17-develop-p0-expansion.md): completed Develop P0 control family scope and task order.
+- [Phase 18 Professional Editing Baseline Brief](phases/phase-18-professional-editing-baseline.md): active P1 Develop control family scope and task order.
 
 ### Decisions
 

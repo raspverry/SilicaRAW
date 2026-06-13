@@ -176,6 +176,34 @@ def main():
         "developContrastSlider",
         "developContrastValue",
         "developContrastReset",
+        "developToneCurvePanel",
+        "developToneCurveMidpointSlider",
+        "developToneCurveMidpointValue",
+        "developToneCurveReset",
+        "developToneCurveSupportStatus",
+        "developToneCurveChannelRed",
+        "developToneCurveChannelGreen",
+        "developToneCurveChannelBlue",
+        "developToneCurveParametric",
+        "developHslPanel",
+        "developHslSupportStatus",
+        "developHslChannelRed",
+        "developHslChannelOrange",
+        "developHslChannelYellow",
+        "developHslChannelGreen",
+        "developHslChannelAqua",
+        "developHslChannelBlue",
+        "developHslChannelPurple",
+        "developHslChannelMagenta",
+        "developHslHueSlider",
+        "developHslHueValue",
+        "developHslHueReset",
+        "developHslSaturationSlider",
+        "developHslSaturationValue",
+        "developHslSaturationReset",
+        "developHslLuminanceSlider",
+        "developHslLuminanceValue",
+        "developHslLuminanceReset",
         "developCommitEdit",
         "developRevertEdit",
         "developHistoryPanel",
@@ -272,6 +300,7 @@ def main():
             ".sr-statusbar",
             ".sr-develop-workbench",
             ".sr-adjustment-slider",
+            ".sr-tone-curve-panel",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
         ]:
@@ -306,6 +335,48 @@ def main():
     require(contrast_slider.get("min") == "-100", "#developContrastSlider min must match edit graph contrast", failures)
     require(contrast_slider.get("max") == "100", "#developContrastSlider max must match edit graph contrast", failures)
     require(contrast_slider.get("step") == "1", "#developContrastSlider step must support integer contrast edits", failures)
+
+    tone_curve_slider = parser.ids.get("developToneCurveMidpointSlider", {})
+    require(tone_curve_slider.get("type") == "range", "#developToneCurveMidpointSlider must be a range input", failures)
+    require(tone_curve_slider.get("min") == "0", "#developToneCurveMidpointSlider min must use normalized tone values", failures)
+    require(tone_curve_slider.get("max") == "1", "#developToneCurveMidpointSlider max must use normalized tone values", failures)
+    require(tone_curve_slider.get("step") == "0.01", "#developToneCurveMidpointSlider step must support point curve edits", failures)
+    for control_id in [
+        "developToneCurveChannelRed",
+        "developToneCurveChannelGreen",
+        "developToneCurveChannelBlue",
+        "developToneCurveParametric",
+    ]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must remain disabled until runtime support exists",
+            failures,
+        )
+
+    hsl_channels = {
+        "developHslChannelRed": "red",
+        "developHslChannelOrange": "orange",
+        "developHslChannelYellow": "yellow",
+        "developHslChannelGreen": "green",
+        "developHslChannelAqua": "aqua",
+        "developHslChannelBlue": "blue",
+        "developHslChannelPurple": "purple",
+        "developHslChannelMagenta": "magenta",
+    }
+    for control_id, channel in hsl_channels.items():
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("data-hsl-channel") == channel, f"#{control_id} must declare data-hsl-channel={channel}", failures)
+        require(attrs.get("type") == "button", f"#{control_id} must be a button", failures)
+    for control_id in [
+        "developHslHueSlider",
+        "developHslSaturationSlider",
+        "developHslLuminanceSlider",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "range", f"#{control_id} must be a range input", failures)
+        require(attrs.get("min") == "-100", f"#{control_id} min must match HSL edit graph bounds", failures)
+        require(attrs.get("max") == "100", f"#{control_id} max must match HSL edit graph bounds", failures)
+        require(attrs.get("step") == "1", f"#{control_id} step must support integer HSL edits", failures)
 
     expected_native_hosts = {
         "loupeViewer": "loupe",
@@ -343,6 +414,18 @@ def main():
         "developContrastSlider",
         "developContrastValue",
         "developContrastReset",
+        "developToneCurveMidpointSlider",
+        "developToneCurveMidpointValue",
+        "developToneCurveReset",
+        "developHslHueSlider",
+        "developHslHueValue",
+        "developHslHueReset",
+        "developHslSaturationSlider",
+        "developHslSaturationValue",
+        "developHslSaturationReset",
+        "developHslLuminanceSlider",
+        "developHslLuminanceValue",
+        "developHslLuminanceReset",
         "developCommitEdit",
         "developRevertEdit",
         "openExportDialog",

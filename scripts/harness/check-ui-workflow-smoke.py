@@ -26,10 +26,14 @@ ALLOWED_COMMANDS = {
     "preview_white_balance_edit",
     "preview_tone_recovery_edit",
     "preview_color_presence_edit",
+    "preview_tone_curve_edit",
+    "preview_hsl_color_mixer_edit",
     "commit_exposure_contrast_edit",
     "commit_white_balance_edit",
     "commit_tone_recovery_edit",
     "commit_color_presence_edit",
+    "commit_tone_curve_edit",
+    "commit_hsl_color_mixer_edit",
     "commit_p0_basic_reset",
     "commit_basic_preset_edit",
     "get_photo_edit_state",
@@ -161,6 +165,34 @@ WORKFLOW_STEPS = [
             "developBlacksSlider",
             "developVibranceSlider",
             "developSaturationSlider",
+            "developToneCurvePanel",
+            "developToneCurveMidpointSlider",
+            "developToneCurveMidpointValue",
+            "developToneCurveReset",
+            "developToneCurveSupportStatus",
+            "developToneCurveChannelRed",
+            "developToneCurveChannelGreen",
+            "developToneCurveChannelBlue",
+            "developToneCurveParametric",
+            "developHslPanel",
+            "developHslSupportStatus",
+            "developHslChannelRed",
+            "developHslChannelOrange",
+            "developHslChannelYellow",
+            "developHslChannelGreen",
+            "developHslChannelAqua",
+            "developHslChannelBlue",
+            "developHslChannelPurple",
+            "developHslChannelMagenta",
+            "developHslHueSlider",
+            "developHslHueValue",
+            "developHslHueReset",
+            "developHslSaturationSlider",
+            "developHslSaturationValue",
+            "developHslSaturationReset",
+            "developHslLuminanceSlider",
+            "developHslLuminanceValue",
+            "developHslLuminanceReset",
             "developCommitEdit",
             "developRevertEdit",
             "developResetBasic",
@@ -187,10 +219,14 @@ WORKFLOW_STEPS = [
             "preview_white_balance_edit",
             "preview_tone_recovery_edit",
             "preview_color_presence_edit",
+            "preview_tone_curve_edit",
+            "preview_hsl_color_mixer_edit",
             "commit_exposure_contrast_edit",
             "commit_white_balance_edit",
             "commit_tone_recovery_edit",
             "commit_color_presence_edit",
+            "commit_tone_curve_edit",
+            "commit_hsl_color_mixer_edit",
             "commit_p0_basic_reset",
             "commit_basic_preset_edit",
         ],
@@ -201,6 +237,12 @@ WORKFLOW_STEPS = [
             "Commit Edit",
             "Revert Draft",
             "Reset All",
+            "Tone Curve",
+            "RGB Midpoint",
+            "Point RGB",
+            "HSL Mixer",
+            "Hue",
+            "Luminance",
             "History",
             "No committed history yet.",
         ],
@@ -560,6 +602,37 @@ def main():
         and parser.ids.get("developContrastSlider", {}).get("max") == "100"
         and parser.ids.get("developContrastSlider", {}).get("step") == "1",
         "develop contrast slider must use edit graph bounds -100..100 step 1",
+        failures,
+    )
+    require(
+        parser.ids.get("developToneCurveMidpointSlider", {}).get("min") == "0"
+        and parser.ids.get("developToneCurveMidpointSlider", {}).get("max") == "1"
+        and parser.ids.get("developToneCurveMidpointSlider", {}).get("step") == "0.01",
+        "tone curve midpoint slider must use normalized 0..1 point bounds",
+        failures,
+    )
+    for control_id in [
+        "developToneCurveChannelRed",
+        "developToneCurveChannelGreen",
+        "developToneCurveChannelBlue",
+        "developToneCurveParametric",
+    ]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must stay disabled until end-to-end support exists",
+            failures,
+        )
+    require(
+        parser.ids.get("developHslHueSlider", {}).get("min") == "-100"
+        and parser.ids.get("developHslHueSlider", {}).get("max") == "100"
+        and parser.ids.get("developHslHueSlider", {}).get("step") == "1"
+        and parser.ids.get("developHslSaturationSlider", {}).get("min") == "-100"
+        and parser.ids.get("developHslSaturationSlider", {}).get("max") == "100"
+        and parser.ids.get("developHslSaturationSlider", {}).get("step") == "1"
+        and parser.ids.get("developHslLuminanceSlider", {}).get("min") == "-100"
+        and parser.ids.get("developHslLuminanceSlider", {}).get("max") == "100"
+        and parser.ids.get("developHslLuminanceSlider", {}).get("step") == "1",
+        "HSL hue/saturation/luminance sliders must use edit graph bounds -100..100 step 1",
         failures,
     )
     require(

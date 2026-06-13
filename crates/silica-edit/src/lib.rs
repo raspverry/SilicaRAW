@@ -208,6 +208,40 @@ pub struct HslAdjustments {
     pub magenta: HslChannel,
 }
 
+/// Schema-owned HSL color mixer channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HslColorChannel {
+    Red,
+    Orange,
+    Yellow,
+    Green,
+    Aqua,
+    Blue,
+    Purple,
+    Magenta,
+}
+
+impl TryFrom<&str> for HslColorChannel {
+    type Error = EditGraphValidationError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "red" => Ok(Self::Red),
+            "orange" => Ok(Self::Orange),
+            "yellow" => Ok(Self::Yellow),
+            "green" => Ok(Self::Green),
+            "aqua" => Ok(Self::Aqua),
+            "blue" => Ok(Self::Blue),
+            "purple" => Ok(Self::Purple),
+            "magenta" => Ok(Self::Magenta),
+            unsupported => Err(EditGraphValidationError::new(
+                "color.hsl",
+                format!("unsupported HSL color channel: {unsupported}"),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HslChannel {
@@ -576,6 +610,34 @@ pub fn apply_tone_recovery(
     Ok(edited)
 }
 
+/// Return a draft graph with point tone curves adjusted.
+pub fn apply_tone_curve(
+    graph: &EditGraph,
+    curve_mode: CurveMode,
+    rgb_curve: &[(f64, f64)],
+    red_curve: &[(f64, f64)],
+    green_curve: &[(f64, f64)],
+    blue_curve: &[(f64, f64)],
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    if curve_mode == CurveMode::Parametric {
+        return Err(EditGraphValidationError::new(
+            "tone.curve_mode",
+            "parametric curves have no schema-owned parameters yet",
+        ));
+    }
+
+    let mut edited = graph.clone();
+    edited.tone.curve_mode = curve_mode;
+    edited.tone.rgb_curve = curve_points_from_pairs("tone.rgb_curve", rgb_curve)?;
+    edited.tone.red_curve = curve_points_from_pairs("tone.red_curve", red_curve)?;
+    edited.tone.green_curve = curve_points_from_pairs("tone.green_curve", green_curve)?;
+    edited.tone.blue_curve = curve_points_from_pairs("tone.blue_curve", blue_curve)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
 /// Return a draft graph with color presence controls adjusted.
 pub fn apply_color_presence(
     graph: &EditGraph,
@@ -586,6 +648,69 @@ pub fn apply_color_presence(
     let mut edited = graph.clone();
     edited.basic.vibrance = number_from_f64("basic.vibrance", vibrance)?;
     edited.basic.saturation = number_from_f64("basic.saturation", saturation)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with one HSL color mixer channel adjusted.
+pub fn apply_hsl_color_channel(
+    graph: &EditGraph,
+    channel: HslColorChannel,
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    let hsl_channel = hsl_color_channel_mut(&mut edited.color.hsl, channel);
+    hsl_channel.hue = number_from_f64(&hsl_channel_path(channel, "hue"), hue)?;
+    hsl_channel.saturation = number_from_f64(&hsl_channel_path(channel, "saturation"), saturation)?;
+    hsl_channel.luminance = number_from_f64(&hsl_channel_path(channel, "luminance"), luminance)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with schema-owned sharpening controls adjusted.
+pub fn apply_detail_sharpening(
+    graph: &EditGraph,
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.detail.sharpening.amount = number_from_f64("detail.sharpening.amount", amount)?;
+    edited.detail.sharpening.radius = number_from_f64("detail.sharpening.radius", radius)?;
+    edited.detail.sharpening.detail = number_from_f64("detail.sharpening.detail", detail)?;
+    edited.detail.sharpening.masking = number_from_f64("detail.sharpening.masking", masking)?;
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Return a draft graph with schema-owned non-MLX noise reduction controls adjusted.
+pub fn apply_detail_noise_reduction(
+    graph: &EditGraph,
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.detail.noise_reduction.luminance =
+        number_from_f64("detail.noise_reduction.luminance", luminance)?;
+    edited.detail.noise_reduction.detail =
+        number_from_f64("detail.noise_reduction.detail", detail)?;
+    edited.detail.noise_reduction.contrast =
+        number_from_f64("detail.noise_reduction.contrast", contrast)?;
+    edited.detail.noise_reduction.color = number_from_f64("detail.noise_reduction.color", color)?;
+    edited.detail.noise_reduction.color_detail =
+        number_from_f64("detail.noise_reduction.color_detail", color_detail)?;
     edited.updated_at = updated_at.into();
     validate_edit_graph(&edited)?;
     Ok(edited)
@@ -709,6 +834,33 @@ pub fn validate_edit_graph(graph: &EditGraph) -> Result<(), EditGraphValidationE
     Ok(())
 }
 
+fn hsl_color_channel_mut(hsl: &mut HslAdjustments, channel: HslColorChannel) -> &mut HslChannel {
+    match channel {
+        HslColorChannel::Red => &mut hsl.red,
+        HslColorChannel::Orange => &mut hsl.orange,
+        HslColorChannel::Yellow => &mut hsl.yellow,
+        HslColorChannel::Green => &mut hsl.green,
+        HslColorChannel::Aqua => &mut hsl.aqua,
+        HslColorChannel::Blue => &mut hsl.blue,
+        HslColorChannel::Purple => &mut hsl.purple,
+        HslColorChannel::Magenta => &mut hsl.magenta,
+    }
+}
+
+fn hsl_channel_path(channel: HslColorChannel, field: &str) -> String {
+    let channel_name = match channel {
+        HslColorChannel::Red => "red",
+        HslColorChannel::Orange => "orange",
+        HslColorChannel::Yellow => "yellow",
+        HslColorChannel::Green => "green",
+        HslColorChannel::Aqua => "aqua",
+        HslColorChannel::Blue => "blue",
+        HslColorChannel::Purple => "purple",
+        HslColorChannel::Magenta => "magenta",
+    };
+    format!("color.hsl.{channel_name}.{field}")
+}
+
 fn validate_profile(profile: &Profile) -> Result<(), EditGraphValidationError> {
     if profile.name.trim().is_empty() {
         return Err(EditGraphValidationError::new(
@@ -774,17 +926,90 @@ fn validate_basic(basic: &BasicAdjustments) -> Result<(), EditGraphValidationErr
 }
 
 fn validate_tone(tone: &ToneAdjustments) -> Result<(), EditGraphValidationError> {
+    if tone.curve_mode == CurveMode::None
+        && (!tone.rgb_curve.is_empty()
+            || !tone.red_curve.is_empty()
+            || !tone.green_curve.is_empty()
+            || !tone.blue_curve.is_empty())
+    {
+        return Err(EditGraphValidationError::new(
+            "tone.curve_mode",
+            "none mode must not carry curve points",
+        ));
+    }
+
     for (name, curve) in [
         ("tone.rgb_curve", &tone.rgb_curve),
         ("tone.red_curve", &tone.red_curve),
         ("tone.green_curve", &tone.green_curve),
         ("tone.blue_curve", &tone.blue_curve),
     ] {
-        for (index, point) in curve.iter().enumerate() {
-            validate_range(format!("{name}.{index}.x"), &point.x, 0.0, 1.0)?;
-            validate_range(format!("{name}.{index}.y"), &point.y, 0.0, 1.0)?;
-        }
+        validate_curve_points(name, curve)?;
     }
+    Ok(())
+}
+
+fn curve_points_from_pairs(
+    path: &str,
+    points: &[(f64, f64)],
+) -> Result<Vec<CurvePoint>, EditGraphValidationError> {
+    points
+        .iter()
+        .enumerate()
+        .map(|(index, (x, y))| {
+            Ok(CurvePoint {
+                x: number_from_f64(&format!("{path}.{index}.x"), *x)?,
+                y: number_from_f64(&format!("{path}.{index}.y"), *y)?,
+            })
+        })
+        .collect()
+}
+
+fn validate_curve_points(
+    path: &str,
+    points: &[CurvePoint],
+) -> Result<(), EditGraphValidationError> {
+    if points.is_empty() {
+        return Ok(());
+    }
+    if points.len() < 2 {
+        return Err(EditGraphValidationError::new(
+            path,
+            "non-empty curves must include endpoints",
+        ));
+    }
+
+    let mut previous_x = None;
+    for (index, point) in points.iter().enumerate() {
+        let point_path = format!("{path}.{index}");
+        validate_range(format!("{point_path}.x"), &point.x, 0.0, 1.0)?;
+        validate_range(format!("{point_path}.y"), &point.y, 0.0, 1.0)?;
+        let x = number_as_f64(&format!("{point_path}.x"), &point.x)?;
+        if let Some(previous_x) = previous_x {
+            if x <= previous_x {
+                return Err(EditGraphValidationError::new(
+                    format!("{point_path}.x"),
+                    "x values must be strictly increasing",
+                ));
+            }
+        }
+        previous_x = Some(x);
+    }
+
+    let first = points.first().expect("non-empty curve checked");
+    let last = points.last().expect("non-empty curve checked");
+    let first_x = number_as_f64(&format!("{path}.0.x"), &first.x)?;
+    let first_y = number_as_f64(&format!("{path}.0.y"), &first.y)?;
+    let last_index = points.len() - 1;
+    let last_x = number_as_f64(&format!("{path}.{last_index}.x"), &last.x)?;
+    let last_y = number_as_f64(&format!("{path}.{last_index}.y"), &last.y)?;
+    if first_x != 0.0 || first_y != 0.0 || last_x != 1.0 || last_y != 1.0 {
+        return Err(EditGraphValidationError::new(
+            path,
+            "non-empty curves must start at (0, 0) and end at (1, 1)",
+        ));
+    }
+
     Ok(())
 }
 
@@ -1217,6 +1442,112 @@ mod tests {
     }
 
     #[test]
+    fn applies_tone_curve_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.35, 0.28), (0.72, 0.81), (1.0, 1.0)],
+            &[(0.0, 0.0), (0.5, 0.48), (1.0, 1.0)],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect("apply tone curve");
+        let serialized = serde_json::to_value(&edited).expect("serialize edited graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip edited graph");
+
+        assert_eq!(edited.tone.curve_mode, super::CurveMode::Point);
+        assert_eq!(edited.tone.rgb_curve.len(), 4);
+        assert_eq!(edited.tone.red_curve.len(), 3);
+        assert!(edited.tone.green_curve.is_empty());
+        assert!(edited.tone.blue_curve.is_empty());
+        assert_eq!(edited.tone.rgb_curve[1].x.as_f64(), Some(0.35));
+        assert_eq!(edited.tone.rgb_curve[1].y.as_f64(), Some(0.28));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.tone.curve_mode, super::CurveMode::Point);
+        assert_eq!(serialized["tone"]["curve_mode"], json!("point"));
+        assert_eq!(serialized["tone"]["rgb_curve"][2]["x"].as_f64(), Some(0.72));
+        assert_eq!(serialized["tone"]["rgb_curve"][2]["y"].as_f64(), Some(0.81));
+        super::validate_edit_graph_json(&serialized).expect("tone curve graph validates");
+    }
+
+    #[test]
+    fn rejects_invalid_tone_curve_points() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let missing_endpoint_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.1, 0.0), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("missing curve origin");
+        let duplicate_x_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.5, 0.4), (0.5, 0.6), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("duplicate x coordinate");
+        let descending_x_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.8, 0.7), (0.6, 0.65), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("descending x coordinate");
+        let parametric_error = super::apply_tone_curve(
+            &graph,
+            super::CurveMode::Parametric,
+            &[],
+            &[],
+            &[],
+            &[],
+            "unix:3",
+        )
+        .expect_err("parametric curve has no schema-owned parameters yet");
+
+        assert!(missing_endpoint_error
+            .to_string()
+            .contains("tone.rgb_curve"));
+        assert!(duplicate_x_error.to_string().contains("tone.rgb_curve"));
+        assert!(descending_x_error.to_string().contains("tone.rgb_curve"));
+        assert!(parametric_error.to_string().contains("tone.curve_mode"));
+    }
+
+    #[test]
     fn applies_color_presence_and_round_trips_json() {
         let graph = super::default_edit_graph(
             super::EditGraphSource {
@@ -1244,6 +1575,208 @@ mod tests {
         assert_eq!(serialized["basic"]["vibrance"].as_f64(), Some(24.0));
         assert_eq!(serialized["basic"]["saturation"].as_f64(), Some(-8.5));
         super::validate_edit_graph_json(&serialized).expect("color presence graph validates");
+    }
+
+    #[test]
+    fn applies_hsl_color_channel_and_round_trips_json() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let edited = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Blue,
+            -12.0,
+            24.0,
+            -8.5,
+            "unix:3",
+        )
+        .expect("apply HSL color channel");
+        let serialized = serde_json::to_value(&edited).expect("serialize HSL graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip HSL graph");
+
+        assert_eq!(edited.color.hsl.blue.hue.as_f64(), Some(-12.0));
+        assert_eq!(edited.color.hsl.blue.saturation.as_f64(), Some(24.0));
+        assert_eq!(edited.color.hsl.blue.luminance.as_f64(), Some(-8.5));
+        assert_eq!(edited.color.hsl.red.hue.as_f64(), Some(0.0));
+        assert_eq!(edited.basic.vibrance.as_f64(), Some(0.0));
+        assert_eq!(edited.updated_at, "unix:3");
+        assert_eq!(round_tripped.color.hsl.blue.saturation.as_f64(), Some(24.0));
+        assert_eq!(
+            serialized["color"]["hsl"]["blue"]["hue"].as_f64(),
+            Some(-12.0)
+        );
+        assert_eq!(
+            serialized["color"]["hsl"]["blue"]["luminance"].as_f64(),
+            Some(-8.5)
+        );
+        for (name, expected) in [
+            ("red", super::HslColorChannel::Red),
+            ("orange", super::HslColorChannel::Orange),
+            ("yellow", super::HslColorChannel::Yellow),
+            ("green", super::HslColorChannel::Green),
+            ("aqua", super::HslColorChannel::Aqua),
+            ("blue", super::HslColorChannel::Blue),
+            ("purple", super::HslColorChannel::Purple),
+            ("magenta", super::HslColorChannel::Magenta),
+        ] {
+            assert_eq!(
+                super::HslColorChannel::try_from(name).expect("parse HSL color channel"),
+                expected
+            );
+        }
+        super::validate_edit_graph_json(&serialized).expect("HSL graph validates");
+    }
+
+    #[test]
+    fn rejects_invalid_hsl_color_channel_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let invalid_channel =
+            super::HslColorChannel::try_from("cyan").expect_err("unsupported HSL channel name");
+        let hue_error = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Red,
+            101.0,
+            0.0,
+            0.0,
+            "unix:3",
+        )
+        .expect_err("hue above schema range");
+        let saturation_error = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Orange,
+            0.0,
+            -101.0,
+            0.0,
+            "unix:3",
+        )
+        .expect_err("saturation below schema range");
+        let luminance_error = super::apply_hsl_color_channel(
+            &graph,
+            super::HslColorChannel::Magenta,
+            0.0,
+            0.0,
+            101.0,
+            "unix:3",
+        )
+        .expect_err("luminance above schema range");
+
+        assert!(invalid_channel.to_string().contains("color.hsl"));
+        assert!(hue_error.to_string().contains("color.hsl.red.hue"));
+        assert!(saturation_error
+            .to_string()
+            .contains("color.hsl.orange.saturation"));
+        assert!(luminance_error
+            .to_string()
+            .contains("color.hsl.magenta.luminance"));
+    }
+
+    #[test]
+    fn applies_detail_sharpening_and_noise_reduction_and_round_trips_json() {
+        let mut graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        graph.detail.mlx_denoise = Some(json!({ "status": "deferred" }));
+
+        let sharpened = super::apply_detail_sharpening(&graph, 82.0, 1.4, 58.0, 22.0, "unix:3")
+            .expect("apply detail sharpening");
+        let edited =
+            super::apply_detail_noise_reduction(&sharpened, 32.0, 44.0, 18.0, 26.0, 64.0, "unix:4")
+                .expect("apply detail noise reduction");
+        let serialized = serde_json::to_value(&edited).expect("serialize detail graph");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip detail graph");
+
+        assert_eq!(edited.detail.sharpening.amount.as_f64(), Some(82.0));
+        assert_eq!(edited.detail.sharpening.radius.as_f64(), Some(1.4));
+        assert_eq!(edited.detail.sharpening.detail.as_f64(), Some(58.0));
+        assert_eq!(edited.detail.sharpening.masking.as_f64(), Some(22.0));
+        assert_eq!(edited.detail.noise_reduction.luminance.as_f64(), Some(32.0));
+        assert_eq!(edited.detail.noise_reduction.detail.as_f64(), Some(44.0));
+        assert_eq!(edited.detail.noise_reduction.contrast.as_f64(), Some(18.0));
+        assert_eq!(edited.detail.noise_reduction.color.as_f64(), Some(26.0));
+        assert_eq!(
+            edited.detail.noise_reduction.color_detail.as_f64(),
+            Some(64.0)
+        );
+        assert_eq!(
+            edited.detail.mlx_denoise.as_ref(),
+            Some(&json!({ "status": "deferred" }))
+        );
+        assert_eq!(edited.updated_at, "unix:4");
+        assert_eq!(round_tripped.detail.sharpening.amount.as_f64(), Some(82.0));
+        assert_eq!(
+            serialized["detail"]["noise_reduction"]["color_detail"].as_f64(),
+            Some(64.0)
+        );
+        super::validate_edit_graph_json(&serialized).expect("detail graph validates");
+    }
+
+    #[test]
+    fn rejects_invalid_detail_edits() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let amount_error = super::apply_detail_sharpening(&graph, 151.0, 1.0, 25.0, 0.0, "unix:3")
+            .expect_err("sharpening amount above schema range");
+        let radius_error = super::apply_detail_sharpening(&graph, 40.0, 0.0, 25.0, 0.0, "unix:3")
+            .expect_err("sharpening radius below schema range");
+        let luminance_error =
+            super::apply_detail_noise_reduction(&graph, 101.0, 50.0, 0.0, 25.0, 50.0, "unix:3")
+                .expect_err("luminance noise reduction above schema range");
+        let color_detail_error =
+            super::apply_detail_noise_reduction(&graph, 0.0, 50.0, 0.0, 25.0, -1.0, "unix:3")
+                .expect_err("color detail below schema range");
+
+        assert!(amount_error
+            .to_string()
+            .contains("detail.sharpening.amount"));
+        assert!(radius_error
+            .to_string()
+            .contains("detail.sharpening.radius"));
+        assert!(luminance_error
+            .to_string()
+            .contains("detail.noise_reduction.luminance"));
+        assert!(color_detail_error
+            .to_string()
+            .contains("detail.noise_reduction.color_detail"));
     }
 
     #[test]

@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Next task: create Phase 18 task cards from [Phase 18: Professional Editing Baseline](post-alpha-product-roadmap.md#phase-18-professional-editing-baseline), starting with Task 18.1 Tone Curve Panel.
+- Phase 18 task cards exist. Tasks 18.1.1 through 18.3.2 are complete. Current next task is [Task 18.3.3 Detail Panel UI and QA](../tasks/18.3.3-detail-panel-ui-qa.md).
 
 ## Wave Map
 
@@ -387,8 +387,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Create the Phase 18 brief and atomic task cards from the product roadmap.
-2. Start with Task 18.1 Tone Curve Panel after the task card exists.
+1. Start [Task 18.3.3 Detail Panel UI and QA](../tasks/18.3.3-detail-panel-ui-qa.md).
+2. Continue Phase 18 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links
 

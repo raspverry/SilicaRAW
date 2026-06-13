@@ -22,12 +22,14 @@ If the task changes schemas, dependencies, architecture, release behavior, or pr
 
 ## Current Route
 
-Phase 14, Phase 15, Phase 16, and Phase 17 are complete. The current planned product area is Phase 18: Professional Editing Baseline.
+Phase 14, Phase 15, Phase 16, and Phase 17 are complete. The current product area is Phase 18: Professional Editing Baseline.
 
 For Phase 14 through v1.0 sequencing, read [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) once before choosing work. It prevents repeated phase-wide replanning and records the dependency graph, stop gates, and future task splits.
 
 For Phase 18 task-card creation or implementation, read:
 
+- [Phase 18 Brief](../phases/phase-18-professional-editing-baseline.md)
+- The selected Phase 18 task card under [Task Cards](../tasks/index.md)
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md#phase-18-professional-editing-baseline)
 - [Catalog](../topics/catalog.md)

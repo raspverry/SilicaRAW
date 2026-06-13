@@ -16,6 +16,8 @@ pub const CRATE_NAME: &str = "silica-core";
 pub use silica_decode::RawFullResolutionExportSourceError;
 pub use silica_decode::RawPreviewArtifactError;
 pub use silica_edit::BasicPreset;
+pub use silica_edit::CurveMode;
+pub use silica_edit::HslColorChannel;
 pub use silica_edit::WhiteBalance;
 pub use silica_storage::ActionLogEntry;
 pub use silica_storage::CatalogRebuildDryRunAction;
@@ -465,6 +467,70 @@ impl PhotoPreviewSession {
     }
 }
 
+/// Normalized tone curve point exposed by the core command boundary.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoToneCurvePoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Current tone curve state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoToneCurveState {
+    pub curve_mode: silica_edit::CurveMode,
+    pub rgb_curve: Vec<PhotoToneCurvePoint>,
+    pub red_curve: Vec<PhotoToneCurvePoint>,
+    pub green_curve: Vec<PhotoToneCurvePoint>,
+    pub blue_curve: Vec<PhotoToneCurvePoint>,
+}
+
+/// One HSL color mixer channel exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoHslColorChannelState {
+    pub hue: f64,
+    pub saturation: f64,
+    pub luminance: f64,
+}
+
+/// Current HSL color mixer state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoHslColorMixerState {
+    pub red: PhotoHslColorChannelState,
+    pub orange: PhotoHslColorChannelState,
+    pub yellow: PhotoHslColorChannelState,
+    pub green: PhotoHslColorChannelState,
+    pub aqua: PhotoHslColorChannelState,
+    pub blue: PhotoHslColorChannelState,
+    pub purple: PhotoHslColorChannelState,
+    pub magenta: PhotoHslColorChannelState,
+}
+
+/// Sharpening state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoDetailSharpeningState {
+    pub amount: f64,
+    pub radius: f64,
+    pub detail: f64,
+    pub masking: f64,
+}
+
+/// Non-MLX noise reduction state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoDetailNoiseReductionState {
+    pub luminance: f64,
+    pub detail: f64,
+    pub contrast: f64,
+    pub color: f64,
+    pub color_detail: f64,
+}
+
+/// Current Detail state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoDetailState {
+    pub sharpening: PhotoDetailSharpeningState,
+    pub noise_reduction: PhotoDetailNoiseReductionState,
+}
+
 /// Draft preview request returned while an exposure/contrast slider is moving.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhotoEditPreviewSession {
@@ -483,6 +549,9 @@ pub struct PhotoEditPreviewSession {
     pub blacks: f64,
     pub vibrance: f64,
     pub saturation: f64,
+    pub tone_curve: PhotoToneCurveState,
+    pub hsl_color_mixer: PhotoHslColorMixerState,
+    pub detail: PhotoDetailState,
     pub message: String,
 }
 
@@ -525,6 +594,9 @@ pub struct PhotoEditCommit {
     pub blacks: f64,
     pub vibrance: f64,
     pub saturation: f64,
+    pub tone_curve: PhotoToneCurveState,
+    pub hsl_color_mixer: PhotoHslColorMixerState,
+    pub detail: PhotoDetailState,
     pub persisted: bool,
     pub message: String,
 }
@@ -567,6 +639,9 @@ pub struct PhotoEditState {
     pub blacks: f64,
     pub vibrance: f64,
     pub saturation: f64,
+    pub tone_curve: PhotoToneCurveState,
+    pub hsl_color_mixer: PhotoHslColorMixerState,
+    pub detail: PhotoDetailState,
     pub persisted: bool,
     pub message: String,
 }
@@ -692,6 +767,7 @@ pub enum CoreError {
     EditGraph(silica_edit::EditGraphValidationError),
     Export(silica_export::ExportError),
     ExportBlocked(String),
+    UnsupportedEdit(String),
     AppSession(String),
 }
 
@@ -704,6 +780,7 @@ impl fmt::Display for CoreError {
             Self::EditGraph(error) => write!(formatter, "{error}"),
             Self::Export(error) => write!(formatter, "{error}"),
             Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
+            Self::UnsupportedEdit(message) => write!(formatter, "unsupported edit: {message}"),
             Self::AppSession(message) => write!(formatter, "app session error: {message}"),
         }
     }
@@ -718,6 +795,7 @@ impl Error for CoreError {
             Self::EditGraph(error) => Some(error),
             Self::Export(error) => Some(error),
             Self::ExportBlocked(_) => None,
+            Self::UnsupportedEdit(_) => None,
             Self::AppSession(_) => None,
         }
     }
@@ -1473,6 +1551,22 @@ pub fn get_photo_histogram(
             Some(graph) => graph,
             None => return Ok(None),
         };
+    let render_detail = render_detail_from_graph(&graph);
+    if !render_detail.is_neutral() {
+        return Ok(Some(PhotoHistogramSession {
+            photo_id: candidate.photo_id,
+            source_path: candidate.path,
+            status: PhotoHistogramStatus::Unsupported,
+            red: empty_bins(),
+            green: empty_bins(),
+            blue: empty_bins(),
+            luminance: empty_bins(),
+            pixel_count: 0,
+            cache_key: String::new(),
+            cache_path: String::new(),
+            message: detail_unsupported_message(),
+        }));
+    }
     let histogram =
         silica_export::compute_jpeg_develop_histogram(silica_export::JpegHistogramRequest {
             source_path: source_path.clone(),
@@ -1487,6 +1581,11 @@ pub fn get_photo_histogram(
             color_presence: export_color_presence_from_render(render_color_presence_from_graph(
                 &graph,
             )),
+            tone_curve: export_tone_curve_from_render(render_tone_curve_from_graph(&graph)),
+            hsl_color_mixer: export_hsl_color_mixer_from_render(render_hsl_color_mixer_from_graph(
+                &graph,
+            )),
+            detail: export_detail_from_render(render_detail),
         })?;
     let pixel_count = histogram.pixel_count;
     let red = histogram.red;
@@ -1572,6 +1671,9 @@ pub fn preview_exposure_contrast_edit(
     request.white_balance = render_white_balance_from_graph(&graph);
     request.tone_recovery = render_tone_recovery_from_graph(&graph);
     request.color_presence = render_color_presence_from_graph(&graph);
+    request.tone_curve = render_tone_curve_from_graph(&graph);
+    request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
+    let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1592,6 +1694,9 @@ pub fn preview_exposure_contrast_edit(
             export_white_balance_from_render(request.white_balance),
             export_tone_recovery_from_render(request.tone_recovery),
             export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
         )?
     } else {
         None
@@ -1613,6 +1718,9 @@ pub fn preview_exposure_contrast_edit(
         blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
+        detail: detail_state_from_graph(&graph),
         message,
     }))
 }
@@ -1654,6 +1762,9 @@ pub fn preview_white_balance_edit(
     let mut request = request;
     request.tone_recovery = render_tone_recovery_from_graph(&graph);
     request.color_presence = render_color_presence_from_graph(&graph);
+    request.tone_curve = render_tone_curve_from_graph(&graph);
+    request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
+    let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1674,6 +1785,9 @@ pub fn preview_white_balance_edit(
             export_white_balance_from_render(request.white_balance),
             export_tone_recovery_from_render(request.tone_recovery),
             export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
         )?
     } else {
         None
@@ -1695,6 +1809,9 @@ pub fn preview_white_balance_edit(
         blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
+        detail: detail_state_from_graph(&graph),
         message,
     }))
 }
@@ -1736,6 +1853,9 @@ pub fn preview_tone_recovery_edit(
     );
     let mut request = request;
     request.color_presence = render_color_presence_from_graph(&graph);
+    request.tone_curve = render_tone_curve_from_graph(&graph);
+    request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
+    let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1756,6 +1876,9 @@ pub fn preview_tone_recovery_edit(
             export_white_balance_from_render(request.white_balance),
             export_tone_recovery_from_render(request.tone_recovery),
             export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
         )?
     } else {
         None
@@ -1777,6 +1900,190 @@ pub fn preview_tone_recovery_edit(
         blacks: edited.basic.blacks.as_f64().unwrap_or(blacks),
         vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
+        detail: detail_state_from_graph(&graph),
+        message,
+    }))
+}
+
+/// Build a draft tone-curve preview request without writing the catalog.
+pub fn preview_tone_curve_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    rgb_curve: &[(f64, f64)],
+    red_curve: &[(f64, f64)],
+    green_curve: &[(f64, f64)],
+    blue_curve: &[(f64, f64)],
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_tone_curve(
+        &graph,
+        silica_edit::CurveMode::Point,
+        rgb_curve,
+        red_curve,
+        green_curve,
+        blue_curve,
+        current_timestamp_string(),
+    )?;
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let mut request = silica_render::plan_tone_curve_preview(
+        render_plan,
+        graph.basic.exposure.as_f64().unwrap_or(0.0),
+        graph.basic.contrast.as_f64().unwrap_or(0.0),
+        render_white_balance_from_graph(&graph),
+        render_tone_recovery_from_graph(&graph),
+        render_color_presence_from_graph(&graph),
+        render_tone_curve_from_graph(&edited),
+    );
+    request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
+    let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+            export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
+            export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
+        )?
+    } else {
+        None
+    };
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        develop_preview_bytes,
+        status,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&edited),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&edited),
+        detail: detail_state_from_graph(&edited),
+        message,
+    }))
+}
+
+/// Build a draft HSL color mixer preview request without writing the catalog.
+pub fn preview_hsl_color_mixer_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    channel: silica_edit::HslColorChannel,
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_hsl_color_channel(
+        &graph,
+        channel,
+        hue,
+        saturation,
+        luminance,
+        current_timestamp_string(),
+    )?;
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let request = silica_render::plan_hsl_color_mixer_preview(
+        render_plan,
+        graph.basic.exposure.as_f64().unwrap_or(0.0),
+        graph.basic.contrast.as_f64().unwrap_or(0.0),
+        render_white_balance_from_graph(&graph),
+        render_tone_recovery_from_graph(&graph),
+        render_color_presence_from_graph(&graph),
+        render_tone_curve_from_graph(&graph),
+        render_hsl_color_mixer_from_graph(&edited),
+    );
+    let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+            export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
+            export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
+        )?
+    } else {
+        None
+    };
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        develop_preview_bytes,
+        status,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&edited),
+        detail: detail_state_from_graph(&edited),
         message,
     }))
 }
@@ -1805,7 +2112,7 @@ pub fn preview_color_presence_edit(
             Some(plan) => plan,
             None => return Ok(None),
         };
-    let request = silica_render::plan_color_presence_preview(
+    let mut request = silica_render::plan_color_presence_preview(
         render_plan,
         graph.basic.exposure.as_f64().unwrap_or(0.0),
         graph.basic.contrast.as_f64().unwrap_or(0.0),
@@ -1813,6 +2120,9 @@ pub fn preview_color_presence_edit(
         render_tone_recovery_from_graph(&graph),
         render_color_presence_from_graph(&edited),
     );
+    request.tone_curve = render_tone_curve_from_graph(&graph);
+    request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
+    let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1833,6 +2143,9 @@ pub fn preview_color_presence_edit(
             export_white_balance_from_render(request.white_balance),
             export_tone_recovery_from_render(request.tone_recovery),
             export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
         )?
     } else {
         None
@@ -1854,8 +2167,125 @@ pub fn preview_color_presence_edit(
         blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: edited.basic.vibrance.as_f64().unwrap_or(vibrance),
         saturation: edited.basic.saturation.as_f64().unwrap_or(saturation),
+        tone_curve: tone_curve_state_from_graph(&graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
+        detail: detail_state_from_graph(&graph),
         message,
     }))
+}
+
+/// Build a draft sharpening preview without writing the catalog.
+pub fn preview_detail_sharpening_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_detail_sharpening(
+        &graph,
+        amount,
+        radius,
+        detail,
+        masking,
+        current_timestamp_string(),
+    )?;
+
+    preview_detail_edit(library_root_path, photo_id, &graph, &edited)
+}
+
+/// Build a draft noise-reduction preview without writing the catalog.
+#[allow(clippy::too_many_arguments)]
+pub fn preview_detail_noise_reduction_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_detail_noise_reduction(
+        &graph,
+        luminance,
+        detail,
+        contrast,
+        color,
+        color_detail,
+        current_timestamp_string(),
+    )?;
+
+    preview_detail_edit(library_root_path, photo_id, &graph, &edited)
+}
+
+/// Detail commit is intentionally blocked until a real renderer/export path exists.
+pub fn commit_detail_sharpening_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let _edited = silica_edit::apply_detail_sharpening(
+        &graph,
+        amount,
+        radius,
+        detail,
+        masking,
+        current_timestamp_string(),
+    )?;
+
+    Err(CoreError::UnsupportedEdit(detail_unsupported_message()))
+}
+
+/// Detail commit is intentionally blocked until a real renderer/export path exists.
+#[allow(clippy::too_many_arguments)]
+pub fn commit_detail_noise_reduction_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let _edited = silica_edit::apply_detail_noise_reduction(
+        &graph,
+        luminance,
+        detail,
+        contrast,
+        color,
+        color_detail,
+        current_timestamp_string(),
+    )?;
+
+    Err(CoreError::UnsupportedEdit(detail_unsupported_message()))
 }
 
 /// Persist an exposure/contrast edit on commit/release.
@@ -1880,7 +2310,7 @@ pub fn commit_exposure_contrast_edit(
     let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
 
     Ok(Some(PhotoEditCommit {
-        photo_id: persisted.source.photo_id,
+        photo_id: persisted.source.photo_id.clone(),
         exposure: persisted.basic.exposure.as_f64().unwrap_or(exposure),
         contrast: persisted.basic.contrast.as_f64().unwrap_or(contrast),
         white_balance: persisted.basic.white_balance,
@@ -1892,6 +2322,9 @@ pub fn commit_exposure_contrast_edit(
         blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
         persisted: true,
         message: "Exposure/contrast edit persisted on commit.".to_string(),
     }))
@@ -1921,7 +2354,7 @@ pub fn commit_white_balance_edit(
     let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
 
     Ok(Some(PhotoEditCommit {
-        photo_id: persisted.source.photo_id,
+        photo_id: persisted.source.photo_id.clone(),
         exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
         white_balance: persisted.basic.white_balance,
@@ -1933,6 +2366,9 @@ pub fn commit_white_balance_edit(
         blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
         persisted: true,
         message: "White balance edit persisted on commit.".to_string(),
     }))
@@ -1964,7 +2400,7 @@ pub fn commit_tone_recovery_edit(
     let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
 
     Ok(Some(PhotoEditCommit {
-        photo_id: persisted.source.photo_id,
+        photo_id: persisted.source.photo_id.clone(),
         exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
         white_balance: persisted.basic.white_balance,
@@ -1976,8 +2412,104 @@ pub fn commit_tone_recovery_edit(
         blacks: persisted.basic.blacks.as_f64().unwrap_or(blacks),
         vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
         persisted: true,
         message: "Tone recovery edit persisted on commit.".to_string(),
+    }))
+}
+
+/// Persist a tone-curve edit on commit/release.
+pub fn commit_tone_curve_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    rgb_curve: &[(f64, f64)],
+    red_curve: &[(f64, f64)],
+    green_curve: &[(f64, f64)],
+    blue_curve: &[(f64, f64)],
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_tone_curve(
+        &graph,
+        silica_edit::CurveMode::Point,
+        rgb_curve,
+        red_curve,
+        green_curve,
+        blue_curve,
+        current_timestamp_string(),
+    )?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id.clone(),
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
+        persisted: true,
+        message: "Tone curve edit persisted on commit.".to_string(),
+    }))
+}
+
+/// Persist an HSL color mixer edit on commit/release.
+pub fn commit_hsl_color_mixer_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    channel: silica_edit::HslColorChannel,
+    hue: f64,
+    saturation: f64,
+    luminance: f64,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_hsl_color_channel(
+        &graph,
+        channel,
+        hue,
+        saturation,
+        luminance,
+        current_timestamp_string(),
+    )?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(PhotoEditCommit {
+        photo_id: persisted.source.photo_id.clone(),
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
+        persisted: true,
+        message: "HSL color mixer edit persisted on commit.".to_string(),
     }))
 }
 
@@ -2003,7 +2535,7 @@ pub fn commit_color_presence_edit(
     let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
 
     Ok(Some(PhotoEditCommit {
-        photo_id: persisted.source.photo_id,
+        photo_id: persisted.source.photo_id.clone(),
         exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
         white_balance: persisted.basic.white_balance,
@@ -2015,6 +2547,9 @@ pub fn commit_color_presence_edit(
         blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: persisted.basic.vibrance.as_f64().unwrap_or(vibrance),
         saturation: persisted.basic.saturation.as_f64().unwrap_or(saturation),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
         persisted: true,
         message: "Color presence edit persisted on commit.".to_string(),
     }))
@@ -2035,7 +2570,7 @@ pub fn commit_p0_basic_reset(
     let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
 
     Ok(Some(PhotoEditCommit {
-        photo_id: persisted.source.photo_id,
+        photo_id: persisted.source.photo_id.clone(),
         exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
         white_balance: persisted.basic.white_balance,
@@ -2047,6 +2582,9 @@ pub fn commit_p0_basic_reset(
         blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
         persisted: true,
         message: "P0 Basic reset persisted on commit.".to_string(),
     }))
@@ -2068,7 +2606,7 @@ pub fn commit_basic_preset_edit(
     let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
 
     Ok(Some(PhotoEditCommit {
-        photo_id: persisted.source.photo_id,
+        photo_id: persisted.source.photo_id.clone(),
         exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
         white_balance: persisted.basic.white_balance,
@@ -2080,6 +2618,9 @@ pub fn commit_basic_preset_edit(
         blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
+        detail: detail_state_from_graph(&persisted),
         persisted: true,
         message: "Basic preset persisted on commit.".to_string(),
     }))
@@ -2093,7 +2634,7 @@ pub fn get_photo_edit_state(
     let library_root_path = library_root_path.as_ref();
     if let Some(graph) = silica_storage::load_active_edit_graph(library_root_path, photo_id)? {
         return Ok(Some(PhotoEditState {
-            photo_id: graph.source.photo_id,
+            photo_id: graph.source.photo_id.clone(),
             exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
             contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
             white_balance: graph.basic.white_balance,
@@ -2105,6 +2646,9 @@ pub fn get_photo_edit_state(
             blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
             vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
             saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+            tone_curve: tone_curve_state_from_graph(&graph),
+            hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
+            detail: detail_state_from_graph(&graph),
             persisted: true,
             message: "Restored committed edit state.".to_string(),
         }));
@@ -2117,7 +2661,7 @@ pub fn get_photo_edit_state(
         };
 
     Ok(Some(PhotoEditState {
-        photo_id: graph.source.photo_id,
+        photo_id: graph.source.photo_id.clone(),
         exposure: graph.basic.exposure.as_f64().unwrap_or(0.0),
         contrast: graph.basic.contrast.as_f64().unwrap_or(0.0),
         white_balance: graph.basic.white_balance,
@@ -2129,6 +2673,9 @@ pub fn get_photo_edit_state(
         blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
         vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
         saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(&graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
+        detail: detail_state_from_graph(&graph),
         persisted: false,
         message: "Default clean edit state loaded.".to_string(),
     }))
@@ -2183,6 +2730,33 @@ pub fn export_photo_jpeg(
         render_color_presence_from_graph(&graph),
         LOCAL_ALPHA_JPEG_QUALITY,
     );
+    let render_request = silica_render::plan_jpeg_srgb_export_with_tone_curve(
+        render_request.source_path,
+        render_request.output_path,
+        render_request.exposure,
+        render_request.contrast,
+        render_request.white_balance,
+        render_request.tone_recovery,
+        render_request.color_presence,
+        render_tone_curve_from_graph(&graph),
+        render_request.quality,
+    );
+    let render_request = silica_render::plan_jpeg_srgb_export_with_detail(
+        render_request.source_path,
+        render_request.output_path,
+        render_request.exposure,
+        render_request.contrast,
+        render_request.white_balance,
+        render_request.tone_recovery,
+        render_request.color_presence,
+        render_request.tone_curve,
+        render_hsl_color_mixer_from_graph(&graph),
+        render_detail_from_graph(&graph),
+        render_request.quality,
+    );
+    if !render_request.detail.is_neutral() {
+        return Err(CoreError::ExportBlocked(render_request.message));
+    }
 
     let export_result =
         silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
@@ -2193,6 +2767,9 @@ pub fn export_photo_jpeg(
             white_balance: export_white_balance_from_render(render_request.white_balance),
             tone_recovery: export_tone_recovery_from_render(render_request.tone_recovery),
             color_presence: export_color_presence_from_render(render_request.color_presence),
+            tone_curve: export_tone_curve_from_render(render_request.tone_curve.clone()),
+            hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
+            detail: export_detail_from_render(render_request.detail),
             quality: render_request.quality,
             color_profile: export_color_profile_to_export(color_profile),
         })?;
@@ -2217,6 +2794,9 @@ pub fn export_photo_jpeg(
         "blacks": render_request.tone_recovery.blacks,
         "vibrance": render_request.color_presence.vibrance,
         "saturation": render_request.color_presence.saturation,
+        "tone_curve": tone_curve_settings_json(&render_request.tone_curve),
+        "hsl_color_mixer": hsl_color_mixer_settings_json(&render_request.hsl_color_mixer),
+        "detail": detail_settings_json(&render_request.detail),
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
@@ -2317,6 +2897,37 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         render_color_presence_from_graph(&graph),
         LOCAL_ALPHA_JPEG_QUALITY,
     );
+    let render_request = silica_render::plan_raw_derived_jpeg_srgb_export_with_tone_curve(
+        render_request.source_path,
+        render_request.output_path,
+        render_request.exposure,
+        render_request.contrast,
+        render_request.white_balance,
+        render_request.tone_recovery,
+        render_request.color_presence,
+        render_tone_curve_from_graph(&graph),
+        render_request.quality,
+    );
+    let mut render_request = silica_render::plan_raw_derived_jpeg_srgb_export_with_hsl_color_mixer(
+        render_request.source_path,
+        render_request.output_path,
+        render_request.exposure,
+        render_request.contrast,
+        render_request.white_balance,
+        render_request.tone_recovery,
+        render_request.color_presence,
+        render_request.tone_curve,
+        render_hsl_color_mixer_from_graph(&graph),
+        render_request.quality,
+    );
+    render_request.detail = render_detail_from_graph(&graph);
+    if !render_request.detail.is_neutral() {
+        render_request.message =
+            "Detail export unsupported until renderer support exists.".to_string();
+    }
+    if !render_request.detail.is_neutral() {
+        return Err(CoreError::ExportBlocked(render_request.message));
+    }
     let export_result =
         silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
             source_path: PathBuf::from(&render_request.source_path),
@@ -2326,6 +2937,9 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             white_balance: export_white_balance_from_render(render_request.white_balance),
             tone_recovery: export_tone_recovery_from_render(render_request.tone_recovery),
             color_presence: export_color_presence_from_render(render_request.color_presence),
+            tone_curve: export_tone_curve_from_render(render_request.tone_curve.clone()),
+            hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
+            detail: export_detail_from_render(render_request.detail),
             quality: render_request.quality,
             color_profile: silica_export::ExportColorProfile::Srgb,
         })?;
@@ -2352,6 +2966,9 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         "blacks": render_request.tone_recovery.blacks,
         "vibrance": render_request.color_presence.vibrance,
         "saturation": render_request.color_presence.saturation,
+        "tone_curve": tone_curve_settings_json(&render_request.tone_curve),
+        "hsl_color_mixer": hsl_color_mixer_settings_json(&render_request.hsl_color_mixer),
+        "detail": detail_settings_json(&render_request.detail),
         "source_path": source_artifact.source_path.clone(),
         "source_sha256": source_artifact.source_sha256.clone(),
         "raw_source_path": source_artifact.source_path.clone(),
@@ -2449,6 +3066,79 @@ fn preview_render_plan(
     Ok(Some((candidate.photo_id, candidate.file_name, render_plan)))
 }
 
+fn preview_detail_edit(
+    library_root_path: &Path,
+    photo_id: &str,
+    graph: &silica_edit::EditGraph,
+    edited: &silica_edit::EditGraph,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let request = silica_render::plan_detail_preview(
+        render_plan,
+        graph.basic.exposure.as_f64().unwrap_or(0.0),
+        graph.basic.contrast.as_f64().unwrap_or(0.0),
+        render_white_balance_from_graph(graph),
+        render_tone_recovery_from_graph(graph),
+        render_color_presence_from_graph(graph),
+        render_tone_curve_from_graph(graph),
+        render_hsl_color_mixer_from_graph(graph),
+        render_detail_from_graph(edited),
+    );
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+            export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
+            export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
+        )?
+    } else {
+        None
+    };
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        develop_preview_bytes,
+        status,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(graph),
+        detail: detail_state_from_graph(edited),
+        message,
+    }))
+}
+
 fn ensure_jpeg_loupe_preview_cache(
     library_root_path: &Path,
     photo_id: &str,
@@ -2517,6 +3207,9 @@ fn write_jpeg_develop_preview_bytes(
     white_balance: silica_export::WhiteBalanceAdjustment,
     tone_recovery: silica_export::ToneRecoveryAdjustment,
     color_presence: silica_export::ColorPresenceAdjustment,
+    tone_curve: silica_export::ToneCurveAdjustment,
+    hsl_color_mixer: silica_export::HslColorMixerAdjustment,
+    detail: silica_export::DetailAdjustment,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
     if !is_jpeg_path(&source_path) || !source_path.is_file() {
@@ -2539,6 +3232,9 @@ fn write_jpeg_develop_preview_bytes(
             white_balance,
             tone_recovery,
             color_presence,
+            tone_curve,
+            hsl_color_mixer,
+            detail,
         }) {
             Ok(result) => result,
             Err(silica_export::ExportError::Image(_)) => return Ok(None),
@@ -3261,6 +3957,332 @@ fn export_tone_recovery_from_render(
         whites: tone_recovery.whites,
         blacks: tone_recovery.blacks,
     }
+}
+
+fn tone_curve_state_from_graph(graph: &silica_edit::EditGraph) -> PhotoToneCurveState {
+    PhotoToneCurveState {
+        curve_mode: graph.tone.curve_mode,
+        rgb_curve: photo_tone_curve_points_from_edit(&graph.tone.rgb_curve),
+        red_curve: photo_tone_curve_points_from_edit(&graph.tone.red_curve),
+        green_curve: photo_tone_curve_points_from_edit(&graph.tone.green_curve),
+        blue_curve: photo_tone_curve_points_from_edit(&graph.tone.blue_curve),
+    }
+}
+
+fn photo_tone_curve_points_from_edit(
+    points: &[silica_edit::CurvePoint],
+) -> Vec<PhotoToneCurvePoint> {
+    points
+        .iter()
+        .map(|point| PhotoToneCurvePoint {
+            x: point.x.as_f64().unwrap_or(0.0),
+            y: point.y.as_f64().unwrap_or(0.0),
+        })
+        .collect()
+}
+
+fn render_tone_curve_from_graph(
+    graph: &silica_edit::EditGraph,
+) -> silica_render::ToneCurveRenderAdjustment {
+    silica_render::ToneCurveRenderAdjustment {
+        mode: match graph.tone.curve_mode {
+            silica_edit::CurveMode::None => silica_render::ToneCurveRenderMode::None,
+            silica_edit::CurveMode::Point => silica_render::ToneCurveRenderMode::Point,
+            silica_edit::CurveMode::Parametric => silica_render::ToneCurveRenderMode::Parametric,
+        },
+        rgb_curve: render_tone_curve_points_from_edit(&graph.tone.rgb_curve),
+        red_curve: render_tone_curve_points_from_edit(&graph.tone.red_curve),
+        green_curve: render_tone_curve_points_from_edit(&graph.tone.green_curve),
+        blue_curve: render_tone_curve_points_from_edit(&graph.tone.blue_curve),
+    }
+}
+
+fn render_tone_curve_points_from_edit(
+    points: &[silica_edit::CurvePoint],
+) -> Vec<silica_render::ToneCurveRenderPoint> {
+    points
+        .iter()
+        .map(|point| silica_render::ToneCurveRenderPoint {
+            x: point.x.as_f64().unwrap_or(0.0),
+            y: point.y.as_f64().unwrap_or(0.0),
+        })
+        .collect()
+}
+
+fn export_tone_curve_from_render(
+    tone_curve: silica_render::ToneCurveRenderAdjustment,
+) -> silica_export::ToneCurveAdjustment {
+    silica_export::ToneCurveAdjustment {
+        mode: match tone_curve.mode {
+            silica_render::ToneCurveRenderMode::None => silica_export::ToneCurveMode::None,
+            silica_render::ToneCurveRenderMode::Parametric => {
+                silica_export::ToneCurveMode::Parametric
+            }
+            silica_render::ToneCurveRenderMode::Point => silica_export::ToneCurveMode::Point,
+        },
+        rgb_curve: tone_curve_points_to_export(tone_curve.rgb_curve),
+        red_curve: tone_curve_points_to_export(tone_curve.red_curve),
+        green_curve: tone_curve_points_to_export(tone_curve.green_curve),
+        blue_curve: tone_curve_points_to_export(tone_curve.blue_curve),
+    }
+}
+
+fn tone_curve_points_to_export(
+    points: Vec<silica_render::ToneCurveRenderPoint>,
+) -> Vec<silica_export::ToneCurvePoint> {
+    points
+        .into_iter()
+        .map(|point| silica_export::ToneCurvePoint {
+            x: point.x,
+            y: point.y,
+        })
+        .collect()
+}
+
+fn tone_curve_settings_json(
+    tone_curve: &silica_render::ToneCurveRenderAdjustment,
+) -> serde_json::Value {
+    serde_json::json!({
+        "curve_mode": match tone_curve.mode {
+            silica_render::ToneCurveRenderMode::None => "none",
+            silica_render::ToneCurveRenderMode::Parametric => "parametric",
+            silica_render::ToneCurveRenderMode::Point => "point",
+        },
+        "rgb_curve": tone_curve_points_json(&tone_curve.rgb_curve),
+        "red_curve": tone_curve_points_json(&tone_curve.red_curve),
+        "green_curve": tone_curve_points_json(&tone_curve.green_curve),
+        "blue_curve": tone_curve_points_json(&tone_curve.blue_curve),
+    })
+}
+
+fn tone_curve_points_json(
+    points: &[silica_render::ToneCurveRenderPoint],
+) -> Vec<serde_json::Value> {
+    points
+        .iter()
+        .map(|point| serde_json::json!({ "x": point.x, "y": point.y }))
+        .collect()
+}
+
+fn hsl_color_mixer_state_from_graph(graph: &silica_edit::EditGraph) -> PhotoHslColorMixerState {
+    PhotoHslColorMixerState {
+        red: photo_hsl_color_channel_from_edit(&graph.color.hsl.red),
+        orange: photo_hsl_color_channel_from_edit(&graph.color.hsl.orange),
+        yellow: photo_hsl_color_channel_from_edit(&graph.color.hsl.yellow),
+        green: photo_hsl_color_channel_from_edit(&graph.color.hsl.green),
+        aqua: photo_hsl_color_channel_from_edit(&graph.color.hsl.aqua),
+        blue: photo_hsl_color_channel_from_edit(&graph.color.hsl.blue),
+        purple: photo_hsl_color_channel_from_edit(&graph.color.hsl.purple),
+        magenta: photo_hsl_color_channel_from_edit(&graph.color.hsl.magenta),
+    }
+}
+
+fn photo_hsl_color_channel_from_edit(
+    channel: &silica_edit::HslChannel,
+) -> PhotoHslColorChannelState {
+    PhotoHslColorChannelState {
+        hue: channel.hue.as_f64().unwrap_or(0.0),
+        saturation: channel.saturation.as_f64().unwrap_or(0.0),
+        luminance: channel.luminance.as_f64().unwrap_or(0.0),
+    }
+}
+
+fn render_hsl_color_mixer_from_graph(
+    graph: &silica_edit::EditGraph,
+) -> silica_render::HslColorMixerRenderAdjustment {
+    silica_render::HslColorMixerRenderAdjustment {
+        red: render_hsl_color_channel_from_edit(&graph.color.hsl.red),
+        orange: render_hsl_color_channel_from_edit(&graph.color.hsl.orange),
+        yellow: render_hsl_color_channel_from_edit(&graph.color.hsl.yellow),
+        green: render_hsl_color_channel_from_edit(&graph.color.hsl.green),
+        aqua: render_hsl_color_channel_from_edit(&graph.color.hsl.aqua),
+        blue: render_hsl_color_channel_from_edit(&graph.color.hsl.blue),
+        purple: render_hsl_color_channel_from_edit(&graph.color.hsl.purple),
+        magenta: render_hsl_color_channel_from_edit(&graph.color.hsl.magenta),
+    }
+}
+
+fn render_hsl_color_channel_from_edit(
+    channel: &silica_edit::HslChannel,
+) -> silica_render::HslColorChannelRenderAdjustment {
+    silica_render::HslColorChannelRenderAdjustment {
+        hue: channel.hue.as_f64().unwrap_or(0.0),
+        saturation: channel.saturation.as_f64().unwrap_or(0.0),
+        luminance: channel.luminance.as_f64().unwrap_or(0.0),
+    }
+}
+
+fn export_hsl_color_mixer_from_render(
+    hsl_color_mixer: silica_render::HslColorMixerRenderAdjustment,
+) -> silica_export::HslColorMixerAdjustment {
+    silica_export::HslColorMixerAdjustment {
+        red: hsl_color_channel_to_export(hsl_color_mixer.red),
+        orange: hsl_color_channel_to_export(hsl_color_mixer.orange),
+        yellow: hsl_color_channel_to_export(hsl_color_mixer.yellow),
+        green: hsl_color_channel_to_export(hsl_color_mixer.green),
+        aqua: hsl_color_channel_to_export(hsl_color_mixer.aqua),
+        blue: hsl_color_channel_to_export(hsl_color_mixer.blue),
+        purple: hsl_color_channel_to_export(hsl_color_mixer.purple),
+        magenta: hsl_color_channel_to_export(hsl_color_mixer.magenta),
+    }
+}
+
+fn hsl_color_channel_to_export(
+    channel: silica_render::HslColorChannelRenderAdjustment,
+) -> silica_export::HslColorChannelAdjustment {
+    silica_export::HslColorChannelAdjustment {
+        hue: channel.hue,
+        saturation: channel.saturation,
+        luminance: channel.luminance,
+    }
+}
+
+fn hsl_color_mixer_settings_json(
+    hsl_color_mixer: &silica_render::HslColorMixerRenderAdjustment,
+) -> serde_json::Value {
+    serde_json::json!({
+        "red": hsl_color_channel_settings_json(hsl_color_mixer.red),
+        "orange": hsl_color_channel_settings_json(hsl_color_mixer.orange),
+        "yellow": hsl_color_channel_settings_json(hsl_color_mixer.yellow),
+        "green": hsl_color_channel_settings_json(hsl_color_mixer.green),
+        "aqua": hsl_color_channel_settings_json(hsl_color_mixer.aqua),
+        "blue": hsl_color_channel_settings_json(hsl_color_mixer.blue),
+        "purple": hsl_color_channel_settings_json(hsl_color_mixer.purple),
+        "magenta": hsl_color_channel_settings_json(hsl_color_mixer.magenta),
+    })
+}
+
+fn hsl_color_channel_settings_json(
+    channel: silica_render::HslColorChannelRenderAdjustment,
+) -> serde_json::Value {
+    serde_json::json!({
+        "hue": channel.hue,
+        "saturation": channel.saturation,
+        "luminance": channel.luminance,
+    })
+}
+
+fn detail_state_from_graph(graph: &silica_edit::EditGraph) -> PhotoDetailState {
+    PhotoDetailState {
+        sharpening: PhotoDetailSharpeningState {
+            amount: graph.detail.sharpening.amount.as_f64().unwrap_or(0.0),
+            radius: graph.detail.sharpening.radius.as_f64().unwrap_or(1.0),
+            detail: graph.detail.sharpening.detail.as_f64().unwrap_or(25.0),
+            masking: graph.detail.sharpening.masking.as_f64().unwrap_or(0.0),
+        },
+        noise_reduction: PhotoDetailNoiseReductionState {
+            luminance: graph
+                .detail
+                .noise_reduction
+                .luminance
+                .as_f64()
+                .unwrap_or(0.0),
+            detail: graph.detail.noise_reduction.detail.as_f64().unwrap_or(50.0),
+            contrast: graph
+                .detail
+                .noise_reduction
+                .contrast
+                .as_f64()
+                .unwrap_or(0.0),
+            color: graph.detail.noise_reduction.color.as_f64().unwrap_or(25.0),
+            color_detail: graph
+                .detail
+                .noise_reduction
+                .color_detail
+                .as_f64()
+                .unwrap_or(50.0),
+        },
+    }
+}
+
+fn render_detail_from_graph(
+    graph: &silica_edit::EditGraph,
+) -> silica_render::DetailRenderAdjustment {
+    silica_render::DetailRenderAdjustment {
+        sharpening: silica_render::DetailSharpeningRenderAdjustment {
+            amount: graph.detail.sharpening.amount.as_f64().unwrap_or(0.0),
+            radius: graph.detail.sharpening.radius.as_f64().unwrap_or(1.0),
+            detail: graph.detail.sharpening.detail.as_f64().unwrap_or(25.0),
+            masking: graph.detail.sharpening.masking.as_f64().unwrap_or(0.0),
+        },
+        noise_reduction: silica_render::DetailNoiseReductionRenderAdjustment {
+            luminance: graph
+                .detail
+                .noise_reduction
+                .luminance
+                .as_f64()
+                .unwrap_or(0.0),
+            detail: graph.detail.noise_reduction.detail.as_f64().unwrap_or(50.0),
+            contrast: graph
+                .detail
+                .noise_reduction
+                .contrast
+                .as_f64()
+                .unwrap_or(0.0),
+            color: graph.detail.noise_reduction.color.as_f64().unwrap_or(25.0),
+            color_detail: graph
+                .detail
+                .noise_reduction
+                .color_detail
+                .as_f64()
+                .unwrap_or(50.0),
+        },
+    }
+}
+
+fn export_detail_from_render(
+    detail: silica_render::DetailRenderAdjustment,
+) -> silica_export::DetailAdjustment {
+    silica_export::DetailAdjustment {
+        sharpening: silica_export::DetailSharpeningAdjustment {
+            amount: detail.sharpening.amount,
+            radius: detail.sharpening.radius,
+            detail: detail.sharpening.detail,
+            masking: detail.sharpening.masking,
+        },
+        noise_reduction: silica_export::DetailNoiseReductionAdjustment {
+            luminance: detail.noise_reduction.luminance,
+            detail: detail.noise_reduction.detail,
+            contrast: detail.noise_reduction.contrast,
+            color: detail.noise_reduction.color,
+            color_detail: detail.noise_reduction.color_detail,
+        },
+    }
+}
+
+fn detail_settings_json(detail: &silica_render::DetailRenderAdjustment) -> serde_json::Value {
+    serde_json::json!({
+        "sharpening": {
+            "amount": detail.sharpening.amount,
+            "radius": detail.sharpening.radius,
+            "detail": detail.sharpening.detail,
+            "masking": detail.sharpening.masking,
+        },
+        "noise_reduction": {
+            "luminance": detail.noise_reduction.luminance,
+            "detail": detail.noise_reduction.detail,
+            "contrast": detail.noise_reduction.contrast,
+            "color": detail.noise_reduction.color,
+            "color_detail": detail.noise_reduction.color_detail,
+        },
+        "mlx_denoise": "deferred",
+    })
+}
+
+fn detail_unsupported_message() -> String {
+    "Detail preview/export is unsupported until renderer support exists.".to_string()
+}
+
+fn apply_detail_preview_boundary(
+    mut request: silica_render::ExposureContrastPreviewRequest,
+    detail: silica_render::DetailRenderAdjustment,
+) -> silica_render::ExposureContrastPreviewRequest {
+    request.detail = detail;
+    if request.status == silica_render::PreviewRenderStatus::Ready && !detail.is_neutral() {
+        request.status = silica_render::PreviewRenderStatus::Unsupported;
+        request.message = detail_unsupported_message();
+    }
+    request
 }
 
 fn render_color_presence_from_graph(
@@ -5128,6 +6150,235 @@ mod tests {
         assert_eq!(settings["shadows"], 42.0);
         assert_eq!(settings["whites"], 10.0);
         assert_eq!(settings["blacks"], -12.0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn previews_commits_and_exports_tone_curve_through_core() {
+        let workspace = unique_library_root("core-tone-curve");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+        let rgb_curve = [(0.0, 0.0), (0.5, 0.28), (1.0, 1.0)];
+
+        let preview =
+            preview_tone_curve_edit(&created.root_path, &photo_id, &rgb_curve, &[], &[], &[])
+                .expect("preview tone curve")
+                .expect("preview result");
+
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(preview.tone_curve.curve_mode, silica_edit::CurveMode::Point);
+        assert_eq!(preview.tone_curve.rgb_curve.len(), 3);
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after preview")
+                .is_none(),
+            "tone curve preview must not write edit state"
+        );
+
+        let committed =
+            commit_tone_curve_edit(&created.root_path, &photo_id, &rgb_curve, &[], &[], &[])
+                .expect("commit tone curve")
+                .expect("commit result");
+        assert_eq!(
+            committed.tone_curve.curve_mode,
+            silica_edit::CurveMode::Point
+        );
+        assert_eq!(committed.tone_curve.rgb_curve[1].y, 0.28);
+        assert!(committed.persisted);
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 1);
+        assert_eq!(history.items[0].label, "Tone curve");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+        assert!(exported.bytes_written > 0);
+
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["tone_curve"]["curve_mode"], "point");
+        assert_eq!(settings["tone_curve"]["rgb_curve"][1]["x"], 0.5);
+        assert_eq!(settings["tone_curve"]["rgb_curve"][1]["y"], 0.28);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn previews_commits_and_exports_hsl_color_mixer_through_core() {
+        let workspace = unique_library_root("core-hsl-color-mixer");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let preview = preview_hsl_color_mixer_edit(
+            &created.root_path,
+            &photo_id,
+            silica_edit::HslColorChannel::Blue,
+            -12.0,
+            24.0,
+            -8.5,
+        )
+        .expect("preview hsl color mixer")
+        .expect("preview result");
+
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(preview.hsl_color_mixer.blue.hue, -12.0);
+        assert_eq!(preview.hsl_color_mixer.blue.saturation, 24.0);
+        assert_eq!(preview.hsl_color_mixer.blue.luminance, -8.5);
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after preview")
+                .is_none(),
+            "HSL color mixer preview must not write edit state"
+        );
+
+        let committed = commit_hsl_color_mixer_edit(
+            &created.root_path,
+            &photo_id,
+            silica_edit::HslColorChannel::Blue,
+            -12.0,
+            24.0,
+            -8.5,
+        )
+        .expect("commit hsl color mixer")
+        .expect("commit result");
+        assert_eq!(committed.hsl_color_mixer.blue.hue, -12.0);
+        assert_eq!(committed.hsl_color_mixer.blue.saturation, 24.0);
+        assert_eq!(committed.hsl_color_mixer.blue.luminance, -8.5);
+        assert!(committed.persisted);
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 1);
+        assert_eq!(history.items[0].label, "HSL color mixer");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+        assert!(exported.bytes_written > 0);
+
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["hsl_color_mixer"]["blue"]["hue"], -12.0);
+        assert_eq!(settings["hsl_color_mixer"]["blue"]["saturation"], 24.0);
+        assert_eq!(settings["hsl_color_mixer"]["blue"]["luminance"], -8.5);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn blocks_detail_preview_commit_and_export_until_renderer_support_exists() {
+        let workspace = unique_library_root("core-detail-boundary");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let preview =
+            preview_detail_sharpening_edit(&created.root_path, &photo_id, 42.0, 1.2, 35.0, 10.0)
+                .expect("preview detail sharpening")
+                .expect("preview result");
+        assert_eq!(preview.status, PhotoPreviewStatus::Unsupported);
+        assert_eq!(preview.detail.sharpening.amount, 42.0);
+        assert!(preview.develop_preview_bytes.is_none());
+        assert!(preview.message.contains("Detail"));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after blocked detail preview")
+                .is_none(),
+            "blocked detail preview must not write edit state"
+        );
+
+        let commit_error =
+            commit_detail_sharpening_edit(&created.root_path, &photo_id, 42.0, 1.2, 35.0, 10.0)
+                .expect_err("detail commit unsupported");
+        assert!(matches!(commit_error, CoreError::UnsupportedEdit(_)));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after blocked detail commit")
+                .is_none(),
+            "blocked detail commit must not persist an edit graph"
+        );
+
+        let graph =
+            silica_storage::load_active_edit_graph_or_default(&created.root_path, &photo_id)
+                .expect("load default graph")
+                .expect("default graph");
+        let detail_graph =
+            silica_edit::apply_detail_sharpening(&graph, 42.0, 1.2, 35.0, 10.0, "unix:detail")
+                .expect("build detail graph");
+        silica_storage::commit_edit_graph(&created.root_path, detail_graph)
+            .expect("seed unsupported committed detail state");
+        let export_error = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect_err("active detail export unsupported");
+        assert!(matches!(export_error, CoreError::ExportBlocked(_)));
+        assert!(!output_path.exists());
 
         remove_library_root(&workspace);
     }

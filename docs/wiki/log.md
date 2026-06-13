@@ -14,6 +14,60 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Detail runtime boundary added
+
+- Completed Task 18.3.2 with an explicit no-supported-detail-runtime boundary.
+- Carried neutral Detail state through render/export/core/desktop request contracts while blocking non-neutral preview, commit, histogram, and export paths honestly.
+- Kept MLX denoise, model loading, fallback effects, and active Detail UI enablement out of scope and routed Phase 18 to Task 18.3.3.
+
+## [2026-06-13] phase-18 | Detail mutators added
+
+- Completed Task 18.3.1 with graph-only sharpening and non-MLX noise reduction mutators.
+- Added round-trip and invalid-range tests in `silica-edit` while leaving `detail.mlx_denoise` unchanged and inert.
+- Kept preview, export, UI, storage, sidecar, MLX runtime, and model behavior out of scope and routed Phase 18 to Task 18.3.2.
+
+## [2026-06-13] phase-18 | HSL panel UI completed
+
+- Completed Task 18.2.3 with a compact Develop HSL Mixer panel for all eight schema-owned color channels.
+- Wired hue, saturation, and luminance controls to the existing HSL preview and commit desktop commands while preserving non-persistent draft preview behavior.
+- Extended static UI, workflow smoke, and final visual QA checks for HSL command wiring, control bounds, and seeded blue-channel state; routed Phase 18 to Task 18.3.1.
+
+## [2026-06-13] phase-18 | HSL runtime parity added
+
+- Completed Task 18.2.2 with HSL color mixer preview, commit, desktop command, histogram, and JPEG export parity for supported local paths.
+- Kept draft HSL preview non-persistent and persisted committed HSL changes through one undoable history checkpoint.
+- Recorded HSL color mixer settings in export evidence without adding broad color-correctness, RAW renderer, UI, sidecar, MLX, MCP, or plugin claims and routed Phase 18 to Task 18.2.3.
+
+## [2026-06-13] phase-18 | HSL color mixer mutator added
+
+- Completed Task 18.2.1 with graph-only HSL color mixer mutation for all eight schema-owned channels.
+- Added unsupported channel-name rejection and hue, saturation, and luminance range validation through the existing edit graph validator.
+- Kept preview, export, UI, storage, sidecar, and color-correctness behavior out of scope and routed Phase 18 to Task 18.2.2.
+
+## [2026-06-13] phase-18 | Tone curve panel UI completed
+
+- Completed Task 18.1.3 with a compact Develop Tone Curve panel for the supported RGB point midpoint control.
+- Routed preview and commit through existing desktop/core tone curve commands and kept channel/parametric controls hidden and disabled.
+- Extended static UI, workflow smoke, and final visual QA checks and routed Phase 18 to Task 18.2.1.
+
+## [2026-06-13] phase-18 | Tone curve runtime parity added
+
+- Completed Task 18.1.2 with point tone curve preview, commit, desktop command, and JPEG export parity.
+- Kept draft preview non-persistent and persisted committed tone curves through one undoable history checkpoint.
+- Blocked parametric tone curve runtime behavior instead of silently approximating unsupported state and routed Phase 18 to Task 18.1.3.
+
+## [2026-06-13] phase-18 | Tone curve mutator added
+
+- Completed Task 18.1.1 with a graph-only tone curve mutator.
+- Added validation for non-empty curve endpoints and strictly increasing `x` values.
+- Rejected parametric tone curve mutation until schema-owned parameters exist and routed Phase 18 to Task 18.1.2.
+
+## [2026-06-13] phase-18 | Professional editing task cards added
+
+- Added the Phase 18 Professional Editing Baseline brief.
+- Split Phase 18 into atomic graph, runtime parity, UI/QA, and batch-sync task cards.
+- Routed the LLM index and master execution plan to Task 18.1.1.
+
 ## [2026-06-13] phase-17 | Develop P0 visual QA completed
 
 - Completed Task 17.5 with 36 final visual QA screenshots across 12 surfaces and three desktop widths.
