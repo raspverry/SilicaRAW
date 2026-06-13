@@ -106,6 +106,7 @@ pub struct ExposureContrastPreviewRequest {
     pub color_presence: ColorPresenceRenderAdjustment,
     pub tone_curve: ToneCurveRenderAdjustment,
     pub hsl_color_mixer: HslColorMixerRenderAdjustment,
+    pub detail: DetailRenderAdjustment,
     pub message: String,
 }
 
@@ -123,6 +124,7 @@ pub struct JpegSrgbExportRenderRequest {
     pub color_presence: ColorPresenceRenderAdjustment,
     pub tone_curve: ToneCurveRenderAdjustment,
     pub hsl_color_mixer: HslColorMixerRenderAdjustment,
+    pub detail: DetailRenderAdjustment,
     pub quality: u8,
     pub message: String,
 }
@@ -260,6 +262,76 @@ impl HslColorMixerRenderAdjustment {
             purple: neutral,
             magenta: neutral,
         }
+    }
+}
+
+/// Sharpening values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetailSharpeningRenderAdjustment {
+    pub amount: f64,
+    pub radius: f64,
+    pub detail: f64,
+    pub masking: f64,
+}
+
+impl DetailSharpeningRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            amount: 0.0,
+            radius: 1.0,
+            detail: 25.0,
+            masking: 0.0,
+        }
+    }
+
+    pub fn is_neutral(self) -> bool {
+        self == Self::neutral()
+    }
+}
+
+/// Non-MLX noise reduction values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetailNoiseReductionRenderAdjustment {
+    pub luminance: f64,
+    pub detail: f64,
+    pub contrast: f64,
+    pub color: f64,
+    pub color_detail: f64,
+}
+
+impl DetailNoiseReductionRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            luminance: 0.0,
+            detail: 50.0,
+            contrast: 0.0,
+            color: 25.0,
+            color_detail: 50.0,
+        }
+    }
+
+    pub fn is_neutral(self) -> bool {
+        self == Self::neutral()
+    }
+}
+
+/// Detail values carried by preview/export render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetailRenderAdjustment {
+    pub sharpening: DetailSharpeningRenderAdjustment,
+    pub noise_reduction: DetailNoiseReductionRenderAdjustment,
+}
+
+impl DetailRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            sharpening: DetailSharpeningRenderAdjustment::neutral(),
+            noise_reduction: DetailNoiseReductionRenderAdjustment::neutral(),
+        }
+    }
+
+    pub fn is_neutral(self) -> bool {
+        self.sharpening.is_neutral() && self.noise_reduction.is_neutral()
     }
 }
 
@@ -1201,6 +1273,7 @@ pub fn plan_color_presence_preview(
         color_presence,
         tone_curve: ToneCurveRenderAdjustment::neutral(),
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
+        detail: DetailRenderAdjustment::neutral(),
         message,
     }
 }
@@ -1253,6 +1326,44 @@ pub fn plan_hsl_color_mixer_preview(
     request.hsl_color_mixer = hsl_color_mixer;
     if request.status == PreviewRenderStatus::Ready {
         request.message = "HSL color mixer preview request is ready.".to_string();
+    }
+    request
+}
+
+/// Build a render request for a draft Detail preview update.
+///
+/// The current local alpha renderer has no honest Detail implementation. Non-neutral
+/// detail values are carried for UI/readback but marked unsupported instead of no-oping.
+pub fn plan_detail_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    detail: DetailRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
+    let mut request = plan_hsl_color_mixer_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        hsl_color_mixer,
+    );
+    request.detail = detail;
+    if request.status == PreviewRenderStatus::Ready {
+        if detail.is_neutral() {
+            request.message = "Detail preview request is neutral.".to_string();
+        } else {
+            request.status = PreviewRenderStatus::Unsupported;
+            request.message =
+                "Detail preview/export is unsupported until renderer support exists.".to_string();
+        }
     }
     request
 }
@@ -1340,6 +1451,7 @@ pub fn plan_jpeg_srgb_export_with_color_presence(
         color_presence,
         tone_curve: ToneCurveRenderAdjustment::neutral(),
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
+        detail: DetailRenderAdjustment::neutral(),
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
@@ -1396,6 +1508,42 @@ pub fn plan_jpeg_srgb_export_with_hsl_color_mixer(
         quality,
     );
     request.hsl_color_mixer = hsl_color_mixer;
+    request
+}
+
+/// Build a render-side request for exporting a raster source with Detail values.
+///
+/// Non-neutral Detail remains unsupported and must be blocked by callers before
+/// pixel export. The values are still carried so the boundary is explicit.
+pub fn plan_jpeg_srgb_export_with_detail(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    detail: DetailRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    let mut request = plan_jpeg_srgb_export_with_hsl_color_mixer(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        hsl_color_mixer,
+        quality,
+    );
+    request.detail = detail;
+    if !detail.is_neutral() {
+        request.message = "Detail export unsupported until renderer support exists.".to_string();
+    }
     request
 }
 
@@ -1482,6 +1630,7 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_color_presence(
         color_presence,
         tone_curve: ToneCurveRenderAdjustment::neutral(),
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
+        detail: DetailRenderAdjustment::neutral(),
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
@@ -1825,6 +1974,54 @@ mod tests {
             export.tone_curve,
             super::ToneCurveRenderAdjustment::neutral()
         );
+    }
+
+    #[test]
+    fn blocks_non_neutral_detail_preview_and_marks_export_boundary() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let detail = super::DetailRenderAdjustment {
+            sharpening: super::DetailSharpeningRenderAdjustment {
+                amount: 42.0,
+                radius: 1.2,
+                detail: 35.0,
+                masking: 10.0,
+            },
+            ..super::DetailRenderAdjustment::neutral()
+        };
+
+        let preview = super::plan_detail_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            super::HslColorMixerRenderAdjustment::neutral(),
+            detail,
+        );
+        let export = super::plan_jpeg_srgb_export_with_detail(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            super::HslColorMixerRenderAdjustment::neutral(),
+            detail,
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Unsupported);
+        assert_eq!(preview.detail, detail);
+        assert!(preview.message.contains("Detail"));
+        assert_eq!(export.detail, detail);
+        assert!(export.message.contains("Detail export unsupported"));
     }
 
     #[test]

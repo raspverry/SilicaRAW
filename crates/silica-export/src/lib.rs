@@ -42,6 +42,7 @@ pub struct JpegSrgbExportRequest {
     pub color_presence: ColorPresenceAdjustment,
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
+    pub detail: DetailAdjustment,
     pub quality: u8,
 }
 
@@ -57,6 +58,7 @@ pub struct JpegColorExportRequest {
     pub color_presence: ColorPresenceAdjustment,
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
+    pub detail: DetailAdjustment,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
 }
@@ -216,6 +218,76 @@ impl HslColorMixerAdjustment {
     }
 }
 
+/// Sharpening values for local JPEG preview/export.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetailSharpeningAdjustment {
+    pub amount: f64,
+    pub radius: f64,
+    pub detail: f64,
+    pub masking: f64,
+}
+
+impl DetailSharpeningAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            amount: 0.0,
+            radius: 1.0,
+            detail: 25.0,
+            masking: 0.0,
+        }
+    }
+
+    fn is_neutral(self) -> bool {
+        self == Self::neutral()
+    }
+}
+
+/// Non-MLX noise reduction values for local JPEG preview/export.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetailNoiseReductionAdjustment {
+    pub luminance: f64,
+    pub detail: f64,
+    pub contrast: f64,
+    pub color: f64,
+    pub color_detail: f64,
+}
+
+impl DetailNoiseReductionAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            luminance: 0.0,
+            detail: 50.0,
+            contrast: 0.0,
+            color: 25.0,
+            color_detail: 50.0,
+        }
+    }
+
+    fn is_neutral(self) -> bool {
+        self == Self::neutral()
+    }
+}
+
+/// Detail values for local JPEG preview/export.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DetailAdjustment {
+    pub sharpening: DetailSharpeningAdjustment,
+    pub noise_reduction: DetailNoiseReductionAdjustment,
+}
+
+impl DetailAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            sharpening: DetailSharpeningAdjustment::neutral(),
+            noise_reduction: DetailNoiseReductionAdjustment::neutral(),
+        }
+    }
+
+    fn is_neutral(self) -> bool {
+        self.sharpening.is_neutral() && self.noise_reduction.is_neutral()
+    }
+}
+
 /// Color presence values applied to local JPEG preview/export pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColorPresenceAdjustment {
@@ -279,6 +351,7 @@ pub struct JpegDevelopPreviewRequest {
     pub color_presence: ColorPresenceAdjustment,
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
+    pub detail: DetailAdjustment,
 }
 
 /// Request to compute Develop histogram data from a supported JPEG source.
@@ -292,6 +365,7 @@ pub struct JpegHistogramRequest {
     pub color_presence: ColorPresenceAdjustment,
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
+    pub detail: DetailAdjustment,
 }
 
 /// Result returned after a JPEG thumbnail is written.
@@ -319,6 +393,7 @@ pub enum ExportError {
     NonFiniteAdjustment,
     InvalidToneCurveAdjustment(String),
     InvalidHslColorMixerAdjustment(String),
+    UnsupportedDetailAdjustment(String),
     SameSourceAndOutput(PathBuf),
     IccProfileUnavailable {
         profile: ExportColorProfile,
@@ -356,6 +431,9 @@ impl fmt::Display for ExportError {
             }
             Self::InvalidHslColorMixerAdjustment(message) => {
                 write!(formatter, "invalid HSL color mixer adjustment: {message}")
+            }
+            Self::UnsupportedDetailAdjustment(message) => {
+                write!(formatter, "unsupported detail adjustment: {message}")
             }
             Self::SameSourceAndOutput(path) => {
                 write!(
@@ -397,6 +475,7 @@ impl Error for ExportError {
             | Self::NonFiniteAdjustment
             | Self::InvalidToneCurveAdjustment(_)
             | Self::InvalidHslColorMixerAdjustment(_)
+            | Self::UnsupportedDetailAdjustment(_)
             | Self::SameSourceAndOutput(_)
             | Self::IccProfileUnavailable { .. }
             | Self::InvalidJpegIccProfile(_) => None,
@@ -430,6 +509,7 @@ pub fn export_jpeg_srgb(
         color_presence: request.color_presence,
         tone_curve: request.tone_curve,
         hsl_color_mixer: request.hsl_color_mixer,
+        detail: request.detail,
         quality: request.quality,
         color_profile: ExportColorProfile::Srgb,
     })
@@ -453,11 +533,13 @@ pub fn export_jpeg_with_color_profile(
         request.color_presence,
         &request.tone_curve,
         request.hsl_color_mixer,
+        request.detail,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
     validate_tone_curve_adjustment(&request.tone_curve)?;
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
+    validate_detail_adjustment(request.detail)?;
 
     let source_sha256 = sha256_file(&request.source_path)?;
     let icc_profile = export_icc_profile(request.color_profile)?;
@@ -597,11 +679,13 @@ pub fn write_jpeg_develop_preview(
         request.color_presence,
         &request.tone_curve,
         request.hsl_color_mixer,
+        request.detail,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
     validate_tone_curve_adjustment(&request.tone_curve)?;
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
+    validate_detail_adjustment(request.detail)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -646,11 +730,13 @@ pub fn compute_jpeg_develop_histogram(
         request.color_presence,
         &request.tone_curve,
         request.hsl_color_mixer,
+        request.detail,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
     validate_tone_curve_adjustment(&request.tone_curve)?;
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
+    validate_detail_adjustment(request.detail)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -927,6 +1013,7 @@ fn adjustments_are_finite(
     color_presence: ColorPresenceAdjustment,
     tone_curve: &ToneCurveAdjustment,
     hsl_color_mixer: HslColorMixerAdjustment,
+    detail: DetailAdjustment,
 ) -> bool {
     exposure.is_finite()
         && contrast.is_finite()
@@ -943,6 +1030,7 @@ fn adjustments_are_finite(
         && tone_curve_points_are_finite(&tone_curve.green_curve)
         && tone_curve_points_are_finite(&tone_curve.blue_curve)
         && hsl_color_mixer_is_finite(hsl_color_mixer)
+        && detail_is_finite(detail)
 }
 
 fn tone_curve_points_are_finite(points: &[ToneCurvePoint]) -> bool {
@@ -959,6 +1047,18 @@ fn hsl_color_mixer_is_finite(hsl_color_mixer: HslColorMixerAdjustment) -> bool {
                 && channel.saturation.is_finite()
                 && channel.luminance.is_finite()
         })
+}
+
+fn detail_is_finite(detail: DetailAdjustment) -> bool {
+    detail.sharpening.amount.is_finite()
+        && detail.sharpening.radius.is_finite()
+        && detail.sharpening.detail.is_finite()
+        && detail.sharpening.masking.is_finite()
+        && detail.noise_reduction.luminance.is_finite()
+        && detail.noise_reduction.detail.is_finite()
+        && detail.noise_reduction.contrast.is_finite()
+        && detail.noise_reduction.color.is_finite()
+        && detail.noise_reduction.color_detail.is_finite()
 }
 
 fn validate_tone_curve_adjustment(tone_curve: &ToneCurveAdjustment) -> Result<(), ExportError> {
@@ -1035,6 +1135,16 @@ fn validate_hsl_color_mixer_adjustment(
         validate_hsl_channel_adjustment(name, channel)?;
     }
     Ok(())
+}
+
+fn validate_detail_adjustment(detail: DetailAdjustment) -> Result<(), ExportError> {
+    if detail.is_neutral() {
+        Ok(())
+    } else {
+        Err(ExportError::UnsupportedDetailAdjustment(
+            "Detail preview/export is unsupported until renderer support exists".to_string(),
+        ))
+    }
 }
 
 fn validate_hsl_channel_adjustment(
@@ -1266,6 +1376,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -1331,6 +1442,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::DisplayP3,
         })
@@ -1395,6 +1507,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -1463,6 +1576,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1477,6 +1591,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write adjusted preview");
 
@@ -1523,6 +1638,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1537,6 +1653,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write white balance preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1551,6 +1668,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("export white balance jpeg");
 
@@ -1599,6 +1717,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1613,6 +1732,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write tone recovery preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1625,6 +1745,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1680,6 +1801,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1694,6 +1816,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: tone_curve.clone(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write tone curve preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1706,6 +1829,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve,
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1754,6 +1878,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1768,6 +1893,7 @@ mod tests {
             color_presence,
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write color presence preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1780,6 +1906,7 @@ mod tests {
             color_presence,
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1832,6 +1959,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1846,6 +1974,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer,
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("write hsl preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1858,6 +1987,7 @@ mod tests {
             color_presence: super::ColorPresenceAdjustment::neutral(),
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer,
+            detail: super::DetailAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1872,6 +2002,72 @@ mod tests {
             std::fs::read(&source_path).expect("read original after"),
             original_before
         );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn rejects_non_neutral_detail_preview_and_export_until_renderer_support_exists() {
+        let root = unique_export_root("detail-boundary");
+        let source_path = root.join("source.jpg");
+        let preview_path = root.join("previews").join("detail.jpg");
+        let export_path = root.join("export").join("detail.jpg");
+        std::fs::create_dir_all(preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        std::fs::create_dir_all(export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        write_source_jpeg(&source_path);
+        let detail = super::DetailAdjustment {
+            sharpening: super::DetailSharpeningAdjustment {
+                amount: 42.0,
+                radius: 1.2,
+                detail: 35.0,
+                masking: 10.0,
+            },
+            ..super::DetailAdjustment::neutral()
+        };
+
+        let preview_error = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: preview_path.clone(),
+            max_edge: 2,
+            quality: 82,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail,
+        })
+        .expect_err("detail preview unsupported");
+        let export_error = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: export_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail,
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect_err("detail export unsupported");
+
+        assert!(matches!(
+            preview_error,
+            super::ExportError::UnsupportedDetailAdjustment(_)
+        ));
+        assert!(matches!(
+            export_error,
+            super::ExportError::UnsupportedDetailAdjustment(_)
+        ));
+        assert!(!preview_path.exists());
+        assert!(!export_path.exists());
 
         remove_export_root(&root);
     }
@@ -1896,6 +2092,7 @@ mod tests {
             },
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
         })
         .expect("compute histogram");
 

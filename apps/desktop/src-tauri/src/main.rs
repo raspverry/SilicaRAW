@@ -91,6 +91,32 @@ struct DesktopHslColorMixerState {
     magenta: DesktopHslColorChannelState,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopDetailSharpeningState {
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopDetailNoiseReductionState {
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopDetailState {
+    sharpening: DesktopDetailSharpeningState,
+    noise_reduction: DesktopDetailNoiseReductionState,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopToneCurvePoint {
@@ -206,6 +232,7 @@ enum DesktopCommandData {
         saturation: f64,
         tone_curve: DesktopToneCurveState,
         hsl_color_mixer: DesktopHslColorMixerState,
+        detail: DesktopDetailState,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -224,6 +251,7 @@ enum DesktopCommandData {
         saturation: f64,
         tone_curve: DesktopToneCurveState,
         hsl_color_mixer: DesktopHslColorMixerState,
+        detail: DesktopDetailState,
         persisted: bool,
         message: String,
     },
@@ -242,6 +270,7 @@ enum DesktopCommandData {
         saturation: f64,
         tone_curve: DesktopToneCurveState,
         hsl_color_mixer: DesktopHslColorMixerState,
+        detail: DesktopDetailState,
         persisted: bool,
         message: String,
     },
@@ -1197,6 +1226,7 @@ fn preview_exposure_contrast_edit(
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1264,6 +1294,7 @@ fn preview_white_balance_edit(
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1319,6 +1350,7 @@ fn preview_tone_recovery_edit(
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1370,6 +1402,7 @@ fn preview_color_presence_edit(
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1430,6 +1463,7 @@ fn preview_tone_curve_edit(
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1500,6 +1534,122 @@ fn preview_hsl_color_mixer_edit(
                 saturation: preview.saturation,
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_detail_sharpening_edit(
+    library_path: String,
+    photo_id: String,
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_detail_sharpening_edit";
+    match silica_core::preview_detail_sharpening_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        amount,
+        radius,
+        detail,
+        masking,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn preview_detail_noise_reduction_edit(
+    library_path: String,
+    photo_id: String,
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+) -> DesktopCommandResponse {
+    let command = "preview_detail_noise_reduction_edit";
+    match silica_core::preview_detail_noise_reduction_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        luminance,
+        detail,
+        contrast,
+        color,
+        color_detail,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1549,6 +1699,7 @@ fn commit_exposure_contrast_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1614,6 +1765,7 @@ fn commit_white_balance_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1667,6 +1819,7 @@ fn commit_tone_recovery_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1716,6 +1869,7 @@ fn commit_color_presence_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1774,6 +1928,7 @@ fn commit_tone_curve_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1842,6 +1997,118 @@ fn commit_hsl_color_mixer_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_detail_sharpening_edit(
+    library_path: String,
+    photo_id: String,
+    amount: f64,
+    radius: f64,
+    detail: f64,
+    masking: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_detail_sharpening_edit";
+    match silica_core::commit_detail_sharpening_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        amount,
+        radius,
+        detail,
+        masking,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn commit_detail_noise_reduction_edit(
+    library_path: String,
+    photo_id: String,
+    luminance: f64,
+    detail: f64,
+    contrast: f64,
+    color: f64,
+    color_detail: f64,
+) -> DesktopCommandResponse {
+    let command = "commit_detail_noise_reduction_edit";
+    match silica_core::commit_detail_noise_reduction_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        luminance,
+        detail,
+        contrast,
+        color,
+        color_detail,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1881,6 +2148,7 @@ fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopComma
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1938,6 +2206,7 @@ fn commit_basic_preset_edit(
                 saturation: commit.saturation,
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1977,6 +2246,7 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 saturation: state.saturation,
                 tone_curve: tone_curve_data(state.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(state.hsl_color_mixer),
+                detail: detail_data(state.detail),
                 persisted: state.persisted,
                 message: state.message,
             },
@@ -2261,6 +2531,24 @@ fn hsl_color_channel_data(
         hue: channel.hue,
         saturation: channel.saturation,
         luminance: channel.luminance,
+    }
+}
+
+fn detail_data(detail: silica_core::PhotoDetailState) -> DesktopDetailState {
+    DesktopDetailState {
+        sharpening: DesktopDetailSharpeningState {
+            amount: detail.sharpening.amount,
+            radius: detail.sharpening.radius,
+            detail: detail.sharpening.detail,
+            masking: detail.sharpening.masking,
+        },
+        noise_reduction: DesktopDetailNoiseReductionState {
+            luminance: detail.noise_reduction.luminance,
+            detail: detail.noise_reduction.detail,
+            contrast: detail.noise_reduction.contrast,
+            color: detail.noise_reduction.color,
+            color_detail: detail.noise_reduction.color_detail,
+        },
     }
 }
 
@@ -2850,6 +3138,7 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
         silica_core::CoreError::Decode(_) => "decode",
         silica_core::CoreError::RawExport(_) => "decode",
         silica_core::CoreError::EditGraph(_) => "editGraph",
+        silica_core::CoreError::UnsupportedEdit(_) => "unsupportedEdit",
         silica_core::CoreError::Export(_) => "export",
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
         silica_core::CoreError::AppSession(_) => "appSession",
@@ -2916,12 +3205,16 @@ fn main() {
             preview_color_presence_edit,
             preview_tone_curve_edit,
             preview_hsl_color_mixer_edit,
+            preview_detail_sharpening_edit,
+            preview_detail_noise_reduction_edit,
             commit_exposure_contrast_edit,
             commit_white_balance_edit,
             commit_tone_recovery_edit,
             commit_color_presence_edit,
             commit_tone_curve_edit,
             commit_hsl_color_mixer_edit,
+            commit_detail_sharpening_edit,
+            commit_detail_noise_reduction_edit,
             commit_p0_basic_reset,
             commit_basic_preset_edit,
             get_photo_edit_state,
@@ -4200,6 +4493,60 @@ mod tests {
             }
             other => panic!("unexpected response data: {other:?}"),
         }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_commands_block_detail_commit_until_renderer_support_exists() {
+        let workspace = unique_library_root("desktop-detail-boundary-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_detail_sharpening_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            42.0,
+            1.2,
+            35.0,
+            10.0,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                detail,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Unsupported");
+                assert_eq!(detail.sharpening.amount, 42.0);
+                assert!(develop_preview_bytes.is_none());
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let committed = super::commit_detail_sharpening_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            42.0,
+            1.2,
+            35.0,
+            10.0,
+        );
+        assert!(!committed.ok);
+        assert_eq!(
+            committed.error.as_ref().map(|error| error.kind.as_str()),
+            Some("unsupportedEdit")
+        );
 
         remove_library_root(&workspace);
     }

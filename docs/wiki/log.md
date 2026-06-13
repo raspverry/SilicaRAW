@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-13] phase-18 | Detail runtime boundary added
+
+- Completed Task 18.3.2 with an explicit no-supported-detail-runtime boundary.
+- Carried neutral Detail state through render/export/core/desktop request contracts while blocking non-neutral preview, commit, histogram, and export paths honestly.
+- Kept MLX denoise, model loading, fallback effects, and active Detail UI enablement out of scope and routed Phase 18 to Task 18.3.3.
+
 ## [2026-06-13] phase-18 | Detail mutators added
 
 - Completed Task 18.3.1 with graph-only sharpening and non-MLX noise reduction mutators.
