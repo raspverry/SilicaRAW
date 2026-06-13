@@ -39,7 +39,7 @@ Phase 18 turns the schema-owned `tone`, `color`, `detail`, `lens`, and `geometry
 | 18.4.1 | Lens and Geometry Mutators | Complete: lens, transform, crop, rotate, and flip graph values validate and round-trip |
 | 18.4.2 | Geometry Preview/Export Parity | Complete: rectangular crop, quarter-turn rotate, and flips preserve originals and export semantics; unsupported lens/transform states block explicitly |
 | 18.4.3 | Lens Geometry Panel UI and QA | Complete: Develop exposes supported crop, quarter-turn rotate, and flip controls while lens correction and transform remain visibly disabled |
-| 18.5.1 | Edit Clipboard Contract | Copy/paste subsets are schema-owned and user-selectable |
+| 18.5.1 | Edit Clipboard Contract | Complete: typed graph-only payloads copy allowed subsets while preserving target identity and excluding source-specific/model-owned data |
 | 18.5.2 | Batch Sync History | Batch sync writes one undoable checkpoint per affected photo |
 | 18.5.3 | Copy Paste Batch UI and QA | UI exposes copy/paste/sync without hidden broad batch mutation |
 

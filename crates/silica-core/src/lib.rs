@@ -800,6 +800,7 @@ pub enum CoreError {
     Decode(silica_decode::RawPreviewArtifactError),
     RawExport(silica_decode::RawFullResolutionExportSourceError),
     EditGraph(silica_edit::EditGraphValidationError),
+    EditClipboard(silica_edit::EditClipboardError),
     Export(silica_export::ExportError),
     ExportBlocked(String),
     UnsupportedEdit(String),
@@ -813,6 +814,7 @@ impl fmt::Display for CoreError {
             Self::Decode(error) => write!(formatter, "{error}"),
             Self::RawExport(error) => write!(formatter, "{error}"),
             Self::EditGraph(error) => write!(formatter, "{error}"),
+            Self::EditClipboard(error) => write!(formatter, "{error}"),
             Self::Export(error) => write!(formatter, "{error}"),
             Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
             Self::UnsupportedEdit(message) => write!(formatter, "unsupported edit: {message}"),
@@ -828,6 +830,7 @@ impl Error for CoreError {
             Self::Decode(error) => Some(error),
             Self::RawExport(error) => Some(error),
             Self::EditGraph(error) => Some(error),
+            Self::EditClipboard(error) => Some(error),
             Self::Export(error) => Some(error),
             Self::ExportBlocked(_) => None,
             Self::UnsupportedEdit(_) => None,
@@ -860,10 +863,33 @@ impl From<silica_edit::EditGraphValidationError> for CoreError {
     }
 }
 
+impl From<silica_edit::EditClipboardError> for CoreError {
+    fn from(error: silica_edit::EditClipboardError) -> Self {
+        Self::EditClipboard(error)
+    }
+}
+
 impl From<silica_export::ExportError> for CoreError {
     fn from(error: silica_export::ExportError) -> Self {
         Self::Export(error)
     }
+}
+
+/// Copy edit sections through the core boundary without reading or writing catalog state.
+pub fn copy_edit_clipboard_payload(
+    source: &silica_edit::EditGraph,
+    selection: silica_edit::EditClipboardSelection,
+) -> Result<silica_edit::EditClipboardPayload, CoreError> {
+    silica_edit::copy_edit_clipboard_payload(source, selection).map_err(CoreError::from)
+}
+
+/// Apply an edit clipboard payload to a target graph without catalog or sidecar mutation.
+pub fn apply_edit_clipboard_payload_to_graph(
+    target: &silica_edit::EditGraph,
+    payload: &silica_edit::EditClipboardPayload,
+    updated_at: impl Into<String>,
+) -> Result<silica_edit::EditGraph, CoreError> {
+    silica_edit::apply_edit_clipboard_payload(target, payload, updated_at).map_err(CoreError::from)
 }
 
 /// Load app-level desktop session state from a caller-provided path.
@@ -4999,6 +5025,73 @@ mod tests {
             }
             other => panic!("expected decoded image artifact input, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn edit_clipboard_contract_through_core_preserves_target_identity_without_catalog_write() {
+        let mut source = silica_edit::default_edit_graph(
+            silica_edit::EditGraphSource {
+                photo_id: "source-photo".to_string(),
+                path: "/tmp/source.raw".to_string(),
+                file_size: 2048,
+                modified_at: Some("unix:11".to_string()),
+                partial_hash: Some("source-partial".to_string()),
+                full_hash: Some("source-full".to_string()),
+            },
+            "unix:12",
+        );
+        source.profile.input_profile = "source-profile".to_string();
+        source.metadata.rating = 5;
+        source.extensions.insert(
+            "com.example.source".to_string(),
+            serde_json::json!({ "owned_by": "source" }),
+        );
+        let source = silica_edit::apply_exposure_contrast(&source, 0.8, 12.0, "unix:13")
+            .expect("source basic edit");
+        let source = silica_edit::apply_geometry_orientation(&source, 90.0, true, false, "unix:14")
+            .expect("source geometry edit");
+
+        let mut target = silica_edit::default_edit_graph(
+            silica_edit::EditGraphSource {
+                photo_id: "target-photo".to_string(),
+                path: "/tmp/target.raw".to_string(),
+                file_size: 4096,
+                modified_at: Some("unix:21".to_string()),
+                partial_hash: Some("target-partial".to_string()),
+                full_hash: Some("target-full".to_string()),
+            },
+            "unix:22",
+        );
+        target.profile.input_profile = "target-profile".to_string();
+        target.metadata.rejected = true;
+        target.extensions.insert(
+            "com.example.target".to_string(),
+            serde_json::json!({ "owned_by": "target" }),
+        );
+
+        let payload = copy_edit_clipboard_payload(
+            &source,
+            silica_edit::EditClipboardSelection {
+                basic: true,
+                geometry: true,
+                ..Default::default()
+            },
+        )
+        .expect("copy clipboard through core");
+        let pasted = apply_edit_clipboard_payload_to_graph(&target, &payload, "unix:30")
+            .expect("paste clipboard through core");
+
+        assert_eq!(pasted.source, target.source);
+        assert_eq!(pasted.profile, target.profile);
+        assert_eq!(pasted.metadata, target.metadata);
+        assert_eq!(pasted.extensions, target.extensions);
+        assert_eq!(pasted.masks, target.masks);
+        assert_eq!(pasted.basic, source.basic);
+        assert_eq!(pasted.geometry, source.geometry);
+        assert_eq!(pasted.tone, target.tone);
+        assert_eq!(pasted.color, target.color);
+        assert_eq!(pasted.detail, target.detail);
+        assert_eq!(pasted.lens, target.lens);
     }
 
     #[test]
