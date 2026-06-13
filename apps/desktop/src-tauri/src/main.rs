@@ -117,6 +117,38 @@ struct DesktopDetailState {
     noise_reduction: DesktopDetailNoiseReductionState,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGeometryCropState {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    angle: f64,
+    aspect: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGeometryTransformState {
+    vertical: f64,
+    horizontal: f64,
+    aspect: f64,
+    scale: f64,
+    x_offset: f64,
+    y_offset: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopGeometryState {
+    crop: Option<DesktopGeometryCropState>,
+    rotation: f64,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+    transform: DesktopGeometryTransformState,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopToneCurvePoint {
@@ -233,6 +265,7 @@ enum DesktopCommandData {
         tone_curve: DesktopToneCurveState,
         hsl_color_mixer: DesktopHslColorMixerState,
         detail: DesktopDetailState,
+        geometry: DesktopGeometryState,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -252,6 +285,7 @@ enum DesktopCommandData {
         tone_curve: DesktopToneCurveState,
         hsl_color_mixer: DesktopHslColorMixerState,
         detail: DesktopDetailState,
+        geometry: DesktopGeometryState,
         persisted: bool,
         message: String,
     },
@@ -271,6 +305,7 @@ enum DesktopCommandData {
         tone_curve: DesktopToneCurveState,
         hsl_color_mixer: DesktopHslColorMixerState,
         detail: DesktopDetailState,
+        geometry: DesktopGeometryState,
         persisted: bool,
         message: String,
     },
@@ -1227,6 +1262,7 @@ fn preview_exposure_contrast_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1295,6 +1331,7 @@ fn preview_white_balance_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1351,6 +1388,7 @@ fn preview_tone_recovery_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1403,6 +1441,7 @@ fn preview_color_presence_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1464,6 +1503,7 @@ fn preview_tone_curve_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1535,6 +1575,7 @@ fn preview_hsl_color_mixer_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1591,6 +1632,7 @@ fn preview_detail_sharpening_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1650,6 +1692,167 @@ fn preview_detail_noise_reduction_edit(
                 tone_curve: tone_curve_data(preview.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn preview_geometry_crop_edit(
+    library_path: String,
+    photo_id: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    angle: f64,
+    aspect: Option<String>,
+) -> DesktopCommandResponse {
+    let command = "preview_geometry_crop_edit";
+    match silica_core::preview_geometry_crop_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        x,
+        y,
+        width,
+        height,
+        angle,
+        aspect.as_deref(),
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_clear_geometry_crop(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "preview_clear_geometry_crop";
+    match silica_core::preview_clear_geometry_crop(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
+                develop_preview_bytes: preview.develop_preview_bytes,
+                message: preview.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn preview_geometry_orientation_edit(
+    library_path: String,
+    photo_id: String,
+    rotation: f64,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> DesktopCommandResponse {
+    let command = "preview_geometry_orientation_edit";
+    match silica_core::preview_geometry_orientation_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+    ) {
+        Ok(Some(preview)) => DesktopCommandResponse::ok(
+            command,
+            preview.message.clone(),
+            DesktopCommandData::EditPreview {
+                photo_id: preview.photo_id,
+                source_path: preview.source_path,
+                status: preview_status_text(preview.status),
+                exposure: preview.exposure,
+                contrast: preview.contrast,
+                white_balance: white_balance_text(preview.white_balance),
+                temperature: preview.temperature,
+                tint: preview.tint,
+                highlights: preview.highlights,
+                shadows: preview.shadows,
+                whites: preview.whites,
+                blacks: preview.blacks,
+                vibrance: preview.vibrance,
+                saturation: preview.saturation,
+                tone_curve: tone_curve_data(preview.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
+                detail: detail_data(preview.detail),
+                geometry: geometry_data(preview.geometry),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1700,6 +1903,7 @@ fn commit_exposure_contrast_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1766,6 +1970,7 @@ fn commit_white_balance_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1820,6 +2025,7 @@ fn commit_tone_recovery_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1870,6 +2076,7 @@ fn commit_color_presence_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1929,6 +2136,7 @@ fn commit_tone_curve_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -1998,6 +2206,7 @@ fn commit_hsl_color_mixer_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2052,6 +2261,7 @@ fn commit_detail_sharpening_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2109,6 +2319,161 @@ fn commit_detail_noise_reduction_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn commit_geometry_crop_edit(
+    library_path: String,
+    photo_id: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    angle: f64,
+    aspect: Option<String>,
+) -> DesktopCommandResponse {
+    let command = "commit_geometry_crop_edit";
+    match silica_core::commit_geometry_crop_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        x,
+        y,
+        width,
+        height,
+        angle,
+        aspect.as_deref(),
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_clear_geometry_crop(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "commit_clear_geometry_crop";
+    match silica_core::commit_clear_geometry_crop(PathBuf::from(&library_path), &photo_id) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
+                persisted: commit.persisted,
+                message: commit.message,
+            },
+        ),
+        Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn commit_geometry_orientation_edit(
+    library_path: String,
+    photo_id: String,
+    rotation: f64,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> DesktopCommandResponse {
+    let command = "commit_geometry_orientation_edit";
+    match silica_core::commit_geometry_orientation_edit(
+        PathBuf::from(&library_path),
+        &photo_id,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+    ) {
+        Ok(Some(commit)) => DesktopCommandResponse::ok(
+            command,
+            commit.message.clone(),
+            DesktopCommandData::EditCommit {
+                photo_id: commit.photo_id,
+                exposure: commit.exposure,
+                contrast: commit.contrast,
+                white_balance: white_balance_text(commit.white_balance),
+                temperature: commit.temperature,
+                tint: commit.tint,
+                highlights: commit.highlights,
+                shadows: commit.shadows,
+                whites: commit.whites,
+                blacks: commit.blacks,
+                vibrance: commit.vibrance,
+                saturation: commit.saturation,
+                tone_curve: tone_curve_data(commit.tone_curve),
+                hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
+                detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2149,6 +2514,7 @@ fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopComma
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2207,6 +2573,7 @@ fn commit_basic_preset_edit(
                 tone_curve: tone_curve_data(commit.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
+                geometry: geometry_data(commit.geometry),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2247,6 +2614,7 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 tone_curve: tone_curve_data(state.tone_curve),
                 hsl_color_mixer: hsl_color_mixer_data(state.hsl_color_mixer),
                 detail: detail_data(state.detail),
+                geometry: geometry_data(state.geometry),
                 persisted: state.persisted,
                 message: state.message,
             },
@@ -2548,6 +2916,30 @@ fn detail_data(detail: silica_core::PhotoDetailState) -> DesktopDetailState {
             contrast: detail.noise_reduction.contrast,
             color: detail.noise_reduction.color,
             color_detail: detail.noise_reduction.color_detail,
+        },
+    }
+}
+
+fn geometry_data(geometry: silica_core::PhotoGeometryState) -> DesktopGeometryState {
+    DesktopGeometryState {
+        crop: geometry.crop.map(|crop| DesktopGeometryCropState {
+            x: crop.x,
+            y: crop.y,
+            width: crop.width,
+            height: crop.height,
+            angle: crop.angle,
+            aspect: crop.aspect,
+        }),
+        rotation: geometry.rotation,
+        flip_horizontal: geometry.flip_horizontal,
+        flip_vertical: geometry.flip_vertical,
+        transform: DesktopGeometryTransformState {
+            vertical: geometry.transform.vertical,
+            horizontal: geometry.transform.horizontal,
+            aspect: geometry.transform.aspect,
+            scale: geometry.transform.scale,
+            x_offset: geometry.transform.x_offset,
+            y_offset: geometry.transform.y_offset,
         },
     }
 }
@@ -3207,6 +3599,9 @@ fn main() {
             preview_hsl_color_mixer_edit,
             preview_detail_sharpening_edit,
             preview_detail_noise_reduction_edit,
+            preview_geometry_crop_edit,
+            preview_clear_geometry_crop,
+            preview_geometry_orientation_edit,
             commit_exposure_contrast_edit,
             commit_white_balance_edit,
             commit_tone_recovery_edit,
@@ -3215,6 +3610,9 @@ fn main() {
             commit_hsl_color_mixer_edit,
             commit_detail_sharpening_edit,
             commit_detail_noise_reduction_edit,
+            commit_geometry_crop_edit,
+            commit_clear_geometry_crop,
+            commit_geometry_orientation_edit,
             commit_p0_basic_reset,
             commit_basic_preset_edit,
             get_photo_edit_state,
@@ -4498,6 +4896,94 @@ mod tests {
     }
 
     #[test]
+    fn desktop_commands_preview_and_commit_geometry_edit() {
+        let workspace = unique_library_root("desktop-geometry-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_geometry_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let preview = super::preview_geometry_crop_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.0,
+            0.0,
+            0.5,
+            1.0,
+            0.0,
+            None,
+        );
+        assert!(preview.ok);
+        match response_data(&preview) {
+            super::DesktopCommandData::EditPreview {
+                status,
+                geometry,
+                develop_preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert_eq!(geometry.crop.as_ref().map(|crop| crop.width), Some(0.5));
+                assert!(develop_preview_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let crop_commit = super::commit_geometry_crop_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            0.0,
+            0.0,
+            0.5,
+            1.0,
+            0.0,
+            None,
+        );
+        assert!(crop_commit.ok);
+        match response_data(&crop_commit) {
+            super::DesktopCommandData::EditCommit {
+                geometry,
+                persisted,
+                ..
+            } => {
+                assert_eq!(geometry.crop.as_ref().map(|crop| crop.height), Some(1.0));
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let orientation_commit = super::commit_geometry_orientation_edit(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            90.0,
+            true,
+            false,
+        );
+        assert!(orientation_commit.ok);
+        match response_data(&orientation_commit) {
+            super::DesktopCommandData::EditCommit {
+                geometry,
+                persisted,
+                ..
+            } => {
+                assert_eq!(geometry.rotation, 90.0);
+                assert!(geometry.flip_horizontal);
+                assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn desktop_commands_block_detail_commit_until_renderer_support_exists() {
         let workspace = unique_library_root("desktop-detail-boundary-flow");
         let library_root = workspace.join("SilicaRAW Library");
@@ -5547,5 +6033,18 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn write_geometry_source_jpeg(path: &Path) {
+        let image = image::RgbImage::from_fn(4, 3, |x, y| {
+            image::Rgb([
+                (32 + (x * 40)) as u8,
+                (48 + (y * 50)) as u8,
+                (96 + ((x + y) * 10)) as u8,
+            ])
+        });
+        image
+            .save_with_format(path, image::ImageFormat::Jpeg)
+            .expect("write geometry source jpeg");
     }
 }

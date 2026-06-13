@@ -43,6 +43,7 @@ pub struct JpegSrgbExportRequest {
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
+    pub geometry: GeometryAdjustment,
     pub quality: u8,
 }
 
@@ -59,6 +60,7 @@ pub struct JpegColorExportRequest {
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
+    pub geometry: GeometryAdjustment,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
 }
@@ -288,6 +290,67 @@ impl DetailAdjustment {
     }
 }
 
+/// Normalized crop rectangle applied by local JPEG preview/export.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeometryCropAdjustment {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub angle: f64,
+    pub aspect: Option<String>,
+}
+
+/// Perspective/scale transform controls carried for explicit unsupported-state handling.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GeometryTransformAdjustment {
+    pub vertical: f64,
+    pub horizontal: f64,
+    pub aspect: f64,
+    pub scale: f64,
+    pub x_offset: f64,
+    pub y_offset: f64,
+}
+
+impl GeometryTransformAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            vertical: 0.0,
+            horizontal: 0.0,
+            aspect: 0.0,
+            scale: 100.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    pub fn is_neutral(self) -> bool {
+        self == Self::neutral()
+    }
+}
+
+/// Supported non-destructive geometry applied to disposable preview/export output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeometryAdjustment {
+    pub crop: Option<GeometryCropAdjustment>,
+    pub rotation: f64,
+    pub flip_horizontal: bool,
+    pub flip_vertical: bool,
+    pub transform: GeometryTransformAdjustment,
+}
+
+impl GeometryAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            crop: None,
+            rotation: 0.0,
+            flip_horizontal: false,
+            flip_vertical: false,
+            transform: GeometryTransformAdjustment::neutral(),
+        }
+    }
+}
+
 /// Color presence values applied to local JPEG preview/export pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColorPresenceAdjustment {
@@ -352,6 +415,7 @@ pub struct JpegDevelopPreviewRequest {
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
+    pub geometry: GeometryAdjustment,
 }
 
 /// Request to compute Develop histogram data from a supported JPEG source.
@@ -366,6 +430,7 @@ pub struct JpegHistogramRequest {
     pub tone_curve: ToneCurveAdjustment,
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
+    pub geometry: GeometryAdjustment,
 }
 
 /// Result returned after a JPEG thumbnail is written.
@@ -394,6 +459,7 @@ pub enum ExportError {
     InvalidToneCurveAdjustment(String),
     InvalidHslColorMixerAdjustment(String),
     UnsupportedDetailAdjustment(String),
+    UnsupportedGeometryAdjustment(String),
     SameSourceAndOutput(PathBuf),
     IccProfileUnavailable {
         profile: ExportColorProfile,
@@ -434,6 +500,9 @@ impl fmt::Display for ExportError {
             }
             Self::UnsupportedDetailAdjustment(message) => {
                 write!(formatter, "unsupported detail adjustment: {message}")
+            }
+            Self::UnsupportedGeometryAdjustment(message) => {
+                write!(formatter, "unsupported geometry adjustment: {message}")
             }
             Self::SameSourceAndOutput(path) => {
                 write!(
@@ -476,6 +545,7 @@ impl Error for ExportError {
             | Self::InvalidToneCurveAdjustment(_)
             | Self::InvalidHslColorMixerAdjustment(_)
             | Self::UnsupportedDetailAdjustment(_)
+            | Self::UnsupportedGeometryAdjustment(_)
             | Self::SameSourceAndOutput(_)
             | Self::IccProfileUnavailable { .. }
             | Self::InvalidJpegIccProfile(_) => None,
@@ -510,6 +580,7 @@ pub fn export_jpeg_srgb(
         tone_curve: request.tone_curve,
         hsl_color_mixer: request.hsl_color_mixer,
         detail: request.detail,
+        geometry: request.geometry,
         quality: request.quality,
         color_profile: ExportColorProfile::Srgb,
     })
@@ -534,12 +605,14 @@ pub fn export_jpeg_with_color_profile(
         &request.tone_curve,
         request.hsl_color_mixer,
         request.detail,
+        &request.geometry,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
     validate_tone_curve_adjustment(&request.tone_curve)?;
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
     validate_detail_adjustment(request.detail)?;
+    validate_geometry_adjustment(&request.geometry)?;
 
     let source_sha256 = sha256_file(&request.source_path)?;
     let icc_profile = export_icc_profile(request.color_profile)?;
@@ -553,6 +626,7 @@ pub fn export_jpeg_with_color_profile(
     apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
     apply_hsl_color_mixer(&mut rgb, request.hsl_color_mixer);
+    let rgb = apply_supported_geometry(rgb, &request.geometry)?;
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -680,12 +754,14 @@ pub fn write_jpeg_develop_preview(
         &request.tone_curve,
         request.hsl_color_mixer,
         request.detail,
+        &request.geometry,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
     validate_tone_curve_adjustment(&request.tone_curve)?;
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
     validate_detail_adjustment(request.detail)?;
+    validate_geometry_adjustment(&request.geometry)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -699,6 +775,7 @@ pub fn write_jpeg_develop_preview(
     apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
     apply_hsl_color_mixer(&mut rgb, request.hsl_color_mixer);
+    let rgb = apply_supported_geometry(rgb, &request.geometry)?;
 
     let mut output = File::create(&request.output_path)?;
     let mut encoder =
@@ -731,12 +808,14 @@ pub fn compute_jpeg_develop_histogram(
         &request.tone_curve,
         request.hsl_color_mixer,
         request.detail,
+        &request.geometry,
     ) {
         return Err(ExportError::NonFiniteAdjustment);
     }
     validate_tone_curve_adjustment(&request.tone_curve)?;
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
     validate_detail_adjustment(request.detail)?;
+    validate_geometry_adjustment(&request.geometry)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -748,6 +827,7 @@ pub fn compute_jpeg_develop_histogram(
     apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
     apply_hsl_color_mixer(&mut rgb, request.hsl_color_mixer);
+    let rgb = apply_supported_geometry(rgb, &request.geometry)?;
     silica_render::compute_rgb_histogram(rgb.as_raw()).map_err(|error| {
         ExportError::Image(image::ImageError::IoError(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
@@ -917,6 +997,72 @@ fn apply_hsl_color_mixer(image: &mut image::RgbImage, hsl_color_mixer: HslColorM
     }
 }
 
+fn apply_supported_geometry(
+    mut image: image::RgbImage,
+    geometry: &GeometryAdjustment,
+) -> Result<image::RgbImage, ExportError> {
+    validate_geometry_adjustment(geometry)?;
+
+    if let Some(crop) = &geometry.crop {
+        let (x, y, width, height) = normalized_crop_bounds(crop, image.width(), image.height())?;
+        image = image::imageops::crop_imm(&image, x, y, width, height).to_image();
+    }
+    if geometry.flip_horizontal {
+        image = image::imageops::flip_horizontal(&image);
+    }
+    if geometry.flip_vertical {
+        image = image::imageops::flip_vertical(&image);
+    }
+    image = match normalized_quarter_turn(geometry.rotation)? {
+        0 => image,
+        90 => image::imageops::rotate90(&image),
+        180 | -180 => image::imageops::rotate180(&image),
+        -90 => image::imageops::rotate270(&image),
+        _ => unreachable!("validated quarter turn"),
+    };
+    Ok(image)
+}
+
+fn normalized_crop_bounds(
+    crop: &GeometryCropAdjustment,
+    image_width: u32,
+    image_height: u32,
+) -> Result<(u32, u32, u32, u32), ExportError> {
+    if image_width == 0 || image_height == 0 {
+        return Err(ExportError::UnsupportedGeometryAdjustment(
+            "Geometry crop requires a non-empty raster source".to_string(),
+        ));
+    }
+    let x = crop.x;
+    let y = crop.y;
+    let width = crop.width;
+    let height = crop.height;
+    if !(0.0..=1.0).contains(&x)
+        || !(0.0..=1.0).contains(&y)
+        || !(0.0..=1.0).contains(&width)
+        || !(0.0..=1.0).contains(&height)
+        || width <= 0.0
+        || height <= 0.0
+        || x + width > 1.0
+        || y + height > 1.0
+    {
+        return Err(ExportError::UnsupportedGeometryAdjustment(
+            "Geometry crop must stay within the normalized source bounds".to_string(),
+        ));
+    }
+
+    let x_px = ((x * f64::from(image_width)).floor() as u32).min(image_width - 1);
+    let y_px = ((y * f64::from(image_height)).floor() as u32).min(image_height - 1);
+    let width_px = ((width * f64::from(image_width)).round() as u32)
+        .max(1)
+        .min(image_width - x_px);
+    let height_px = ((height * f64::from(image_height)).round() as u32)
+        .max(1)
+        .min(image_height - y_px);
+
+    Ok((x_px, y_px, width_px, height_px))
+}
+
 fn hsl_channel_centers(
     hsl_color_mixer: HslColorMixerAdjustment,
 ) -> [(f32, HslColorChannelAdjustment); 8] {
@@ -1014,6 +1160,7 @@ fn adjustments_are_finite(
     tone_curve: &ToneCurveAdjustment,
     hsl_color_mixer: HslColorMixerAdjustment,
     detail: DetailAdjustment,
+    geometry: &GeometryAdjustment,
 ) -> bool {
     exposure.is_finite()
         && contrast.is_finite()
@@ -1031,6 +1178,7 @@ fn adjustments_are_finite(
         && tone_curve_points_are_finite(&tone_curve.blue_curve)
         && hsl_color_mixer_is_finite(hsl_color_mixer)
         && detail_is_finite(detail)
+        && geometry_is_finite(geometry)
 }
 
 fn tone_curve_points_are_finite(points: &[ToneCurvePoint]) -> bool {
@@ -1059,6 +1207,23 @@ fn detail_is_finite(detail: DetailAdjustment) -> bool {
         && detail.noise_reduction.contrast.is_finite()
         && detail.noise_reduction.color.is_finite()
         && detail.noise_reduction.color_detail.is_finite()
+}
+
+fn geometry_is_finite(geometry: &GeometryAdjustment) -> bool {
+    geometry.rotation.is_finite()
+        && geometry.transform.vertical.is_finite()
+        && geometry.transform.horizontal.is_finite()
+        && geometry.transform.aspect.is_finite()
+        && geometry.transform.scale.is_finite()
+        && geometry.transform.x_offset.is_finite()
+        && geometry.transform.y_offset.is_finite()
+        && geometry.crop.as_ref().map_or(true, |crop| {
+            crop.x.is_finite()
+                && crop.y.is_finite()
+                && crop.width.is_finite()
+                && crop.height.is_finite()
+                && crop.angle.is_finite()
+        })
 }
 
 fn validate_tone_curve_adjustment(tone_curve: &ToneCurveAdjustment) -> Result<(), ExportError> {
@@ -1145,6 +1310,38 @@ fn validate_detail_adjustment(detail: DetailAdjustment) -> Result<(), ExportErro
             "Detail preview/export is unsupported until renderer support exists".to_string(),
         ))
     }
+}
+
+fn validate_geometry_adjustment(geometry: &GeometryAdjustment) -> Result<(), ExportError> {
+    if !geometry.transform.is_neutral() {
+        return Err(ExportError::UnsupportedGeometryAdjustment(
+            "Geometry transform preview/export is unsupported until renderer support exists"
+                .to_string(),
+        ));
+    }
+    if let Some(crop) = &geometry.crop {
+        if crop.angle != 0.0 {
+            return Err(ExportError::UnsupportedGeometryAdjustment(
+                "Angled crop preview/export is unsupported until renderer support exists"
+                    .to_string(),
+            ));
+        }
+        normalized_crop_bounds(crop, 1, 1)?;
+    }
+    normalized_quarter_turn(geometry.rotation)?;
+    Ok(())
+}
+
+fn normalized_quarter_turn(rotation: f64) -> Result<i16, ExportError> {
+    for supported in [0_i16, 90, -90, 180, -180] {
+        if (rotation - f64::from(supported)).abs() <= f64::EPSILON {
+            return Ok(supported);
+        }
+    }
+    Err(ExportError::UnsupportedGeometryAdjustment(
+        "Arbitrary rotation preview/export is unsupported until renderer support exists"
+            .to_string(),
+    ))
 }
 
 fn validate_hsl_channel_adjustment(
@@ -1377,6 +1574,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -1443,6 +1641,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::DisplayP3,
         })
@@ -1508,6 +1707,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -1577,6 +1777,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1592,6 +1793,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write adjusted preview");
 
@@ -1639,6 +1841,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1654,6 +1857,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write white balance preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1669,6 +1873,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("export white balance jpeg");
 
@@ -1682,6 +1887,122 @@ mod tests {
             original_before
         );
 
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn applies_supported_geometry_preview_and_export_without_mutating_original() {
+        let root = unique_export_root("geometry");
+        let source_path = root.join("source.jpg");
+        let preview_path = root.join("previews").join("geometry.jpg");
+        let export_path = root.join("export").join("geometry.jpg");
+        std::fs::create_dir_all(export_path.parent().expect("export parent"))
+            .expect("create export directory");
+        std::fs::create_dir_all(preview_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_geometry_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let geometry = super::GeometryAdjustment {
+            crop: Some(super::GeometryCropAdjustment {
+                x: 0.0,
+                y: 0.0,
+                width: 0.5,
+                height: 1.0,
+                angle: 0.0,
+                aspect: None,
+            }),
+            rotation: 90.0,
+            flip_horizontal: true,
+            flip_vertical: false,
+            ..super::GeometryAdjustment::neutral()
+        };
+
+        let preview = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: preview_path,
+            max_edge: 4,
+            quality: 95,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: geometry.clone(),
+        })
+        .expect("write geometry preview");
+        let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path: source_path.clone(),
+            output_path: export_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry,
+            quality: 95,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect("export geometry jpeg");
+
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        for path in [&preview.output_path, &exported.output_path] {
+            let decoded = image::ImageReader::open(path)
+                .expect("open geometry output")
+                .with_guessed_format()
+                .expect("guess geometry format")
+                .decode()
+                .expect("decode geometry output");
+            assert_eq!(decoded.width(), 3);
+            assert_eq!(decoded.height(), 2);
+        }
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn blocks_unsupported_geometry_without_writing_output() {
+        let root = unique_export_root("unsupported-geometry");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("unsupported.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("export parent"))
+            .expect("create export directory");
+        write_geometry_source_jpeg(&source_path);
+        let geometry = super::GeometryAdjustment {
+            rotation: 13.0,
+            ..super::GeometryAdjustment::neutral()
+        };
+
+        let error = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
+            source_path,
+            output_path: output_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry,
+            quality: 95,
+            color_profile: super::ExportColorProfile::Srgb,
+        })
+        .expect_err("unsupported arbitrary rotation should fail");
+
+        assert!(matches!(
+            error,
+            super::ExportError::UnsupportedGeometryAdjustment(_)
+        ));
+        assert!(!output_path.exists());
         remove_export_root(&root);
     }
 
@@ -1718,6 +2039,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1733,6 +2055,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write tone recovery preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1746,6 +2069,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1802,6 +2126,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1817,6 +2142,7 @@ mod tests {
             tone_curve: tone_curve.clone(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write tone curve preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1830,6 +2156,7 @@ mod tests {
             tone_curve,
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1879,6 +2206,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1894,6 +2222,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write color presence preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1907,6 +2236,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -1960,6 +2290,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1975,6 +2306,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer,
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("write hsl preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1988,6 +2320,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer,
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2040,6 +2373,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail,
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect_err("detail preview unsupported");
         let export_error = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -2053,6 +2387,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail,
+            geometry: super::GeometryAdjustment::neutral(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2093,6 +2428,7 @@ mod tests {
             tone_curve: super::ToneCurveAdjustment::neutral(),
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
         })
         .expect("compute histogram");
 
@@ -2120,6 +2456,19 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn write_geometry_source_jpeg(path: &Path) {
+        let image = image::RgbImage::from_fn(4, 3, |x, y| {
+            image::Rgb([
+                (32 + (x * 40)) as u8,
+                (48 + (y * 50)) as u8,
+                (96 + ((x + y) * 10)) as u8,
+            ])
+        });
+        image
+            .save_with_format(path, image::ImageFormat::Jpeg)
+            .expect("write geometry source jpeg");
     }
 
     fn synthetic_rgb_icc_profile(primaries: [[f64; 3]; 3]) -> Vec<u8> {
