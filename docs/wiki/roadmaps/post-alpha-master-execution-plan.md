@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 18 task cards exist. Tasks 18.1.1 through 18.4.3 are complete. Current next task is [Task 18.5.1 Edit Clipboard Contract](../tasks/18.5.1-edit-clipboard-contract.md).
+- Phase 18 task cards exist. Tasks 18.1.1 through 18.5.1 are complete. Current next task is [Task 18.5.2 Batch Sync History](../tasks/18.5.2-batch-sync-history.md).
 
 ## Wave Map
 
@@ -387,7 +387,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Start [Task 18.5.1 Edit Clipboard Contract](../tasks/18.5.1-edit-clipboard-contract.md).
+1. Start [Task 18.5.2 Batch Sync History](../tasks/18.5.2-batch-sync-history.md).
 2. Continue Phase 18 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links

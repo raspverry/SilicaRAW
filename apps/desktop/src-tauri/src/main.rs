@@ -3530,6 +3530,7 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
         silica_core::CoreError::Decode(_) => "decode",
         silica_core::CoreError::RawExport(_) => "decode",
         silica_core::CoreError::EditGraph(_) => "editGraph",
+        silica_core::CoreError::EditClipboard(_) => "editClipboard",
         silica_core::CoreError::UnsupportedEdit(_) => "unsupportedEdit",
         silica_core::CoreError::Export(_) => "export",
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",

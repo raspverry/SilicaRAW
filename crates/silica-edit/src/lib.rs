@@ -19,6 +19,12 @@ pub const EDIT_GRAPH_SCHEMA: &str = "silica.edit_graph";
 /// Stable edit graph schema version for v0.1.
 pub const EDIT_GRAPH_VERSION: i64 = 1;
 
+/// Stable schema marker for typed edit clipboard payloads.
+pub const EDIT_CLIPBOARD_SCHEMA: &str = "silica.edit_clipboard";
+
+/// Stable edit clipboard contract version for v0.1.
+pub const EDIT_CLIPBOARD_VERSION: i64 = 1;
+
 /// Explicit input profile value when no fixture-backed profile evidence exists.
 pub const INPUT_PROFILE_UNKNOWN: &str = "unknown";
 
@@ -58,6 +64,56 @@ pub struct EditGraph {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
     pub updated_at: String,
+}
+
+/// Schema-owned edit sections that can be copied and pasted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct EditClipboardSelection {
+    pub basic: bool,
+    pub tone: bool,
+    pub color: bool,
+    pub detail: bool,
+    pub lens: bool,
+    pub geometry: bool,
+}
+
+/// Copyable schema-owned Detail controls, excluding model/plugin-owned payloads.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EditClipboardDetailSection {
+    pub sharpening: Sharpening,
+    pub noise_reduction: NoiseReduction,
+}
+
+/// Copyable schema-owned Lens controls, excluding source-specific profile identifiers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EditClipboardLensSection {
+    pub profile_correction: bool,
+    pub chromatic_aberration: bool,
+    pub distortion: Number,
+    pub vignetting: Number,
+}
+
+/// Typed payload for copying and pasting schema-owned edit sections.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EditClipboardPayload {
+    pub schema: String,
+    pub version: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub basic: Option<BasicAdjustments>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tone: Option<ToneAdjustments>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<ColorAdjustments>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<EditClipboardDetailSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lens: Option<EditClipboardLensSection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<GeometryAdjustments>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -431,6 +487,35 @@ impl fmt::Display for EditGraphValidationError {
 }
 
 impl Error for EditGraphValidationError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditClipboardError {
+    path: String,
+    message: String,
+}
+
+impl EditClipboardError {
+    fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for EditClipboardError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}: {}", self.path, self.message)
+    }
+}
+
+impl Error for EditClipboardError {}
+
+impl From<EditGraphValidationError> for EditClipboardError {
+    fn from(error: EditGraphValidationError) -> Self {
+        Self::new("edit_graph", error.to_string())
+    }
+}
 
 /// Build a schema-valid default edit graph without persisting it.
 pub fn default_edit_graph(source: EditGraphSource, updated_at: impl Into<String>) -> EditGraph {
@@ -893,6 +978,119 @@ pub fn apply_color_profile_metadata(
     Ok(edited)
 }
 
+/// Copy selected schema-owned edit sections into a typed clipboard payload.
+pub fn copy_edit_clipboard_payload(
+    graph: &EditGraph,
+    sections: EditClipboardSelection,
+) -> Result<EditClipboardPayload, EditClipboardError> {
+    validate_edit_graph(graph)?;
+
+    let payload = EditClipboardPayload {
+        schema: EDIT_CLIPBOARD_SCHEMA.to_string(),
+        version: EDIT_CLIPBOARD_VERSION,
+        basic: sections.basic.then(|| graph.basic.clone()),
+        tone: sections.tone.then(|| graph.tone.clone()),
+        color: sections.color.then(|| graph.color.clone()),
+        detail: sections
+            .detail
+            .then(|| edit_clipboard_detail_from_graph(&graph.detail)),
+        lens: sections
+            .lens
+            .then(|| edit_clipboard_lens_from_graph(&graph.lens)),
+        geometry: sections.geometry.then(|| graph.geometry.clone()),
+    };
+    validate_edit_clipboard_payload(&payload)?;
+    Ok(payload)
+}
+
+/// Apply a typed edit clipboard payload to a target graph without changing target identity fields.
+pub fn apply_edit_clipboard_payload(
+    target: &EditGraph,
+    payload: &EditClipboardPayload,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditClipboardError> {
+    validate_edit_clipboard_payload(payload)?;
+
+    let mut edited = target.clone();
+    if let Some(basic) = payload.basic.as_ref() {
+        edited.basic = basic.clone();
+    }
+    if let Some(tone) = payload.tone.as_ref() {
+        edited.tone = tone.clone();
+    }
+    if let Some(color) = payload.color.as_ref() {
+        edited.color = color.clone();
+    }
+    if let Some(detail) = payload.detail.as_ref() {
+        edited.detail.sharpening = detail.sharpening.clone();
+        edited.detail.noise_reduction = detail.noise_reduction.clone();
+    }
+    if let Some(lens) = payload.lens.as_ref() {
+        edited.lens.profile_correction = lens.profile_correction;
+        edited.lens.chromatic_aberration = lens.chromatic_aberration;
+        edited.lens.distortion = lens.distortion.clone();
+        edited.lens.vignetting = lens.vignetting.clone();
+    }
+    if let Some(geometry) = payload.geometry.as_ref() {
+        edited.geometry = geometry.clone();
+    }
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Validate a typed edit clipboard payload before any paste operation uses it.
+pub fn validate_edit_clipboard_payload(
+    payload: &EditClipboardPayload,
+) -> Result<(), EditClipboardError> {
+    if payload.schema != EDIT_CLIPBOARD_SCHEMA {
+        return Err(EditClipboardError::new(
+            "schema",
+            format!("expected {EDIT_CLIPBOARD_SCHEMA}"),
+        ));
+    }
+    if payload.version != EDIT_CLIPBOARD_VERSION {
+        return Err(EditClipboardError::new(
+            "version",
+            format!("expected {EDIT_CLIPBOARD_VERSION}"),
+        ));
+    }
+
+    if payload.basic.is_none()
+        && payload.tone.is_none()
+        && payload.color.is_none()
+        && payload.detail.is_none()
+        && payload.lens.is_none()
+        && payload.geometry.is_none()
+    {
+        return Err(EditClipboardError::new(
+            "sections",
+            "at least one edit section must be selected",
+        ));
+    }
+
+    if let Some(basic) = payload.basic.as_ref() {
+        validate_basic(basic)?;
+    }
+    if let Some(tone) = payload.tone.as_ref() {
+        validate_tone(tone)?;
+    }
+    if let Some(color) = payload.color.as_ref() {
+        validate_color(color)?;
+    }
+    if let Some(detail) = payload.detail.as_ref() {
+        validate_edit_clipboard_detail(detail)?;
+    }
+    if let Some(lens) = payload.lens.as_ref() {
+        validate_edit_clipboard_lens(lens)?;
+    }
+    if let Some(geometry) = payload.geometry.as_ref() {
+        validate_geometry(geometry)?;
+    }
+
+    Ok(())
+}
+
 /// Validate JSON against the local alpha edit graph contract.
 pub fn validate_edit_graph_json(value: &Value) -> Result<(), EditGraphValidationError> {
     let graph: EditGraph = serde_json::from_value(value.clone())
@@ -942,6 +1140,46 @@ fn hsl_color_channel_mut(hsl: &mut HslAdjustments, channel: HslColorChannel) -> 
         HslColorChannel::Purple => &mut hsl.purple,
         HslColorChannel::Magenta => &mut hsl.magenta,
     }
+}
+
+fn edit_clipboard_detail_from_graph(detail: &DetailAdjustments) -> EditClipboardDetailSection {
+    EditClipboardDetailSection {
+        sharpening: detail.sharpening.clone(),
+        noise_reduction: detail.noise_reduction.clone(),
+    }
+}
+
+fn edit_clipboard_lens_from_graph(lens: &LensAdjustments) -> EditClipboardLensSection {
+    EditClipboardLensSection {
+        profile_correction: lens.profile_correction,
+        chromatic_aberration: lens.chromatic_aberration,
+        distortion: lens.distortion.clone(),
+        vignetting: lens.vignetting.clone(),
+    }
+}
+
+fn validate_edit_clipboard_detail(
+    detail: &EditClipboardDetailSection,
+) -> Result<(), EditClipboardError> {
+    let graph_detail = DetailAdjustments {
+        sharpening: detail.sharpening.clone(),
+        noise_reduction: detail.noise_reduction.clone(),
+        mlx_denoise: None,
+    };
+    validate_detail(&graph_detail)?;
+    Ok(())
+}
+
+fn validate_edit_clipboard_lens(lens: &EditClipboardLensSection) -> Result<(), EditClipboardError> {
+    let graph_lens = LensAdjustments {
+        profile_correction: lens.profile_correction,
+        profile_id: None,
+        chromatic_aberration: lens.chromatic_aberration,
+        distortion: lens.distortion.clone(),
+        vignetting: lens.vignetting.clone(),
+    };
+    validate_lens(&graph_lens)?;
+    Ok(())
 }
 
 fn hsl_channel_path(channel: HslColorChannel, field: &str) -> String {
@@ -2014,6 +2252,307 @@ mod tests {
         assert!(crop_x_bounds_error.to_string().contains("geometry.crop.x"));
         assert!(crop_y_bounds_error.to_string().contains("geometry.crop.y"));
         assert!(crop_angle_error.to_string().contains("geometry.crop.angle"));
+    }
+
+    #[test]
+    fn edit_clipboard_copies_selected_sections_without_identity_fields() {
+        let mut source = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "source-photo".to_string(),
+                path: "/tmp/source.raw".to_string(),
+                file_size: 2048,
+                modified_at: Some("unix:11".to_string()),
+                partial_hash: Some("source-partial".to_string()),
+                full_hash: Some("source-full".to_string()),
+            },
+            "unix:12",
+        );
+        source.profile.input_profile = "source-camera-profile".to_string();
+        source.metadata.rating = 5;
+        source.metadata.picked = true;
+        source.detail.mlx_denoise = Some(json!({ "status": "source-model-payload" }));
+        source.lens.profile_id = Some("source-lens-profile".to_string());
+        source.extensions.insert(
+            "com.example.source".to_string(),
+            json!({ "owned_by": "source" }),
+        );
+        let source = super::apply_exposure_contrast(&source, 1.25, 18.0, "unix:13")
+            .expect("apply source basic");
+        let source = super::apply_tone_curve(
+            &source,
+            super::CurveMode::Point,
+            &[(0.0, 0.0), (0.45, 0.55), (1.0, 1.0)],
+            &[],
+            &[],
+            &[],
+            "unix:14",
+        )
+        .expect("apply source tone");
+        let source = super::apply_hsl_color_channel(
+            &source,
+            super::HslColorChannel::Blue,
+            -10.0,
+            18.0,
+            -6.0,
+            "unix:15",
+        )
+        .expect("apply source color");
+        let source = super::apply_detail_sharpening(&source, 72.0, 1.4, 48.0, 20.0, "unix:16")
+            .expect("apply source sharpening");
+        let source =
+            super::apply_detail_noise_reduction(&source, 28.0, 42.0, 14.0, 32.0, 58.0, "unix:17")
+                .expect("apply source noise reduction");
+        let source = super::apply_lens_adjustments(&source, true, true, -8.0, 12.0, "unix:18")
+            .expect("apply source lens");
+        let source = super::apply_geometry_orientation(&source, 90.0, true, false, "unix:19")
+            .expect("apply source orientation");
+        let source =
+            super::apply_geometry_crop(&source, 0.1, 0.2, 0.7, 0.6, 0.0, Some("4:3"), "unix:20")
+                .expect("apply source crop");
+
+        let mut target = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "target-photo".to_string(),
+                path: "/tmp/target.raw".to_string(),
+                file_size: 4096,
+                modified_at: Some("unix:21".to_string()),
+                partial_hash: Some("target-partial".to_string()),
+                full_hash: Some("target-full".to_string()),
+            },
+            "unix:22",
+        );
+        target.profile.input_profile = "target-camera-profile".to_string();
+        target.metadata.rating = 2;
+        target.metadata.rejected = true;
+        target.detail.mlx_denoise = Some(json!({ "status": "target-model-payload" }));
+        target.lens.profile_id = Some("target-lens-profile".to_string());
+        target.extensions.insert(
+            "com.example.target".to_string(),
+            json!({ "owned_by": "target" }),
+        );
+
+        let payload = super::copy_edit_clipboard_payload(
+            &source,
+            super::EditClipboardSelection {
+                basic: true,
+                tone: true,
+                color: true,
+                detail: true,
+                lens: true,
+                geometry: true,
+            },
+        )
+        .expect("copy selected edit sections");
+        let serialized = serde_json::to_value(&payload).expect("serialize clipboard payload");
+
+        assert_eq!(payload.schema, super::EDIT_CLIPBOARD_SCHEMA);
+        assert_eq!(payload.version, super::EDIT_CLIPBOARD_VERSION);
+        assert_eq!(payload.basic.as_ref(), Some(&source.basic));
+        assert_eq!(payload.tone.as_ref(), Some(&source.tone));
+        assert_eq!(payload.color.as_ref(), Some(&source.color));
+        assert_eq!(
+            payload.detail.as_ref().map(|detail| &detail.sharpening),
+            Some(&source.detail.sharpening)
+        );
+        assert_eq!(
+            payload
+                .detail
+                .as_ref()
+                .map(|detail| &detail.noise_reduction),
+            Some(&source.detail.noise_reduction)
+        );
+        assert_eq!(
+            payload.lens.as_ref().map(|lens| lens.profile_correction),
+            Some(source.lens.profile_correction)
+        );
+        assert_eq!(payload.geometry.as_ref(), Some(&source.geometry));
+        assert!(serialized.get("sections").is_none());
+        assert!(serialized.get("source").is_none());
+        assert!(serialized.get("profile").is_none());
+        assert!(serialized.get("metadata").is_none());
+        assert!(serialized.get("masks").is_none());
+        assert!(serialized.get("extensions").is_none());
+        assert!(serialized["detail"].get("mlx_denoise").is_none());
+        assert!(serialized["lens"].get("profile_id").is_none());
+
+        let pasted = super::apply_edit_clipboard_payload(&target, &payload, "unix:30")
+            .expect("paste selected edit sections");
+
+        assert_eq!(pasted.source, target.source);
+        assert_eq!(pasted.profile, target.profile);
+        assert_eq!(pasted.metadata, target.metadata);
+        assert_eq!(pasted.extensions, target.extensions);
+        assert_eq!(pasted.masks, target.masks);
+        assert_eq!(pasted.created_at, target.created_at);
+        assert_eq!(pasted.app_version, target.app_version);
+        assert_eq!(pasted.basic, source.basic);
+        assert_eq!(pasted.tone, source.tone);
+        assert_eq!(pasted.color, source.color);
+        assert_eq!(pasted.detail.sharpening, source.detail.sharpening);
+        assert_eq!(pasted.detail.noise_reduction, source.detail.noise_reduction);
+        assert_eq!(pasted.detail.mlx_denoise, target.detail.mlx_denoise);
+        assert_eq!(
+            pasted.lens.profile_correction,
+            source.lens.profile_correction
+        );
+        assert_eq!(
+            pasted.lens.chromatic_aberration,
+            source.lens.chromatic_aberration
+        );
+        assert_eq!(pasted.lens.distortion, source.lens.distortion);
+        assert_eq!(pasted.lens.vignetting, source.lens.vignetting);
+        assert_eq!(pasted.lens.profile_id, target.lens.profile_id);
+        assert_eq!(pasted.geometry, source.geometry);
+        assert_eq!(pasted.updated_at, "unix:30");
+        super::validate_edit_graph(&pasted).expect("pasted graph validates");
+    }
+
+    #[test]
+    fn edit_clipboard_rejects_empty_selection_and_payload() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+
+        let empty_error =
+            super::copy_edit_clipboard_payload(&graph, super::EditClipboardSelection::default())
+                .expect_err("empty clipboard selection is invalid");
+        assert!(empty_error.to_string().contains("sections"));
+
+        let empty_payload = super::EditClipboardPayload {
+            schema: super::EDIT_CLIPBOARD_SCHEMA.to_string(),
+            version: super::EDIT_CLIPBOARD_VERSION,
+            basic: None,
+            tone: None,
+            color: None,
+            detail: None,
+            lens: None,
+            geometry: None,
+        };
+        let payload_error = super::validate_edit_clipboard_payload(&empty_payload)
+            .expect_err("clipboard payload must contain at least one section");
+        assert!(payload_error.to_string().contains("sections"));
+    }
+
+    #[test]
+    fn edit_clipboard_rejects_wrong_schema_and_version() {
+        let valid_basic = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        )
+        .basic;
+
+        let wrong_schema = super::EditClipboardPayload {
+            schema: "silica.edit_graph".to_string(),
+            version: super::EDIT_CLIPBOARD_VERSION,
+            basic: Some(valid_basic.clone()),
+            tone: None,
+            color: None,
+            detail: None,
+            lens: None,
+            geometry: None,
+        };
+        let schema_error = super::validate_edit_clipboard_payload(&wrong_schema)
+            .expect_err("clipboard payload rejects wrong schema");
+        assert!(schema_error.to_string().contains("schema"));
+
+        let wrong_version = super::EditClipboardPayload {
+            schema: super::EDIT_CLIPBOARD_SCHEMA.to_string(),
+            version: super::EDIT_CLIPBOARD_VERSION + 1,
+            basic: Some(valid_basic),
+            tone: None,
+            color: None,
+            detail: None,
+            lens: None,
+            geometry: None,
+        };
+        let version_error = super::validate_edit_clipboard_payload(&wrong_version)
+            .expect_err("clipboard payload rejects wrong version");
+        assert!(version_error.to_string().contains("version"));
+    }
+
+    #[test]
+    fn edit_clipboard_rejects_unknown_json_and_invalid_adjustment_ranges() {
+        let invalid_json = json!({
+            "schema": "silica.edit_clipboard",
+            "version": 1,
+            "source": { "photo_id": "source-photo" }
+        });
+        let json_error = serde_json::from_value::<super::EditClipboardPayload>(invalid_json)
+            .expect_err("clipboard payload rejects arbitrary source patch");
+        assert!(json_error.to_string().contains("unknown field"));
+
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        let detail_with_model_payload = json!({
+            "schema": super::EDIT_CLIPBOARD_SCHEMA,
+            "version": super::EDIT_CLIPBOARD_VERSION,
+            "detail": {
+                "sharpening": graph.detail.sharpening,
+                "noise_reduction": graph.detail.noise_reduction,
+                "mlx_denoise": { "status": "not-copyable" }
+            }
+        });
+        let detail_json_error =
+            serde_json::from_value::<super::EditClipboardPayload>(detail_with_model_payload)
+                .expect_err("clipboard payload rejects MLX denoise data");
+        assert!(detail_json_error.to_string().contains("unknown field"));
+
+        let lens_with_profile_id = json!({
+            "schema": super::EDIT_CLIPBOARD_SCHEMA,
+            "version": super::EDIT_CLIPBOARD_VERSION,
+            "lens": {
+                "profile_correction": false,
+                "profile_id": "source-specific-profile",
+                "chromatic_aberration": false,
+                "distortion": 0,
+                "vignetting": 0
+            }
+        });
+        let lens_json_error =
+            serde_json::from_value::<super::EditClipboardPayload>(lens_with_profile_id)
+                .expect_err("clipboard payload rejects lens profile identifiers");
+        assert!(lens_json_error.to_string().contains("unknown field"));
+
+        let mut invalid_basic = graph.basic.clone();
+        invalid_basic.exposure = serde_json::Number::from(12);
+        let invalid_payload = super::EditClipboardPayload {
+            schema: super::EDIT_CLIPBOARD_SCHEMA.to_string(),
+            version: super::EDIT_CLIPBOARD_VERSION,
+            basic: Some(invalid_basic),
+            tone: None,
+            color: None,
+            detail: None,
+            lens: None,
+            geometry: None,
+        };
+
+        let range_error = super::apply_edit_clipboard_payload(&graph, &invalid_payload, "unix:3")
+            .expect_err("invalid pasted adjustment range is rejected");
+        assert!(range_error.to_string().contains("basic.exposure"));
     }
 
     #[test]
