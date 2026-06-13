@@ -107,6 +107,7 @@ pub struct ExposureContrastPreviewRequest {
     pub tone_curve: ToneCurveRenderAdjustment,
     pub hsl_color_mixer: HslColorMixerRenderAdjustment,
     pub detail: DetailRenderAdjustment,
+    pub geometry: GeometryRenderAdjustment,
     pub message: String,
 }
 
@@ -125,6 +126,7 @@ pub struct JpegSrgbExportRenderRequest {
     pub tone_curve: ToneCurveRenderAdjustment,
     pub hsl_color_mixer: HslColorMixerRenderAdjustment,
     pub detail: DetailRenderAdjustment,
+    pub geometry: GeometryRenderAdjustment,
     pub quality: u8,
     pub message: String,
 }
@@ -332,6 +334,75 @@ impl DetailRenderAdjustment {
 
     pub fn is_neutral(self) -> bool {
         self.sharpening.is_neutral() && self.noise_reduction.is_neutral()
+    }
+}
+
+/// Normalized crop rectangle carried by preview/export render requests.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeometryCropRenderAdjustment {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub angle: f64,
+    pub aspect: Option<String>,
+}
+
+/// Perspective/scale transform controls carried for explicit unsupported-state handling.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GeometryTransformRenderAdjustment {
+    pub vertical: f64,
+    pub horizontal: f64,
+    pub aspect: f64,
+    pub scale: f64,
+    pub x_offset: f64,
+    pub y_offset: f64,
+}
+
+impl GeometryTransformRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            vertical: 0.0,
+            horizontal: 0.0,
+            aspect: 0.0,
+            scale: 100.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    pub fn is_neutral(self) -> bool {
+        self == Self::neutral()
+    }
+}
+
+/// Supported non-destructive geometry carried through preview/export contracts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeometryRenderAdjustment {
+    pub crop: Option<GeometryCropRenderAdjustment>,
+    pub rotation: f64,
+    pub flip_horizontal: bool,
+    pub flip_vertical: bool,
+    pub transform: GeometryTransformRenderAdjustment,
+}
+
+impl GeometryRenderAdjustment {
+    pub fn neutral() -> Self {
+        Self {
+            crop: None,
+            rotation: 0.0,
+            flip_horizontal: false,
+            flip_vertical: false,
+            transform: GeometryTransformRenderAdjustment::neutral(),
+        }
+    }
+
+    pub fn is_neutral(&self) -> bool {
+        self.crop.is_none()
+            && self.rotation == 0.0
+            && !self.flip_horizontal
+            && !self.flip_vertical
+            && self.transform.is_neutral()
     }
 }
 
@@ -1274,6 +1345,7 @@ pub fn plan_color_presence_preview(
         tone_curve: ToneCurveRenderAdjustment::neutral(),
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         detail: DetailRenderAdjustment::neutral(),
+        geometry: GeometryRenderAdjustment::neutral(),
         message,
     }
 }
@@ -1368,6 +1440,46 @@ pub fn plan_detail_preview(
     request
 }
 
+/// Build a render request for a draft Geometry preview update.
+///
+/// The local alpha supports rectangular crop, quarter-turn rotation, and flips.
+/// Perspective transform, crop angle, and arbitrary rotation remain explicit
+/// unsupported states until the renderer has real implementations.
+pub fn plan_geometry_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    detail: DetailRenderAdjustment,
+    geometry: GeometryRenderAdjustment,
+) -> ExposureContrastPreviewRequest {
+    let mut request = plan_detail_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        hsl_color_mixer,
+        detail,
+    );
+    request.geometry = geometry;
+    if request.status == PreviewRenderStatus::Ready {
+        if let Some(message) = unsupported_geometry_message(&request.geometry) {
+            request.status = PreviewRenderStatus::Unsupported;
+            request.message = message;
+        } else {
+            request.message = "Geometry preview request is ready.".to_string();
+        }
+    }
+    request
+}
+
 /// Build a render-side request for exporting an edited raster source as sRGB JPEG.
 pub fn plan_jpeg_srgb_export(
     source_path: impl Into<String>,
@@ -1452,6 +1564,7 @@ pub fn plan_jpeg_srgb_export_with_color_presence(
         tone_curve: ToneCurveRenderAdjustment::neutral(),
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         detail: DetailRenderAdjustment::neutral(),
+        geometry: GeometryRenderAdjustment::neutral(),
         quality,
         message: "JPEG sRGB export request is ready.".to_string(),
     }
@@ -1547,6 +1660,44 @@ pub fn plan_jpeg_srgb_export_with_detail(
     request
 }
 
+/// Build a render-side request for exporting a raster source with supported Geometry values.
+#[allow(clippy::too_many_arguments)]
+pub fn plan_jpeg_srgb_export_with_geometry(
+    source_path: impl Into<String>,
+    output_path: impl Into<String>,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    detail: DetailRenderAdjustment,
+    geometry: GeometryRenderAdjustment,
+    quality: u8,
+) -> JpegSrgbExportRenderRequest {
+    let mut request = plan_jpeg_srgb_export_with_detail(
+        source_path,
+        output_path,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        hsl_color_mixer,
+        detail,
+        quality,
+    );
+    request.geometry = geometry;
+    if let Some(message) = unsupported_geometry_message(&request.geometry) {
+        request.message = message;
+    } else if request.detail.is_neutral() && !request.geometry.is_neutral() {
+        request.message = "Geometry JPEG sRGB export request is ready.".to_string();
+    }
+    request
+}
+
 /// Build a render-side request for exporting a full-resolution RAW-derived source artifact.
 pub fn plan_raw_derived_jpeg_srgb_export(
     source_path: impl Into<String>,
@@ -1631,6 +1782,7 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_color_presence(
         tone_curve: ToneCurveRenderAdjustment::neutral(),
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         detail: DetailRenderAdjustment::neutral(),
+        geometry: GeometryRenderAdjustment::neutral(),
         quality,
         message: "RAW-derived JPEG sRGB export request is ready.".to_string(),
     }
@@ -1688,6 +1840,36 @@ pub fn plan_raw_derived_jpeg_srgb_export_with_hsl_color_mixer(
     );
     request.hsl_color_mixer = hsl_color_mixer;
     request
+}
+
+fn unsupported_geometry_message(geometry: &GeometryRenderAdjustment) -> Option<String> {
+    if !geometry.transform.is_neutral() {
+        return Some(
+            "Geometry transform preview/export is unsupported until renderer support exists."
+                .to_string(),
+        );
+    }
+    if let Some(crop) = &geometry.crop {
+        if crop.angle != 0.0 {
+            return Some(
+                "Angled crop preview/export is unsupported until renderer support exists."
+                    .to_string(),
+            );
+        }
+    }
+    if !is_supported_quarter_turn(geometry.rotation) {
+        return Some(
+            "Arbitrary rotation preview/export is unsupported until renderer support exists."
+                .to_string(),
+        );
+    }
+    None
+}
+
+fn is_supported_quarter_turn(rotation: f64) -> bool {
+    [0.0, 90.0, -90.0, 180.0, -180.0]
+        .iter()
+        .any(|supported| (rotation - supported).abs() <= f64::EPSILON)
 }
 
 #[cfg(test)]
@@ -2022,6 +2204,61 @@ mod tests {
         assert!(preview.message.contains("Detail"));
         assert_eq!(export.detail, detail);
         assert!(export.message.contains("Detail export unsupported"));
+    }
+
+    #[test]
+    fn plans_geometry_preview_and_export_requests() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let geometry = super::GeometryRenderAdjustment {
+            crop: Some(super::GeometryCropRenderAdjustment {
+                x: 0.0,
+                y: 0.0,
+                width: 0.75,
+                height: 1.0,
+                angle: 0.0,
+                aspect: None,
+            }),
+            rotation: 90.0,
+            flip_horizontal: true,
+            flip_vertical: false,
+            ..super::GeometryRenderAdjustment::neutral()
+        };
+
+        let preview = super::plan_geometry_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            super::HslColorMixerRenderAdjustment::neutral(),
+            super::DetailRenderAdjustment::neutral(),
+            geometry.clone(),
+        );
+        let export = super::plan_jpeg_srgb_export_with_geometry(
+            "/tmp/original.jpg",
+            "/tmp/exported.jpg",
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            super::HslColorMixerRenderAdjustment::neutral(),
+            super::DetailRenderAdjustment::neutral(),
+            geometry.clone(),
+            90,
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.geometry, geometry);
+        assert!(preview.message.contains("Geometry"));
+        assert_eq!(export.geometry, geometry);
+        assert!(export.message.contains("Geometry"));
     }
 
     #[test]

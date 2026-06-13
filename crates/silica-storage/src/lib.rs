@@ -2897,6 +2897,14 @@ fn edit_graph_history_label(
         before.vibrance != after.vibrance || before.saturation != after.saturation;
     let tone_curve_changed = before_graph.tone != after_graph.tone;
     let hsl_color_mixer_changed = before_graph.color.hsl != after_graph.color.hsl;
+    let geometry_crop_changed = before_graph.geometry.crop != after_graph.geometry.crop;
+    let geometry_orientation_changed = before_graph.geometry.rotation
+        != after_graph.geometry.rotation
+        || before_graph.geometry.flip_horizontal != after_graph.geometry.flip_horizontal
+        || before_graph.geometry.flip_vertical != after_graph.geometry.flip_vertical;
+    let geometry_transform_changed =
+        before_graph.geometry.transform != after_graph.geometry.transform;
+    let lens_changed = before_graph.lens != after_graph.lens;
 
     match (
         exposure_contrast_changed,
@@ -2905,13 +2913,27 @@ fn edit_graph_history_label(
         color_presence_changed,
         tone_curve_changed,
         hsl_color_mixer_changed,
+        geometry_crop_changed,
+        geometry_orientation_changed,
+        geometry_transform_changed,
+        lens_changed,
     ) {
-        (true, false, false, false, false, false) => "Exposure / contrast",
-        (false, true, false, false, false, false) => "White balance",
-        (false, false, true, false, false, false) => "Tone recovery",
-        (false, false, false, true, false, false) => "Color presence",
-        (false, false, false, false, true, false) => "Tone curve",
-        (false, false, false, false, false, true) => "HSL color mixer",
+        (true, false, false, false, false, false, false, false, false, false) => {
+            "Exposure / contrast"
+        }
+        (false, true, false, false, false, false, false, false, false, false) => "White balance",
+        (false, false, true, false, false, false, false, false, false, false) => "Tone recovery",
+        (false, false, false, true, false, false, false, false, false, false) => "Color presence",
+        (false, false, false, false, true, false, false, false, false, false) => "Tone curve",
+        (false, false, false, false, false, true, false, false, false, false) => "HSL color mixer",
+        (false, false, false, false, false, false, true, false, false, false) => "Geometry crop",
+        (false, false, false, false, false, false, false, true, false, false) => {
+            "Geometry orientation"
+        }
+        (false, false, false, false, false, false, false, false, true, false) => {
+            "Geometry transform"
+        }
+        (false, false, false, false, false, false, false, false, false, true) => "Lens correction",
         _ => "Develop edit",
     }
 }

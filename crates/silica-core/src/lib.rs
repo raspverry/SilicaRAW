@@ -531,6 +531,38 @@ pub struct PhotoDetailState {
     pub noise_reduction: PhotoDetailNoiseReductionState,
 }
 
+/// Normalized crop state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoGeometryCropState {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub angle: f64,
+    pub aspect: Option<String>,
+}
+
+/// Perspective/scale transform state exposed for explicit unsupported-state reporting.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoGeometryTransformState {
+    pub vertical: f64,
+    pub horizontal: f64,
+    pub aspect: f64,
+    pub scale: f64,
+    pub x_offset: f64,
+    pub y_offset: f64,
+}
+
+/// Current Geometry state exposed by preview, commit, and edit-state responses.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoGeometryState {
+    pub crop: Option<PhotoGeometryCropState>,
+    pub rotation: f64,
+    pub flip_horizontal: bool,
+    pub flip_vertical: bool,
+    pub transform: PhotoGeometryTransformState,
+}
+
 /// Draft preview request returned while an exposure/contrast slider is moving.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhotoEditPreviewSession {
@@ -552,6 +584,7 @@ pub struct PhotoEditPreviewSession {
     pub tone_curve: PhotoToneCurveState,
     pub hsl_color_mixer: PhotoHslColorMixerState,
     pub detail: PhotoDetailState,
+    pub geometry: PhotoGeometryState,
     pub message: String,
 }
 
@@ -597,6 +630,7 @@ pub struct PhotoEditCommit {
     pub tone_curve: PhotoToneCurveState,
     pub hsl_color_mixer: PhotoHslColorMixerState,
     pub detail: PhotoDetailState,
+    pub geometry: PhotoGeometryState,
     pub persisted: bool,
     pub message: String,
 }
@@ -642,6 +676,7 @@ pub struct PhotoEditState {
     pub tone_curve: PhotoToneCurveState,
     pub hsl_color_mixer: PhotoHslColorMixerState,
     pub detail: PhotoDetailState,
+    pub geometry: PhotoGeometryState,
     pub persisted: bool,
     pub message: String,
 }
@@ -1551,6 +1586,24 @@ pub fn get_photo_histogram(
             Some(graph) => graph,
             None => return Ok(None),
         };
+    let render_geometry = render_geometry_from_graph(&graph);
+    if let Some(message) =
+        lens_unsupported_message(&graph).or_else(|| geometry_unsupported_message(&render_geometry))
+    {
+        return Ok(Some(PhotoHistogramSession {
+            photo_id: candidate.photo_id,
+            source_path: candidate.path,
+            status: PhotoHistogramStatus::Unsupported,
+            red: empty_bins(),
+            green: empty_bins(),
+            blue: empty_bins(),
+            luminance: empty_bins(),
+            pixel_count: 0,
+            cache_key: String::new(),
+            cache_path: String::new(),
+            message,
+        }));
+    }
     let render_detail = render_detail_from_graph(&graph);
     if !render_detail.is_neutral() {
         return Ok(Some(PhotoHistogramSession {
@@ -1586,6 +1639,7 @@ pub fn get_photo_histogram(
                 &graph,
             )),
             detail: export_detail_from_render(render_detail),
+            geometry: export_geometry_from_render(render_geometry),
         })?;
     let pixel_count = histogram.pixel_count;
     let red = histogram.red;
@@ -1674,6 +1728,7 @@ pub fn preview_exposure_contrast_edit(
     request.tone_curve = render_tone_curve_from_graph(&graph);
     request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let request = apply_lens_geometry_preview_boundary(request, &graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1697,6 +1752,7 @@ pub fn preview_exposure_contrast_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -1721,6 +1777,7 @@ pub fn preview_exposure_contrast_edit(
         tone_curve: tone_curve_state_from_graph(&graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
         detail: detail_state_from_graph(&graph),
+        geometry: geometry_state_from_graph(&graph),
         message,
     }))
 }
@@ -1765,6 +1822,7 @@ pub fn preview_white_balance_edit(
     request.tone_curve = render_tone_curve_from_graph(&graph);
     request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let request = apply_lens_geometry_preview_boundary(request, &graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1788,6 +1846,7 @@ pub fn preview_white_balance_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -1812,6 +1871,7 @@ pub fn preview_white_balance_edit(
         tone_curve: tone_curve_state_from_graph(&graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
         detail: detail_state_from_graph(&graph),
+        geometry: geometry_state_from_graph(&graph),
         message,
     }))
 }
@@ -1856,6 +1916,7 @@ pub fn preview_tone_recovery_edit(
     request.tone_curve = render_tone_curve_from_graph(&graph);
     request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let request = apply_lens_geometry_preview_boundary(request, &graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1879,6 +1940,7 @@ pub fn preview_tone_recovery_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -1903,6 +1965,7 @@ pub fn preview_tone_recovery_edit(
         tone_curve: tone_curve_state_from_graph(&graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
         detail: detail_state_from_graph(&graph),
+        geometry: geometry_state_from_graph(&graph),
         message,
     }))
 }
@@ -1947,6 +2010,7 @@ pub fn preview_tone_curve_edit(
     );
     request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let request = apply_lens_geometry_preview_boundary(request, &graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -1970,6 +2034,7 @@ pub fn preview_tone_curve_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -1994,6 +2059,7 @@ pub fn preview_tone_curve_edit(
         tone_curve: tone_curve_state_from_graph(&edited),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&edited),
         detail: detail_state_from_graph(&edited),
+        geometry: geometry_state_from_graph(&edited),
         message,
     }))
 }
@@ -2037,6 +2103,7 @@ pub fn preview_hsl_color_mixer_edit(
         render_hsl_color_mixer_from_graph(&edited),
     );
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let request = apply_lens_geometry_preview_boundary(request, &graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -2060,6 +2127,7 @@ pub fn preview_hsl_color_mixer_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -2084,6 +2152,7 @@ pub fn preview_hsl_color_mixer_edit(
         tone_curve: tone_curve_state_from_graph(&graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&edited),
         detail: detail_state_from_graph(&edited),
+        geometry: geometry_state_from_graph(&edited),
         message,
     }))
 }
@@ -2123,6 +2192,7 @@ pub fn preview_color_presence_edit(
     request.tone_curve = render_tone_curve_from_graph(&graph);
     request.hsl_color_mixer = render_hsl_color_mixer_from_graph(&graph);
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
+    let request = apply_lens_geometry_preview_boundary(request, &graph);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -2146,6 +2216,7 @@ pub fn preview_color_presence_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -2170,6 +2241,7 @@ pub fn preview_color_presence_edit(
         tone_curve: tone_curve_state_from_graph(&graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
         detail: detail_state_from_graph(&graph),
+        geometry: geometry_state_from_graph(&graph),
         message,
     }))
 }
@@ -2231,6 +2303,79 @@ pub fn preview_detail_noise_reduction_edit(
     preview_detail_edit(library_root_path, photo_id, &graph, &edited)
 }
 
+/// Build a draft rectangular crop preview without writing the catalog.
+#[allow(clippy::too_many_arguments)]
+pub fn preview_geometry_crop_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    angle: f64,
+    aspect: Option<&str>,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_geometry_crop(
+        &graph,
+        x,
+        y,
+        width,
+        height,
+        angle,
+        aspect,
+        current_timestamp_string(),
+    )?;
+
+    preview_geometry_edit(library_root_path, photo_id, &graph, &edited)
+}
+
+/// Build a draft crop-clear preview without writing the catalog.
+pub fn preview_clear_geometry_crop(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::clear_geometry_crop(&graph, current_timestamp_string())?;
+
+    preview_geometry_edit(library_root_path, photo_id, &graph, &edited)
+}
+
+/// Build a draft rotation/flip preview without writing the catalog.
+pub fn preview_geometry_orientation_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    rotation: f64,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_geometry_orientation(
+        &graph,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+        current_timestamp_string(),
+    )?;
+
+    preview_geometry_edit(library_root_path, photo_id, &graph, &edited)
+}
+
 /// Detail commit is intentionally blocked until a real renderer/export path exists.
 pub fn commit_detail_sharpening_edit(
     library_root_path: impl AsRef<Path>,
@@ -2288,6 +2433,94 @@ pub fn commit_detail_noise_reduction_edit(
     Err(CoreError::UnsupportedEdit(detail_unsupported_message()))
 }
 
+/// Persist a rectangular crop edit on commit/release.
+#[allow(clippy::too_many_arguments)]
+pub fn commit_geometry_crop_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    angle: f64,
+    aspect: Option<&str>,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_geometry_crop(
+        &graph,
+        x,
+        y,
+        width,
+        height,
+        angle,
+        aspect,
+        current_timestamp_string(),
+    )?;
+    ensure_supported_lens_geometry_commit(&edited)?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(photo_edit_commit_from_graph(
+        &persisted,
+        "Geometry crop edit persisted on commit.",
+    )))
+}
+
+/// Persist a crop-clear edit on commit/release.
+pub fn commit_clear_geometry_crop(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::clear_geometry_crop(&graph, current_timestamp_string())?;
+    ensure_supported_lens_geometry_commit(&edited)?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(photo_edit_commit_from_graph(
+        &persisted,
+        "Geometry crop cleared on commit.",
+    )))
+}
+
+/// Persist a rotation/flip edit on commit/release.
+pub fn commit_geometry_orientation_edit(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    rotation: f64,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let edited = silica_edit::apply_geometry_orientation(
+        &graph,
+        rotation,
+        flip_horizontal,
+        flip_vertical,
+        current_timestamp_string(),
+    )?;
+    ensure_supported_lens_geometry_commit(&edited)?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(photo_edit_commit_from_graph(
+        &persisted,
+        "Geometry orientation edit persisted on commit.",
+    )))
+}
+
 /// Persist an exposure/contrast edit on commit/release.
 pub fn commit_exposure_contrast_edit(
     library_root_path: impl AsRef<Path>,
@@ -2325,6 +2558,7 @@ pub fn commit_exposure_contrast_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "Exposure/contrast edit persisted on commit.".to_string(),
     }))
@@ -2369,6 +2603,7 @@ pub fn commit_white_balance_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "White balance edit persisted on commit.".to_string(),
     }))
@@ -2415,6 +2650,7 @@ pub fn commit_tone_recovery_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "Tone recovery edit persisted on commit.".to_string(),
     }))
@@ -2462,6 +2698,7 @@ pub fn commit_tone_curve_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "Tone curve edit persisted on commit.".to_string(),
     }))
@@ -2508,6 +2745,7 @@ pub fn commit_hsl_color_mixer_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "HSL color mixer edit persisted on commit.".to_string(),
     }))
@@ -2550,6 +2788,7 @@ pub fn commit_color_presence_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "Color presence edit persisted on commit.".to_string(),
     }))
@@ -2585,6 +2824,7 @@ pub fn commit_p0_basic_reset(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "P0 Basic reset persisted on commit.".to_string(),
     }))
@@ -2621,6 +2861,7 @@ pub fn commit_basic_preset_edit(
         tone_curve: tone_curve_state_from_graph(&persisted),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&persisted),
         detail: detail_state_from_graph(&persisted),
+        geometry: geometry_state_from_graph(&persisted),
         persisted: true,
         message: "Basic preset persisted on commit.".to_string(),
     }))
@@ -2649,6 +2890,7 @@ pub fn get_photo_edit_state(
             tone_curve: tone_curve_state_from_graph(&graph),
             hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
             detail: detail_state_from_graph(&graph),
+            geometry: geometry_state_from_graph(&graph),
             persisted: true,
             message: "Restored committed edit state.".to_string(),
         }));
@@ -2676,6 +2918,7 @@ pub fn get_photo_edit_state(
         tone_curve: tone_curve_state_from_graph(&graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(&graph),
         detail: detail_state_from_graph(&graph),
+        geometry: geometry_state_from_graph(&graph),
         persisted: false,
         message: "Default clean edit state loaded.".to_string(),
     }))
@@ -2741,7 +2984,7 @@ pub fn export_photo_jpeg(
         render_tone_curve_from_graph(&graph),
         render_request.quality,
     );
-    let render_request = silica_render::plan_jpeg_srgb_export_with_detail(
+    let render_request = silica_render::plan_jpeg_srgb_export_with_geometry(
         render_request.source_path,
         render_request.output_path,
         render_request.exposure,
@@ -2752,11 +2995,13 @@ pub fn export_photo_jpeg(
         render_request.tone_curve,
         render_hsl_color_mixer_from_graph(&graph),
         render_detail_from_graph(&graph),
+        render_geometry_from_graph(&graph),
         render_request.quality,
     );
     if !render_request.detail.is_neutral() {
         return Err(CoreError::ExportBlocked(render_request.message));
     }
+    ensure_supported_lens_geometry_export(&graph, &render_request.geometry)?;
 
     let export_result =
         silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
@@ -2770,6 +3015,7 @@ pub fn export_photo_jpeg(
             tone_curve: export_tone_curve_from_render(render_request.tone_curve.clone()),
             hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
             detail: export_detail_from_render(render_request.detail),
+            geometry: export_geometry_from_render(render_request.geometry.clone()),
             quality: render_request.quality,
             color_profile: export_color_profile_to_export(color_profile),
         })?;
@@ -2797,6 +3043,7 @@ pub fn export_photo_jpeg(
         "tone_curve": tone_curve_settings_json(&render_request.tone_curve),
         "hsl_color_mixer": hsl_color_mixer_settings_json(&render_request.hsl_color_mixer),
         "detail": detail_settings_json(&render_request.detail),
+        "geometry": geometry_settings_json(&render_request.geometry),
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
@@ -2921,6 +3168,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         render_request.quality,
     );
     render_request.detail = render_detail_from_graph(&graph);
+    render_request.geometry = render_geometry_from_graph(&graph);
     if !render_request.detail.is_neutral() {
         render_request.message =
             "Detail export unsupported until renderer support exists.".to_string();
@@ -2928,6 +3176,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
     if !render_request.detail.is_neutral() {
         return Err(CoreError::ExportBlocked(render_request.message));
     }
+    ensure_supported_lens_geometry_export(&graph, &render_request.geometry)?;
     let export_result =
         silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
             source_path: PathBuf::from(&render_request.source_path),
@@ -2940,6 +3189,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             tone_curve: export_tone_curve_from_render(render_request.tone_curve.clone()),
             hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
             detail: export_detail_from_render(render_request.detail),
+            geometry: export_geometry_from_render(render_request.geometry.clone()),
             quality: render_request.quality,
             color_profile: silica_export::ExportColorProfile::Srgb,
         })?;
@@ -2969,6 +3219,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
         "tone_curve": tone_curve_settings_json(&render_request.tone_curve),
         "hsl_color_mixer": hsl_color_mixer_settings_json(&render_request.hsl_color_mixer),
         "detail": detail_settings_json(&render_request.detail),
+        "geometry": geometry_settings_json(&render_request.geometry),
         "source_path": source_artifact.source_path.clone(),
         "source_sha256": source_artifact.source_sha256.clone(),
         "raw_source_path": source_artifact.source_path.clone(),
@@ -3088,6 +3339,7 @@ fn preview_detail_edit(
         render_hsl_color_mixer_from_graph(graph),
         render_detail_from_graph(edited),
     );
+    let request = apply_lens_geometry_preview_boundary(request, edited);
     let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
@@ -3111,6 +3363,7 @@ fn preview_detail_edit(
             export_tone_curve_from_render(request.tone_curve.clone()),
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
         )?
     } else {
         None
@@ -3135,8 +3388,112 @@ fn preview_detail_edit(
         tone_curve: tone_curve_state_from_graph(graph),
         hsl_color_mixer: hsl_color_mixer_state_from_graph(graph),
         detail: detail_state_from_graph(edited),
+        geometry: geometry_state_from_graph(edited),
         message,
     }))
+}
+
+fn preview_geometry_edit(
+    library_root_path: &Path,
+    photo_id: &str,
+    graph: &silica_edit::EditGraph,
+    edited: &silica_edit::EditGraph,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let (photo_id, _file_name, render_plan) =
+        match preview_render_plan(library_root_path, photo_id)? {
+            Some(plan) => plan,
+            None => return Ok(None),
+        };
+    let request = silica_render::plan_geometry_preview(
+        render_plan,
+        graph.basic.exposure.as_f64().unwrap_or(0.0),
+        graph.basic.contrast.as_f64().unwrap_or(0.0),
+        render_white_balance_from_graph(graph),
+        render_tone_recovery_from_graph(graph),
+        render_color_presence_from_graph(graph),
+        render_tone_curve_from_graph(graph),
+        render_hsl_color_mixer_from_graph(graph),
+        render_detail_from_graph(graph),
+        render_geometry_from_graph(edited),
+    );
+    let request = apply_lens_geometry_preview_boundary(request, edited);
+    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let mut message = request.message;
+    let status = match preview_status_from_render(request.status) {
+        PhotoPreviewStatus::Ready if !source_is_jpeg => {
+            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+                .to_string();
+            PhotoPreviewStatus::BlockedByDecode
+        }
+        status => status,
+    };
+    let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
+        write_jpeg_develop_preview_bytes(
+            library_root_path,
+            &photo_id,
+            &request.source_path,
+            request.exposure,
+            request.contrast,
+            export_white_balance_from_render(request.white_balance),
+            export_tone_recovery_from_render(request.tone_recovery),
+            export_color_presence_from_render(request.color_presence),
+            export_tone_curve_from_render(request.tone_curve.clone()),
+            export_hsl_color_mixer_from_render(request.hsl_color_mixer),
+            export_detail_from_render(request.detail),
+            export_geometry_from_render(request.geometry),
+        )?
+    } else {
+        None
+    };
+
+    Ok(Some(PhotoEditPreviewSession {
+        photo_id,
+        source_path: request.source_path,
+        develop_preview_bytes,
+        status,
+        exposure: request.exposure,
+        contrast: request.contrast,
+        white_balance: graph.basic.white_balance,
+        temperature: graph.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: graph.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: graph.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: graph.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: graph.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: graph.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: graph.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: graph.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(graph),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(graph),
+        detail: detail_state_from_graph(graph),
+        geometry: geometry_state_from_graph(edited),
+        message,
+    }))
+}
+
+fn photo_edit_commit_from_graph(
+    persisted: &silica_edit::EditGraph,
+    message: impl Into<String>,
+) -> PhotoEditCommit {
+    PhotoEditCommit {
+        photo_id: persisted.source.photo_id.clone(),
+        exposure: persisted.basic.exposure.as_f64().unwrap_or(0.0),
+        contrast: persisted.basic.contrast.as_f64().unwrap_or(0.0),
+        white_balance: persisted.basic.white_balance,
+        temperature: persisted.basic.temperature.as_f64().unwrap_or(5200.0),
+        tint: persisted.basic.tint.as_f64().unwrap_or(0.0),
+        highlights: persisted.basic.highlights.as_f64().unwrap_or(0.0),
+        shadows: persisted.basic.shadows.as_f64().unwrap_or(0.0),
+        whites: persisted.basic.whites.as_f64().unwrap_or(0.0),
+        blacks: persisted.basic.blacks.as_f64().unwrap_or(0.0),
+        vibrance: persisted.basic.vibrance.as_f64().unwrap_or(0.0),
+        saturation: persisted.basic.saturation.as_f64().unwrap_or(0.0),
+        tone_curve: tone_curve_state_from_graph(persisted),
+        hsl_color_mixer: hsl_color_mixer_state_from_graph(persisted),
+        detail: detail_state_from_graph(persisted),
+        geometry: geometry_state_from_graph(persisted),
+        persisted: true,
+        message: message.into(),
+    }
 }
 
 fn ensure_jpeg_loupe_preview_cache(
@@ -3210,6 +3567,7 @@ fn write_jpeg_develop_preview_bytes(
     tone_curve: silica_export::ToneCurveAdjustment,
     hsl_color_mixer: silica_export::HslColorMixerAdjustment,
     detail: silica_export::DetailAdjustment,
+    geometry: silica_export::GeometryAdjustment,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
     if !is_jpeg_path(&source_path) || !source_path.is_file() {
@@ -3235,6 +3593,7 @@ fn write_jpeg_develop_preview_bytes(
             tone_curve,
             hsl_color_mixer,
             detail,
+            geometry,
         }) {
             Ok(result) => result,
             Err(silica_export::ExportError::Image(_)) => return Ok(None),
@@ -4269,6 +4628,116 @@ fn detail_settings_json(detail: &silica_render::DetailRenderAdjustment) -> serde
     })
 }
 
+fn geometry_state_from_graph(graph: &silica_edit::EditGraph) -> PhotoGeometryState {
+    PhotoGeometryState {
+        crop: graph
+            .geometry
+            .crop
+            .as_ref()
+            .map(|crop| PhotoGeometryCropState {
+                x: crop.x.as_f64().unwrap_or(0.0),
+                y: crop.y.as_f64().unwrap_or(0.0),
+                width: crop.width.as_f64().unwrap_or(1.0),
+                height: crop.height.as_f64().unwrap_or(1.0),
+                angle: crop.angle.as_f64().unwrap_or(0.0),
+                aspect: crop.aspect.clone(),
+            }),
+        rotation: graph.geometry.rotation.as_f64().unwrap_or(0.0),
+        flip_horizontal: graph.geometry.flip_horizontal,
+        flip_vertical: graph.geometry.flip_vertical,
+        transform: PhotoGeometryTransformState {
+            vertical: graph.geometry.transform.vertical.as_f64().unwrap_or(0.0),
+            horizontal: graph.geometry.transform.horizontal.as_f64().unwrap_or(0.0),
+            aspect: graph.geometry.transform.aspect.as_f64().unwrap_or(0.0),
+            scale: graph.geometry.transform.scale.as_f64().unwrap_or(100.0),
+            x_offset: graph.geometry.transform.x_offset.as_f64().unwrap_or(0.0),
+            y_offset: graph.geometry.transform.y_offset.as_f64().unwrap_or(0.0),
+        },
+    }
+}
+
+fn render_geometry_from_graph(
+    graph: &silica_edit::EditGraph,
+) -> silica_render::GeometryRenderAdjustment {
+    silica_render::GeometryRenderAdjustment {
+        crop: graph.geometry.crop.as_ref().map(|crop| {
+            silica_render::GeometryCropRenderAdjustment {
+                x: crop.x.as_f64().unwrap_or(0.0),
+                y: crop.y.as_f64().unwrap_or(0.0),
+                width: crop.width.as_f64().unwrap_or(1.0),
+                height: crop.height.as_f64().unwrap_or(1.0),
+                angle: crop.angle.as_f64().unwrap_or(0.0),
+                aspect: crop.aspect.clone(),
+            }
+        }),
+        rotation: graph.geometry.rotation.as_f64().unwrap_or(0.0),
+        flip_horizontal: graph.geometry.flip_horizontal,
+        flip_vertical: graph.geometry.flip_vertical,
+        transform: silica_render::GeometryTransformRenderAdjustment {
+            vertical: graph.geometry.transform.vertical.as_f64().unwrap_or(0.0),
+            horizontal: graph.geometry.transform.horizontal.as_f64().unwrap_or(0.0),
+            aspect: graph.geometry.transform.aspect.as_f64().unwrap_or(0.0),
+            scale: graph.geometry.transform.scale.as_f64().unwrap_or(100.0),
+            x_offset: graph.geometry.transform.x_offset.as_f64().unwrap_or(0.0),
+            y_offset: graph.geometry.transform.y_offset.as_f64().unwrap_or(0.0),
+        },
+    }
+}
+
+fn export_geometry_from_render(
+    geometry: silica_render::GeometryRenderAdjustment,
+) -> silica_export::GeometryAdjustment {
+    silica_export::GeometryAdjustment {
+        crop: geometry
+            .crop
+            .map(|crop| silica_export::GeometryCropAdjustment {
+                x: crop.x,
+                y: crop.y,
+                width: crop.width,
+                height: crop.height,
+                angle: crop.angle,
+                aspect: crop.aspect,
+            }),
+        rotation: geometry.rotation,
+        flip_horizontal: geometry.flip_horizontal,
+        flip_vertical: geometry.flip_vertical,
+        transform: silica_export::GeometryTransformAdjustment {
+            vertical: geometry.transform.vertical,
+            horizontal: geometry.transform.horizontal,
+            aspect: geometry.transform.aspect,
+            scale: geometry.transform.scale,
+            x_offset: geometry.transform.x_offset,
+            y_offset: geometry.transform.y_offset,
+        },
+    }
+}
+
+fn geometry_settings_json(geometry: &silica_render::GeometryRenderAdjustment) -> serde_json::Value {
+    serde_json::json!({
+        "crop": geometry.crop.as_ref().map(|crop| {
+            serde_json::json!({
+                "x": crop.x,
+                "y": crop.y,
+                "width": crop.width,
+                "height": crop.height,
+                "angle": crop.angle,
+                "aspect": crop.aspect,
+            })
+        }),
+        "rotation": geometry.rotation,
+        "flip_horizontal": geometry.flip_horizontal,
+        "flip_vertical": geometry.flip_vertical,
+        "transform": {
+            "vertical": geometry.transform.vertical,
+            "horizontal": geometry.transform.horizontal,
+            "aspect": geometry.transform.aspect,
+            "scale": geometry.transform.scale,
+            "x_offset": geometry.transform.x_offset,
+            "y_offset": geometry.transform.y_offset,
+        },
+    })
+}
+
 fn detail_unsupported_message() -> String {
     "Detail preview/export is unsupported until renderer support exists.".to_string()
 }
@@ -4283,6 +4752,94 @@ fn apply_detail_preview_boundary(
         request.message = detail_unsupported_message();
     }
     request
+}
+
+fn apply_lens_geometry_preview_boundary(
+    mut request: silica_render::ExposureContrastPreviewRequest,
+    graph: &silica_edit::EditGraph,
+) -> silica_render::ExposureContrastPreviewRequest {
+    request.geometry = render_geometry_from_graph(graph);
+    if request.status == silica_render::PreviewRenderStatus::Ready {
+        if let Some(message) = lens_unsupported_message(graph)
+            .or_else(|| geometry_unsupported_message(&request.geometry))
+        {
+            request.status = silica_render::PreviewRenderStatus::Unsupported;
+            request.message = message;
+        }
+    }
+    request
+}
+
+fn lens_unsupported_message(graph: &silica_edit::EditGraph) -> Option<String> {
+    let distortion = graph.lens.distortion.as_f64().unwrap_or(0.0);
+    let vignetting = graph.lens.vignetting.as_f64().unwrap_or(0.0);
+    if graph.lens.profile_correction
+        || graph.lens.profile_id.is_some()
+        || graph.lens.chromatic_aberration
+        || distortion != 0.0
+        || vignetting != 0.0
+    {
+        return Some(
+            "Lens correction preview/export is unsupported until lens-profile support exists."
+                .to_string(),
+        );
+    }
+    None
+}
+
+fn geometry_unsupported_message(
+    geometry: &silica_render::GeometryRenderAdjustment,
+) -> Option<String> {
+    if !geometry.transform.is_neutral() {
+        return Some(
+            "Geometry transform preview/export is unsupported until renderer support exists."
+                .to_string(),
+        );
+    }
+    if let Some(crop) = &geometry.crop {
+        if crop.angle != 0.0 {
+            return Some(
+                "Angled crop preview/export is unsupported until renderer support exists."
+                    .to_string(),
+            );
+        }
+    }
+    if !is_supported_quarter_turn(geometry.rotation) {
+        return Some(
+            "Arbitrary rotation preview/export is unsupported until renderer support exists."
+                .to_string(),
+        );
+    }
+    None
+}
+
+fn ensure_supported_lens_geometry_export(
+    graph: &silica_edit::EditGraph,
+    geometry: &silica_render::GeometryRenderAdjustment,
+) -> Result<(), CoreError> {
+    if let Some(message) = lens_unsupported_message(graph) {
+        return Err(CoreError::ExportBlocked(message));
+    }
+    if let Some(message) = geometry_unsupported_message(geometry) {
+        return Err(CoreError::ExportBlocked(message));
+    }
+    Ok(())
+}
+
+fn ensure_supported_lens_geometry_commit(graph: &silica_edit::EditGraph) -> Result<(), CoreError> {
+    if let Some(message) = lens_unsupported_message(graph) {
+        return Err(CoreError::UnsupportedEdit(message));
+    }
+    if let Some(message) = geometry_unsupported_message(&render_geometry_from_graph(graph)) {
+        return Err(CoreError::UnsupportedEdit(message));
+    }
+    Ok(())
+}
+
+fn is_supported_quarter_turn(rotation: f64) -> bool {
+    [0.0, 90.0, -90.0, 180.0, -180.0]
+        .iter()
+        .any(|supported| (rotation - supported).abs() <= f64::EPSILON)
 }
 
 fn render_color_presence_from_graph(
@@ -6384,6 +6941,185 @@ mod tests {
     }
 
     #[test]
+    fn previews_commits_and_exports_geometry_through_core() {
+        let workspace = unique_library_root("core-geometry");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_geometry_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+        let orientation_before = get_photo_metadata(&created.root_path, &photo_id)
+            .expect("read metadata before")
+            .expect("metadata before")
+            .orientation;
+
+        let preview = preview_geometry_crop_edit(
+            &created.root_path,
+            &photo_id,
+            0.0,
+            0.0,
+            0.5,
+            1.0,
+            0.0,
+            None,
+        )
+        .expect("preview geometry crop")
+        .expect("preview result");
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(
+            preview.geometry.crop.as_ref().map(|crop| crop.width),
+            Some(0.5)
+        );
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load active graph after preview")
+                .is_none(),
+            "geometry preview must not write edit state"
+        );
+
+        let crop_commit =
+            commit_geometry_crop_edit(&created.root_path, &photo_id, 0.0, 0.0, 0.5, 1.0, 0.0, None)
+                .expect("commit geometry crop")
+                .expect("crop commit");
+        assert!(crop_commit.persisted);
+        assert_eq!(
+            crop_commit.geometry.crop.as_ref().map(|crop| crop.height),
+            Some(1.0)
+        );
+
+        let orientation_preview =
+            preview_geometry_orientation_edit(&created.root_path, &photo_id, 90.0, true, false)
+                .expect("preview geometry orientation")
+                .expect("orientation preview");
+        assert_eq!(orientation_preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(orientation_preview.geometry.rotation, 90.0);
+        assert!(orientation_preview.geometry.flip_horizontal);
+
+        let orientation_commit =
+            commit_geometry_orientation_edit(&created.root_path, &photo_id, 90.0, true, false)
+                .expect("commit geometry orientation")
+                .expect("orientation commit");
+        assert_eq!(orientation_commit.geometry.rotation, 90.0);
+        assert!(orientation_commit.geometry.flip_horizontal);
+        assert!(orientation_commit.persisted);
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 2);
+        assert_eq!(history.items[0].label, "Geometry orientation");
+        assert_eq!(history.items[1].label, "Geometry crop");
+
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export geometry photo")
+            .expect("export result");
+        let decoded = image::ImageReader::open(&exported.output_path)
+            .expect("open geometry export")
+            .with_guessed_format()
+            .expect("guess geometry export")
+            .decode()
+            .expect("decode geometry export");
+        assert_eq!(decoded.width(), 3);
+        assert_eq!(decoded.height(), 2);
+        assert_original_hash(&jpeg_file, &original_hash, "geometry preview/export");
+        let orientation_after = get_photo_metadata(&created.root_path, &photo_id)
+            .expect("read metadata after")
+            .expect("metadata after")
+            .orientation;
+        assert_eq!(orientation_after, orientation_before);
+
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest export")
+            .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["geometry"]["crop"]["width"], 0.5);
+        assert_eq!(settings["geometry"]["rotation"], 90.0);
+        assert_eq!(settings["geometry"]["flip_horizontal"], true);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn blocks_unsupported_lens_and_geometry_export_states() {
+        let workspace = unique_library_root("core-unsupported-geometry");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let lens_output_path = export_root.join("lens-export.jpg");
+        let transform_output_path = export_root.join("transform-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_geometry_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let graph =
+            silica_storage::load_active_edit_graph_or_default(&created.root_path, &photo_id)
+                .expect("load default graph")
+                .expect("default graph");
+        let lens_graph =
+            silica_edit::apply_lens_adjustments(&graph, true, false, 0.0, 0.0, "unix:lens")
+                .expect("build unsupported lens graph");
+        silica_storage::commit_edit_graph(&created.root_path, lens_graph)
+            .expect("seed unsupported lens state");
+        let lens_error = export_photo_jpeg_srgb(&created.root_path, &photo_id, &lens_output_path)
+            .expect_err("active lens export unsupported");
+        assert!(matches!(lens_error, CoreError::ExportBlocked(_)));
+        assert!(!lens_output_path.exists());
+
+        let transform_graph = silica_edit::apply_geometry_transform(
+            &graph,
+            0.0,
+            0.0,
+            0.0,
+            125.0,
+            0.0,
+            0.0,
+            "unix:transform",
+        )
+        .expect("build unsupported transform graph");
+        silica_storage::commit_edit_graph(&created.root_path, transform_graph)
+            .expect("seed unsupported transform state");
+        let transform_error =
+            export_photo_jpeg_srgb(&created.root_path, &photo_id, &transform_output_path)
+                .expect_err("active transform export unsupported");
+        assert!(matches!(transform_error, CoreError::ExportBlocked(_)));
+        assert!(!transform_output_path.exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn previews_commits_and_exports_color_presence_through_core() {
         let workspace = unique_library_root("core-color-presence");
         let library_root = workspace.join("SilicaRAW Library");
@@ -7107,6 +7843,19 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn write_geometry_source_jpeg(path: &Path) {
+        let image = image::RgbImage::from_fn(4, 3, |x, y| {
+            image::Rgb([
+                (32 + (x * 40)) as u8,
+                (48 + (y * 50)) as u8,
+                (96 + ((x + y) * 10)) as u8,
+            ])
+        });
+        image
+            .save_with_format(path, image::ImageFormat::Jpeg)
+            .expect("write geometry source jpeg");
     }
 
     fn successful_raw_probe(
