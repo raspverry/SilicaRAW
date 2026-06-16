@@ -94,13 +94,19 @@ Task 19.2 runtime boundary:
 
 - `linear_gradient` and `radial_gradient` masks can be created through graph-owned helpers, previewed on supported JPEG/JPG develop previews, and committed through undoable catalog history.
 - Phase 19.2 supports only local `exposure` and `contrast` mask adjustments; unsupported adjustment keys or ranges must block before preview/commit.
-- JPEG export blocks active masks until Task 19.4 adds export compositing, so export never silently ignores committed mask state.
+- Supported JPEG/JPG catalog export applies committed manual gradient masks instead of silently ignoring them.
 
 Task 19.3 runtime boundary:
 
 - Manual brush masks can be created through graph-owned helpers, previewed on supported JPEG/JPG develop previews, and committed through undoable catalog history.
 - Brush raster alpha planes are regenerated from durable strokes and recorded only as disposable `mask_raster` cache artifacts under `render-cache/masks/`.
 - Clearing disposable cache must not remove durable brush data.
+
+Task 19.4 runtime boundary:
+
+- Supported JPEG/JPG catalog export applies committed manual linear, radial, and brush masks with the same CPU compositing semantics used by Develop preview.
+- Export records store mask evidence (`id`, kind, enabled/invert/opacity/feather, geometry metadata, and local exposure/contrast) but not brush alpha bytes.
+- RAW-derived export blocks active committed manual masks before output or raw-export artifacts are written.
 
 ## Links
 

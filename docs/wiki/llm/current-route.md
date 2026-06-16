@@ -16,7 +16,7 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 18 is complete. The current product area is **Phase 19: Manual Masks**.
 
-Tasks 19.1 through 19.3 are complete. The current next task is [Task 19.4 Mask Compositing in Preview and Export](../tasks/19.4-mask-compositing-preview-export.md).
+Tasks 19.1 through 19.4 are complete. The current next task is [Task 19.5 Mask Editor Visual QA](../tasks/19.5-mask-editor-visual-qa.md).
 
 ## Minimal Read Set
 

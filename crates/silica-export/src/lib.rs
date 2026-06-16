@@ -44,6 +44,7 @@ pub struct JpegSrgbExportRequest {
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
     pub geometry: GeometryAdjustment,
+    pub masks: Vec<ManualMaskAdjustment>,
     pub quality: u8,
 }
 
@@ -61,6 +62,7 @@ pub struct JpegColorExportRequest {
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
     pub geometry: GeometryAdjustment,
+    pub masks: Vec<ManualMaskAdjustment>,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
 }
@@ -623,6 +625,7 @@ pub fn export_jpeg_srgb(
         hsl_color_mixer: request.hsl_color_mixer,
         detail: request.detail,
         geometry: request.geometry,
+        masks: request.masks,
         quality: request.quality,
         color_profile: ExportColorProfile::Srgb,
     })
@@ -655,6 +658,7 @@ pub fn export_jpeg_with_color_profile(
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
     validate_detail_adjustment(request.detail)?;
     validate_geometry_adjustment(&request.geometry)?;
+    validate_manual_mask_adjustments(&request.masks)?;
 
     let source_sha256 = sha256_file(&request.source_path)?;
     let icc_profile = export_icc_profile(request.color_profile)?;
@@ -668,6 +672,7 @@ pub fn export_jpeg_with_color_profile(
     apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
     apply_hsl_color_mixer(&mut rgb, request.hsl_color_mixer);
+    apply_manual_masks(&mut rgb, &request.masks);
     let rgb = apply_supported_geometry(rgb, &request.geometry)?;
 
     let mut output = File::create(&request.output_path)?;
@@ -1839,6 +1844,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
         })
         .expect("export jpeg srgb");
@@ -1906,6 +1912,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
             color_profile: super::ExportColorProfile::DisplayP3,
         })
@@ -1972,6 +1979,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
         })
         .expect_err("same source/output path should fail");
@@ -2149,6 +2157,75 @@ mod tests {
     }
 
     #[test]
+    fn exports_masked_jpeg_srgb_without_mutating_original() {
+        let root = unique_export_root("masked-export");
+        let source_path = root.join("source.jpg");
+        let neutral_path = root.join("export").join("neutral.jpg");
+        let masked_path = root.join("export").join("masked.jpg");
+        std::fs::create_dir_all(neutral_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let mask = super::ManualMaskAdjustment {
+            id: "mask-linear-1".to_string(),
+            enabled: true,
+            invert: false,
+            opacity: 100.0,
+            feather: 0.0,
+            geometry: super::ManualMaskGeometry::LinearGradient {
+                start_x: 0.0,
+                start_y: 0.0,
+                end_x: 1.0,
+                end_y: 1.0,
+            },
+            exposure: 1.0,
+            contrast: 0.0,
+        };
+
+        let neutral = super::export_jpeg_srgb(super::JpegSrgbExportRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+            quality: 95,
+        })
+        .expect("export neutral jpeg");
+        let masked = super::export_jpeg_srgb(super::JpegSrgbExportRequest {
+            source_path: source_path.clone(),
+            output_path: masked_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: vec![mask],
+            quality: 95,
+        })
+        .expect("export masked jpeg");
+
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        assert_ne!(neutral.output_sha256, masked.output_sha256);
+        assert_eq!(masked.color_profile, super::ExportColorProfile::Srgb);
+
+        remove_export_root(&root);
+    }
+
+    #[test]
     fn writes_brush_masked_jpeg_preview_from_alpha_plane_without_mutating_original() {
         let root = unique_export_root("brush-masked-develop-preview");
         let source_path = root.join("source.jpg");
@@ -2287,6 +2364,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("export white balance jpeg");
 
@@ -2359,6 +2437,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry,
+            masks: Vec::new(),
             quality: 95,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2407,6 +2486,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry,
+            masks: Vec::new(),
             quality: 95,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2486,6 +2566,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2575,6 +2656,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2657,6 +2739,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2743,6 +2826,7 @@ mod tests {
             hsl_color_mixer,
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })
@@ -2811,6 +2895,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail,
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
             quality: 90,
             color_profile: super::ExportColorProfile::Srgb,
         })

@@ -3511,7 +3511,7 @@ pub fn export_photo_jpeg(
             Some(graph) => graph,
             None => return Ok(None),
         };
-    ensure_no_active_manual_masks_for_export(&graph)?;
+    let render_masks = render_manual_masks_from_graph(&graph)?;
     let exposure = graph.basic.exposure.as_f64().unwrap_or(0.0);
     let contrast = graph.basic.contrast.as_f64().unwrap_or(0.0);
     let render_request = silica_render::plan_jpeg_srgb_export_with_color_presence(
@@ -3553,6 +3553,8 @@ pub fn export_photo_jpeg(
         return Err(CoreError::ExportBlocked(render_request.message));
     }
     ensure_supported_lens_geometry_export(&graph, &render_request.geometry)?;
+    record_brush_mask_raster_caches(library_root_path, &photo_id, &render_masks)?;
+    let export_masks = export_manual_masks_from_render(&render_masks);
 
     let export_result =
         silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
@@ -3567,6 +3569,7 @@ pub fn export_photo_jpeg(
             hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
             detail: export_detail_from_render(render_request.detail),
             geometry: export_geometry_from_render(render_request.geometry.clone()),
+            masks: export_masks,
             quality: render_request.quality,
             color_profile: export_color_profile_to_export(color_profile),
         })?;
@@ -3595,6 +3598,7 @@ pub fn export_photo_jpeg(
         "hsl_color_mixer": hsl_color_mixer_settings_json(&render_request.hsl_color_mixer),
         "detail": detail_settings_json(&render_request.detail),
         "geometry": geometry_settings_json(&render_request.geometry),
+        "masks": manual_mask_settings_json(&render_masks),
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
@@ -3742,6 +3746,7 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
             hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
             detail: export_detail_from_render(render_request.detail),
             geometry: export_geometry_from_render(render_request.geometry.clone()),
+            masks: Vec::new(),
             quality: render_request.quality,
             color_profile: silica_export::ExportColorProfile::Srgb,
         })?;
@@ -5456,6 +5461,78 @@ fn geometry_settings_json(geometry: &silica_render::GeometryRenderAdjustment) ->
     })
 }
 
+fn manual_mask_settings_json(
+    masks: &[silica_render::ManualMaskRenderAdjustment],
+) -> serde_json::Value {
+    serde_json::Value::Array(masks.iter().map(manual_mask_setting_json).collect())
+}
+
+fn manual_mask_setting_json(mask: &silica_render::ManualMaskRenderAdjustment) -> serde_json::Value {
+    serde_json::json!({
+        "id": mask.id,
+        "kind": manual_mask_render_kind(&mask.geometry),
+        "enabled": mask.enabled,
+        "invert": mask.invert,
+        "opacity": mask.opacity,
+        "feather": mask.feather,
+        "geometry": manual_mask_geometry_settings_json(&mask.geometry),
+        "exposure": mask.exposure,
+        "contrast": mask.contrast,
+    })
+}
+
+fn manual_mask_render_kind(geometry: &silica_render::ManualMaskRenderGeometry) -> &'static str {
+    match geometry {
+        silica_render::ManualMaskRenderGeometry::LinearGradient { .. } => "linear_gradient",
+        silica_render::ManualMaskRenderGeometry::RadialGradient { .. } => "radial_gradient",
+        silica_render::ManualMaskRenderGeometry::BrushRaster { .. } => "brush",
+    }
+}
+
+fn manual_mask_geometry_settings_json(
+    geometry: &silica_render::ManualMaskRenderGeometry,
+) -> serde_json::Value {
+    match geometry {
+        silica_render::ManualMaskRenderGeometry::LinearGradient {
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+        } => serde_json::json!({
+            "kind": "linear_gradient",
+            "start_x": start_x,
+            "start_y": start_y,
+            "end_x": end_x,
+            "end_y": end_y,
+        }),
+        silica_render::ManualMaskRenderGeometry::RadialGradient {
+            center_x,
+            center_y,
+            radius_x,
+            radius_y,
+            rotation,
+        } => serde_json::json!({
+            "kind": "radial_gradient",
+            "center_x": center_x,
+            "center_y": center_y,
+            "radius_x": radius_x,
+            "radius_y": radius_y,
+            "rotation": rotation,
+        }),
+        silica_render::ManualMaskRenderGeometry::BrushRaster {
+            width,
+            height,
+            cache_key,
+            ..
+        } => serde_json::json!({
+            "kind": "brush_raster",
+            "width": width,
+            "height": height,
+            "cache_key": cache_key,
+        }),
+    }
+}
+
 fn detail_unsupported_message() -> String {
     "Detail preview/export is unsupported until renderer support exists.".to_string()
 }
@@ -5792,7 +5869,7 @@ fn ensure_no_active_manual_masks_for_export(
 }
 
 fn masked_export_blocked_message() -> String {
-    "Manual mask export is unsupported until Task 19.4.".to_string()
+    "Manual mask export is unsupported for RAW-derived export in the local alpha.".to_string()
 }
 
 fn manual_mask_unsupported_message(message: impl AsRef<str>) -> CoreError {
@@ -8270,23 +8347,43 @@ mod tests {
         assert_eq!(restored.masks[0].kind, "brush");
         assert!(restored.masks[0].geometry.is_none());
 
-        let export_error = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
-            .expect_err("brush masked export blocked before Phase 19.4");
-        assert!(matches!(export_error, CoreError::ExportBlocked(_)));
-        assert!(!output_path.exists());
-        assert_original_hash(&jpeg_file, &original_hash, "brush mask commit/export block");
+        let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect("export brush masked photo")
+            .expect("export result");
+        assert!(exported.bytes_written > 0);
+        assert!(output_path.exists());
+        let export_cache = silica_storage::get_photo_cache_record(
+            &created.root_path,
+            &photo_id,
+            silica_storage::MASK_RASTER_CACHE_TYPE,
+        )
+        .expect("read mask raster cache after export")
+        .expect("mask raster cache row after export");
+        assert!(Path::new(&export_cache.path).is_file());
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest brush masked export")
+            .expect("latest brush masked export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["masks"][0]["kind"], "brush");
+        assert_eq!(settings["masks"][0]["geometry"]["kind"], "brush_raster");
+        assert!(settings["masks"][0]["geometry"]["cache_key"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty()));
+        assert_original_hash(&jpeg_file, &original_hash, "brush mask export");
 
         remove_library_root(&workspace);
     }
 
     #[test]
-    fn blocks_masked_jpeg_export_until_renderer_export_support() {
-        let workspace = unique_library_root("core-manual-mask-export-block");
+    fn exports_committed_manual_mask_and_records_mask_evidence() {
+        let workspace = unique_library_root("core-manual-mask-export");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
         let export_root = workspace.join("Exports");
         let jpeg_file = import_root.join("sample.jpg");
-        let output_path = export_root.join("sample-export.jpg");
+        let neutral_output_path = export_root.join("sample-neutral.jpg");
+        let masked_output_path = export_root.join("sample-masked.jpg");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
         std::fs::create_dir_all(&export_root).expect("create export directory");
@@ -8305,35 +8402,56 @@ mod tests {
             .expect("photo id");
         drop(connection);
 
-        commit_manual_radial_gradient_mask(
+        let neutral_export =
+            export_photo_jpeg_srgb(&created.root_path, &photo_id, &neutral_output_path)
+                .expect("export neutral photo")
+                .expect("neutral export result");
+        assert!(neutral_output_path.exists());
+        assert_original_hash(&jpeg_file, &original_hash, "neutral export before mask");
+
+        commit_manual_linear_gradient_mask(
             &created.root_path,
             &photo_id,
-            "mask-radial-1",
-            "Face lift",
-            80.0,
-            20.0,
-            false,
-            0.5,
-            0.5,
-            0.35,
-            0.35,
+            "mask-linear-1",
+            "Diagonal lift",
+            100.0,
             0.0,
-            Some(0.35),
-            Some(6.0),
+            false,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            Some(1.0),
+            Some(0.0),
         )
-        .expect("commit radial mask")
+        .expect("commit linear mask")
         .expect("commit result");
 
-        let export_error = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
-            .expect_err("masked export blocked before Phase 19.4");
-        assert!(matches!(export_error, CoreError::ExportBlocked(_)));
-        assert!(!output_path.exists());
-        assert!(
-            silica_storage::get_latest_export_record(&created.root_path, &photo_id)
-                .expect("read latest export")
-                .is_none()
-        );
-        assert_original_hash(&jpeg_file, &original_hash, "blocked masked export");
+        let masked_preview =
+            preview_exposure_contrast_edit(&created.root_path, &photo_id, 0.0, 0.0)
+                .expect("preview committed mask")
+                .expect("masked preview result");
+        assert_eq!(masked_preview.status, PhotoPreviewStatus::Ready);
+        assert!(masked_preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        let masked_export =
+            export_photo_jpeg_srgb(&created.root_path, &photo_id, &masked_output_path)
+                .expect("export masked photo")
+                .expect("masked export result");
+        assert!(masked_output_path.exists());
+        assert_ne!(neutral_export.output_sha256, masked_export.output_sha256);
+        let latest = silica_storage::get_latest_export_record(&created.root_path, &photo_id)
+            .expect("read latest masked export")
+            .expect("latest masked export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["masks"][0]["kind"], "linear_gradient");
+        assert_eq!(settings["masks"][0]["geometry"]["kind"], "linear_gradient");
+        assert_eq!(settings["masks"][0]["geometry"]["start_x"], 0.0);
+        assert_eq!(settings["masks"][0]["exposure"], 1.0);
+        assert_original_hash(&jpeg_file, &original_hash, "masked export");
 
         remove_library_root(&workspace);
     }
@@ -9359,6 +9477,72 @@ mod tests {
             )
         ));
         assert_original_hash(&raw_file, &file_hash(&raw_file), "RAW overwrite rejection");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn raw_derived_jpeg_srgb_export_blocks_committed_manual_masks_before_output() {
+        let workspace = unique_library_root("core-raw-export-mask-block");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let raw_file = import_root.join("sample.cr2");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        std::fs::write(&raw_file, b"raw placeholder").expect("write raw placeholder");
+        let original_hash = file_hash(&raw_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.cr2'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        commit_manual_linear_gradient_mask(
+            &created.root_path,
+            &photo_id,
+            "mask-linear-1",
+            "Diagonal lift",
+            100.0,
+            0.0,
+            false,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            Some(1.0),
+            Some(0.0),
+        )
+        .expect("commit RAW manual mask")
+        .expect("commit result");
+        let probe = successful_raw_probe(&raw_file.display().to_string(), Some(5184), Some(3456));
+
+        let error = export_raw_photo_jpeg_srgb_from_probe(
+            &created.root_path,
+            &photo_id,
+            "A",
+            &probe,
+            &output_path,
+        )
+        .expect_err("RAW-derived masked export should block before output");
+
+        assert!(matches!(error, CoreError::ExportBlocked(_)));
+        assert!(error.to_string().contains("RAW-derived export"));
+        assert!(!output_path.exists());
+        assert!(!created
+            .root_path
+            .join("render-cache")
+            .join("raw-export-sources")
+            .exists());
+        assert_original_hash(&raw_file, &original_hash, "blocked RAW mask export");
 
         remove_library_root(&workspace);
     }
