@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-16] phase-19 | Mask compositing preview/export completed
+
+- Completed Task 19.4 with supported JPEG/JPG export compositing for committed manual linear, radial, and brush masks.
+- Added export mask evidence without storing brush alpha bytes in export settings.
+- Kept RAW-derived masked export blocked before output/artifact writes.
+- Routed Phase 19 to Task 19.5 for mask editor visual QA.
+
 ## [2026-06-16] phase-19 | Brush mask storage and rasterization completed
 
 - Completed Task 19.3 with schema-owned durable manual brush strokes in `masks[].brush`.

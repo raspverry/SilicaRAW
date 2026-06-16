@@ -804,6 +804,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Masked edits are recorded in history.
   - Unsupported export combinations are blocked.
 - **Validation:** Render/export fixture tests.
+- **Status:** Completed on 2026-06-16. Supported JPEG/JPG catalog export now applies committed manual linear, radial, and brush masks through the same CPU mask compositing semantics used by Develop preview; export records include mask evidence without brush alpha payloads, and RAW-derived masked export blocks before output/artifact writes.
 
 ### Task 19.5: Mask Editor Visual QA
 
