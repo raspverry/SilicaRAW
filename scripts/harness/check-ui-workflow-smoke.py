@@ -325,6 +325,51 @@ WORKFLOW_STEPS = [
         ],
     },
     {
+        "name": "develop-mask-active",
+        "ids": [
+            "developMaskPanel",
+            "developMaskSelectedPhoto",
+            "developMaskSupportStatus",
+            "developMaskBoundaryStatus",
+            "developMaskRawBoundaryStatus",
+            "developMaskToolManual",
+            "developMaskToolAI",
+            "developMaskToolMLX",
+            "developMaskAddMask",
+            "developMaskList",
+            "developMaskBrushRow",
+            "developMaskLinearRow",
+            "developMaskRadialRow",
+            "developMaskSubjectUnavailable",
+            "developMaskSkyUnavailable",
+            "developMaskActiveState",
+            "developMaskActiveGeometry",
+            "developMaskOverlayToggle",
+            "developMaskOverlayColor",
+            "developMaskExposureSlider",
+            "developMaskExposureValue",
+            "developMaskContrastSlider",
+            "developMaskContrastValue",
+            "developMaskOpacitySlider",
+            "developMaskOpacityValue",
+            "developMaskFeatherSlider",
+            "developMaskFeatherValue",
+        ],
+        "commands": [],
+        "text": [
+            "Mask",
+            "Manual",
+            "Manual masks read from committed edit state",
+            "Selected photo",
+            "Local Adjustments",
+            "AI unavailable",
+            "MLX unavailable",
+            "Subject Mask",
+            "Sky Mask",
+            "RAW masked export blocks before output until RAW decode is implemented.",
+        ],
+    },
+    {
         "name": "copy-paste-batch-sync",
         "ids": [
             "developClipboardPanel",
@@ -618,6 +663,30 @@ def main():
         "Next redo",
     ]:
         require(marker in source, f"develop history marker missing: {marker}", failures)
+    for marker in [
+        "normalizeManualMasks",
+        "renderMaskControlState",
+        "activeMaskId",
+        "masks: response.data.masks",
+        "Manual masks read from committed edit state",
+        "AI unavailable",
+        "MLX unavailable",
+    ]:
+        require(marker in source, f"manual mask UI marker missing: {marker}", failures)
+    for control_id in [
+        "developMaskToolAI",
+        "developMaskToolMLX",
+        "developMaskAddMask",
+        "developMaskSubjectUnavailable",
+        "developMaskSkyUnavailable",
+        "developMaskExposureSlider",
+        "developMaskContrastSlider",
+    ]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"manual mask UI must keep #{control_id} disabled in Task 19.5",
+            failures,
+        )
     for marker in [
         "setDevelopBeforeAfterMode",
         "data-before-after-mode",

@@ -149,6 +149,43 @@ struct DesktopGeometryState {
     transform: DesktopGeometryTransformState,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    tag = "kind",
+    rename_all_fields = "camelCase"
+)]
+enum DesktopManualMaskGeometryState {
+    LinearGradient {
+        start_x: f64,
+        start_y: f64,
+        end_x: f64,
+        end_y: f64,
+    },
+    RadialGradient {
+        center_x: f64,
+        center_y: f64,
+        radius_x: f64,
+        radius_y: f64,
+        rotation: f64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopManualMaskState {
+    id: String,
+    kind: String,
+    name: String,
+    enabled: bool,
+    invert: bool,
+    opacity: f64,
+    feather: f64,
+    geometry: Option<DesktopManualMaskGeometryState>,
+    exposure: f64,
+    contrast: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopToneCurvePoint {
@@ -290,6 +327,7 @@ enum DesktopCommandData {
         hsl_color_mixer: DesktopHslColorMixerState,
         detail: DesktopDetailState,
         geometry: DesktopGeometryState,
+        masks: Vec<DesktopManualMaskState>,
         develop_preview_bytes: Option<Vec<u8>>,
         message: String,
     },
@@ -310,6 +348,7 @@ enum DesktopCommandData {
         hsl_color_mixer: DesktopHslColorMixerState,
         detail: DesktopDetailState,
         geometry: DesktopGeometryState,
+        masks: Vec<DesktopManualMaskState>,
         persisted: bool,
         message: String,
     },
@@ -330,6 +369,7 @@ enum DesktopCommandData {
         hsl_color_mixer: DesktopHslColorMixerState,
         detail: DesktopDetailState,
         geometry: DesktopGeometryState,
+        masks: Vec<DesktopManualMaskState>,
         persisted: bool,
         message: String,
     },
@@ -1318,6 +1358,7 @@ fn preview_exposure_contrast_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1387,6 +1428,7 @@ fn preview_white_balance_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1444,6 +1486,7 @@ fn preview_tone_recovery_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1497,6 +1540,7 @@ fn preview_color_presence_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1559,6 +1603,7 @@ fn preview_tone_curve_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1631,6 +1676,7 @@ fn preview_hsl_color_mixer_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1688,6 +1734,7 @@ fn preview_detail_sharpening_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1748,6 +1795,7 @@ fn preview_detail_noise_reduction_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1810,6 +1858,7 @@ fn preview_geometry_crop_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1853,6 +1902,7 @@ fn preview_clear_geometry_crop(library_path: String, photo_id: String) -> Deskto
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1908,6 +1958,7 @@ fn preview_geometry_orientation_edit(
                 hsl_color_mixer: hsl_color_mixer_data(preview.hsl_color_mixer),
                 detail: detail_data(preview.detail),
                 geometry: geometry_data(preview.geometry),
+                masks: manual_mask_data(preview.masks),
                 develop_preview_bytes: preview.develop_preview_bytes,
                 message: preview.message,
             },
@@ -1959,6 +2010,7 @@ fn commit_exposure_contrast_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2026,6 +2078,7 @@ fn commit_white_balance_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2081,6 +2134,7 @@ fn commit_tone_recovery_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2132,6 +2186,7 @@ fn commit_color_presence_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2192,6 +2247,7 @@ fn commit_tone_curve_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2262,6 +2318,7 @@ fn commit_hsl_color_mixer_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2317,6 +2374,7 @@ fn commit_detail_sharpening_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2375,6 +2433,7 @@ fn commit_detail_noise_reduction_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2435,6 +2494,7 @@ fn commit_geometry_crop_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2476,6 +2536,7 @@ fn commit_clear_geometry_crop(library_path: String, photo_id: String) -> Desktop
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2529,6 +2590,7 @@ fn commit_geometry_orientation_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2570,6 +2632,7 @@ fn commit_p0_basic_reset(library_path: String, photo_id: String) -> DesktopComma
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2629,6 +2692,7 @@ fn commit_basic_preset_edit(
                 hsl_color_mixer: hsl_color_mixer_data(commit.hsl_color_mixer),
                 detail: detail_data(commit.detail),
                 geometry: geometry_data(commit.geometry),
+                masks: manual_mask_data(commit.masks),
                 persisted: commit.persisted,
                 message: commit.message,
             },
@@ -2670,6 +2734,7 @@ fn get_photo_edit_state(library_path: String, photo_id: String) -> DesktopComman
                 hsl_color_mixer: hsl_color_mixer_data(state.hsl_color_mixer),
                 detail: detail_data(state.detail),
                 geometry: geometry_data(state.geometry),
+                masks: manual_mask_data(state.masks),
                 persisted: state.persisted,
                 message: state.message,
             },
@@ -3079,6 +3144,55 @@ fn geometry_data(geometry: silica_core::PhotoGeometryState) -> DesktopGeometrySt
             y_offset: geometry.transform.y_offset,
         },
     }
+}
+
+fn manual_mask_geometry_data(
+    geometry: Option<silica_core::PhotoManualMaskGeometryState>,
+) -> Option<DesktopManualMaskGeometryState> {
+    geometry.map(|geometry| match geometry {
+        silica_core::PhotoManualMaskGeometryState::LinearGradient {
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+        } => DesktopManualMaskGeometryState::LinearGradient {
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+        },
+        silica_core::PhotoManualMaskGeometryState::RadialGradient {
+            center_x,
+            center_y,
+            radius_x,
+            radius_y,
+            rotation,
+        } => DesktopManualMaskGeometryState::RadialGradient {
+            center_x,
+            center_y,
+            radius_x,
+            radius_y,
+            rotation,
+        },
+    })
+}
+
+fn manual_mask_data(masks: Vec<silica_core::PhotoManualMaskState>) -> Vec<DesktopManualMaskState> {
+    masks
+        .into_iter()
+        .map(|mask| DesktopManualMaskState {
+            id: mask.id,
+            kind: mask.kind,
+            name: mask.name,
+            enabled: mask.enabled,
+            invert: mask.invert,
+            opacity: mask.opacity,
+            feather: mask.feather,
+            geometry: manual_mask_geometry_data(mask.geometry),
+            exposure: mask.exposure,
+            contrast: mask.contrast,
+        })
+        .collect()
 }
 
 fn parse_hsl_color_channel(
@@ -4756,6 +4870,59 @@ mod tests {
                 assert_eq!(*exposure, 0.5);
                 assert_eq!(*contrast, -8.0);
                 assert!(*persisted);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_edit_state_returns_manual_mask_readback() {
+        let workspace = unique_library_root("desktop-mask-readback");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        silica_core::commit_manual_linear_gradient_mask(
+            &library_root,
+            &photo_id,
+            "mask-linear-1",
+            "Linear Gradient 1",
+            82.0,
+            24.0,
+            false,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            Some(0.75),
+            Some(-12.0),
+        )
+        .expect("commit manual mask")
+        .expect("manual mask commit result");
+
+        let restored =
+            super::get_photo_edit_state(library_root.display().to_string(), photo_id.clone());
+        assert!(restored.ok);
+        match response_data(&restored) {
+            super::DesktopCommandData::EditState { masks, .. } => {
+                assert_eq!(masks.len(), 1);
+                assert_eq!(masks[0].kind, "linear_gradient");
+                assert_eq!(masks[0].name, "Linear Gradient 1");
+                assert_eq!(masks[0].exposure, 0.75);
+                assert_eq!(masks[0].contrast, -12.0);
+                assert!(matches!(
+                    &masks[0].geometry,
+                    Some(super::DesktopManualMaskGeometryState::LinearGradient { .. })
+                ));
             }
             other => panic!("unexpected response data: {other:?}"),
         }

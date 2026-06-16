@@ -816,6 +816,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Compact and large Develop mockups remain coherent.
   - No control overlap or hidden active state.
 - **Validation:** Visual QA.
+- **Status:** Completed on 2026-06-16. Added a compact Develop Mask panel for committed manual mask readback, active selected-photo scope, geometry and local exposure/contrast readback, disabled AI/MLX/Subject/Sky paths, desktop response mask summaries, and M006 static/workflow/final visual QA coverage.
 
 ## Phase 20: Export and Delivery Expansion
 

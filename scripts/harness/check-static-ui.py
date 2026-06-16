@@ -180,6 +180,42 @@ def main():
         "developContrastSlider",
         "developContrastValue",
         "developContrastReset",
+        "developMaskPanel",
+        "developMaskSelectedPhoto",
+        "developMaskSupportStatus",
+        "developMaskBoundaryStatus",
+        "developMaskRawBoundaryStatus",
+        "developMaskToolManual",
+        "developMaskToolAI",
+        "developMaskToolMLX",
+        "developMaskAddMask",
+        "developMaskList",
+        "developMaskBrushRow",
+        "developMaskBrushName",
+        "developMaskBrushSummary",
+        "developMaskBrushState",
+        "developMaskLinearRow",
+        "developMaskLinearName",
+        "developMaskLinearSummary",
+        "developMaskLinearState",
+        "developMaskRadialRow",
+        "developMaskRadialName",
+        "developMaskRadialSummary",
+        "developMaskRadialState",
+        "developMaskSubjectUnavailable",
+        "developMaskSkyUnavailable",
+        "developMaskActiveState",
+        "developMaskActiveGeometry",
+        "developMaskOverlayToggle",
+        "developMaskOverlayColor",
+        "developMaskExposureSlider",
+        "developMaskExposureValue",
+        "developMaskContrastSlider",
+        "developMaskContrastValue",
+        "developMaskOpacitySlider",
+        "developMaskOpacityValue",
+        "developMaskFeatherSlider",
+        "developMaskFeatherValue",
         "developToneCurvePanel",
         "developToneCurveMidpointSlider",
         "developToneCurveMidpointValue",
@@ -367,6 +403,8 @@ def main():
             ".sr-develop-workbench",
             ".sr-adjustment-slider",
             ".sr-tone-curve-panel",
+            ".sr-mask-panel",
+            ".sr-mask-row",
             ".sr-detail-panel",
             ".sr-geometry-panel",
             ".sr-edit-clipboard-panel",
@@ -404,6 +442,47 @@ def main():
     require(contrast_slider.get("min") == "-100", "#developContrastSlider min must match edit graph contrast", failures)
     require(contrast_slider.get("max") == "100", "#developContrastSlider max must match edit graph contrast", failures)
     require(contrast_slider.get("step") == "1", "#developContrastSlider step must support integer contrast edits", failures)
+
+    mask_panel = parser.ids.get("developMaskPanel", {})
+    require(
+        mask_panel.get("data-mask-state") == "empty",
+        "#developMaskPanel must default to an honest empty mask state",
+        failures,
+    )
+    for control_id in [
+        "developMaskToolManual",
+        "developMaskToolAI",
+        "developMaskToolMLX",
+        "developMaskAddMask",
+        "developMaskSubjectUnavailable",
+        "developMaskSkyUnavailable",
+    ]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must stay disabled until desktop mask creation support exists",
+            failures,
+        )
+    for control_id, (minimum, maximum, step) in {
+        "developMaskExposureSlider": ("-5", "5", "0.05"),
+        "developMaskContrastSlider": ("-100", "100", "1"),
+        "developMaskOpacitySlider": ("0", "100", "1"),
+        "developMaskFeatherSlider": ("0", "100", "1"),
+    }.items():
+        attrs = parser.ids.get(control_id, {})
+        require(attrs.get("type") == "range", f"#{control_id} must be a range input", failures)
+        require("disabled" in attrs, f"#{control_id} must be readback-only in Task 19.5", failures)
+        require(attrs.get("min") == minimum, f"#{control_id} min must match mask bounds", failures)
+        require(attrs.get("max") == maximum, f"#{control_id} max must match mask bounds", failures)
+        require(attrs.get("step") == step, f"#{control_id} step must match mask precision", failures)
+    for marker in [
+        "Manual",
+        "AI unavailable",
+        "MLX unavailable",
+        "Subject Mask",
+        "Sky Mask",
+        "RAW masked export blocks before output until RAW decode is implemented.",
+    ]:
+        require(marker in source, f"Mask editor marker missing: {marker}", failures)
 
     tone_curve_slider = parser.ids.get("developToneCurveMidpointSlider", {})
     require(tone_curve_slider.get("type") == "range", "#developToneCurveMidpointSlider must be a range input", failures)

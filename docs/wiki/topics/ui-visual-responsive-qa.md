@@ -2,7 +2,7 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-13
+updated: 2026-06-16
 source_of_truth: docs/wiki/topics/ui-mvp-baseline.md
 ---
 
@@ -88,6 +88,12 @@ Visual QA now seeds a supported crop/flip state and verifies geometry readiness,
 Task 18.5.3 adds a Develop Copy & Sync panel with explicit selected-page scope, subset checkboxes, and separate Copy, Paste to Primary, and Batch Sync actions. Copy, paste, and batch sync are gated to JPEG/JPG Develop photos; Detail and Lens clipboard subsets remain disabled because their runtime behavior is not supported by the current alpha.
 
 Visual QA now seeds an edit clipboard state and verifies source readback, selected-photo count, Basic/Tone/Geometry subset choice, disabled unsupported subsets, enabled paste/sync actions, and plan rows across `1280x800`, `1440x900`, and `1728x965`.
+
+## Phase 19 Mask Editor Note
+
+Task 19.5 adds a compact Develop Mask panel for committed manual mask readback. The panel shows selected-photo scope, manual brush/linear/radial rows, the active mask geometry summary, and local exposure/contrast readback while keeping Add Mask, Subject/Sky, AI, and MLX paths unavailable.
+
+Visual QA now adds `M006-mask-active` and verifies active manual mask state, selected-photo scope, disabled unsupported mask controls, readback-only local adjustment values, RAW mask blocked boundary copy, and no horizontal overflow, toolbar overlap, or clipped controls across `1280x800`, `1440x900`, and `1728x965`.
 
 ## Final Phase 5.6.12 Refresh
 

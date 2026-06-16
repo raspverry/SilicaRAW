@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-16] phase-19 | Mask editor visual QA completed
+
+- Completed Task 19.5 with a compact Develop Mask panel for committed manual mask readback.
+- Kept Add Mask, Subject/Sky, AI, and MLX paths disabled/unavailable in the local alpha UI.
+- Added M006 mask-active static, workflow, and final visual QA coverage.
+- Marked Phase 19 complete and routed the current LLM path to Task 20.1 Export Settings Model and Presets.
+
 ## [2026-06-16] phase-19 | Mask compositing preview/export completed
 
 - Completed Task 19.4 with supported JPEG/JPG export compositing for committed manual linear, radial, and brush masks.
