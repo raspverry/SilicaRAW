@@ -2,7 +2,7 @@
 title: Task Cards
 status: active
 audience: agents
-updated: 2026-06-13
+updated: 2026-06-16
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 

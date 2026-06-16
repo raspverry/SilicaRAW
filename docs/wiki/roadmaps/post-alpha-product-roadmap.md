@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-06-16
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -767,6 +767,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No hidden mask format is invented.
   - Any schema expansion is explicit and versioned if breaking.
   - Manual masks and future AI masks have separate provenance.
+- **Status:** Completed on 2026-06-16. Added explicit `masks[].geometry` for manual linear/radial masks, kept manual `source.kind = "manual"` provenance-only, reserved brush durable storage for Task 19.3, and added `silica-edit` validation/round-trip coverage without preview, export, UI, storage cache, MLX, MCP, or plugin behavior.
 - **Validation:** `cargo test -p silica-edit`
 
 ### Task 19.2: Linear and Radial Manual Masks

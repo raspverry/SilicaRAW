@@ -2,7 +2,7 @@
 title: Post-Alpha Master Execution Plan
 status: active
 audience: all
-updated: 2026-06-13
+updated: 2026-06-16
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 18 is complete. Phase 19 task cards exist. Current next task is [Task 19.1 Mask Schema and Edit Graph Audit](../tasks/19.1-mask-schema-edit-graph-audit.md).
+- Phase 18 is complete. Phase 19 task cards exist. Task 19.1 is complete. Current next task is [Task 19.2 Linear and Radial Manual Masks](../tasks/19.2-linear-radial-manual-masks.md).
 
 ## Wave Map
 
@@ -387,7 +387,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Start [Task 19.1 Mask Schema and Edit Graph Audit](../tasks/19.1-mask-schema-edit-graph-audit.md).
+1. Start [Task 19.2 Linear and Radial Manual Masks](../tasks/19.2-linear-radial-manual-masks.md).
 2. Continue Phase 19 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links
