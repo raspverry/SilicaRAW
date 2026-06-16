@@ -351,8 +351,8 @@ impl GeometryAdjustment {
     }
 }
 
-/// Manual gradient mask geometry applied to disposable preview output.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Manual mask geometry applied to disposable preview output.
+#[derive(Debug, Clone, PartialEq)]
 pub enum ManualMaskGeometry {
     LinearGradient {
         start_x: f64,
@@ -366,6 +366,11 @@ pub enum ManualMaskGeometry {
         radius_x: f64,
         radius_y: f64,
         rotation: f64,
+    },
+    RasterAlphaPlane {
+        width: u32,
+        height: u32,
+        alpha: Vec<u8>,
     },
 }
 
@@ -490,6 +495,7 @@ pub enum ExportError {
     NonFiniteAdjustment,
     InvalidToneCurveAdjustment(String),
     InvalidHslColorMixerAdjustment(String),
+    InvalidManualMaskAdjustment(String),
     UnsupportedDetailAdjustment(String),
     UnsupportedGeometryAdjustment(String),
     SameSourceAndOutput(PathBuf),
@@ -529,6 +535,9 @@ impl fmt::Display for ExportError {
             }
             Self::InvalidHslColorMixerAdjustment(message) => {
                 write!(formatter, "invalid HSL color mixer adjustment: {message}")
+            }
+            Self::InvalidManualMaskAdjustment(message) => {
+                write!(formatter, "invalid manual mask adjustment: {message}")
             }
             Self::UnsupportedDetailAdjustment(message) => {
                 write!(formatter, "unsupported detail adjustment: {message}")
@@ -576,6 +585,7 @@ impl Error for ExportError {
             | Self::NonFiniteAdjustment
             | Self::InvalidToneCurveAdjustment(_)
             | Self::InvalidHslColorMixerAdjustment(_)
+            | Self::InvalidManualMaskAdjustment(_)
             | Self::UnsupportedDetailAdjustment(_)
             | Self::UnsupportedGeometryAdjustment(_)
             | Self::SameSourceAndOutput(_)
@@ -794,6 +804,7 @@ pub fn write_jpeg_develop_preview(
     validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
     validate_detail_adjustment(request.detail)?;
     validate_geometry_adjustment(&request.geometry)?;
+    validate_manual_mask_adjustments(&request.masks)?;
 
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -1046,17 +1057,17 @@ fn apply_manual_masks(image: &mut image::RgbImage, masks: &[ManualMaskAdjustment
 }
 
 fn mask_weight(mask: &ManualMaskAdjustment, x: f32, y: f32) -> f32 {
-    match mask.geometry {
+    match &mask.geometry {
         ManualMaskGeometry::LinearGradient {
             start_x,
             start_y,
             end_x,
             end_y,
         } => {
-            let start_x = start_x as f32;
-            let start_y = start_y as f32;
-            let vector_x = end_x as f32 - start_x;
-            let vector_y = end_y as f32 - start_y;
+            let start_x = *start_x as f32;
+            let start_y = *start_y as f32;
+            let vector_x = *end_x as f32 - start_x;
+            let vector_y = *end_y as f32 - start_y;
             let length_squared = (vector_x * vector_x + vector_y * vector_y).max(f32::EPSILON);
             let projection = ((x - start_x) * vector_x + (y - start_y) * vector_y) / length_squared;
             smooth_mask_edge(projection.clamp(0.0, 1.0), mask.feather)
@@ -1068,15 +1079,29 @@ fn mask_weight(mask: &ManualMaskAdjustment, x: f32, y: f32) -> f32 {
             radius_y,
             rotation,
         } => {
-            let angle = -(rotation as f32).to_radians();
+            let angle = -(*rotation as f32).to_radians();
             let cos = angle.cos();
             let sin = angle.sin();
-            let dx = x - center_x as f32;
-            let dy = y - center_y as f32;
-            let rotated_x = (dx * cos - dy * sin) / (radius_x as f32).max(f32::EPSILON);
-            let rotated_y = (dx * sin + dy * cos) / (radius_y as f32).max(f32::EPSILON);
+            let dx = x - *center_x as f32;
+            let dy = y - *center_y as f32;
+            let rotated_x = (dx * cos - dy * sin) / (*radius_x as f32).max(f32::EPSILON);
+            let rotated_y = (dx * sin + dy * cos) / (*radius_y as f32).max(f32::EPSILON);
             let distance = (rotated_x * rotated_x + rotated_y * rotated_y).sqrt();
             smooth_mask_edge((1.0 - distance).clamp(0.0, 1.0), mask.feather)
+        }
+        ManualMaskGeometry::RasterAlphaPlane {
+            width,
+            height,
+            alpha,
+        } => {
+            let sample_x = (x * width.saturating_sub(1) as f32)
+                .round()
+                .clamp(0.0, width.saturating_sub(1) as f32) as usize;
+            let sample_y = (y * height.saturating_sub(1) as f32)
+                .round()
+                .clamp(0.0, height.saturating_sub(1) as f32) as usize;
+            let index = sample_y * (*width as usize) + sample_x;
+            f32::from(alpha[index]) / 255.0
         }
     }
 }
@@ -1457,6 +1482,117 @@ fn validate_geometry_adjustment(geometry: &GeometryAdjustment) -> Result<(), Exp
         normalized_crop_bounds(crop, 1, 1)?;
     }
     normalized_quarter_turn(geometry.rotation)?;
+    Ok(())
+}
+
+fn validate_manual_mask_adjustments(masks: &[ManualMaskAdjustment]) -> Result<(), ExportError> {
+    for mask in masks {
+        if mask.id.trim().is_empty() {
+            return Err(ExportError::InvalidManualMaskAdjustment(
+                "id must not be empty".to_string(),
+            ));
+        }
+        if !mask.opacity.is_finite() || !(0.0..=100.0).contains(&mask.opacity) {
+            return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                "{} opacity must be finite and between 0 and 100",
+                mask.id
+            )));
+        }
+        if !mask.feather.is_finite() || !(0.0..=100.0).contains(&mask.feather) {
+            return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                "{} feather must be finite and between 0 and 100",
+                mask.id
+            )));
+        }
+        if !mask.exposure.is_finite() || !mask.contrast.is_finite() {
+            return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                "{} local adjustments must be finite",
+                mask.id
+            )));
+        }
+        validate_manual_mask_geometry(mask)?;
+    }
+    Ok(())
+}
+
+fn validate_manual_mask_geometry(mask: &ManualMaskAdjustment) -> Result<(), ExportError> {
+    match &mask.geometry {
+        ManualMaskGeometry::LinearGradient {
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+        } => {
+            for (path, value) in [
+                ("start_x", start_x),
+                ("start_y", start_y),
+                ("end_x", end_x),
+                ("end_y", end_y),
+            ] {
+                if !value.is_finite() || !(0.0..=1.0).contains(value) {
+                    return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                        "{} geometry.{path} must be finite and between 0 and 1",
+                        mask.id
+                    )));
+                }
+            }
+            if start_x == end_x && start_y == end_y {
+                return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                    "{} linear gradient endpoints must differ",
+                    mask.id
+                )));
+            }
+        }
+        ManualMaskGeometry::RadialGradient {
+            center_x,
+            center_y,
+            radius_x,
+            radius_y,
+            rotation,
+        } => {
+            for (path, value) in [("center_x", center_x), ("center_y", center_y)] {
+                if !value.is_finite() || !(0.0..=1.0).contains(value) {
+                    return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                        "{} geometry.{path} must be finite and between 0 and 1",
+                        mask.id
+                    )));
+                }
+            }
+            for (path, value) in [("radius_x", radius_x), ("radius_y", radius_y)] {
+                if !value.is_finite() || *value <= 0.0 || *value > 1.0 {
+                    return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                        "{} geometry.{path} must be finite and in the range (0, 1]",
+                        mask.id
+                    )));
+                }
+            }
+            if !rotation.is_finite() || !(-180.0..=180.0).contains(rotation) {
+                return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                    "{} geometry.rotation must be finite and between -180 and 180",
+                    mask.id
+                )));
+            }
+        }
+        ManualMaskGeometry::RasterAlphaPlane {
+            width,
+            height,
+            alpha,
+        } => {
+            if *width == 0 || *height == 0 {
+                return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                    "{} raster alpha plane dimensions must be greater than zero",
+                    mask.id
+                )));
+            }
+            let expected_len = (*width as usize) * (*height as usize);
+            if alpha.len() != expected_len {
+                return Err(ExportError::InvalidManualMaskAdjustment(format!(
+                    "{} raster alpha plane length must equal width * height",
+                    mask.id
+                )));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1999,6 +2135,78 @@ mod tests {
             masks: vec![mask],
         })
         .expect("write masked preview");
+
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(masked.output_path).expect("read masked preview")
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_brush_masked_jpeg_preview_from_alpha_plane_without_mutating_original() {
+        let root = unique_export_root("brush-masked-develop-preview");
+        let source_path = root.join("source.jpg");
+        let neutral_path = root.join("previews").join("source-neutral.jpg");
+        let masked_path = root.join("previews").join("source-brush-masked.jpg");
+        std::fs::create_dir_all(neutral_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let mask = super::ManualMaskAdjustment {
+            id: "mask-brush-1".to_string(),
+            enabled: true,
+            invert: false,
+            opacity: 100.0,
+            feather: 0.0,
+            geometry: super::ManualMaskGeometry::RasterAlphaPlane {
+                width: 2,
+                height: 2,
+                alpha: vec![255, 0, 0, 0],
+            },
+            exposure: 1.0,
+            contrast: 0.0,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_path,
+            max_edge: 2,
+            quality: 95,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+        })
+        .expect("write neutral preview");
+        let masked = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: masked_path,
+            max_edge: 2,
+            quality: 95,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: vec![mask],
+        })
+        .expect("write brush masked preview");
 
         assert_eq!(
             std::fs::read(&source_path).expect("read original after"),

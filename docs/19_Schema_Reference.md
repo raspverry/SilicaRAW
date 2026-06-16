@@ -229,12 +229,14 @@ Phase 5.2 status: `crates/silica-edit` implements typed edit graph structures an
 
 Phase 19.1 status: `schemas/edit_graph.schema.json` now makes the previously loose manual gradient mask shape explicit before any runtime mask writes exist. This is a pre-runtime additive schema completion for v0.1, not a storage migration.
 
+Phase 19.3 status: `schemas/edit_graph.schema.json` now defines durable manual brush strokes in `masks[].brush`. This is an additive v0.1 schema completion. Brush raster bytes remain disposable cache artifacts and are not a durable representation.
+
 Manual mask rules:
 
 ```txt
 linear_gradient -> requires masks[].geometry.kind = "linear_gradient"
 radial_gradient -> requires masks[].geometry.kind = "radial_gradient"
-brush -> enum reserved until Task 19.3 defines durable brush storage
+brush -> requires masks[].brush.coordinate_space = "normalized_image" and sampled strokes
 source.kind = "manual" -> provenance only
 ```
 

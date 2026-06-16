@@ -27,8 +27,8 @@ Phase 19 is manual-first. AI masks remain deferred until mask provenance, action
 | --- | --- | --- |
 | 19.1 | Mask Schema and Edit Graph Audit | Complete: manual gradient geometry and provenance boundaries are schema-owned before behavior is added |
 | 19.2 | Linear and Radial Manual Masks | Complete: manual gradient masks persist in the edit graph, preview on supported JPEG/JPG paths, and block export until compositing is implemented |
-| 19.3 | Brush Mask Storage and Rasterization | Active: brush data remains non-destructive and durable data stays separate from disposable raster/cache artifacts |
-| 19.4 | Mask Compositing in Preview and Export | Pending: committed masks apply consistently in preview and export or block honestly |
+| 19.3 | Brush Mask Storage and Rasterization | Complete: brush data is durable in `masks[].brush`; raster artifacts are disposable `render-cache/masks/` cache files |
+| 19.4 | Mask Compositing in Preview and Export | Active: committed masks apply consistently in preview and export or block honestly |
 | 19.5 | Mask Editor Visual QA | Pending: mask editor UI matches design system and visual QA covers the active mask screen |
 
 ## Non-Goals
@@ -44,6 +44,7 @@ Phase 19 is manual-first. AI masks remain deferred until mask provenance, action
 - Manual mask data must validate against `schemas/edit_graph.schema.json`.
 - Manual mask provenance must remain distinct from future AI/MLX provenance.
 - Manual gradient geometry must live in `masks[].geometry`, not `mask.source`.
+- Manual brush strokes must live in `masks[].brush`, not `mask.source` or disposable cache files.
 - Manual `mask.source` must remain provenance-only `{ "kind": "manual" }`.
 - Durable edit graph mask data and disposable mask/render caches must remain separate.
 - Draft mask preview must not write durable catalog state, sidecars, exports, action-log rows, or originals.

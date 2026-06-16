@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-16] phase-19 | Brush mask storage and rasterization completed
+
+- Completed Task 19.3 with schema-owned durable manual brush strokes in `masks[].brush`.
+- Added disposable brush raster cache artifacts under `render-cache/masks/` with `mask_raster` cache records.
+- Added core brush preview/commit APIs while keeping final masked export blocked until Task 19.4.
+- Routed Phase 19 to Task 19.4 for preview/export compositing parity.
+
 ## [2026-06-16] phase-19 | Linear and radial manual masks completed
 
 - Completed Task 19.2 with graph-owned manual linear/radial mask helpers and undoable core commit APIs.

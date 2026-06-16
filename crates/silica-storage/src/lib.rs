@@ -129,6 +129,8 @@ pub const THUMBNAIL_CACHE_TYPE: &str = "thumbnail";
 pub const PREVIEW_CACHE_TYPE: &str = "preview";
 /// Cache record type used for disposable Develop histogram data.
 pub const HISTOGRAM_CACHE_TYPE: &str = "histogram";
+/// Cache record type used for disposable manual brush alpha rasters.
+pub const MASK_RASTER_CACHE_TYPE: &str = "mask_raster";
 
 /// Stable action payload schema marker for undo/history records.
 pub const ACTION_SCHEMA: &str = "silica.action";
@@ -1403,6 +1405,27 @@ pub fn record_histogram_cache(
     )
 }
 
+/// Record disposable manual brush alpha raster cache data for a catalog photo.
+pub fn record_mask_raster_cache(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    cache_key: impl AsRef<str>,
+    path: impl AsRef<Path>,
+    byte_size: i64,
+) -> Result<CacheRecord, LibraryStorageError> {
+    let cache_key = cache_key.as_ref();
+    let cache_id_namespace = format!("cache-mask-raster-{cache_key}");
+    record_photo_cache(
+        library_root_path,
+        &cache_id_namespace,
+        photo_id,
+        MASK_RASTER_CACHE_TYPE,
+        cache_key,
+        path,
+        byte_size,
+    )
+}
+
 /// Read a disposable cache record for one catalog photo and cache type.
 pub fn get_photo_cache_record(
     library_root_path: impl AsRef<Path>,
@@ -1532,6 +1555,7 @@ fn validate_cache_path(
         THUMBNAIL_CACHE_TYPE => Some("thumbnails"),
         PREVIEW_CACHE_TYPE => Some("previews"),
         HISTOGRAM_CACHE_TYPE => Some("render-cache"),
+        MASK_RASTER_CACHE_TYPE => Some("render-cache/masks"),
         _ => None,
     };
     let Some(expected_directory) = expected_directory else {
@@ -7407,6 +7431,102 @@ mod tests {
             LibraryStorageError::CacheValidation(message)
                 if message.contains("render-cache")
         ));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn records_mask_raster_cache_under_render_cache_masks_only() {
+        let workspace = unique_library_root("mask-raster-cache");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let mask_dir = library.root_path.join("render-cache").join("masks");
+        std::fs::create_dir_all(&mask_dir).expect("create mask cache directory");
+        let mask_path = mask_dir.join("mask-brush-1.mask8");
+        std::fs::write(&mask_path, [0_u8, 255, 0, 255]).expect("write mask raster");
+
+        let record = record_mask_raster_cache(
+            &library.root_path,
+            &photo_id,
+            "brush-mask-v1-test",
+            &mask_path,
+            4,
+        )
+        .expect("record mask raster cache");
+        assert_eq!(record.cache_type, MASK_RASTER_CACHE_TYPE);
+
+        let cached = get_photo_cache_record(&library.root_path, &photo_id, MASK_RASTER_CACHE_TYPE)
+            .expect("read mask cache")
+            .expect("mask cache row");
+        assert_eq!(cached.path, mask_path.display().to_string());
+
+        let outside_masks = library
+            .root_path
+            .join("render-cache")
+            .join("mask-brush-1.mask8");
+        std::fs::write(&outside_masks, [255_u8]).expect("write outside masks directory");
+        let error = record_mask_raster_cache(
+            &library.root_path,
+            &photo_id,
+            "brush-mask-v1-test",
+            &outside_masks,
+            1,
+        )
+        .expect_err("mask raster cache outside render-cache/masks/ must be rejected");
+        assert!(matches!(
+            error,
+            LibraryStorageError::CacheValidation(message)
+                if message.contains("render-cache/masks")
+        ));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn clear_disposable_cache_removes_mask_raster_records_and_artifacts() {
+        let workspace = unique_library_root("mask-raster-clear");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let mask_dir = library.root_path.join("render-cache").join("masks");
+        std::fs::create_dir_all(&mask_dir).expect("create mask cache directory");
+        let mask_path = mask_dir.join("mask-brush-1.mask8");
+        std::fs::write(&mask_path, [0_u8, 255, 0, 255]).expect("write mask raster");
+        record_mask_raster_cache(
+            &library.root_path,
+            &photo_id,
+            "brush-mask-v1-test",
+            &mask_path,
+            4,
+        )
+        .expect("record mask raster cache");
+
+        let summary = clear_disposable_cache(&library.root_path).expect("clear cache");
+
+        assert_eq!(summary.removed_cache_records, 1);
+        assert!(!mask_path.exists());
+        assert!(
+            get_photo_cache_record(&library.root_path, &photo_id, MASK_RASTER_CACHE_TYPE)
+                .expect("read mask cache after clear")
+                .is_none()
+        );
 
         remove_library_root(&workspace);
     }

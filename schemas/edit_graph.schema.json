@@ -779,6 +779,69 @@
         }
       ]
     },
+    "mask_brush": {
+      "type": "object",
+      "required": [
+        "coordinate_space",
+        "strokes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "coordinate_space": {
+          "const": "normalized_image"
+        },
+        "strokes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "radius",
+              "points"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "radius": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              "points": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 512,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "mask": {
       "type": "object",
       "required": [
@@ -873,6 +936,9 @@
         "geometry": {
           "$ref": "#/$defs/mask_geometry"
         },
+        "brush": {
+          "$ref": "#/$defs/mask_brush"
+        },
         "local_adjustments": {
           "type": "object",
           "additionalProperties": {
@@ -907,6 +973,44 @@
                   "kind"
                 ]
               }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "brush"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "brush"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "not": {
+                  "const": "brush"
+                }
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "brush"
+              ]
             }
           }
         },
