@@ -132,8 +132,8 @@ pub struct JpegSrgbExportRenderRequest {
     pub message: String,
 }
 
-/// Manual gradient mask geometry carried by preview render requests.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Manual mask geometry carried by preview render requests.
+#[derive(Debug, Clone, PartialEq)]
 pub enum ManualMaskRenderGeometry {
     LinearGradient {
         start_x: f64,
@@ -147,6 +147,12 @@ pub enum ManualMaskRenderGeometry {
         radius_x: f64,
         radius_y: f64,
         rotation: f64,
+    },
+    BrushRaster {
+        width: u32,
+        height: u32,
+        alpha: Vec<u8>,
+        cache_key: String,
     },
 }
 
@@ -162,6 +168,53 @@ pub struct ManualMaskRenderAdjustment {
     pub exposure: f64,
     pub contrast: f64,
 }
+
+/// Normalized brush point used by the pure CPU reference rasterizer.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BrushMaskRasterPoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Normalized brush stroke used by the pure CPU reference rasterizer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BrushMaskRasterStroke {
+    pub id: String,
+    pub radius: f64,
+    pub points: Vec<BrushMaskRasterPoint>,
+}
+
+/// Disposable alpha plane generated from durable brush strokes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrushMaskRaster {
+    pub width: u32,
+    pub height: u32,
+    pub alpha: Vec<u8>,
+    pub cache_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrushMaskRasterError {
+    path: String,
+    message: String,
+}
+
+impl BrushMaskRasterError {
+    fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for BrushMaskRasterError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}: {}", self.path, self.message)
+    }
+}
+
+impl std::error::Error for BrushMaskRasterError {}
 
 /// White balance mode carried through render planning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1289,6 +1342,139 @@ pub fn compute_rgb_histogram(rgb_bytes: &[u8]) -> Result<RgbHistogram, Histogram
     Ok(histogram)
 }
 
+/// Rasterize durable normalized brush strokes into a disposable 8-bit alpha plane.
+pub fn rasterize_brush_mask(
+    mask_id: &str,
+    strokes: &[BrushMaskRasterStroke],
+    width: u32,
+    height: u32,
+) -> Result<BrushMaskRaster, BrushMaskRasterError> {
+    if mask_id.trim().is_empty() {
+        return Err(BrushMaskRasterError::new("mask_id", "must not be empty"));
+    }
+    if width == 0 {
+        return Err(BrushMaskRasterError::new(
+            "width",
+            "must be greater than zero",
+        ));
+    }
+    if height == 0 {
+        return Err(BrushMaskRasterError::new(
+            "height",
+            "must be greater than zero",
+        ));
+    }
+
+    for (stroke_index, stroke) in strokes.iter().enumerate() {
+        validate_brush_raster_stroke(stroke_index, stroke)?;
+    }
+
+    let mut alpha = vec![0_u8; (width as usize) * (height as usize)];
+    let radius_scale = f64::from(width.min(height).max(1));
+    let x_scale = f64::from(width.saturating_sub(1));
+    let y_scale = f64::from(height.saturating_sub(1));
+
+    for stroke in strokes {
+        let radius_pixels = stroke.radius * radius_scale;
+        for point in &stroke.points {
+            let center_x = point.x * x_scale;
+            let center_y = point.y * y_scale;
+            let min_x = (center_x - radius_pixels).floor().max(0.0) as u32;
+            let max_x = (center_x + radius_pixels)
+                .ceil()
+                .min(f64::from(width.saturating_sub(1))) as u32;
+            let min_y = (center_y - radius_pixels).floor().max(0.0) as u32;
+            let max_y = (center_y + radius_pixels)
+                .ceil()
+                .min(f64::from(height.saturating_sub(1))) as u32;
+            for y in min_y..=max_y {
+                for x in min_x..=max_x {
+                    let dx = f64::from(x) - center_x;
+                    let dy = f64::from(y) - center_y;
+                    if (dx * dx + dy * dy).sqrt() <= radius_pixels {
+                        let index = (y as usize) * (width as usize) + (x as usize);
+                        alpha[index] = 255;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(BrushMaskRaster {
+        width,
+        height,
+        alpha,
+        cache_key: brush_raster_cache_key(mask_id, strokes, width, height),
+    })
+}
+
+fn validate_brush_raster_stroke(
+    stroke_index: usize,
+    stroke: &BrushMaskRasterStroke,
+) -> Result<(), BrushMaskRasterError> {
+    let prefix = format!("strokes.{stroke_index}");
+    if stroke.id.trim().is_empty() {
+        return Err(BrushMaskRasterError::new(
+            format!("{prefix}.id"),
+            "must not be empty",
+        ));
+    }
+    if !stroke.radius.is_finite() || stroke.radius <= 0.0 || stroke.radius > 1.0 {
+        return Err(BrushMaskRasterError::new(
+            format!("{prefix}.radius"),
+            "must be finite and in the range (0, 1]",
+        ));
+    }
+    if stroke.points.is_empty() {
+        return Err(BrushMaskRasterError::new(
+            format!("{prefix}.points"),
+            "must contain at least one point",
+        ));
+    }
+    for (point_index, point) in stroke.points.iter().enumerate() {
+        validate_brush_raster_coordinate(&format!("{prefix}.points.{point_index}.x"), point.x)?;
+        validate_brush_raster_coordinate(&format!("{prefix}.points.{point_index}.y"), point.y)?;
+    }
+    Ok(())
+}
+
+fn validate_brush_raster_coordinate(path: &str, value: f64) -> Result<(), BrushMaskRasterError> {
+    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+        return Err(BrushMaskRasterError::new(
+            path,
+            "must be finite and in the range [0, 1]",
+        ));
+    }
+    Ok(())
+}
+
+fn brush_raster_cache_key(
+    mask_id: &str,
+    strokes: &[BrushMaskRasterStroke],
+    width: u32,
+    height: u32,
+) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    fn write_hash(hash: &mut u64, value: &str) {
+        for byte in value.as_bytes() {
+            *hash ^= u64::from(*byte);
+            *hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+
+    write_hash(&mut hash, "brush-mask-v1");
+    write_hash(&mut hash, mask_id);
+    write_hash(&mut hash, &format!("{width}x{height}"));
+    for stroke in strokes {
+        write_hash(&mut hash, &stroke.id);
+        write_hash(&mut hash, &format!("{:.6}", stroke.radius));
+        for point in &stroke.points {
+            write_hash(&mut hash, &format!("{:.6},{:.6}", point.x, point.y));
+        }
+    }
+    format!("brush-mask-v1-{hash:016x}")
+}
+
 /// Build a render request for a draft exposure/contrast preview update.
 pub fn plan_exposure_contrast_preview(
     preview_plan: PreviewRenderPlan,
@@ -2366,6 +2552,61 @@ mod tests {
         assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
         assert_eq!(preview.masks, vec![mask]);
         assert!(preview.message.contains("Manual mask"));
+    }
+
+    #[test]
+    fn rasterizes_manual_brush_mask_to_deterministic_alpha_plane() {
+        let stroke = super::BrushMaskRasterStroke {
+            id: "stroke-1".to_string(),
+            radius: 0.20,
+            points: vec![super::BrushMaskRasterPoint { x: 0.5, y: 0.5 }],
+        };
+
+        let raster =
+            super::rasterize_brush_mask("mask-brush-1", std::slice::from_ref(&stroke), 5, 5)
+                .expect("rasterize brush");
+        let repeated = super::rasterize_brush_mask("mask-brush-1", &[stroke], 5, 5)
+            .expect("repeat rasterize brush");
+
+        assert_eq!(raster.width, 5);
+        assert_eq!(raster.height, 5);
+        assert_eq!(
+            raster.alpha,
+            vec![
+                0, 0, 0, 0, 0, //
+                0, 0, 255, 0, 0, //
+                0, 255, 255, 255, 0, //
+                0, 0, 255, 0, 0, //
+                0, 0, 0, 0, 0,
+            ]
+        );
+        assert!(raster.cache_key.starts_with("brush-mask-v1-"));
+        assert_eq!(raster.cache_key, repeated.cache_key);
+    }
+
+    #[test]
+    fn rejects_invalid_manual_brush_raster_inputs() {
+        let missing_size =
+            super::rasterize_brush_mask("mask-brush-1", &[], 0, 5).expect_err("zero width");
+        assert!(missing_size.to_string().contains("width"));
+
+        let bad_radius = super::BrushMaskRasterStroke {
+            id: "stroke-1".to_string(),
+            radius: 0.0,
+            points: vec![super::BrushMaskRasterPoint { x: 0.5, y: 0.5 }],
+        };
+        let radius_error = super::rasterize_brush_mask("mask-brush-1", &[bad_radius], 5, 5)
+            .expect_err("zero radius");
+        assert!(radius_error.to_string().contains("radius"));
+
+        let bad_point = super::BrushMaskRasterStroke {
+            id: "stroke-1".to_string(),
+            radius: 0.2,
+            points: vec![super::BrushMaskRasterPoint { x: 1.5, y: 0.5 }],
+        };
+        let point_error = super::rasterize_brush_mask("mask-brush-1", &[bad_point], 5, 5)
+            .expect_err("invalid point");
+        assert!(point_error.to_string().contains("points.0.x"));
     }
 
     #[test]

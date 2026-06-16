@@ -211,6 +211,7 @@ const LOCAL_ALPHA_THUMBNAIL_MAX_EDGE: u32 = 320;
 const LOCAL_ALPHA_LOUPE_PREVIEW_QUALITY: u8 = 88;
 const LOCAL_ALPHA_LOUPE_PREVIEW_MAX_EDGE: u32 = 2048;
 const LOCAL_ALPHA_DEVELOP_PREVIEW_QUALITY: u8 = 86;
+const LOCAL_ALPHA_BRUSH_MASK_RASTER_EDGE: u32 = 512;
 
 /// App-level desktop session schema identifier.
 pub const APP_SESSION_SCHEMA: &str = "silica.desktop_session";
@@ -594,9 +595,24 @@ pub struct PhotoManualMaskState {
     pub invert: bool,
     pub opacity: f64,
     pub feather: f64,
-    pub geometry: PhotoManualMaskGeometryState,
+    pub geometry: Option<PhotoManualMaskGeometryState>,
     pub exposure: f64,
     pub contrast: f64,
+}
+
+/// Core input point for a sampled manual brush stroke.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhotoManualBrushPointInput {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Core input stroke for a sampled manual brush mask.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoManualBrushStrokeInput {
+    pub id: String,
+    pub radius: f64,
+    pub points: Vec<PhotoManualBrushPointInput>,
 }
 
 /// Draft preview request returned while an exposure/contrast slider is moving.
@@ -2013,7 +2029,7 @@ pub fn preview_exposure_contrast_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -2110,7 +2126,7 @@ pub fn preview_white_balance_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -2207,7 +2223,7 @@ pub fn preview_tone_recovery_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -2304,7 +2320,7 @@ pub fn preview_tone_curve_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -2400,7 +2416,7 @@ pub fn preview_hsl_color_mixer_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -2492,7 +2508,7 @@ pub fn preview_color_presence_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -2735,6 +2751,40 @@ pub fn preview_manual_radial_gradient_mask(
     preview_manual_mask_edit(library_root_path, photo_id, &edited)
 }
 
+/// Build a draft manual brush mask preview without writing durable edit state.
+#[allow(clippy::too_many_arguments)]
+pub fn preview_manual_brush_mask(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    id: &str,
+    name: &str,
+    opacity: f64,
+    feather: f64,
+    invert: bool,
+    strokes: Vec<PhotoManualBrushStrokeInput>,
+    exposure: Option<f64>,
+    contrast: Option<f64>,
+) -> Result<Option<PhotoEditPreviewSession>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let mask = silica_edit::manual_brush_mask(
+        id,
+        name,
+        opacity,
+        feather,
+        invert,
+        edit_brush_strokes(strokes)?,
+        manual_mask_adjustments(exposure, contrast),
+    )?;
+    let edited = silica_edit::append_manual_mask(&graph, mask, current_timestamp_string())?;
+
+    preview_manual_mask_edit(library_root_path, photo_id, &edited)
+}
+
 /// Persist a manual linear-gradient mask on commit/release.
 #[allow(clippy::too_many_arguments)]
 pub fn commit_manual_linear_gradient_mask(
@@ -2824,6 +2874,45 @@ pub fn commit_manual_radial_gradient_mask(
     Ok(Some(photo_edit_commit_from_graph(
         &persisted,
         "Manual radial gradient mask persisted on commit.",
+    )))
+}
+
+/// Persist a manual brush mask on commit/release.
+#[allow(clippy::too_many_arguments)]
+pub fn commit_manual_brush_mask(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    id: &str,
+    name: &str,
+    opacity: f64,
+    feather: f64,
+    invert: bool,
+    strokes: Vec<PhotoManualBrushStrokeInput>,
+    exposure: Option<f64>,
+    contrast: Option<f64>,
+) -> Result<Option<PhotoEditCommit>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let mask = silica_edit::manual_brush_mask(
+        id,
+        name,
+        opacity,
+        feather,
+        invert,
+        edit_brush_strokes(strokes)?,
+        manual_mask_adjustments(exposure, contrast),
+    )?;
+    let edited = silica_edit::append_manual_mask(&graph, mask, current_timestamp_string())?;
+    ensure_supported_manual_masks_commit(&edited)?;
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+
+    Ok(Some(photo_edit_commit_from_graph(
+        &persisted,
+        "Manual brush mask persisted on commit.",
     )))
 }
 
@@ -3787,6 +3876,23 @@ fn manual_mask_adjustments(
     silica_edit::ManualMaskLocalAdjustments { exposure, contrast }
 }
 
+fn edit_brush_strokes(
+    strokes: Vec<PhotoManualBrushStrokeInput>,
+) -> Result<Vec<silica_edit::MaskBrushStroke>, CoreError> {
+    strokes
+        .into_iter()
+        .map(|stroke| {
+            let points = stroke
+                .points
+                .into_iter()
+                .map(|point| (point.x, point.y))
+                .collect::<Vec<_>>();
+            silica_edit::manual_brush_stroke(stroke.id, stroke.radius, points)
+                .map_err(CoreError::from)
+        })
+        .collect()
+}
+
 fn preview_manual_mask_edit(
     library_root_path: &Path,
     photo_id: &str,
@@ -3822,7 +3928,6 @@ fn preview_manual_mask_edit(
         }
         status => status,
     };
-    let export_masks = export_manual_masks_from_render(&request.masks);
     let develop_preview_bytes = if status == PhotoPreviewStatus::Ready {
         write_jpeg_develop_preview_bytes(
             library_root_path,
@@ -3837,7 +3942,7 @@ fn preview_manual_mask_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry.clone()),
-            export_masks,
+            request.masks.clone(),
         )?
     } else {
         None
@@ -3916,7 +4021,7 @@ fn preview_detail_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -3995,7 +4100,7 @@ fn preview_geometry_edit(
             export_hsl_color_mixer_from_render(request.hsl_color_mixer),
             export_detail_from_render(request.detail),
             export_geometry_from_render(request.geometry),
-            export_manual_masks_from_render(&request.masks),
+            request.masks.clone(),
         )?
     } else {
         None
@@ -4112,6 +4217,57 @@ fn ensure_jpeg_loupe_preview_cache(
         .map_err(CoreError::from)
 }
 
+fn record_brush_mask_raster_caches(
+    library_root_path: &Path,
+    photo_id: &str,
+    masks: &[silica_render::ManualMaskRenderAdjustment],
+) -> Result<(), CoreError> {
+    let mask_root = library_root_path.join("render-cache").join("masks");
+    for mask in masks {
+        let silica_render::ManualMaskRenderGeometry::BrushRaster {
+            alpha, cache_key, ..
+        } = &mask.geometry
+        else {
+            continue;
+        };
+        std::fs::create_dir_all(&mask_root)
+            .map_err(silica_storage::LibraryStorageError::from)
+            .map_err(CoreError::from)?;
+        let file_name = format!(
+            "{}-{}-{}.mask8",
+            safe_cache_file_component(photo_id),
+            safe_cache_file_component(&mask.id),
+            safe_cache_file_component(cache_key)
+        );
+        let path = mask_root.join(file_name);
+        std::fs::write(&path, alpha)
+            .map_err(silica_storage::LibraryStorageError::from)
+            .map_err(CoreError::from)?;
+        let byte_size = i64::try_from(alpha.len()).unwrap_or(i64::MAX);
+        silica_storage::record_mask_raster_cache(
+            library_root_path,
+            photo_id,
+            cache_key,
+            &path,
+            byte_size,
+        )?;
+    }
+    Ok(())
+}
+
+fn safe_cache_file_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 fn write_jpeg_develop_preview_bytes(
     library_root_path: &Path,
     photo_id: &str,
@@ -4125,12 +4281,15 @@ fn write_jpeg_develop_preview_bytes(
     hsl_color_mixer: silica_export::HslColorMixerAdjustment,
     detail: silica_export::DetailAdjustment,
     geometry: silica_export::GeometryAdjustment,
-    masks: Vec<silica_export::ManualMaskAdjustment>,
+    masks: Vec<silica_render::ManualMaskRenderAdjustment>,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
     if !is_jpeg_path(&source_path) || !source_path.is_file() {
         return Ok(None);
     }
+
+    record_brush_mask_raster_caches(library_root_path, photo_id, &masks)?;
+    let masks = export_manual_masks_from_render(&masks);
 
     let preview_root = library_root_path.join("previews");
     std::fs::create_dir_all(&preview_root)
@@ -5662,37 +5821,38 @@ fn photo_manual_masks_from_graph(graph: &silica_edit::EditGraph) -> Vec<PhotoMan
 }
 
 fn photo_manual_mask_from_edit(mask: &silica_edit::Mask) -> Option<PhotoManualMaskState> {
-    let geometry = match (&mask.mask_type, mask.geometry.as_ref()?) {
+    let geometry = match (&mask.mask_type, mask.geometry.as_ref()) {
         (
             silica_edit::MaskType::LinearGradient,
-            silica_edit::MaskGeometry::LinearGradient {
+            Some(silica_edit::MaskGeometry::LinearGradient {
                 start_x,
                 start_y,
                 end_x,
                 end_y,
-            },
-        ) => PhotoManualMaskGeometryState::LinearGradient {
+            }),
+        ) => Some(PhotoManualMaskGeometryState::LinearGradient {
             start_x: start_x.as_f64().unwrap_or(0.0),
             start_y: start_y.as_f64().unwrap_or(0.0),
             end_x: end_x.as_f64().unwrap_or(1.0),
             end_y: end_y.as_f64().unwrap_or(1.0),
-        },
+        }),
         (
             silica_edit::MaskType::RadialGradient,
-            silica_edit::MaskGeometry::RadialGradient {
+            Some(silica_edit::MaskGeometry::RadialGradient {
                 center_x,
                 center_y,
                 radius_x,
                 radius_y,
                 rotation,
-            },
-        ) => PhotoManualMaskGeometryState::RadialGradient {
+            }),
+        ) => Some(PhotoManualMaskGeometryState::RadialGradient {
             center_x: center_x.as_f64().unwrap_or(0.5),
             center_y: center_y.as_f64().unwrap_or(0.5),
             radius_x: radius_x.as_f64().unwrap_or(0.25),
             radius_y: radius_y.as_f64().unwrap_or(0.25),
             rotation: rotation.as_f64().unwrap_or(0.0),
-        },
+        }),
+        (silica_edit::MaskType::Brush, None) if mask.brush.is_some() => None,
         _ => return None,
     };
 
@@ -5745,6 +5905,25 @@ fn render_manual_mask_from_edit(
     }
 
     let geometry = match (&mask.mask_type, &mask.geometry) {
+        (silica_edit::MaskType::Brush, None) => {
+            let brush = mask.brush.as_ref().ok_or_else(|| {
+                manual_mask_unsupported_message("brush masks require durable brush strokes")
+            })?;
+            let strokes = render_brush_strokes_from_edit(brush);
+            let raster = silica_render::rasterize_brush_mask(
+                &mask.id,
+                &strokes,
+                LOCAL_ALPHA_BRUSH_MASK_RASTER_EDGE,
+                LOCAL_ALPHA_BRUSH_MASK_RASTER_EDGE,
+            )
+            .map_err(|error| manual_mask_unsupported_message(error.to_string()))?;
+            silica_render::ManualMaskRenderGeometry::BrushRaster {
+                width: raster.width,
+                height: raster.height,
+                alpha: raster.alpha,
+                cache_key: raster.cache_key,
+            }
+        }
         (
             silica_edit::MaskType::LinearGradient,
             Some(silica_edit::MaskGeometry::LinearGradient {
@@ -5777,7 +5956,7 @@ fn render_manual_mask_from_edit(
         },
         _ => {
             return Err(manual_mask_unsupported_message(
-                "only linear and radial gradient geometry is supported",
+                "mask type and geometry payload must match",
             ))
         }
     };
@@ -5794,6 +5973,27 @@ fn render_manual_mask_from_edit(
         exposure,
         contrast,
     })
+}
+
+fn render_brush_strokes_from_edit(
+    brush: &silica_edit::MaskBrush,
+) -> Vec<silica_render::BrushMaskRasterStroke> {
+    brush
+        .strokes
+        .iter()
+        .map(|stroke| silica_render::BrushMaskRasterStroke {
+            id: stroke.id.clone(),
+            radius: stroke.radius.as_f64().unwrap_or(0.0),
+            points: stroke
+                .points
+                .iter()
+                .map(|point| silica_render::BrushMaskRasterPoint {
+                    x: point.x.as_f64().unwrap_or(0.0),
+                    y: point.y.as_f64().unwrap_or(0.0),
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 fn manual_mask_local_value(
@@ -5827,17 +6027,17 @@ fn export_manual_masks_from_render(
             invert: mask.invert,
             opacity: mask.opacity,
             feather: mask.feather,
-            geometry: match mask.geometry {
+            geometry: match &mask.geometry {
                 silica_render::ManualMaskRenderGeometry::LinearGradient {
                     start_x,
                     start_y,
                     end_x,
                     end_y,
                 } => silica_export::ManualMaskGeometry::LinearGradient {
-                    start_x,
-                    start_y,
-                    end_x,
-                    end_y,
+                    start_x: *start_x,
+                    start_y: *start_y,
+                    end_x: *end_x,
+                    end_y: *end_y,
                 },
                 silica_render::ManualMaskRenderGeometry::RadialGradient {
                     center_x,
@@ -5846,11 +6046,21 @@ fn export_manual_masks_from_render(
                     radius_y,
                     rotation,
                 } => silica_export::ManualMaskGeometry::RadialGradient {
-                    center_x,
-                    center_y,
-                    radius_x,
-                    radius_y,
-                    rotation,
+                    center_x: *center_x,
+                    center_y: *center_y,
+                    radius_x: *radius_x,
+                    radius_y: *radius_y,
+                    rotation: *rotation,
+                },
+                silica_render::ManualMaskRenderGeometry::BrushRaster {
+                    width,
+                    height,
+                    alpha,
+                    ..
+                } => silica_export::ManualMaskGeometry::RasterAlphaPlane {
+                    width: *width,
+                    height: *height,
+                    alpha: alpha.clone(),
                 },
             },
             exposure: mask.exposure,
@@ -7911,12 +8121,12 @@ mod tests {
         assert_eq!(restored.masks.len(), 1);
         assert_eq!(
             restored.masks[0].geometry,
-            PhotoManualMaskGeometryState::LinearGradient {
+            Some(PhotoManualMaskGeometryState::LinearGradient {
                 start_x: 0.0,
                 start_y: 0.0,
                 end_x: 1.0,
                 end_y: 1.0,
-            }
+            })
         );
         let masked_followup_preview =
             preview_exposure_contrast_edit(&created.root_path, &photo_id, 0.0, 0.0)
@@ -7945,6 +8155,126 @@ mod tests {
             .expect("edit state");
         assert_eq!(redone.masks.len(), 1);
         assert_original_hash(&jpeg_file, &original_hash, "manual mask commit");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn previews_brush_mask_cache_without_durable_edit_writes_and_commits_strokes() {
+        let workspace = unique_library_root("core-brush-mask-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let stroke = PhotoManualBrushStrokeInput {
+            id: "stroke-1".to_string(),
+            radius: 0.20,
+            points: vec![PhotoManualBrushPointInput { x: 0.5, y: 0.5 }],
+        };
+        let before_preview = durable_catalog_counts(&created.catalog_path);
+        let preview = preview_manual_brush_mask(
+            &created.root_path,
+            &photo_id,
+            "mask-brush-1",
+            "Center dodge",
+            100.0,
+            0.0,
+            false,
+            vec![stroke.clone()],
+            Some(0.75),
+            Some(0.0),
+        )
+        .expect("preview brush mask")
+        .expect("preview result");
+
+        assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+        assert_eq!(preview.masks.len(), 1);
+        assert_eq!(preview.masks[0].kind, "brush");
+        assert!(preview.masks[0].geometry.is_none());
+        assert!(preview
+            .develop_preview_bytes
+            .as_ref()
+            .is_some_and(|bytes| bytes.len() > 2));
+        assert_original_hash(&jpeg_file, &original_hash, "brush mask preview");
+        let after_preview = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after_preview.edit_states, before_preview.edit_states);
+        assert_eq!(after_preview.edit_history, before_preview.edit_history);
+        assert_eq!(after_preview.action_log, before_preview.action_log);
+        assert_eq!(after_preview.exports, before_preview.exports);
+        assert_eq!(
+            after_preview.cache_records,
+            before_preview.cache_records + 1
+        );
+        let mask_cache = silica_storage::get_photo_cache_record(
+            &created.root_path,
+            &photo_id,
+            silica_storage::MASK_RASTER_CACHE_TYPE,
+        )
+        .expect("read mask raster cache")
+        .expect("mask raster cache row");
+        assert!(mask_cache.path.contains("render-cache/masks"));
+        assert!(Path::new(&mask_cache.path).is_file());
+
+        silica_storage::clear_disposable_cache(&created.root_path).expect("clear cache");
+        assert!(!Path::new(&mask_cache.path).exists());
+        assert!(silica_storage::get_photo_cache_record(
+            &created.root_path,
+            &photo_id,
+            silica_storage::MASK_RASTER_CACHE_TYPE,
+        )
+        .expect("read mask raster cache after clear")
+        .is_none());
+
+        let committed = commit_manual_brush_mask(
+            &created.root_path,
+            &photo_id,
+            "mask-brush-1",
+            "Center dodge",
+            100.0,
+            0.0,
+            false,
+            vec![stroke],
+            Some(0.75),
+            Some(0.0),
+        )
+        .expect("commit brush mask")
+        .expect("commit result");
+        assert!(committed.persisted);
+        assert_eq!(committed.masks.len(), 1);
+        assert_eq!(committed.masks[0].kind, "brush");
+        assert!(committed.masks[0].geometry.is_none());
+
+        let restored = get_photo_edit_state(&created.root_path, &photo_id)
+            .expect("read brush mask state")
+            .expect("edit state");
+        assert_eq!(restored.masks.len(), 1);
+        assert_eq!(restored.masks[0].kind, "brush");
+        assert!(restored.masks[0].geometry.is_none());
+
+        let export_error = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect_err("brush masked export blocked before Phase 19.4");
+        assert!(matches!(export_error, CoreError::ExportBlocked(_)));
+        assert!(!output_path.exists());
+        assert_original_hash(&jpeg_file, &original_hash, "brush mask commit/export block");
 
         remove_library_root(&workspace);
     }

@@ -93,6 +93,7 @@ Caches are disposable:
 - previews
 - render intermediates
 - histogram
+- manual brush mask rasters under `render-cache/masks/`
 - AI results/masks
 
 Deleting cache must not delete originals, edits, ratings, collections, presets, or sidecars.

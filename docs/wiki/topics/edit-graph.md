@@ -42,7 +42,7 @@ The edit graph is the authoritative portable structure for non-destructive edit 
 - Task 18.5.1 adds a typed edit clipboard contract for schema-owned subsets: `basic`, `tone`, `color`, `detail`, `lens`, and `geometry`. Clipboard payloads never carry `source`, `profile`, `metadata`, `masks`, or `extensions`. Detail clipboard data excludes `detail.mlx_denoise`; lens clipboard data excludes source-specific `lens.profile_id`. Applying a payload preserves the target graph identity and remains graph-only with no catalog, sidecar, UI, plugin, or MCP mutation path.
 - Task 18.5.2 applies typed edit clipboard payloads through Core batch planning and storage all-or-none commit. Unsupported detail, lens, geometry, and Basic runtime-only fields are blocked before writes; successful sync preserves each target graph identity and records one undoable catalog checkpoint per changed photo.
 - Task 18.5.3 exposes edit clipboard copy, paste-to-primary, and batch sync in the Develop UI with explicit selected-page scope, JPEG/JPG Develop target gating, and disabled unsupported clipboard subsets.
-- Task 19.1 completes the mask schema audit before mask behavior is added. Manual gradient masks use schema-owned `masks[].geometry`, not hidden `mask.source` properties. `mask.source.kind = "manual"` is provenance-only; AI/model/cache fields stay reserved for future non-manual provenance. Brush durable data remains deferred to Task 19.3 and raster/cache bytes must not become the source of truth.
+- Task 19.1 completes the mask schema audit before mask behavior is added. Manual gradient masks use schema-owned `masks[].geometry`, not hidden `mask.source` properties. Task 19.3 adds schema-owned `masks[].brush` for durable manual brush strokes. `mask.source.kind = "manual"` is provenance-only; AI/model/cache fields stay reserved for future non-manual provenance. Raster/cache bytes must not become the brush source of truth.
 
 ## Required Sections
 
@@ -78,6 +78,7 @@ Default edit graphs use `input_profile = "unknown"` and `decoder_backend = null`
 masks[].type -> brush | linear_gradient | radial_gradient | future AI/procedural selection types
 masks[].source.kind -> manual | mlx | procedural
 masks[].geometry -> schema-owned linear/radial normalized geometry when type is linear_gradient or radial_gradient
+masks[].brush -> schema-owned normalized sampled strokes when type is brush
 masks[].local_adjustments -> numeric local adjustment map
 ```
 
@@ -85,15 +86,21 @@ Task 19.1 decision:
 
 - `linear_gradient` requires `geometry.kind = "linear_gradient"` with normalized `start_x`, `start_y`, `end_x`, and `end_y`; start and end must differ in `silica-edit` validation.
 - `radial_gradient` requires `geometry.kind = "radial_gradient"` with normalized center/radii and bounded rotation.
-- Non-gradient mask types must not carry `geometry` until their durable shape is explicitly defined.
+- `brush` requires `brush.coordinate_space = "normalized_image"` and at least one sampled stroke. Strokes use normalized image points and a normalized radius.
+- Non-gradient mask types must not carry `geometry`; non-brush mask types must not carry `brush`.
 - Manual sources must serialize as provenance-only `{ "kind": "manual" }`; durable geometry, brush data, cache paths, model identifiers, and AI result identifiers do not belong in manual source.
-- `brush` remains an allowed enum value but has no committed manual brush durable payload until Task 19.3 defines it.
 
 Task 19.2 runtime boundary:
 
 - `linear_gradient` and `radial_gradient` masks can be created through graph-owned helpers, previewed on supported JPEG/JPG develop previews, and committed through undoable catalog history.
 - Phase 19.2 supports only local `exposure` and `contrast` mask adjustments; unsupported adjustment keys or ranges must block before preview/commit.
 - JPEG export blocks active masks until Task 19.4 adds export compositing, so export never silently ignores committed mask state.
+
+Task 19.3 runtime boundary:
+
+- Manual brush masks can be created through graph-owned helpers, previewed on supported JPEG/JPG develop previews, and committed through undoable catalog history.
+- Brush raster alpha planes are regenerated from durable strokes and recorded only as disposable `mask_raster` cache artifacts under `render-cache/masks/`.
+- Clearing disposable cache must not remove durable brush data.
 
 ## Links
 

@@ -407,6 +407,8 @@ pub struct Mask {
     pub source: MaskSource,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub geometry: Option<MaskGeometry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brush: Option<MaskBrush>,
     pub local_adjustments: BTreeMap<String, Number>,
 }
 
@@ -465,12 +467,44 @@ pub enum MaskGeometry {
     },
 }
 
+/// Durable normalized sampled stroke payload for manual brush masks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaskBrush {
+    pub coordinate_space: BrushCoordinateSpace,
+    pub strokes: Vec<MaskBrushStroke>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrushCoordinateSpace {
+    NormalizedImage,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaskBrushStroke {
+    pub id: String,
+    pub radius: Number,
+    pub points: Vec<MaskBrushPoint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaskBrushPoint {
+    pub x: Number,
+    pub y: Number,
+}
+
 /// Supported manual mask local adjustments for Phase 19.2.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ManualMaskLocalAdjustments {
     pub exposure: Option<f64>,
     pub contrast: Option<f64>,
 }
+
+pub const MAX_MANUAL_BRUSH_STROKES: usize = 16;
+pub const MAX_MANUAL_BRUSH_POINTS: usize = 512;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -713,6 +747,7 @@ pub fn manual_linear_gradient_mask(
             end_x: number_from_f64("masks.geometry.end_x", end_x)?,
             end_y: number_from_f64("masks.geometry.end_y", end_y)?,
         }),
+        brush: None,
         local_adjustments: manual_mask_local_adjustments(local_adjustments)?,
     };
     validate_mask(0, &mask)?;
@@ -749,6 +784,61 @@ pub fn manual_radial_gradient_mask(
             radius_x: number_from_f64("masks.geometry.radius_x", radius_x)?,
             radius_y: number_from_f64("masks.geometry.radius_y", radius_y)?,
             rotation: number_from_f64("masks.geometry.rotation", rotation)?,
+        }),
+        brush: None,
+        local_adjustments: manual_mask_local_adjustments(local_adjustments)?,
+    };
+    validate_mask(0, &mask)?;
+    Ok(mask)
+}
+
+/// Build a schema-valid durable manual brush stroke without raster cache data.
+pub fn manual_brush_stroke(
+    id: impl Into<String>,
+    radius: f64,
+    points: Vec<(f64, f64)>,
+) -> Result<MaskBrushStroke, EditGraphValidationError> {
+    let stroke = MaskBrushStroke {
+        id: non_empty_mask_string("masks.brush.strokes.id", id.into())?,
+        radius: number_from_f64("masks.brush.strokes.radius", radius)?,
+        points: points
+            .into_iter()
+            .enumerate()
+            .map(|(index, (x, y))| {
+                Ok(MaskBrushPoint {
+                    x: number_from_f64(&format!("masks.brush.strokes.points.{index}.x"), x)?,
+                    y: number_from_f64(&format!("masks.brush.strokes.points.{index}.y"), y)?,
+                })
+            })
+            .collect::<Result<Vec<_>, EditGraphValidationError>>()?,
+    };
+    validate_brush_stroke("masks.brush.strokes.0", &stroke)?;
+    Ok(stroke)
+}
+
+/// Build a schema-valid manual brush mask without persisting it.
+pub fn manual_brush_mask(
+    id: impl Into<String>,
+    name: impl Into<String>,
+    opacity: f64,
+    feather: f64,
+    invert: bool,
+    strokes: Vec<MaskBrushStroke>,
+    local_adjustments: ManualMaskLocalAdjustments,
+) -> Result<Mask, EditGraphValidationError> {
+    let mask = Mask {
+        id: non_empty_mask_string("masks.id", id.into())?,
+        mask_type: MaskType::Brush,
+        name: non_empty_mask_string("masks.name", name.into())?,
+        enabled: true,
+        invert,
+        opacity: number_from_f64("masks.opacity", opacity)?,
+        feather: number_from_f64("masks.feather", feather)?,
+        source: manual_mask_source(),
+        geometry: None,
+        brush: Some(MaskBrush {
+            coordinate_space: BrushCoordinateSpace::NormalizedImage,
+            strokes,
         }),
         local_adjustments: manual_mask_local_adjustments(local_adjustments)?,
     };
@@ -1677,6 +1767,7 @@ fn validate_mask(index: usize, mask: &Mask) -> Result<(), EditGraphValidationErr
     validate_range(format!("{prefix}.feather"), &mask.feather, 0.0, 100.0)?;
     validate_mask_source(index, &mask.source)?;
     validate_mask_geometry(index, mask)?;
+    validate_mask_brush(index, mask)?;
     for (key, value) in &mask.local_adjustments {
         validate_number(format!("{prefix}.local_adjustments.{key}"), value)?;
     }
@@ -1804,6 +1895,76 @@ fn validate_mask_geometry(index: usize, mask: &Mask) -> Result<(), EditGraphVali
             validate_exclusive_min_range(format!("{prefix}.radius_y"), radius_y, 0.0, 1.0)?;
             validate_range(format!("{prefix}.rotation"), rotation, -180.0, 180.0)?;
         }
+    }
+    Ok(())
+}
+
+fn validate_mask_brush(index: usize, mask: &Mask) -> Result<(), EditGraphValidationError> {
+    let prefix = format!("masks.{index}.brush");
+    match (&mask.mask_type, &mask.brush) {
+        (MaskType::Brush, Some(brush)) => validate_brush(&prefix, brush),
+        (MaskType::Brush, None) => Err(EditGraphValidationError::new(
+            prefix,
+            "brush masks require durable brush strokes",
+        )),
+        (_, Some(_)) => Err(EditGraphValidationError::new(
+            prefix,
+            "brush payload is only supported for brush masks",
+        )),
+        (_, None) => Ok(()),
+    }
+}
+
+fn validate_brush(prefix: &str, brush: &MaskBrush) -> Result<(), EditGraphValidationError> {
+    if brush.strokes.is_empty() {
+        return Err(EditGraphValidationError::new(
+            format!("{prefix}.strokes"),
+            "must contain at least one stroke",
+        ));
+    }
+    if brush.strokes.len() > MAX_MANUAL_BRUSH_STROKES {
+        return Err(EditGraphValidationError::new(
+            format!("{prefix}.strokes"),
+            format!("must contain at most {MAX_MANUAL_BRUSH_STROKES} strokes"),
+        ));
+    }
+    let total_points = brush
+        .strokes
+        .iter()
+        .map(|stroke| stroke.points.len())
+        .sum::<usize>();
+    if total_points > MAX_MANUAL_BRUSH_POINTS {
+        return Err(EditGraphValidationError::new(
+            format!("{prefix}.strokes.points"),
+            format!("must contain at most {MAX_MANUAL_BRUSH_POINTS} total points"),
+        ));
+    }
+    for (index, stroke) in brush.strokes.iter().enumerate() {
+        validate_brush_stroke(&format!("{prefix}.strokes.{index}"), stroke)?;
+    }
+    Ok(())
+}
+
+fn validate_brush_stroke(
+    prefix: &str,
+    stroke: &MaskBrushStroke,
+) -> Result<(), EditGraphValidationError> {
+    if stroke.id.trim().is_empty() {
+        return Err(EditGraphValidationError::new(
+            format!("{prefix}.id"),
+            "must not be empty",
+        ));
+    }
+    validate_exclusive_min_range(format!("{prefix}.radius"), &stroke.radius, 0.0, 1.0)?;
+    if stroke.points.is_empty() {
+        return Err(EditGraphValidationError::new(
+            format!("{prefix}.points"),
+            "must contain at least one point",
+        ));
+    }
+    for (index, point) in stroke.points.iter().enumerate() {
+        validate_range(format!("{prefix}.points.{index}.x"), &point.x, 0.0, 1.0)?;
+        validate_range(format!("{prefix}.points.{index}.y"), &point.y, 0.0, 1.0)?;
     }
     Ok(())
 }
@@ -1960,6 +2121,7 @@ mod tests {
                 end_x: serde_json::Number::from_f64(0.85).expect("finite end x"),
                 end_y: serde_json::Number::from_f64(0.80).expect("finite end y"),
             }),
+            brush: None,
             local_adjustments: std::collections::BTreeMap::from([(
                 "exposure".to_string(),
                 serde_json::Number::from_f64(-0.5).expect("finite exposure"),
@@ -1981,6 +2143,7 @@ mod tests {
                 radius_y: serde_json::Number::from_f64(0.28).expect("finite radius y"),
                 rotation: serde_json::Number::from(0),
             }),
+            brush: None,
             local_adjustments: std::collections::BTreeMap::from([(
                 "contrast".to_string(),
                 serde_json::Number::from(8),
@@ -2217,6 +2380,151 @@ mod tests {
             super::append_manual_mask(&graph, mask.clone(), "unix:3").expect("append mask once");
         let duplicate =
             super::append_manual_mask(&edited, mask, "unix:4").expect_err("duplicate mask id");
+        assert!(duplicate.to_string().contains("masks"));
+    }
+
+    #[test]
+    fn builds_manual_brush_masks_with_durable_strokes() {
+        let graph: super::EditGraph =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("deserialize edit graph");
+        let stroke = super::manual_brush_stroke(
+            "stroke-1",
+            0.08,
+            vec![(0.25, 0.30), (0.50, 0.45), (0.75, 0.60)],
+        )
+        .expect("manual brush stroke");
+        let mask = super::manual_brush_mask(
+            "mask-brush-1",
+            "Cheek dodge",
+            70.0,
+            0.0,
+            false,
+            vec![stroke],
+            super::ManualMaskLocalAdjustments {
+                exposure: Some(0.35),
+                contrast: Some(5.0),
+            },
+        )
+        .expect("manual brush mask");
+
+        let edited = super::append_manual_mask(&graph, mask, "unix:5").expect("append brush mask");
+        assert_eq!(edited.masks.len(), 1);
+        assert_eq!(edited.masks[0].mask_type, super::MaskType::Brush);
+        assert_eq!(edited.masks[0].source, super::manual_mask_source());
+        assert!(edited.masks[0].geometry.is_none());
+        assert_eq!(
+            edited.masks[0]
+                .brush
+                .as_ref()
+                .expect("brush payload")
+                .coordinate_space,
+            super::BrushCoordinateSpace::NormalizedImage
+        );
+
+        let serialized = serde_json::to_value(&edited).expect("serialize brush mask");
+        assert_eq!(serialized["masks"][0]["source"], json!({"kind": "manual"}));
+        assert!(serialized["masks"][0].get("geometry").is_none());
+        assert_eq!(
+            serialized["masks"][0]["brush"]["coordinate_space"],
+            json!("normalized_image")
+        );
+        assert_eq!(
+            serialized["masks"][0]["brush"]["strokes"][0]["points"][1]["x"],
+            json!(0.5)
+        );
+
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip brush mask");
+        assert_eq!(round_tripped, edited);
+        super::validate_edit_graph_json(&serialized).expect("manual brush JSON validates");
+    }
+
+    #[test]
+    fn rejects_invalid_manual_brush_masks() {
+        let graph: super::EditGraph =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("deserialize edit graph");
+
+        let bad_radius = super::manual_brush_stroke("stroke-1", 0.0, vec![(0.25, 0.30)])
+            .expect_err("zero radius");
+        assert!(bad_radius.to_string().contains("radius"));
+
+        let bad_point = super::manual_brush_stroke("stroke-1", 0.05, vec![(1.25, 0.30)])
+            .expect_err("point outside normalized range");
+        assert!(bad_point.to_string().contains("points.0.x"));
+
+        let mut value: serde_json::Value =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("parse edit graph example");
+        value["masks"] = json!([{
+            "id": "mask-brush-1",
+            "type": "brush",
+            "name": "Missing brush",
+            "enabled": true,
+            "invert": false,
+            "opacity": 80,
+            "feather": 0,
+            "source": {"kind": "manual"},
+            "local_adjustments": {"exposure": 0.25}
+        }]);
+        let missing_brush =
+            super::validate_edit_graph_json(&value).expect_err("brush payload required");
+        assert!(missing_brush.to_string().contains("masks.0.brush"));
+
+        value["masks"][0]["brush"] = json!({
+            "coordinate_space": "normalized_image",
+            "strokes": [{
+                "id": "stroke-1",
+                "radius": 0.05,
+                "points": [{"x": 0.25, "y": 0.30}]
+            }]
+        });
+        value["masks"][0]["geometry"] = json!({
+            "kind": "linear_gradient",
+            "start_x": 0.0,
+            "start_y": 0.0,
+            "end_x": 1.0,
+            "end_y": 1.0
+        });
+        let brush_geometry =
+            super::validate_edit_graph_json(&value).expect_err("brush geometry rejected");
+        assert!(brush_geometry.to_string().contains("masks.0.geometry"));
+
+        let stroke =
+            super::manual_brush_stroke("stroke-1", 0.05, vec![(0.25, 0.30)]).expect("valid stroke");
+        let mut too_many_strokes = Vec::new();
+        for index in 0..=super::MAX_MANUAL_BRUSH_STROKES {
+            let mut copy = stroke.clone();
+            copy.id = format!("stroke-{index}");
+            too_many_strokes.push(copy);
+        }
+        let too_many = super::manual_brush_mask(
+            "mask-brush-1",
+            "Too many strokes",
+            80.0,
+            0.0,
+            false,
+            too_many_strokes,
+            super::ManualMaskLocalAdjustments::default(),
+        )
+        .expect_err("stroke cap");
+        assert!(too_many.to_string().contains("strokes"));
+
+        let mask = super::manual_brush_mask(
+            "mask-brush-1",
+            "Valid brush",
+            80.0,
+            0.0,
+            false,
+            vec![stroke],
+            super::ManualMaskLocalAdjustments::default(),
+        )
+        .expect("valid brush");
+        let edited =
+            super::append_manual_mask(&graph, mask.clone(), "unix:5").expect("append brush");
+        let duplicate =
+            super::append_manual_mask(&edited, mask, "unix:6").expect_err("duplicate brush id");
         assert!(duplicate.to_string().contains("masks"));
     }
 

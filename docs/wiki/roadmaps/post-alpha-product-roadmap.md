@@ -792,6 +792,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Large brush data does not bloat per-slider writes.
   - Cache artifacts are disposable.
 - **Validation:** Storage/render tests.
+- **Status:** Completed on 2026-06-16. Added schema-owned `masks[].brush` durable strokes, pure CPU brush alpha rasterization, disposable `mask_raster` cache records under `render-cache/masks/`, core brush preview/commit APIs, and export blocking for active masks until Task 19.4.
 
 ### Task 19.4: Mask Compositing in Preview and Export
 
