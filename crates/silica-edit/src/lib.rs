@@ -405,6 +405,8 @@ pub struct Mask {
     pub opacity: Number,
     pub feather: Number,
     pub source: MaskSource,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<MaskGeometry>,
     pub local_adjustments: BTreeMap<String, Number>,
 }
 
@@ -442,6 +444,25 @@ pub enum MaskSourceKind {
     Manual,
     Mlx,
     Procedural,
+}
+
+/// Durable normalized geometry for parametric manual masks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum MaskGeometry {
+    LinearGradient {
+        start_x: Number,
+        start_y: Number,
+        end_x: Number,
+        end_y: Number,
+    },
+    RadialGradient {
+        center_x: Number,
+        center_y: Number,
+        radius_x: Number,
+        radius_y: Number,
+        rotation: Number,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -641,6 +662,18 @@ pub fn default_edit_graph(source: EditGraphSource, updated_at: impl Into<String>
         extensions: Map::new(),
         created_at: None,
         updated_at: updated_at.into(),
+    }
+}
+
+/// Build the canonical provenance payload for manual masks.
+pub fn manual_mask_source() -> MaskSource {
+    MaskSource {
+        kind: MaskSourceKind::Manual,
+        ai_result_id: None,
+        cache_path: None,
+        model_id: None,
+        model_version: None,
+        extensions: Map::new(),
     }
 }
 
@@ -1543,8 +1576,94 @@ fn validate_mask(index: usize, mask: &Mask) -> Result<(), EditGraphValidationErr
     let prefix = format!("masks.{index}");
     validate_range(format!("{prefix}.opacity"), &mask.opacity, 0.0, 100.0)?;
     validate_range(format!("{prefix}.feather"), &mask.feather, 0.0, 100.0)?;
+    validate_mask_source(index, &mask.source)?;
+    validate_mask_geometry(index, mask)?;
     for (key, value) in &mask.local_adjustments {
         validate_number(format!("{prefix}.local_adjustments.{key}"), value)?;
+    }
+    Ok(())
+}
+
+fn validate_mask_source(index: usize, source: &MaskSource) -> Result<(), EditGraphValidationError> {
+    if source.kind != MaskSourceKind::Manual {
+        return Ok(());
+    }
+
+    if source.ai_result_id.is_some()
+        || source.cache_path.is_some()
+        || source.model_id.is_some()
+        || source.model_version.is_some()
+        || !source.extensions.is_empty()
+    {
+        return Err(EditGraphValidationError::new(
+            format!("masks.{index}.source"),
+            "manual mask source is provenance only",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_mask_geometry(index: usize, mask: &Mask) -> Result<(), EditGraphValidationError> {
+    let prefix = format!("masks.{index}.geometry");
+    match (&mask.mask_type, &mask.geometry) {
+        (MaskType::LinearGradient, Some(MaskGeometry::LinearGradient { .. })) => {}
+        (MaskType::RadialGradient, Some(MaskGeometry::RadialGradient { .. })) => {}
+        (MaskType::LinearGradient | MaskType::RadialGradient, None) => {
+            return Err(EditGraphValidationError::new(
+                prefix,
+                "linear and radial gradient masks require matching geometry",
+            ));
+        }
+        (MaskType::LinearGradient | MaskType::RadialGradient, Some(_)) => {
+            return Err(EditGraphValidationError::new(
+                prefix,
+                "geometry kind must match mask type",
+            ));
+        }
+        (_, Some(_)) => {
+            return Err(EditGraphValidationError::new(
+                prefix,
+                "geometry is only supported for linear and radial gradient masks",
+            ));
+        }
+        (_, None) => return Ok(()),
+    }
+
+    match mask.geometry.as_ref().expect("validated geometry presence") {
+        MaskGeometry::LinearGradient {
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+        } => {
+            validate_range(format!("{prefix}.start_x"), start_x, 0.0, 1.0)?;
+            validate_range(format!("{prefix}.start_y"), start_y, 0.0, 1.0)?;
+            validate_range(format!("{prefix}.end_x"), end_x, 0.0, 1.0)?;
+            validate_range(format!("{prefix}.end_y"), end_y, 0.0, 1.0)?;
+            let start_x = number_as_f64(&format!("{prefix}.start_x"), start_x)?;
+            let start_y = number_as_f64(&format!("{prefix}.start_y"), start_y)?;
+            let end_x = number_as_f64(&format!("{prefix}.end_x"), end_x)?;
+            let end_y = number_as_f64(&format!("{prefix}.end_y"), end_y)?;
+            if start_x == end_x && start_y == end_y {
+                return Err(EditGraphValidationError::new(
+                    prefix,
+                    "linear gradient start and end points must differ",
+                ));
+            }
+        }
+        MaskGeometry::RadialGradient {
+            center_x,
+            center_y,
+            radius_x,
+            radius_y,
+            rotation,
+        } => {
+            validate_range(format!("{prefix}.center_x"), center_x, 0.0, 1.0)?;
+            validate_range(format!("{prefix}.center_y"), center_y, 0.0, 1.0)?;
+            validate_exclusive_min_range(format!("{prefix}.radius_x"), radius_x, 0.0, 1.0)?;
+            validate_exclusive_min_range(format!("{prefix}.radius_y"), radius_y, 0.0, 1.0)?;
+            validate_range(format!("{prefix}.rotation"), rotation, -180.0, 180.0)?;
+        }
     }
     Ok(())
 }
@@ -1678,6 +1797,167 @@ mod tests {
 
         let error = super::validate_edit_graph_json(&value).expect_err("invalid exposure");
         assert!(error.to_string().contains("basic.exposure"));
+    }
+
+    #[test]
+    fn validates_and_round_trips_manual_gradient_masks() {
+        let mut graph: super::EditGraph =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("deserialize edit graph");
+
+        graph.masks.push(super::Mask {
+            id: "mask-linear-1".to_string(),
+            mask_type: super::MaskType::LinearGradient,
+            name: "Linear burn".to_string(),
+            enabled: true,
+            invert: false,
+            opacity: serde_json::Number::from(75),
+            feather: serde_json::Number::from(30),
+            source: super::manual_mask_source(),
+            geometry: Some(super::MaskGeometry::LinearGradient {
+                start_x: serde_json::Number::from_f64(0.15).expect("finite start x"),
+                start_y: serde_json::Number::from_f64(0.20).expect("finite start y"),
+                end_x: serde_json::Number::from_f64(0.85).expect("finite end x"),
+                end_y: serde_json::Number::from_f64(0.80).expect("finite end y"),
+            }),
+            local_adjustments: std::collections::BTreeMap::from([(
+                "exposure".to_string(),
+                serde_json::Number::from_f64(-0.5).expect("finite exposure"),
+            )]),
+        });
+        graph.masks.push(super::Mask {
+            id: "mask-radial-1".to_string(),
+            mask_type: super::MaskType::RadialGradient,
+            name: "Face lift".to_string(),
+            enabled: true,
+            invert: false,
+            opacity: serde_json::Number::from(60),
+            feather: serde_json::Number::from(45),
+            source: super::manual_mask_source(),
+            geometry: Some(super::MaskGeometry::RadialGradient {
+                center_x: serde_json::Number::from_f64(0.50).expect("finite center x"),
+                center_y: serde_json::Number::from_f64(0.48).expect("finite center y"),
+                radius_x: serde_json::Number::from_f64(0.20).expect("finite radius x"),
+                radius_y: serde_json::Number::from_f64(0.28).expect("finite radius y"),
+                rotation: serde_json::Number::from(0),
+            }),
+            local_adjustments: std::collections::BTreeMap::from([(
+                "contrast".to_string(),
+                serde_json::Number::from(8),
+            )]),
+        });
+
+        super::validate_edit_graph(&graph).expect("manual gradient masks validate");
+
+        let serialized = serde_json::to_value(&graph).expect("serialize masked graph");
+        assert_eq!(serialized["masks"][0]["source"], json!({"kind": "manual"}));
+        assert_eq!(
+            serialized["masks"][0]["geometry"]["kind"],
+            json!("linear_gradient")
+        );
+        assert_eq!(
+            serialized["masks"][1]["geometry"]["kind"],
+            json!("radial_gradient")
+        );
+
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip masked graph");
+        assert_eq!(round_tripped, graph);
+        super::validate_edit_graph_json(&serialized).expect("manual mask JSON validates");
+    }
+
+    #[test]
+    fn rejects_invalid_manual_gradient_mask_shapes() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("parse edit graph example");
+        value["masks"] = json!([{
+            "id": "mask-linear-1",
+            "type": "linear_gradient",
+            "name": "Bad linear",
+            "enabled": true,
+            "invert": false,
+            "opacity": 125,
+            "feather": 20,
+            "source": {"kind": "manual"},
+            "geometry": {
+                "kind": "linear_gradient",
+                "start_x": 0.5,
+                "start_y": 0.5,
+                "end_x": 0.5,
+                "end_y": 0.5
+            },
+            "local_adjustments": {"exposure": -0.25}
+        }]);
+
+        let opacity_error =
+            super::validate_edit_graph_json(&value).expect_err("opacity above range");
+        assert!(opacity_error.to_string().contains("masks.0.opacity"));
+
+        value["masks"][0]["opacity"] = json!(80);
+        let geometry_error =
+            super::validate_edit_graph_json(&value).expect_err("degenerate linear mask");
+        assert!(geometry_error.to_string().contains("masks.0.geometry"));
+
+        value["masks"][0]["geometry"]["end_x"] = json!(0.75);
+        value["masks"][0]["type"] = json!("polygon");
+        let type_error = super::validate_edit_graph_json(&value).expect_err("invalid mask type");
+        assert!(type_error.to_string().contains("unknown variant"));
+
+        value["masks"][0]["type"] = json!("linear_gradient");
+        value["masks"][0]["source"] = json!({});
+        let source_error =
+            super::validate_edit_graph_json(&value).expect_err("missing source kind");
+        assert!(source_error.to_string().contains("kind"));
+    }
+
+    #[test]
+    fn rejects_manual_mask_source_runtime_or_geometry_payloads() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("parse edit graph example");
+        value["masks"] = json!([{
+            "id": "mask-linear-1",
+            "type": "linear_gradient",
+            "name": "Bad provenance",
+            "enabled": true,
+            "invert": false,
+            "opacity": 80,
+            "feather": 20,
+            "source": {
+                "kind": "manual",
+                "cache_path": "render-cache/masks/mask-linear-1.png"
+            },
+            "geometry": {
+                "kind": "linear_gradient",
+                "start_x": 0.2,
+                "start_y": 0.2,
+                "end_x": 0.8,
+                "end_y": 0.8
+            },
+            "local_adjustments": {"exposure": -0.25}
+        }]);
+
+        let cache_error =
+            super::validate_edit_graph_json(&value).expect_err("manual source cache path");
+        assert!(cache_error.to_string().contains("masks.0.source"));
+
+        value["masks"][0]["source"] = json!({
+            "kind": "manual",
+            "model_id": "subject-model",
+            "model_version": "1.0"
+        });
+        let model_error =
+            super::validate_edit_graph_json(&value).expect_err("manual source model metadata");
+        assert!(model_error.to_string().contains("masks.0.source"));
+
+        value["masks"][0]["source"] = json!({
+            "kind": "manual",
+            "geometry": {"hidden": true}
+        });
+        let hidden_geometry_error =
+            super::validate_edit_graph_json(&value).expect_err("manual source hidden geometry");
+        assert!(hidden_geometry_error.to_string().contains("masks.0.source"));
     }
 
     #[test]

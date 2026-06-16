@@ -2,7 +2,7 @@
 title: Current LLM Route
 status: active
 audience: agents
-updated: 2026-06-13
+updated: 2026-06-16
 source_of_truth: docs/wiki/llm/index.md
 ---
 
@@ -16,7 +16,7 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 18 is complete. The current product area is **Phase 19: Manual Masks**.
 
-Phase 19 task cards exist. The current next task is [Task 19.1 Mask Schema and Edit Graph Audit](../tasks/19.1-mask-schema-edit-graph-audit.md).
+Task 19.1 is complete. The current next task is [Task 19.2 Linear and Radial Manual Masks](../tasks/19.2-linear-radial-manual-masks.md).
 
 ## Minimal Read Set
 

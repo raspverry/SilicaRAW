@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-13
+updated: 2026-06-16
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-16] phase-19 | Mask schema audit completed
+
+- Completed Task 19.1 with explicit schema-owned manual gradient mask geometry.
+- Recorded manual source provenance boundaries and deferred brush durable storage to Task 19.3.
+- Routed Phase 19 to Task 19.2 for linear and radial manual masks.
 
 ## [2026-06-13] phase-19 | Manual mask task cards added
 

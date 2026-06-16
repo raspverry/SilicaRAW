@@ -2,7 +2,7 @@
 title: Phase 19 Manual Masks
 status: active
 audience: all
-updated: 2026-06-13
+updated: 2026-06-16
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -19,14 +19,14 @@ Phase 19 is manual-first. AI masks remain deferred until mask provenance, action
 - Phase 18 is complete.
 - Develop controls already validate graph-owned edits, preserve originals, commit undoable history, and block unsupported runtime states honestly.
 - `schemas/edit_graph.schema.json` already contains a `masks` array and a `mask` definition.
-- Current mask schema allows `brush`, `linear_gradient`, `radial_gradient`, and future AI/procedural mask types; Phase 19 must audit this before implementation.
+- Task 19.1 audited the mask schema and added explicit `masks[].geometry` for manual linear/radial masks before runtime mask writes exist.
 
 ## Task Order
 
 | Task | Name | Gate |
 | --- | --- | --- |
-| 19.1 | Mask Schema and Edit Graph Audit | Active: existing mask schema and provenance boundaries are audited before behavior is added |
-| 19.2 | Linear and Radial Manual Masks | Pending: simple manual gradient masks persist in the edit graph and preview only where supported |
+| 19.1 | Mask Schema and Edit Graph Audit | Complete: manual gradient geometry and provenance boundaries are schema-owned before behavior is added |
+| 19.2 | Linear and Radial Manual Masks | Active: simple manual gradient masks persist in the edit graph and preview only where supported |
 | 19.3 | Brush Mask Storage and Rasterization | Pending: brush data remains non-destructive and durable data stays separate from disposable raster/cache artifacts |
 | 19.4 | Mask Compositing in Preview and Export | Pending: committed masks apply consistently in preview and export or block honestly |
 | 19.5 | Mask Editor Visual QA | Pending: mask editor UI matches design system and visual QA covers the active mask screen |
@@ -43,6 +43,8 @@ Phase 19 is manual-first. AI masks remain deferred until mask provenance, action
 
 - Manual mask data must validate against `schemas/edit_graph.schema.json`.
 - Manual mask provenance must remain distinct from future AI/MLX provenance.
+- Manual gradient geometry must live in `masks[].geometry`, not `mask.source`.
+- Manual `mask.source` must remain provenance-only `{ "kind": "manual" }`.
 - Durable edit graph mask data and disposable mask/render caches must remain separate.
 - Draft mask preview must not write durable catalog state, sidecars, exports, action-log rows, or originals.
 - Committed mask edits must use undoable catalog history.

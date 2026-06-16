@@ -227,6 +227,19 @@ Unknown fields must not be silently discarded.
 
 Phase 5.2 status: `crates/silica-edit` implements typed edit graph structures and validates the v0.1 schema marker, version, closed objects, enums, numeric ranges, mask adjustment numbers, and `extensions` placement. This is the schema/type boundary only; sidecar persistence and edit application are separate tasks.
 
+Phase 19.1 status: `schemas/edit_graph.schema.json` now makes the previously loose manual gradient mask shape explicit before any runtime mask writes exist. This is a pre-runtime additive schema completion for v0.1, not a storage migration.
+
+Manual mask rules:
+
+```txt
+linear_gradient -> requires masks[].geometry.kind = "linear_gradient"
+radial_gradient -> requires masks[].geometry.kind = "radial_gradient"
+brush -> enum reserved until Task 19.3 defines durable brush storage
+source.kind = "manual" -> provenance only
+```
+
+`mask.source` remains intentionally loose for future non-manual provenance, but manual masks must not store geometry, brush data, cache paths, model identifiers, or AI result identifiers in `source`. `silica-edit` rejects those manual-source payloads before runtime behavior.
+
 ---
 
 # v1.3 Clarifications
@@ -311,6 +324,8 @@ Current v0.1 schemas use:
 This is intentional.
 
 When a breaking schema change occurs, create a new schema file instead of modifying v1 in place.
+
+Task 19.1 note: adding explicit `masks[].geometry` for manual gradient masks is allowed inside current v0.1 because no released runtime path previously wrote linear or radial masks. Future changes that alter already-written persisted mask semantics must use the breaking-change policy below.
 
 Recommended future naming:
 

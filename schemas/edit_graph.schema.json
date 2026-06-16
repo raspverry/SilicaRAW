@@ -697,6 +697,88 @@
         }
       }
     },
+    "mask_geometry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "start_x",
+            "start_y",
+            "end_x",
+            "end_y"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "linear_gradient"
+            },
+            "start_x": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "start_y": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "end_x": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "end_y": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "center_x",
+            "center_y",
+            "radius_x",
+            "radius_y",
+            "rotation"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "radial_gradient"
+            },
+            "center_x": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "center_y": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "radius_x": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "radius_y": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "rotation": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          }
+        }
+      ]
+    },
     "mask": {
       "type": "object",
       "required": [
@@ -788,13 +870,100 @@
             }
           }
         },
+        "geometry": {
+          "$ref": "#/$defs/mask_geometry"
+        },
         "local_adjustments": {
           "type": "object",
           "additionalProperties": {
             "type": "number"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "linear_gradient"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "geometry"
+            ],
+            "properties": {
+              "geometry": {
+                "properties": {
+                  "kind": {
+                    "const": "linear_gradient"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "radial_gradient"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "geometry"
+            ],
+            "properties": {
+              "geometry": {
+                "properties": {
+                  "kind": {
+                    "const": "radial_gradient"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "not": {
+                  "enum": [
+                    "linear_gradient",
+                    "radial_gradient"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "geometry"
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }
