@@ -465,6 +465,13 @@ pub enum MaskGeometry {
     },
 }
 
+/// Supported manual mask local adjustments for Phase 19.2.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ManualMaskLocalAdjustments {
+    pub exposure: Option<f64>,
+    pub contrast: Option<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EditMetadata {
@@ -675,6 +682,98 @@ pub fn manual_mask_source() -> MaskSource {
         model_version: None,
         extensions: Map::new(),
     }
+}
+
+/// Build a schema-valid manual linear gradient mask without persisting it.
+#[allow(clippy::too_many_arguments)]
+pub fn manual_linear_gradient_mask(
+    id: impl Into<String>,
+    name: impl Into<String>,
+    opacity: f64,
+    feather: f64,
+    invert: bool,
+    start_x: f64,
+    start_y: f64,
+    end_x: f64,
+    end_y: f64,
+    local_adjustments: ManualMaskLocalAdjustments,
+) -> Result<Mask, EditGraphValidationError> {
+    let mask = Mask {
+        id: non_empty_mask_string("masks.id", id.into())?,
+        mask_type: MaskType::LinearGradient,
+        name: non_empty_mask_string("masks.name", name.into())?,
+        enabled: true,
+        invert,
+        opacity: number_from_f64("masks.opacity", opacity)?,
+        feather: number_from_f64("masks.feather", feather)?,
+        source: manual_mask_source(),
+        geometry: Some(MaskGeometry::LinearGradient {
+            start_x: number_from_f64("masks.geometry.start_x", start_x)?,
+            start_y: number_from_f64("masks.geometry.start_y", start_y)?,
+            end_x: number_from_f64("masks.geometry.end_x", end_x)?,
+            end_y: number_from_f64("masks.geometry.end_y", end_y)?,
+        }),
+        local_adjustments: manual_mask_local_adjustments(local_adjustments)?,
+    };
+    validate_mask(0, &mask)?;
+    Ok(mask)
+}
+
+/// Build a schema-valid manual radial gradient mask without persisting it.
+#[allow(clippy::too_many_arguments)]
+pub fn manual_radial_gradient_mask(
+    id: impl Into<String>,
+    name: impl Into<String>,
+    opacity: f64,
+    feather: f64,
+    invert: bool,
+    center_x: f64,
+    center_y: f64,
+    radius_x: f64,
+    radius_y: f64,
+    rotation: f64,
+    local_adjustments: ManualMaskLocalAdjustments,
+) -> Result<Mask, EditGraphValidationError> {
+    let mask = Mask {
+        id: non_empty_mask_string("masks.id", id.into())?,
+        mask_type: MaskType::RadialGradient,
+        name: non_empty_mask_string("masks.name", name.into())?,
+        enabled: true,
+        invert,
+        opacity: number_from_f64("masks.opacity", opacity)?,
+        feather: number_from_f64("masks.feather", feather)?,
+        source: manual_mask_source(),
+        geometry: Some(MaskGeometry::RadialGradient {
+            center_x: number_from_f64("masks.geometry.center_x", center_x)?,
+            center_y: number_from_f64("masks.geometry.center_y", center_y)?,
+            radius_x: number_from_f64("masks.geometry.radius_x", radius_x)?,
+            radius_y: number_from_f64("masks.geometry.radius_y", radius_y)?,
+            rotation: number_from_f64("masks.geometry.rotation", rotation)?,
+        }),
+        local_adjustments: manual_mask_local_adjustments(local_adjustments)?,
+    };
+    validate_mask(0, &mask)?;
+    Ok(mask)
+}
+
+/// Append a manual mask to a cloned edit graph without touching external state.
+pub fn append_manual_mask(
+    graph: &EditGraph,
+    mask: Mask,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    if graph.masks.iter().any(|existing| existing.id == mask.id) {
+        return Err(EditGraphValidationError::new(
+            "masks",
+            format!("duplicate mask id: {}", mask.id),
+        ));
+    }
+    validate_mask(graph.masks.len(), &mask)?;
+    let mut edited = graph.clone();
+    edited.masks.push(mask);
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
 }
 
 /// Return a draft graph with exposure and contrast adjusted, without persistence.
@@ -1584,6 +1683,47 @@ fn validate_mask(index: usize, mask: &Mask) -> Result<(), EditGraphValidationErr
     Ok(())
 }
 
+fn manual_mask_local_adjustments(
+    adjustments: ManualMaskLocalAdjustments,
+) -> Result<BTreeMap<String, Number>, EditGraphValidationError> {
+    let mut values = BTreeMap::new();
+    if let Some(exposure) = adjustments.exposure {
+        values.insert(
+            "exposure".to_string(),
+            number_from_f64("masks.local_adjustments.exposure", exposure)?,
+        );
+        validate_range(
+            "masks.local_adjustments.exposure",
+            values.get("exposure").expect("inserted exposure"),
+            -5.0,
+            5.0,
+        )?;
+    }
+    if let Some(contrast) = adjustments.contrast {
+        values.insert(
+            "contrast".to_string(),
+            number_from_f64("masks.local_adjustments.contrast", contrast)?,
+        );
+        validate_range(
+            "masks.local_adjustments.contrast",
+            values.get("contrast").expect("inserted contrast"),
+            -100.0,
+            100.0,
+        )?;
+    }
+    Ok(values)
+}
+
+fn non_empty_mask_string(
+    path: &'static str,
+    value: String,
+) -> Result<String, EditGraphValidationError> {
+    if value.trim().is_empty() {
+        return Err(EditGraphValidationError::new(path, "must not be empty"));
+    }
+    Ok(value)
+}
+
 fn validate_mask_source(index: usize, source: &MaskSource) -> Result<(), EditGraphValidationError> {
     if source.kind != MaskSourceKind::Manual {
         return Ok(());
@@ -1958,6 +2098,126 @@ mod tests {
         let hidden_geometry_error =
             super::validate_edit_graph_json(&value).expect_err("manual source hidden geometry");
         assert!(hidden_geometry_error.to_string().contains("masks.0.source"));
+    }
+
+    #[test]
+    fn builds_manual_gradient_masks_with_supported_local_adjustments() {
+        let graph: super::EditGraph =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("deserialize edit graph");
+        let adjustments = super::ManualMaskLocalAdjustments {
+            exposure: Some(-0.75),
+            contrast: Some(12.0),
+        };
+
+        let linear = super::manual_linear_gradient_mask(
+            "mask-linear-1",
+            "Top burn",
+            80.0,
+            25.0,
+            false,
+            0.2,
+            0.0,
+            0.8,
+            1.0,
+            adjustments,
+        )
+        .expect("manual linear mask");
+        let edited =
+            super::append_manual_mask(&graph, linear, "unix:3").expect("append linear mask");
+        let radial = super::manual_radial_gradient_mask(
+            "mask-radial-1",
+            "Face lift",
+            60.0,
+            45.0,
+            false,
+            0.5,
+            0.45,
+            0.25,
+            0.3,
+            0.0,
+            super::ManualMaskLocalAdjustments {
+                exposure: Some(0.35),
+                contrast: None,
+            },
+        )
+        .expect("manual radial mask");
+        let edited =
+            super::append_manual_mask(&edited, radial, "unix:4").expect("append radial mask");
+
+        assert_eq!(edited.updated_at, "unix:4");
+        assert_eq!(edited.masks.len(), 2);
+        assert_eq!(edited.masks[0].source, super::manual_mask_source());
+        assert_eq!(
+            edited.masks[0]
+                .local_adjustments
+                .get("exposure")
+                .and_then(|value| value.as_f64()),
+            Some(-0.75)
+        );
+        assert_eq!(
+            edited.masks[0]
+                .local_adjustments
+                .get("contrast")
+                .and_then(|value| value.as_f64()),
+            Some(12.0)
+        );
+
+        let serialized = serde_json::to_value(&edited).expect("serialize manual masks");
+        let round_tripped: super::EditGraph =
+            serde_json::from_value(serialized.clone()).expect("round-trip manual masks");
+        assert_eq!(round_tripped, edited);
+        super::validate_edit_graph_json(&serialized).expect("manual masks validate");
+    }
+
+    #[test]
+    fn rejects_invalid_manual_gradient_mask_helpers() {
+        let graph: super::EditGraph =
+            serde_json::from_str(include_str!("../../../schemas/edit_graph.example.json"))
+                .expect("deserialize edit graph");
+
+        let bad_adjustment = super::manual_linear_gradient_mask(
+            "mask-linear-1",
+            "Too bright",
+            80.0,
+            25.0,
+            false,
+            0.2,
+            0.0,
+            0.8,
+            1.0,
+            super::ManualMaskLocalAdjustments {
+                exposure: Some(6.0),
+                contrast: Some(0.0),
+            },
+        )
+        .expect_err("unsupported exposure range");
+        assert!(bad_adjustment
+            .to_string()
+            .contains("local_adjustments.exposure"));
+
+        let mask = super::manual_radial_gradient_mask(
+            "mask-radial-1",
+            "Face lift",
+            60.0,
+            45.0,
+            false,
+            0.5,
+            0.45,
+            0.25,
+            0.3,
+            0.0,
+            super::ManualMaskLocalAdjustments {
+                exposure: Some(0.35),
+                contrast: None,
+            },
+        )
+        .expect("manual radial mask");
+        let edited =
+            super::append_manual_mask(&graph, mask.clone(), "unix:3").expect("append mask once");
+        let duplicate =
+            super::append_manual_mask(&edited, mask, "unix:4").expect_err("duplicate mask id");
+        assert!(duplicate.to_string().contains("masks"));
     }
 
     #[test]

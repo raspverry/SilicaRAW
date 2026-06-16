@@ -26,8 +26,8 @@ Phase 19 is manual-first. AI masks remain deferred until mask provenance, action
 | Task | Name | Gate |
 | --- | --- | --- |
 | 19.1 | Mask Schema and Edit Graph Audit | Complete: manual gradient geometry and provenance boundaries are schema-owned before behavior is added |
-| 19.2 | Linear and Radial Manual Masks | Active: simple manual gradient masks persist in the edit graph and preview only where supported |
-| 19.3 | Brush Mask Storage and Rasterization | Pending: brush data remains non-destructive and durable data stays separate from disposable raster/cache artifacts |
+| 19.2 | Linear and Radial Manual Masks | Complete: manual gradient masks persist in the edit graph, preview on supported JPEG/JPG paths, and block export until compositing is implemented |
+| 19.3 | Brush Mask Storage and Rasterization | Active: brush data remains non-destructive and durable data stays separate from disposable raster/cache artifacts |
 | 19.4 | Mask Compositing in Preview and Export | Pending: committed masks apply consistently in preview and export or block honestly |
 | 19.5 | Mask Editor Visual QA | Pending: mask editor UI matches design system and visual QA covers the active mask screen |
 

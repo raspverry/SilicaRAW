@@ -108,6 +108,7 @@ pub struct ExposureContrastPreviewRequest {
     pub hsl_color_mixer: HslColorMixerRenderAdjustment,
     pub detail: DetailRenderAdjustment,
     pub geometry: GeometryRenderAdjustment,
+    pub masks: Vec<ManualMaskRenderAdjustment>,
     pub message: String,
 }
 
@@ -129,6 +130,37 @@ pub struct JpegSrgbExportRenderRequest {
     pub geometry: GeometryRenderAdjustment,
     pub quality: u8,
     pub message: String,
+}
+
+/// Manual gradient mask geometry carried by preview render requests.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ManualMaskRenderGeometry {
+    LinearGradient {
+        start_x: f64,
+        start_y: f64,
+        end_x: f64,
+        end_y: f64,
+    },
+    RadialGradient {
+        center_x: f64,
+        center_y: f64,
+        radius_x: f64,
+        radius_y: f64,
+        rotation: f64,
+    },
+}
+
+/// Manual mask adjustment carried by preview render requests.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ManualMaskRenderAdjustment {
+    pub id: String,
+    pub enabled: bool,
+    pub invert: bool,
+    pub opacity: f64,
+    pub feather: f64,
+    pub geometry: ManualMaskRenderGeometry,
+    pub exposure: f64,
+    pub contrast: f64,
 }
 
 /// White balance mode carried through render planning.
@@ -1346,6 +1378,7 @@ pub fn plan_color_presence_preview(
         hsl_color_mixer: HslColorMixerRenderAdjustment::neutral(),
         detail: DetailRenderAdjustment::neutral(),
         geometry: GeometryRenderAdjustment::neutral(),
+        masks: Vec::new(),
         message,
     }
 }
@@ -1476,6 +1509,39 @@ pub fn plan_geometry_preview(
         } else {
             request.message = "Geometry preview request is ready.".to_string();
         }
+    }
+    request
+}
+
+/// Build a render request for a draft manual gradient mask preview update.
+pub fn plan_manual_mask_preview(
+    preview_plan: PreviewRenderPlan,
+    exposure: f64,
+    contrast: f64,
+    white_balance: WhiteBalanceRenderAdjustment,
+    tone_recovery: ToneRecoveryRenderAdjustment,
+    color_presence: ColorPresenceRenderAdjustment,
+    tone_curve: ToneCurveRenderAdjustment,
+    hsl_color_mixer: HslColorMixerRenderAdjustment,
+    detail: DetailRenderAdjustment,
+    geometry: GeometryRenderAdjustment,
+    masks: Vec<ManualMaskRenderAdjustment>,
+) -> ExposureContrastPreviewRequest {
+    let mut request = plan_geometry_preview(
+        preview_plan,
+        exposure,
+        contrast,
+        white_balance,
+        tone_recovery,
+        color_presence,
+        tone_curve,
+        hsl_color_mixer,
+        detail,
+        geometry,
+    );
+    request.masks = masks;
+    if request.status == PreviewRenderStatus::Ready {
+        request.message = "Manual mask preview request is ready.".to_string();
     }
     request
 }
@@ -2259,6 +2325,47 @@ mod tests {
         assert!(preview.message.contains("Geometry"));
         assert_eq!(export.geometry, geometry);
         assert!(export.message.contains("Geometry"));
+    }
+
+    #[test]
+    fn plans_manual_mask_preview_request() {
+        let preview_plan = super::plan_preview_render(silica_decode::plan_preview_decode(
+            "/tmp/sample.jpg",
+            false,
+        ));
+        let mask = super::ManualMaskRenderAdjustment {
+            id: "mask-linear-1".to_string(),
+            enabled: true,
+            invert: false,
+            opacity: 85.0,
+            feather: 35.0,
+            geometry: super::ManualMaskRenderGeometry::LinearGradient {
+                start_x: 0.2,
+                start_y: 0.0,
+                end_x: 0.8,
+                end_y: 1.0,
+            },
+            exposure: -0.45,
+            contrast: 12.0,
+        };
+
+        let preview = super::plan_manual_mask_preview(
+            preview_plan,
+            0.25,
+            -3.0,
+            super::WhiteBalanceRenderAdjustment::neutral(),
+            super::ToneRecoveryRenderAdjustment::neutral(),
+            super::ColorPresenceRenderAdjustment::neutral(),
+            super::ToneCurveRenderAdjustment::neutral(),
+            super::HslColorMixerRenderAdjustment::neutral(),
+            super::DetailRenderAdjustment::neutral(),
+            super::GeometryRenderAdjustment::neutral(),
+            vec![mask.clone()],
+        );
+
+        assert_eq!(preview.status, super::PreviewRenderStatus::Ready);
+        assert_eq!(preview.masks, vec![mask]);
+        assert!(preview.message.contains("Manual mask"));
     }
 
     #[test]

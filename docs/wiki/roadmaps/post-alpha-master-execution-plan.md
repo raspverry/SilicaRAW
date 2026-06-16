@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 18 is complete. Phase 19 task cards exist. Task 19.1 is complete. Current next task is [Task 19.2 Linear and Radial Manual Masks](../tasks/19.2-linear-radial-manual-masks.md).
+- Phase 18 is complete. Phase 19 task cards exist. Tasks 19.1 and 19.2 are complete. Current next task is [Task 19.3 Brush Mask Storage and Rasterization](../tasks/19.3-brush-mask-storage-rasterization.md).
 
 ## Wave Map
 
@@ -387,7 +387,7 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Start [Task 19.2 Linear and Radial Manual Masks](../tasks/19.2-linear-radial-manual-masks.md).
+1. Start [Task 19.3 Brush Mask Storage and Rasterization](../tasks/19.3-brush-mask-storage-rasterization.md).
 2. Continue Phase 19 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links

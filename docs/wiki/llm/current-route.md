@@ -16,7 +16,7 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 18 is complete. The current product area is **Phase 19: Manual Masks**.
 
-Task 19.1 is complete. The current next task is [Task 19.2 Linear and Radial Manual Masks](../tasks/19.2-linear-radial-manual-masks.md).
+Tasks 19.1 and 19.2 are complete. The current next task is [Task 19.3 Brush Mask Storage and Rasterization](../tasks/19.3-brush-mask-storage-rasterization.md).
 
 ## Minimal Read Set
 

@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-16] phase-19 | Linear and radial manual masks completed
+
+- Completed Task 19.2 with graph-owned manual linear/radial mask helpers and undoable core commit APIs.
+- Added supported JPEG/JPG develop-preview mask application while keeping mask editor UI deferred to Task 19.5.
+- Added an export guard so active manual masks block before JPEG output until Task 19.4 compositing exists.
+- Routed Phase 19 to Task 19.3 for brush mask storage and rasterization.
+
 ## [2026-06-16] phase-19 | Mask schema audit completed
 
 - Completed Task 19.1 with explicit schema-owned manual gradient mask geometry.
