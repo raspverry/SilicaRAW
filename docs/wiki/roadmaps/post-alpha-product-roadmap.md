@@ -772,14 +772,15 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 ### Task 19.2: Linear and Radial Manual Masks
 
-- **Location:** `crates/silica-edit`, `crates/silica-render`, `apps/desktop/static/`, `MockupUI/M006_Develop_mask_active.png`
+- **Location:** `crates/silica-edit`, `crates/silica-render`, `crates/silica-export`, `crates/silica-core`
 - **Description:** Add simple manual gradient masks with preview support.
 - **Dependencies:** Task 19.1
 - **Acceptance Criteria:**
   - Mask geometry persists in the edit graph.
   - Mask preview is visible where render path supports it.
   - Unsupported mask rendering states are explicit.
-- **Validation:** Edit/render/UI tests.
+- **Status:** Completed on 2026-06-16. Added linear/radial manual mask helpers, disposable JPEG/JPG develop-preview mask application, undoable core commit APIs, and an export guard that blocks active masks until Task 19.4 export compositing exists. Mask editor UI remains deferred to Task 19.5.
+- **Validation:** `cargo test -p silica-edit -p silica-render -p silica-export -p silica-core`
 
 ### Task 19.3: Brush Mask Storage and Rasterization
 

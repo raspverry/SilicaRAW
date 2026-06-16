@@ -351,6 +351,37 @@ impl GeometryAdjustment {
     }
 }
 
+/// Manual gradient mask geometry applied to disposable preview output.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ManualMaskGeometry {
+    LinearGradient {
+        start_x: f64,
+        start_y: f64,
+        end_x: f64,
+        end_y: f64,
+    },
+    RadialGradient {
+        center_x: f64,
+        center_y: f64,
+        radius_x: f64,
+        radius_y: f64,
+        rotation: f64,
+    },
+}
+
+/// Supported manual mask adjustment applied to disposable preview output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ManualMaskAdjustment {
+    pub id: String,
+    pub enabled: bool,
+    pub invert: bool,
+    pub opacity: f64,
+    pub feather: f64,
+    pub geometry: ManualMaskGeometry,
+    pub exposure: f64,
+    pub contrast: f64,
+}
+
 /// Color presence values applied to local JPEG preview/export pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColorPresenceAdjustment {
@@ -416,6 +447,7 @@ pub struct JpegDevelopPreviewRequest {
     pub hsl_color_mixer: HslColorMixerAdjustment,
     pub detail: DetailAdjustment,
     pub geometry: GeometryAdjustment,
+    pub masks: Vec<ManualMaskAdjustment>,
 }
 
 /// Request to compute Develop histogram data from a supported JPEG source.
@@ -775,6 +807,7 @@ pub fn write_jpeg_develop_preview(
     apply_tone_curve(&mut rgb, &request.tone_curve);
     apply_color_presence(&mut rgb, request.color_presence);
     apply_hsl_color_mixer(&mut rgb, request.hsl_color_mixer);
+    apply_manual_masks(&mut rgb, &request.masks);
     let rgb = apply_supported_geometry(rgb, &request.geometry)?;
 
     let mut output = File::create(&request.output_path)?;
@@ -966,6 +999,101 @@ fn apply_color_presence(image: &mut image::RgbImage, color_presence: ColorPresen
         pixel.0[0] = ((luma + (red - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
         pixel.0[1] = ((luma + (green - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
         pixel.0[2] = ((luma + (blue - luma) * factor).clamp(0.0, 1.0) * 255.0).round() as u8;
+    }
+}
+
+fn apply_manual_masks(image: &mut image::RgbImage, masks: &[ManualMaskAdjustment]) {
+    if masks.is_empty() {
+        return;
+    }
+
+    let width = image.width().max(1) as f32;
+    let height = image.height().max(1) as f32;
+    for (x, y, pixel) in image.enumerate_pixels_mut() {
+        let normalized_x = if width <= 1.0 {
+            0.0
+        } else {
+            x as f32 / (width - 1.0)
+        };
+        let normalized_y = if height <= 1.0 {
+            0.0
+        } else {
+            y as f32 / (height - 1.0)
+        };
+        for mask in masks {
+            if !mask.enabled {
+                continue;
+            }
+            let mut weight = mask_weight(mask, normalized_x, normalized_y);
+            if mask.invert {
+                weight = 1.0 - weight;
+            }
+            weight = (weight * (mask.opacity as f32 / 100.0).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+            if weight <= 0.0 {
+                continue;
+            }
+            let exposure_scale = 2.0_f32.powf((mask.exposure as f32) * weight);
+            let contrast = (mask.contrast as f32) * weight;
+            let contrast_scale = ((100.0 + contrast) / 100.0).max(0.0);
+            for channel in &mut pixel.0 {
+                let normalized = f32::from(*channel) / 255.0;
+                let adjusted =
+                    ((normalized * exposure_scale - 0.5) * contrast_scale + 0.5).clamp(0.0, 1.0);
+                *channel = (adjusted * 255.0).round() as u8;
+            }
+        }
+    }
+}
+
+fn mask_weight(mask: &ManualMaskAdjustment, x: f32, y: f32) -> f32 {
+    match mask.geometry {
+        ManualMaskGeometry::LinearGradient {
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+        } => {
+            let start_x = start_x as f32;
+            let start_y = start_y as f32;
+            let vector_x = end_x as f32 - start_x;
+            let vector_y = end_y as f32 - start_y;
+            let length_squared = (vector_x * vector_x + vector_y * vector_y).max(f32::EPSILON);
+            let projection = ((x - start_x) * vector_x + (y - start_y) * vector_y) / length_squared;
+            smooth_mask_edge(projection.clamp(0.0, 1.0), mask.feather)
+        }
+        ManualMaskGeometry::RadialGradient {
+            center_x,
+            center_y,
+            radius_x,
+            radius_y,
+            rotation,
+        } => {
+            let angle = -(rotation as f32).to_radians();
+            let cos = angle.cos();
+            let sin = angle.sin();
+            let dx = x - center_x as f32;
+            let dy = y - center_y as f32;
+            let rotated_x = (dx * cos - dy * sin) / (radius_x as f32).max(f32::EPSILON);
+            let rotated_y = (dx * sin + dy * cos) / (radius_y as f32).max(f32::EPSILON);
+            let distance = (rotated_x * rotated_x + rotated_y * rotated_y).sqrt();
+            smooth_mask_edge((1.0 - distance).clamp(0.0, 1.0), mask.feather)
+        }
+    }
+}
+
+fn smooth_mask_edge(weight: f32, feather: f64) -> f32 {
+    let feather = (feather as f32 / 100.0).clamp(0.0, 1.0);
+    if feather <= f32::EPSILON {
+        return weight;
+    }
+    let lower = (0.5 - feather * 0.5).clamp(0.0, 1.0);
+    let upper = (0.5 + feather * 0.5).clamp(0.0, 1.0);
+    if weight <= lower {
+        0.0
+    } else if weight >= upper {
+        1.0
+    } else {
+        ((weight - lower) / (upper - lower).max(f32::EPSILON)).clamp(0.0, 1.0)
     }
 }
 
@@ -1778,6 +1906,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1794,6 +1923,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write adjusted preview");
 
@@ -1804,6 +1934,79 @@ mod tests {
         assert_ne!(
             std::fs::read(neutral.output_path).expect("read neutral preview"),
             std::fs::read(adjusted.output_path).expect("read adjusted preview")
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn writes_masked_jpeg_preview_without_mutating_original() {
+        let root = unique_export_root("masked-develop-preview");
+        let source_path = root.join("source.jpg");
+        let neutral_path = root.join("previews").join("source-neutral.jpg");
+        let masked_path = root.join("previews").join("source-masked.jpg");
+        std::fs::create_dir_all(neutral_path.parent().expect("preview parent"))
+            .expect("create preview directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        let mask = super::ManualMaskAdjustment {
+            id: "mask-linear-1".to_string(),
+            enabled: true,
+            invert: false,
+            opacity: 100.0,
+            feather: 0.0,
+            geometry: super::ManualMaskGeometry::LinearGradient {
+                start_x: 0.0,
+                start_y: 0.0,
+                end_x: 1.0,
+                end_y: 1.0,
+            },
+            exposure: 1.0,
+            contrast: 0.0,
+        };
+
+        let neutral = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: neutral_path,
+            max_edge: 2,
+            quality: 95,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+        })
+        .expect("write neutral preview");
+        let masked = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
+            source_path: source_path.clone(),
+            output_path: masked_path,
+            max_edge: 2,
+            quality: 95,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: vec![mask],
+        })
+        .expect("write masked preview");
+
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        assert_ne!(
+            std::fs::read(neutral.output_path).expect("read neutral preview"),
+            std::fs::read(masked.output_path).expect("read masked preview")
         );
 
         remove_export_root(&root);
@@ -1842,6 +2045,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -1858,6 +2062,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write white balance preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -1931,6 +2136,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: geometry.clone(),
+            masks: Vec::new(),
         })
         .expect("write geometry preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -2040,6 +2246,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -2056,6 +2263,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write tone recovery preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -2127,6 +2335,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -2143,6 +2352,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write tone curve preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -2207,6 +2417,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -2223,6 +2434,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write color presence preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -2291,6 +2503,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write neutral preview");
         let adjusted = super::write_jpeg_develop_preview(super::JpegDevelopPreviewRequest {
@@ -2307,6 +2520,7 @@ mod tests {
             hsl_color_mixer,
             detail: super::DetailAdjustment::neutral(),
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect("write hsl preview");
         let exported = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
@@ -2374,6 +2588,7 @@ mod tests {
             hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
             detail,
             geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
         })
         .expect_err("detail preview unsupported");
         let export_error = super::export_jpeg_with_color_profile(super::JpegColorExportRequest {
