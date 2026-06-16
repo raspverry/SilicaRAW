@@ -56,7 +56,7 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 18 is complete. Phase 19 task cards exist. Tasks 19.1 through 19.4 are complete. Current next task is [Task 19.5 Mask Editor Visual QA](../tasks/19.5-mask-editor-visual-qa.md).
+- Phase 19 is complete. Current next task is [Task 20.1 Export Settings Model and Presets](../tasks/20.1-export-settings-model-presets.md).
 
 ## Wave Map
 
@@ -387,8 +387,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Start [Task 19.5 Mask Editor Visual QA](../tasks/19.5-mask-editor-visual-qa.md).
-2. Continue Phase 19 in task-card order after each slice passes focused checks and the full harness.
+1. Start [Task 20.1 Export Settings Model and Presets](../tasks/20.1-export-settings-model-presets.md).
+2. Continue Phase 20 in task-card order after each slice passes focused checks and the full harness.
 
 ## Links
 

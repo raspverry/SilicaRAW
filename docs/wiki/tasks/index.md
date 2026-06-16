@@ -102,11 +102,17 @@ Phase 18 is complete. Prefer [Phase 18 Summary](../phases/phase-18-summary.md) u
 
 ## Phase 19
 
+Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-masks.md) unless changing completed mask behavior.
+
 - [19.1: Mask Schema and Edit Graph Audit](19.1-mask-schema-edit-graph-audit.md)
 - [19.2: Linear and Radial Manual Masks](19.2-linear-radial-manual-masks.md)
 - [19.3: Brush Mask Storage and Rasterization](19.3-brush-mask-storage-rasterization.md)
 - [19.4: Mask Compositing in Preview and Export](19.4-mask-compositing-preview-export.md)
 - [19.5: Mask Editor Visual QA](19.5-mask-editor-visual-qa.md)
+
+## Phase 20
+
+- [20.1: Export Settings Model and Presets](20.1-export-settings-model-presets.md)
 
 ## Notes for LLM Agents
 

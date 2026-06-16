@@ -14,30 +14,30 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 18 is complete. The current product area is **Phase 19: Manual Masks**.
+Phase 19 is complete. The current product area is **Phase 20: Export and Delivery Expansion**.
 
-Tasks 19.1 through 19.4 are complete. The current next task is [Task 19.5 Mask Editor Visual QA](../tasks/19.5-mask-editor-visual-qa.md).
+The current next task is [Task 20.1 Export Settings Model and Presets](../tasks/20.1-export-settings-model-presets.md).
 
 ## Minimal Read Set
 
-For Phase 19 task-card creation or implementation, read:
+For Phase 20 task-card creation or implementation, read:
 
-- [Phase 19 Brief](../phases/phase-19-manual-masks.md)
-- The selected Phase 19 task card under [Task Cards](../tasks/index.md)
+- The selected Phase 20 task card under [Task Cards](../tasks/index.md)
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap: Phase 19](../roadmaps/post-alpha-product-roadmap.md#phase-19-masks-and-local-mask-pipeline)
+- [Post-Alpha Product Roadmap: Phase 20](../roadmaps/post-alpha-product-roadmap.md#phase-20-export-and-delivery-expansion)
 - [Edit Graph](../topics/edit-graph.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
-## Phase 18 Context
+## Phase 19 Context
 
-Use [Phase 18 Summary](../phases/phase-18-summary.md) for historical context. Do not read every Phase 18 task card unless the task directly changes completed Phase 18 behavior.
+Use [Phase 19 Manual Masks](../phases/phase-19-manual-masks.md) for completed mask context. Do not read every Phase 19 task card unless the task directly changes completed mask behavior.
 
 ## Stop Rules
 
-- Do not invent mask schema fields outside the authoritative edit graph schema.
+- Do not mix export settings into edit graph state.
+- Do not add PNG, TIFF, metadata controls, or batch export before their scoped tasks.
 - Do not add MLX, MCP, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support.
 - Do not mutate original photo files.

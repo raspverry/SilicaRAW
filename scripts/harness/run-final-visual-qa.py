@@ -33,6 +33,7 @@ SURFACES = [
     ("M003-library-populated", "grid"),
     ("M004-loupe", "loupe"),
     ("M005-develop", "develop"),
+    ("M006-mask-active", "mask-active"),
     ("M014-edit-clipboard-sync", "clipboard"),
     ("M007-export", "export"),
     ("M008-minimal-maintenance", "maintenance"),
@@ -663,7 +664,7 @@ def state_script(state):
     loupeViewer.dataset.previewStatus = "ready";
     loupeViewer.querySelectorAll(".sr-loupe-image").forEach((image) => image.remove());
     loupeViewer.prepend(thumb(imagePath, "sr-loupe-image"));
-  }} else if (state === "develop") {{
+  }} else if (state === "develop" || state === "mask-active") {{
     openLibraryBase(true);
     setMode("develop");
     document.querySelector("#developPhotoName").textContent = "synthetic-gradient.jpg";
@@ -819,7 +820,72 @@ def state_script(state):
     developSurface.dataset.hasPreviewImage = "true";
     developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
     developSurface.prepend(thumb(imagePath, "sr-develop-image"));
-    document.querySelector("#developLensGeometryPanel").scrollIntoView({{ block: "center" }});
+    if (state === "mask-active") {{
+      const maskRows = {{
+        brush: ["#developMaskBrushRow", "#developMaskBrushName", "#developMaskBrushSummary", "#developMaskBrushState"],
+        linear: ["#developMaskLinearRow", "#developMaskLinearName", "#developMaskLinearSummary", "#developMaskLinearState"],
+        radial: ["#developMaskRadialRow", "#developMaskRadialName", "#developMaskRadialSummary", "#developMaskRadialState"],
+      }};
+      const setMaskRow = (key, name, summary, stateText, active) => {{
+        const [rowSelector, nameSelector, summarySelector, stateSelector] = maskRows[key];
+        const row = document.querySelector(rowSelector);
+        row.disabled = false;
+        row.dataset.maskRowState = active ? "active" : "ready";
+        row.classList.toggle("is-active", active);
+        row.setAttribute("aria-pressed", String(active));
+        document.querySelector(nameSelector).textContent = name;
+        document.querySelector(summarySelector).textContent = summary;
+        document.querySelector(stateSelector).textContent = stateText;
+      }};
+      document.querySelector("#developMaskPanel").dataset.maskState = "active";
+      document.querySelector("#developMaskSelectedPhoto").value = "Selected photo: synthetic-gradient.jpg";
+      document.querySelector("#developMaskSelectedPhoto").textContent = "Selected photo: synthetic-gradient.jpg";
+      document.querySelector("#developMaskSupportStatus").value = "Manual Active";
+      document.querySelector("#developMaskSupportStatus").textContent = "Manual Active";
+      document.querySelector("#developMaskBoundaryStatus").value = "Linear Gradient 1 is scoped to the selected photo.";
+      document.querySelector("#developMaskBoundaryStatus").textContent = "Linear Gradient 1 is scoped to the selected photo.";
+      document.querySelector("#developMaskRawBoundaryStatus").value = "RAW masked export blocks before output until RAW decode is implemented.";
+      document.querySelector("#developMaskRawBoundaryStatus").textContent = "RAW masked export blocks before output until RAW decode is implemented.";
+      setMaskRow("brush", "Brush 1", "Brush raster from committed strokes", "On", false);
+      setMaskRow("linear", "Linear Gradient 1", "Linear 0%,0% to 100%,100%", "On", true);
+      setMaskRow("radial", "Radial Gradient 1", "Radial center 50%,50%, radius 30% x 24%", "On", false);
+      document.querySelector("#developMaskSubjectUnavailable").disabled = true;
+      document.querySelector("#developMaskSkyUnavailable").disabled = true;
+      document.querySelector("#developMaskToolManual").disabled = true;
+      document.querySelector("#developMaskToolAI").disabled = true;
+      document.querySelector("#developMaskToolMLX").disabled = true;
+      document.querySelector("#developMaskAddMask").disabled = true;
+      document.querySelector("#developMaskActiveState").value = "Linear Gradient 1 (Linear Gradient)";
+      document.querySelector("#developMaskActiveState").textContent = "Linear Gradient 1 (Linear Gradient)";
+      document.querySelector("#developMaskActiveGeometry").value = "Linear 0%,0% to 100%,100%";
+      document.querySelector("#developMaskActiveGeometry").textContent = "Linear 0%,0% to 100%,100%";
+      document.querySelector("#developMaskOverlayToggle").checked = true;
+      document.querySelector("#developMaskOverlayToggle").disabled = true;
+      document.querySelector("#developMaskExposureSlider").value = "0.75";
+      document.querySelector("#developMaskExposureValue").value = "0.75";
+      document.querySelector("#developMaskContrastSlider").value = "-12";
+      document.querySelector("#developMaskContrastValue").value = "-12";
+      document.querySelector("#developMaskOpacitySlider").value = "82";
+      document.querySelector("#developMaskOpacityValue").value = "82%";
+      document.querySelector("#developMaskOpacityValue").textContent = "82%";
+      document.querySelector("#developMaskFeatherSlider").value = "24";
+      document.querySelector("#developMaskFeatherValue").value = "24";
+      document.querySelector("#developMaskFeatherValue").textContent = "24";
+      [
+        "#developMaskExposureSlider",
+        "#developMaskExposureValue",
+        "#developMaskContrastSlider",
+        "#developMaskContrastValue",
+        "#developMaskOpacitySlider",
+        "#developMaskFeatherSlider",
+      ].forEach((selector) => {{
+        const control = document.querySelector(selector);
+        if (control) control.disabled = true;
+      }});
+      document.querySelector("#developMaskPanel").scrollIntoView({{ block: "start" }});
+    }} else {{
+      document.querySelector("#developLensGeometryPanel").scrollIntoView({{ block: "center" }});
+    }}
   }} else if (state === "clipboard") {{
     openLibraryBase(true);
     setMode("develop");
@@ -1012,6 +1078,31 @@ def metric_script(surface):
         "#developGeometryTransformHorizontalSlider",
       ].every((selector) => disabled(selector)),
     }},
+    maskState: {{
+      visible: Boolean(box("#developMaskPanel")),
+      panelState: document.querySelector("#developMaskPanel")?.dataset.maskState || "",
+      selectedPhoto: text("#developMaskSelectedPhoto"),
+      supportStatus: text("#developMaskSupportStatus"),
+      boundary: text("#developMaskBoundaryStatus"),
+      rawBoundary: text("#developMaskRawBoundaryStatus"),
+      activeState: text("#developMaskActiveState"),
+      activeGeometry: text("#developMaskActiveGeometry"),
+      linearActive: document.querySelector("#developMaskLinearRow")?.getAttribute("aria-pressed") === "true",
+      brushEnabled: !disabled("#developMaskBrushRow"),
+      linearEnabled: !disabled("#developMaskLinearRow"),
+      radialEnabled: !disabled("#developMaskRadialRow"),
+      subjectDisabled: disabled("#developMaskSubjectUnavailable"),
+      skyDisabled: disabled("#developMaskSkyUnavailable"),
+      aiDisabled: disabled("#developMaskToolAI"),
+      mlxDisabled: disabled("#developMaskToolMLX"),
+      addDisabled: disabled("#developMaskAddMask"),
+      exposure: document.querySelector("#developMaskExposureSlider")?.value || "",
+      contrast: document.querySelector("#developMaskContrastSlider")?.value || "",
+      opacity: document.querySelector("#developMaskOpacitySlider")?.value || "",
+      feather: document.querySelector("#developMaskFeatherSlider")?.value || "",
+      exposureDisabled: disabled("#developMaskExposureSlider"),
+      contrastDisabled: disabled("#developMaskContrastSlider"),
+    }},
     clipboardState: {{
       visible: Boolean(box("#developClipboardPanel")),
       source: text("#developClipboardSource"),
@@ -1114,6 +1205,40 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: lens unsupported state copy wrong")
                     if develop_state["geometryTransformStatus"] != "Transform unsupported." or not develop_state["geometryUnsupportedDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: unsupported geometry/lens controls enabled")
+                if state == "mask-active":
+                    mask_state = metrics["maskState"]
+                    if not mask_state["visible"] or mask_state["panelState"] != "active":
+                        failures.append(f"{viewport_name} {surface_name}: mask panel active state not visible")
+                    if mask_state["selectedPhoto"] != "Selected photo: synthetic-gradient.jpg":
+                        failures.append(f"{viewport_name} {surface_name}: mask selected-photo scope unclear")
+                    if mask_state["supportStatus"] != "Manual Active":
+                        failures.append(f"{viewport_name} {surface_name}: mask support status wrong")
+                    if "Linear Gradient 1" not in mask_state["activeState"] or not mask_state["linearActive"]:
+                        failures.append(f"{viewport_name} {surface_name}: active manual mask row not visible")
+                    if "Linear" not in mask_state["activeGeometry"]:
+                        failures.append(f"{viewport_name} {surface_name}: active mask geometry readback missing")
+                    if not (
+                        mask_state["brushEnabled"]
+                        and mask_state["linearEnabled"]
+                        and mask_state["radialEnabled"]
+                    ):
+                        failures.append(f"{viewport_name} {surface_name}: manual mask rows unavailable")
+                    if not (
+                        mask_state["subjectDisabled"]
+                        and mask_state["skyDisabled"]
+                        and mask_state["aiDisabled"]
+                        and mask_state["mlxDisabled"]
+                        and mask_state["addDisabled"]
+                    ):
+                        failures.append(f"{viewport_name} {surface_name}: unsupported mask controls enabled")
+                    if mask_state["exposure"] != "0.75" or mask_state["contrast"] != "-12":
+                        failures.append(f"{viewport_name} {surface_name}: mask exposure/contrast readback wrong")
+                    if mask_state["opacity"] != "82" or mask_state["feather"] != "24":
+                        failures.append(f"{viewport_name} {surface_name}: mask opacity/feather readback wrong")
+                    if not mask_state["exposureDisabled"] or not mask_state["contrastDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: mask local adjustment readback is editable")
+                    if mask_state["rawBoundary"] != "RAW masked export blocks before output until RAW decode is implemented.":
+                        failures.append(f"{viewport_name} {surface_name}: RAW mask blocked boundary missing")
                 if state == "clipboard":
                     clipboard_state = metrics["clipboardState"]
                     if not clipboard_state["visible"]:

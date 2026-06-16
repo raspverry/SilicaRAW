@@ -393,6 +393,98 @@
               <button id="developContrastReset" type="button">Reset</button>
             </div>
           </div>
+          <div class="sr-mask-panel" id="developMaskPanel" data-mask-state="empty">
+            <div class="sr-mask-title-row">
+              <div>
+                <div class="sr-panel-heading">Mask</div>
+                <output id="developMaskSelectedPhoto" aria-live="polite">Selected photo: None</output>
+              </div>
+              <output id="developMaskSupportStatus" aria-live="polite">Manual</output>
+            </div>
+            <output class="sr-mask-boundary-status" id="developMaskBoundaryStatus" aria-live="polite">Manual masks read from committed edit state.</output>
+            <output class="sr-mask-boundary-status" id="developMaskRawBoundaryStatus" aria-live="polite">RAW masked export blocks before output until RAW decode is implemented.</output>
+            <div class="sr-mask-tool-row" role="group" aria-label="Mask mode availability">
+              <button id="developMaskToolManual" type="button" aria-pressed="true" disabled>Manual</button>
+              <button id="developMaskToolAI" type="button" disabled>AI unavailable</button>
+              <button id="developMaskToolMLX" type="button" disabled>MLX unavailable</button>
+            </div>
+            <button class="sr-mask-add-action" id="developMaskAddMask" type="button" disabled>Add Mask</button>
+            <div class="sr-mask-list" id="developMaskList" role="list" aria-label="Manual mask readback">
+              <button class="sr-mask-row" id="developMaskBrushRow" type="button" data-mask-kind="brush" aria-pressed="false" disabled>
+                <span class="sr-mask-row-main">
+                  <span id="developMaskBrushName">Brush</span>
+                  <small id="developMaskBrushSummary">No committed brush mask</small>
+                </span>
+                <span id="developMaskBrushState">Empty</span>
+              </button>
+              <button class="sr-mask-row" id="developMaskLinearRow" type="button" data-mask-kind="linear_gradient" aria-pressed="false" disabled>
+                <span class="sr-mask-row-main">
+                  <span id="developMaskLinearName">Linear Gradient</span>
+                  <small id="developMaskLinearSummary">No committed linear mask</small>
+                </span>
+                <span id="developMaskLinearState">Empty</span>
+              </button>
+              <button class="sr-mask-row" id="developMaskRadialRow" type="button" data-mask-kind="radial_gradient" aria-pressed="false" disabled>
+                <span class="sr-mask-row-main">
+                  <span id="developMaskRadialName">Radial Gradient</span>
+                  <small id="developMaskRadialSummary">No committed radial mask</small>
+                </span>
+                <span id="developMaskRadialState">Empty</span>
+              </button>
+              <button class="sr-mask-row is-unavailable" id="developMaskSubjectUnavailable" type="button" disabled>
+                <span class="sr-mask-row-main">
+                  <span>Subject Mask</span>
+                  <small>AI selection unavailable in local alpha</small>
+                </span>
+                <span>Blocked</span>
+              </button>
+              <button class="sr-mask-row is-unavailable" id="developMaskSkyUnavailable" type="button" disabled>
+                <span class="sr-mask-row-main">
+                  <span>Sky Mask</span>
+                  <small>AI selection unavailable in local alpha</small>
+                </span>
+                <span>Blocked</span>
+              </button>
+            </div>
+            <div class="sr-mask-active-readback">
+              <div><span>Active</span><output id="developMaskActiveState" aria-live="polite">None</output></div>
+              <div><span>Geometry</span><output id="developMaskActiveGeometry" aria-live="polite">No active mask</output></div>
+              <label class="sr-mask-overlay-toggle" for="developMaskOverlayToggle">
+                <input id="developMaskOverlayToggle" type="checkbox" checked disabled>
+                Overlay
+                <span class="sr-mask-overlay-swatch" id="developMaskOverlayColor" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="sr-mask-adjustment-group" aria-label="Active mask readback">
+              <div class="sr-mask-group-heading">Local Adjustments</div>
+              <div class="sr-adjustment-slider" data-mask-control="exposure">
+                <div class="sr-adjustment-header">
+                  <label for="developMaskExposureSlider">Exposure</label>
+                  <input id="developMaskExposureValue" type="number" min="-5" max="5" step="0.05" value="0.00" aria-label="Mask exposure value" disabled>
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developMaskExposureSlider" type="range" min="-5" max="5" step="0.05" value="0" aria-label="Mask exposure" disabled>
+                </div>
+              </div>
+              <div class="sr-adjustment-slider" data-mask-control="contrast">
+                <div class="sr-adjustment-header">
+                  <label for="developMaskContrastSlider">Contrast</label>
+                  <input id="developMaskContrastValue" type="number" min="-100" max="100" step="1" value="0" aria-label="Mask contrast value" disabled>
+                </div>
+                <div class="sr-adjustment-control">
+                  <input id="developMaskContrastSlider" type="range" min="-100" max="100" step="1" value="0" aria-label="Mask contrast" disabled>
+                </div>
+              </div>
+              <div class="sr-mask-property-grid">
+                <label for="developMaskOpacitySlider">Opacity</label>
+                <input id="developMaskOpacitySlider" type="range" min="0" max="100" step="1" value="100" disabled aria-label="Mask opacity">
+                <output id="developMaskOpacityValue" aria-live="polite">100%</output>
+                <label for="developMaskFeatherSlider">Feather</label>
+                <input id="developMaskFeatherSlider" type="range" min="0" max="100" step="1" value="0" disabled aria-label="Mask feather">
+                <output id="developMaskFeatherValue" aria-live="polite">0</output>
+              </div>
+            </div>
+          </div>
           <div class="sr-tone-curve-panel" id="developToneCurvePanel" data-tone-curve-state="enabled">
             <div class="sr-tone-curve-title-row">
               <div class="sr-panel-heading">Tone Curve</div>
@@ -828,7 +920,6 @@
           <button class="sr-collapse-row" type="button">Color</button>
           <button class="sr-collapse-row" type="button">Lens</button>
           <button class="sr-collapse-row" type="button">Geometry</button>
-          <button class="sr-collapse-row" type="button">Mask</button>
         </section>
         <section class="sr-inspector-section" data-mode-panel="export" hidden>
           <div class="sr-panel-heading">Summary</div>
@@ -1125,6 +1216,45 @@
       const developGeometryTransformScaleSlider = document.querySelector("#developGeometryTransformScaleSlider");
       const developGeometryTransformVerticalSlider = document.querySelector("#developGeometryTransformVerticalSlider");
       const developGeometryTransformHorizontalSlider = document.querySelector("#developGeometryTransformHorizontalSlider");
+      const developMaskPanel = document.querySelector("#developMaskPanel");
+      const developMaskSelectedPhoto = document.querySelector("#developMaskSelectedPhoto");
+      const developMaskSupportStatus = document.querySelector("#developMaskSupportStatus");
+      const developMaskBoundaryStatus = document.querySelector("#developMaskBoundaryStatus");
+      const developMaskRawBoundaryStatus = document.querySelector("#developMaskRawBoundaryStatus");
+      const developMaskToolManual = document.querySelector("#developMaskToolManual");
+      const developMaskToolAI = document.querySelector("#developMaskToolAI");
+      const developMaskToolMLX = document.querySelector("#developMaskToolMLX");
+      const developMaskAddMask = document.querySelector("#developMaskAddMask");
+      const developMaskManualRows = Array.from(document.querySelectorAll("[data-mask-kind]"));
+      const developMaskRowsByKind = new Map(developMaskManualRows.map((row) => [row.dataset.maskKind, row]));
+      const developMaskActiveState = document.querySelector("#developMaskActiveState");
+      const developMaskActiveGeometry = document.querySelector("#developMaskActiveGeometry");
+      const developMaskOverlayToggle = document.querySelector("#developMaskOverlayToggle");
+      const developMaskExposureSlider = document.querySelector("#developMaskExposureSlider");
+      const developMaskExposureValue = document.querySelector("#developMaskExposureValue");
+      const developMaskContrastSlider = document.querySelector("#developMaskContrastSlider");
+      const developMaskContrastValue = document.querySelector("#developMaskContrastValue");
+      const developMaskOpacitySlider = document.querySelector("#developMaskOpacitySlider");
+      const developMaskOpacityValue = document.querySelector("#developMaskOpacityValue");
+      const developMaskFeatherSlider = document.querySelector("#developMaskFeatherSlider");
+      const developMaskFeatherValue = document.querySelector("#developMaskFeatherValue");
+      const developMaskReadbackControls = [
+        developMaskOverlayToggle,
+        developMaskExposureSlider,
+        developMaskExposureValue,
+        developMaskContrastSlider,
+        developMaskContrastValue,
+        developMaskOpacitySlider,
+        developMaskFeatherSlider,
+      ];
+      const developMaskUnavailableControls = [
+        developMaskToolManual,
+        developMaskToolAI,
+        developMaskToolMLX,
+        developMaskAddMask,
+        document.querySelector("#developMaskSubjectUnavailable"),
+        document.querySelector("#developMaskSkyUnavailable"),
+      ];
       const developGeometryCropControlPairs = [
         ["developGeometryCropXSlider", "developGeometryCropXValue", "x"],
         ["developGeometryCropYSlider", "developGeometryCropYValue", "y"],
@@ -2138,6 +2268,9 @@
       const HSL_CHANNELS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"];
       const DETAIL_UNSUPPORTED_MESSAGE = "Detail preview/export is unsupported until renderer support exists.";
       const DETAIL_NEUTRAL_MESSAGE = "No Detail pixel effect is enabled in this build.";
+      const MANUAL_MASK_KINDS = ["brush", "linear_gradient", "radial_gradient"];
+      const MASK_NO_SELECTION_MESSAGE = "No committed manual masks for this selected photo.";
+      const MASK_RAW_BLOCKED_MESSAGE = "RAW masked export blocks before output until RAW decode is implemented.";
 
       function neutralHslChannel() {
         return { hue: 0, saturation: 0, luminance: 0 };
@@ -2284,6 +2417,110 @@
 
       function hasUnsupportedCommittedDetail(state) {
         return Boolean(state && !detailIsNeutral(state.committedDetail));
+      }
+
+      function normalizeManualMaskKind(kind) {
+        const normalized = String(kind || "")
+          .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+          .toLowerCase()
+          .replace(/-/g, "_");
+        return MANUAL_MASK_KINDS.includes(normalized) ? normalized : "";
+      }
+
+      function manualMaskDisplayKind(kind) {
+        if (kind === "linear_gradient") {
+          return "Linear Gradient";
+        }
+        if (kind === "radial_gradient") {
+          return "Radial Gradient";
+        }
+        if (kind === "brush") {
+          return "Brush";
+        }
+        return "Manual Mask";
+      }
+
+      function normalizeManualMaskGeometry(geometry) {
+        if (!geometry) {
+          return null;
+        }
+        const kind = normalizeManualMaskKind(geometry.kind);
+        if (kind === "linear_gradient") {
+          return {
+            kind,
+            startX: normalizedUnit(geometry.startX ?? geometry.start_x, 0, 1, 0),
+            startY: normalizedUnit(geometry.startY ?? geometry.start_y, 0, 1, 0),
+            endX: normalizedUnit(geometry.endX ?? geometry.end_x, 0, 1, 1),
+            endY: normalizedUnit(geometry.endY ?? geometry.end_y, 0, 1, 1),
+          };
+        }
+        if (kind === "radial_gradient") {
+          return {
+            kind,
+            centerX: normalizedUnit(geometry.centerX ?? geometry.center_x, 0, 1, 0.5),
+            centerY: normalizedUnit(geometry.centerY ?? geometry.center_y, 0, 1, 0.5),
+            radiusX: normalizedUnit(geometry.radiusX ?? geometry.radius_x, 0.01, 1, 0.25),
+            radiusY: normalizedUnit(geometry.radiusY ?? geometry.radius_y, 0.01, 1, 0.25),
+            rotation: Number(formatRotation(geometry.rotation)),
+          };
+        }
+        return null;
+      }
+
+      function normalizeManualMask(mask, index = 0) {
+        const kind = normalizeManualMaskKind(mask?.kind);
+        if (!kind) {
+          return null;
+        }
+        return {
+          id: String(mask?.id || `${kind}-${index + 1}`),
+          kind,
+          name: String(mask?.name || `${manualMaskDisplayKind(kind)} ${index + 1}`),
+          enabled: mask?.enabled !== false,
+          invert: Boolean(mask?.invert),
+          opacity: clamp(mask?.opacity ?? 100, 0, 100),
+          feather: clamp(mask?.feather ?? 0, 0, 100),
+          geometry: normalizeManualMaskGeometry(mask?.geometry),
+          exposure: Number(formatExposure(mask?.exposure)),
+          contrast: Number(formatContrast(mask?.contrast)),
+        };
+      }
+
+      function normalizeManualMasks(value) {
+        if (!Array.isArray(value)) {
+          return [];
+        }
+        return value
+          .map((mask, index) => normalizeManualMask(mask, index))
+          .filter(Boolean);
+      }
+
+      function cloneManualMasks(value) {
+        return normalizeManualMasks(value);
+      }
+
+      function manualMaskGeometrySummary(mask) {
+        const geometry = mask?.geometry;
+        if (mask?.kind === "brush") {
+          return "Brush raster from committed strokes";
+        }
+        if (geometry?.kind === "linear_gradient") {
+          return `Linear ${Math.round(geometry.startX * 100)}%,${Math.round(geometry.startY * 100)}% to ${Math.round(geometry.endX * 100)}%,${Math.round(geometry.endY * 100)}%`;
+        }
+        if (geometry?.kind === "radial_gradient") {
+          return `Radial center ${Math.round(geometry.centerX * 100)}%,${Math.round(geometry.centerY * 100)}%, radius ${Math.round(geometry.radiusX * 100)}% x ${Math.round(geometry.radiusY * 100)}%`;
+        }
+        return "No geometry readback";
+      }
+
+      function activeManualMask(state) {
+        const masks = normalizeManualMasks(state?.draftMasks?.length ? state.draftMasks : state?.committedMasks);
+        return masks.find((mask) => mask.id === state?.activeMaskId) || masks[0] || null;
+      }
+
+      function setMaskOutput(output, value) {
+        output.value = value;
+        output.textContent = value;
       }
 
       function normalizedUnit(value, min = 0, max = 1, fallback = 0) {
@@ -2741,6 +2978,8 @@
             draftHslMixer: neutralHslMixer(),
             draftDetail: neutralDetailState(),
             draftGeometry: neutralGeometryState(),
+            draftMasks: [],
+            activeMaskId: "",
             committedExposure: 0,
             committedContrast: 0,
             committedWhiteBalance: "as_shot",
@@ -2756,6 +2995,7 @@
             committedHslMixer: neutralHslMixer(),
             committedDetail: neutralDetailState(),
             committedGeometry: neutralGeometryState(),
+            committedMasks: [],
             readbackLoaded: false,
             readbackLibraryPath: "",
           });
@@ -2800,6 +3040,81 @@
         developHslSaturationValue.value = formatSignedHundred(values.saturation);
         developHslLuminanceSlider.value = formatSignedHundred(values.luminance);
         developHslLuminanceValue.value = formatSignedHundred(values.luminance);
+      }
+
+      function renderMaskRow(kind, mask, activeMask) {
+        const row = developMaskRowsByKind.get(kind);
+        if (!row) {
+          return;
+        }
+        const rowFields = {
+          brush: ["developMaskBrushName", "developMaskBrushSummary", "developMaskBrushState"],
+          linear_gradient: ["developMaskLinearName", "developMaskLinearSummary", "developMaskLinearState"],
+          radial_gradient: ["developMaskRadialName", "developMaskRadialSummary", "developMaskRadialState"],
+        };
+        const [nameId, summaryId, stateId] = rowFields[kind];
+        const name = document.querySelector(`#${nameId}`);
+        const summary = document.querySelector(`#${summaryId}`);
+        const state = document.querySelector(`#${stateId}`);
+        const active = Boolean(mask && activeMask?.id === mask.id);
+        row.disabled = controlsBusy || !mask;
+        row.classList.toggle("is-active", active);
+        row.setAttribute("aria-pressed", String(active));
+        row.dataset.maskRowState = mask ? (active ? "active" : "ready") : "empty";
+        name.textContent = mask?.name || manualMaskDisplayKind(kind);
+        summary.textContent = mask ? manualMaskGeometrySummary(mask) : `No committed ${manualMaskDisplayKind(kind).toLowerCase()} mask`;
+        state.textContent = mask ? (mask.enabled ? (mask.invert ? "Invert" : "On") : "Off") : "Empty";
+      }
+
+      function renderMaskControlState(state) {
+        const photo = selectedPhoto();
+        const masks = normalizeManualMasks(state?.draftMasks?.length ? state.draftMasks : state?.committedMasks);
+        const developable = isDevelopable(photo);
+        if (state && masks.length && !masks.some((mask) => mask.id === state.activeMaskId)) {
+          state.activeMaskId = masks[0].id;
+        }
+        const activeMask = activeManualMask(state);
+        developMaskPanel.dataset.maskState = !photo
+          ? "empty"
+          : !developable
+            ? "blocked"
+            : activeMask
+              ? "active"
+              : "ready";
+        setMaskOutput(developMaskSelectedPhoto, `Selected photo: ${photo?.fileName || "None"}`);
+        setMaskOutput(developMaskSupportStatus, activeMask ? "Manual Active" : "Manual");
+        setMaskOutput(
+          developMaskBoundaryStatus,
+          !photo
+            ? "Select a photo to inspect committed manual masks."
+            : !developable
+              ? MASK_RAW_BLOCKED_MESSAGE
+              : activeMask
+                ? `${activeMask.name} is scoped to the selected photo.`
+                : MASK_NO_SELECTION_MESSAGE,
+        );
+        setMaskOutput(developMaskRawBoundaryStatus, MASK_RAW_BLOCKED_MESSAGE);
+
+        MANUAL_MASK_KINDS.forEach((kind) => {
+          renderMaskRow(kind, masks.find((mask) => mask.kind === kind), activeMask);
+        });
+
+        setMaskOutput(developMaskActiveState, activeMask ? `${activeMask.name} (${manualMaskDisplayKind(activeMask.kind)})` : "None");
+        setMaskOutput(developMaskActiveGeometry, activeMask ? manualMaskGeometrySummary(activeMask) : "No active mask");
+        developMaskExposureSlider.value = activeMask ? formatExposure(activeMask.exposure) : "0";
+        developMaskExposureValue.value = activeMask ? formatExposure(activeMask.exposure) : "0.00";
+        developMaskContrastSlider.value = activeMask ? formatContrast(activeMask.contrast) : "0";
+        developMaskContrastValue.value = activeMask ? formatContrast(activeMask.contrast) : "0";
+        developMaskOpacitySlider.value = activeMask ? String(Math.round(activeMask.opacity)) : "100";
+        setMaskOutput(developMaskOpacityValue, `${developMaskOpacitySlider.value}%`);
+        developMaskFeatherSlider.value = activeMask ? String(Math.round(activeMask.feather)) : "0";
+        setMaskOutput(developMaskFeatherValue, developMaskFeatherSlider.value);
+        developMaskReadbackControls.forEach((control) => {
+          control.disabled = true;
+        });
+        developMaskUnavailableControls.forEach((control) => {
+          control.disabled = true;
+        });
       }
 
       function renderDetailControlState(state) {
@@ -2896,6 +3211,7 @@
         developToneCurveMidpointValue.value = formatToneCurvePoint(state.draftToneCurveMidpoint);
         renderToneCurveControlState(state);
         renderHslControlState(state);
+        renderMaskControlState(state);
         renderDetailControlState(state);
         renderGeometryControlState(state);
       }
@@ -2946,6 +3262,7 @@
         state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
         state.committedDetail = normalizeDetailState(editState?.detail);
         state.committedGeometry = normalizeGeometryState(editState?.geometry);
+        state.committedMasks = normalizeManualMasks(editState?.masks);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -2961,6 +3278,10 @@
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.draftDetail = cloneDetailState(state.committedDetail);
         state.draftGeometry = cloneGeometryState(state.committedGeometry);
+        state.draftMasks = cloneManualMasks(state.committedMasks);
+        state.activeMaskId = state.committedMasks.some((mask) => mask.id === state.activeMaskId)
+          ? state.activeMaskId
+          : state.committedMasks[0]?.id || "";
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
 
@@ -3896,6 +4217,7 @@
             toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
             hslColorMixer: cloneHslMixer(state.draftHslMixer),
             geometry: cloneGeometryState(state.draftGeometry),
+            masks: cloneManualMasks(state.draftMasks?.length ? state.draftMasks : state.committedMasks),
             message: `Draft preview updated locally. ${summary}`,
           };
         }
@@ -3904,6 +4226,7 @@
           toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
           hslColorMixer: cloneHslMixer(state.draftHslMixer),
           geometry: cloneGeometryState(state.draftGeometry),
+          masks: cloneManualMasks(state.draftMasks?.length ? state.draftMasks : state.committedMasks),
           message: `Edit graph draft is valid, but RAW preview pixels are blocked until decode is implemented. ${summary}`,
         };
       }
@@ -4037,6 +4360,8 @@
           draftHslMixer: neutralHslMixer(),
           draftDetail: neutralDetailState(),
           draftGeometry: neutralGeometryState(),
+          draftMasks: [],
+          activeMaskId: "",
           committedExposure: 0,
           committedContrast: 0,
           committedWhiteBalance: "as_shot",
@@ -4052,6 +4377,7 @@
           committedHslMixer: neutralHslMixer(),
           committedDetail: neutralDetailState(),
           committedGeometry: neutralGeometryState(),
+          committedMasks: [],
           readbackLoaded: false,
           readbackLibraryPath: "",
         };
@@ -4108,6 +4434,7 @@
             hslColorMixer: response.data.hslColorMixer,
             detail: response.data.detail,
             geometry: response.data.geometry,
+            masks: response.data.masks,
             persisted: response.data.persisted,
             message: response.data.message,
           });
@@ -4215,6 +4542,12 @@
             setStatus("Develop preview unavailable.");
             return;
           }
+          state.committedMasks = normalizeManualMasks(response.data.masks || state.committedMasks);
+          state.draftMasks = cloneManualMasks(state.committedMasks);
+          state.activeMaskId = state.committedMasks.some((mask) => mask.id === state.activeMaskId)
+            ? state.activeMaskId
+            : state.committedMasks[0]?.id || "";
+          renderMaskControlState(state);
           renderDevelopPreviewState({
             photoId: response.data.photoId,
             sourcePath: response.data.sourcePath,
@@ -4233,6 +4566,7 @@
             toneCurveMidpoint: toneCurveMidpointFromEditState(response.data.toneCurve),
             hslColorMixer: response.data.hslColorMixer,
             geometry: response.data.geometry,
+            masks: response.data.masks,
             developPreviewBytes: response.data.developPreviewBytes,
             message: response.data.message,
           });
@@ -4381,7 +4715,12 @@
           state.committedHslMixer = normalizeHslMixer(response.data.hslColorMixer);
           state.committedDetail = normalizeDetailState(response.data.detail);
           state.committedGeometry = normalizeGeometryState(response.data.geometry);
+          state.committedMasks = normalizeManualMasks(response.data.masks);
           state.draftDetail = cloneDetailState(state.committedDetail);
+          state.draftMasks = cloneManualMasks(state.committedMasks);
+          state.activeMaskId = state.committedMasks.some((mask) => mask.id === state.activeMaskId)
+            ? state.activeMaskId
+            : state.committedMasks[0]?.id || "";
           if (whiteBalanceDirty) {
             state.draftWhiteBalance = state.committedWhiteBalance;
             state.draftTemperature = state.committedTemperature;
@@ -4654,6 +4993,10 @@
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.draftDetail = cloneDetailState(state.committedDetail);
         state.draftGeometry = cloneGeometryState(state.committedGeometry);
+        state.draftMasks = cloneManualMasks(state.committedMasks);
+        state.activeMaskId = state.committedMasks.some((mask) => mask.id === state.activeMaskId)
+          ? state.activeMaskId
+          : state.committedMasks[0]?.id || "";
         syncAdjustmentControls(state);
         updateDevelopDirtyState(state);
         previewDevelopEdit();
@@ -4849,6 +5192,7 @@
         state.committedHslMixer = normalizeHslMixer(editState?.hslColorMixer);
         state.committedDetail = normalizeDetailState(editState?.detail);
         state.committedGeometry = normalizeGeometryState(editState?.geometry);
+        state.committedMasks = normalizeManualMasks(editState?.masks);
         state.draftExposure = state.committedExposure;
         state.draftContrast = state.committedContrast;
         state.draftWhiteBalance = state.committedWhiteBalance;
@@ -4864,6 +5208,10 @@
         state.draftHslMixer = cloneHslMixer(state.committedHslMixer);
         state.draftDetail = cloneDetailState(state.committedDetail);
         state.draftGeometry = cloneGeometryState(state.committedGeometry);
+        state.draftMasks = cloneManualMasks(state.committedMasks);
+        state.activeMaskId = state.committedMasks.some((mask) => mask.id === state.activeMaskId)
+          ? state.activeMaskId
+          : state.committedMasks[0]?.id || "";
         state.readbackLoaded = true;
         state.readbackLibraryPath = activeLibraryPath || "";
       }
@@ -5362,6 +5710,7 @@
         });
         renderToneCurveControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         renderHslControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
+        renderMaskControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         renderDetailControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         renderGeometryControlState(selectedPhoto() ? developAdjustmentState(selectedPhoto().photoId) : null);
         basicPresetButtons.forEach((button) => {
@@ -5629,6 +5978,22 @@
       developToneCurveReset.addEventListener("click", () => resetDevelopAdjustment("toneCurveMidpoint"));
       developHslChannelButtons.forEach((button) => {
         button.addEventListener("click", () => setActiveHslChannel(button.dataset.hslChannel));
+      });
+      developMaskManualRows.forEach((button) => {
+        button.addEventListener("click", () => {
+          const photo = selectedPhoto();
+          if (!photo || button.disabled) {
+            return;
+          }
+          const state = developAdjustmentState(photo.photoId);
+          const masks = normalizeManualMasks(state.draftMasks?.length ? state.draftMasks : state.committedMasks);
+          const mask = masks.find((candidate) => candidate.kind === button.dataset.maskKind);
+          if (!mask) {
+            return;
+          }
+          state.activeMaskId = mask.id;
+          renderMaskControlState(state);
+        });
       });
       developHslHueSlider.addEventListener("input", () => updateDevelopAdjustment("hslHue", developHslHueSlider.value));
       developHslHueSlider.addEventListener("dblclick", () => resetDevelopAdjustment("hslHue"));
