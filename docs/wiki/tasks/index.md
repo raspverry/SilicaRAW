@@ -116,6 +116,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [20.2: PNG and TIFF Export](20.2-png-tiff-export.md)
 - [20.3: Export Metadata Policy](20.3-export-metadata-policy.md)
 - [20.4: Batch Export Progress and Recent Exports](20.4-batch-export-progress-recent-exports.md)
+- [20.5: Display P3 Export Enablement](20.5-display-p3-export-enablement.md)
 
 ## Notes for LLM Agents
 

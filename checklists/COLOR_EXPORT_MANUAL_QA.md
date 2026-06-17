@@ -1,13 +1,27 @@
 # Color Export Manual QA Checklist
 
-Status: Task 15.6 RAW export review recorded
-Updated: 2026-06-12
+Status: Task 20.5 Display P3 Export Enablement recorded
+Updated: 2026-06-17
 
 ## Purpose
 
 This checklist records the manual Preview.app or Photos review gate for exported color files.
 
 Task 13.6 proves JPEG ICC embedding by file/profile inspection. This checklist does not claim visual color correctness until a reviewer executes it and records the result.
+
+## Task 20.5 Display P3 Export Enablement
+
+Display P3 export remains explicit. sRGB remains the default. The local alpha exposes Display P3 only as a JPEG profile/ICC capability claim, not a visual color-correctness claim.
+
+Reviewers must verify:
+
+```txt
+default export target remains srgb
+Display P3 requires explicit selection
+Display P3 output embeds inspectable ICC evidence
+PNG/TIFF Display P3 remains blocked until separate proof
+manual review notes do not claim broad color correctness
+```
 
 ## Required Evidence
 

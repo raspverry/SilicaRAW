@@ -16,7 +16,7 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 19 is complete. The current product area is **Phase 20: Export and Delivery Expansion**.
 
-Tasks 20.1, 20.2, 20.3, and 20.4 are complete. The current next task is Task 20.5 Display P3 Export Enablement.
+Phase 20 is complete. The current next work area is **Phase 21: Preferences and App Settings**.
 
 ## Minimal Read Set
 

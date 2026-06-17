@@ -27,6 +27,9 @@ python3 scripts/harness/check-fixture-manifest-contract.py
 echo "==> Checking golden image tolerance policy"
 python3 scripts/harness/check-golden-tolerance-policy.py
 
+echo "==> Checking color export QA coverage"
+python3 scripts/harness/check-color-export-qa.py
+
 echo "==> Checking sidecar contract"
 python3 scripts/harness/check-sidecar-contract.py
 
