@@ -998,23 +998,31 @@
               <section class="sr-preferences-panel" id="preferencesPanelAppearance" role="tabpanel" data-preferences-panel="appearance" aria-labelledby="preferencesPanelAppearanceTitle">
                 <div class="sr-preferences-panel-header">
                   <h3 id="preferencesPanelAppearanceTitle">Appearance</h3>
-                  <p>Planned display preferences. Current build keeps the shipped dark compact frame.</p>
+                  <p>Choose supported theme, density, and UI scale for this desktop shell.</p>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesAppearanceTheme">Theme</label>
-                  <select id="preferencesAppearanceTheme" disabled>
-                    <option>Dark</option>
+                  <select id="preferencesAppearanceTheme" name="preferencesAppearanceTheme">
+                    <option value="dark">Dark</option>
+                    <option value="light">Light</option>
                   </select>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesAppearanceDensity">Density</label>
-                  <select id="preferencesAppearanceDensity" disabled>
-                    <option>Compact</option>
+                  <select id="preferencesAppearanceDensity" name="preferencesAppearanceDensity">
+                    <option value="compact">Compact</option>
+                    <option value="comfortable">Comfortable</option>
                   </select>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesAppearanceUiScale">UI Scale</label>
-                  <input id="preferencesAppearanceUiScale" type="range" min="90" max="120" value="100" disabled>
+                  <div class="sr-preferences-scale-control">
+                    <input id="preferencesAppearanceUiScale" type="range" min="90" max="120" step="5" value="100">
+                    <output id="preferencesAppearanceScaleValue" for="preferencesAppearanceUiScale">100%</output>
+                  </div>
+                </div>
+                <div class="sr-preferences-action-row">
+                  <button id="preferencesAppearanceReset" type="button">Reset Appearance</button>
                 </div>
               </section>
               <section class="sr-preferences-panel" id="preferencesPanelLibrary" role="tabpanel" data-preferences-panel="library" aria-labelledby="preferencesPanelLibraryTitle" hidden>
@@ -1102,7 +1110,7 @@
             </div>
           </div>
           <footer class="sr-preferences-dialog-footer">
-            <output id="preferencesStatus" aria-live="polite">Preferences map is ready. Settings are disabled until scoped implementation tasks.</output>
+            <output id="preferencesStatus" aria-live="polite">Appearance settings save automatically. Other sections stay disabled until scoped tasks.</output>
             <button id="closePreferencesDialogFooter" type="button">Close</button>
           </footer>
         </div>
@@ -1506,6 +1514,11 @@
       const preferencesStatus = document.querySelector("#preferencesStatus");
       const preferencesSectionButtons = Array.from(document.querySelectorAll("[data-preferences-section]"));
       const preferencesPanels = Array.from(document.querySelectorAll("[data-preferences-panel]"));
+      const preferencesAppearanceTheme = document.querySelector("#preferencesAppearanceTheme");
+      const preferencesAppearanceDensity = document.querySelector("#preferencesAppearanceDensity");
+      const preferencesAppearanceUiScale = document.querySelector("#preferencesAppearanceUiScale");
+      const preferencesAppearanceScaleValue = document.querySelector("#preferencesAppearanceScaleValue");
+      const preferencesAppearanceReset = document.querySelector("#preferencesAppearanceReset");
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -1590,6 +1603,8 @@
       let editClipboardSourcePhotoId = "";
       let editClipboardSourceName = "";
       let editClipboardPlan = null;
+      let appearanceHydrating = false;
+      let appearanceSaveTimer = 0;
       let layoutHydrating = false;
       let layoutSaveTimer = 0;
       let gridVirtualRenderFrame = 0;
@@ -1820,6 +1835,98 @@
           return 168;
         }
         return Math.min(220, Math.max(132, parsed));
+      }
+
+      function clampUiScale(value) {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isNaN(parsed)) {
+          return 100;
+        }
+        return Math.min(120, Math.max(90, parsed));
+      }
+
+      function normalizeAppearancePreferences(appearance = {}) {
+        return {
+          theme: ["dark", "light"].includes(appearance.theme) ? appearance.theme : "dark",
+          density: ["compact", "comfortable"].includes(appearance.density) ? appearance.density : "compact",
+          uiScale: clampUiScale(appearance.uiScale ?? appearance.ui_scale ?? 100),
+        };
+      }
+
+      function currentAppearancePreferences() {
+        return normalizeAppearancePreferences({
+          theme: preferencesAppearanceTheme.value,
+          density: preferencesAppearanceDensity.value,
+          uiScale: preferencesAppearanceUiScale.value,
+        });
+      }
+
+      function applyAppearancePreferences(appearance = {}, options = {}) {
+        const normalized = normalizeAppearancePreferences(appearance);
+        appearanceHydrating = true;
+        document.documentElement.dataset.theme = normalized.theme;
+        appFrame.dataset.appearanceTheme = normalized.theme;
+        appFrame.dataset.density = normalized.density;
+        appFrame.style.setProperty("--sr-ui-scale", `${normalized.uiScale / 100}`);
+        preferencesAppearanceTheme.value = normalized.theme;
+        preferencesAppearanceDensity.value = normalized.density;
+        preferencesAppearanceUiScale.value = String(normalized.uiScale);
+        preferencesAppearanceScaleValue.value = `${normalized.uiScale}%`;
+        appearanceHydrating = false;
+        if (options.persist) {
+          scheduleAppearancePersistence();
+        }
+      }
+
+      function scheduleAppearancePersistence() {
+        if (appearanceHydrating || !invoke) {
+          return;
+        }
+        window.clearTimeout(appearanceSaveTimer);
+        appearanceSaveTimer = window.setTimeout(() => recordAppearancePreferences(), 180);
+      }
+
+      async function recordAppearancePreferences() {
+        if (!invoke) {
+          return;
+        }
+        try {
+          const response = await invoke("record_app_session_appearance", {
+            appearance: currentAppearancePreferences(),
+          });
+          if (commandFailed(response)) {
+            preferencesStatus.value = responseErrorMessage(response, "Appearance preferences failed to save.");
+            setStatus(preferencesStatus.value);
+            return;
+          }
+          preferencesStatus.value = "Appearance preferences saved.";
+        } catch (error) {
+          preferencesStatus.value = responseErrorMessage(error, "Appearance preferences failed to save.");
+          setStatus(preferencesStatus.value);
+        }
+      }
+
+      async function resetAppearancePreferences() {
+        if (!invoke) {
+          applyAppearancePreferences({}, { persist: false });
+          preferencesStatus.value = "Appearance reset.";
+          setStatus("Appearance reset.");
+          return;
+        }
+        try {
+          const response = await invoke("reset_app_session_appearance");
+          if (commandFailed(response)) {
+            preferencesStatus.value = responseErrorMessage(response, "Appearance reset failed.");
+            setStatus(preferencesStatus.value);
+            return;
+          }
+          applyAppearancePreferences(response.data?.session?.appearance ?? {}, { persist: false });
+          preferencesStatus.value = "Appearance reset.";
+          setStatus("Appearance reset.");
+        } catch (error) {
+          preferencesStatus.value = responseErrorMessage(error, "Appearance reset failed.");
+          setStatus(preferencesStatus.value);
+        }
       }
 
       function normalizeLayoutPreferences(layout = {}) {
@@ -2064,19 +2171,23 @@
       async function loadAppSession() {
         if (!invoke) {
           renderRecentLibraries([]);
+          applyAppearancePreferences({}, { persist: false });
           return;
         }
         try {
           const response = await invoke("read_app_session");
           if (commandFailed(response)) {
             renderRecentLibraries([]);
+            applyAppearancePreferences({}, { persist: false });
             return;
           }
           const session = response.data?.session ?? {};
           renderRecentLibraries(session.recents ?? []);
+          applyAppearancePreferences(session.appearance ?? {}, { persist: false });
           applyLayoutPreferences(session.layout ?? {}, { persist: false });
         } catch (_error) {
           renderRecentLibraries([]);
+          applyAppearancePreferences({}, { persist: false });
         }
       }
 
@@ -2098,6 +2209,7 @@
       async function resolveLaunchRestore() {
         if (!invoke) {
           renderRecentLibraries([]);
+          applyAppearancePreferences({}, { persist: false });
           applyLayoutPreferences({}, { persist: false });
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
@@ -2109,6 +2221,7 @@
           const response = await invoke("resolve_launch_restore");
           if (commandFailed(response)) {
             renderRecentLibraries([]);
+            applyAppearancePreferences({}, { persist: false });
             applyLayoutPreferences({}, { persist: false });
             renderLibraryGrid(initialGridPhotos);
             setLibraryState("welcome");
@@ -2119,6 +2232,7 @@
 
           const restore = response.data ?? {};
           renderRecentLibraries(restore.session?.recents ?? []);
+          applyAppearancePreferences(restore.session?.appearance ?? {}, { persist: false });
           applyLayoutPreferences(restore.session?.layout ?? {}, { persist: false });
           if (restore.state !== "library" || !restore.libraryRootPath) {
             activeLibraryPath = "";
@@ -2146,6 +2260,7 @@
           );
         } catch (error) {
           renderRecentLibraries([]);
+          applyAppearancePreferences({}, { persist: false });
           applyLayoutPreferences({}, { persist: false });
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
@@ -4799,7 +4914,10 @@
         });
         const selectedButton = preferencesSectionButtons.find((button) => button.dataset.preferencesSection === selectedSection);
         if (preferencesStatus && selectedButton) {
-          preferencesStatus.value = `${selectedButton.querySelector("span")?.textContent ?? "Preferences"} settings are mapped; controls remain disabled until their scoped task.`;
+          const label = selectedButton.querySelector("span")?.textContent ?? "Preferences";
+          preferencesStatus.value = selectedSection === "appearance"
+            ? "Appearance settings save automatically. Other sections stay disabled until scoped tasks."
+            : `${label} settings are mapped; controls remain disabled until their scoped task.`;
         }
       }
 
@@ -6808,6 +6926,12 @@
       preferencesSectionButtons.forEach((button) => {
         button.addEventListener("click", () => setPreferencesSection(button.dataset.preferencesSection));
       });
+      [preferencesAppearanceTheme, preferencesAppearanceDensity, preferencesAppearanceUiScale].forEach((control) => {
+        control.addEventListener("input", () => {
+          applyAppearancePreferences(currentAppearancePreferences(), { persist: true });
+        });
+      });
+      preferencesAppearanceReset.addEventListener("click", resetAppearancePreferences);
       closePreferencesDialogButton.addEventListener("click", closePreferencesDialog);
       closePreferencesDialogFooterButton.addEventListener("click", closePreferencesDialog);
       openExportDialogButton.addEventListener("click", openExportDialog);

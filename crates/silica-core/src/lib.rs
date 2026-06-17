@@ -226,6 +226,12 @@ pub const DEFAULT_APP_SESSION_THUMBNAIL_SIZE: u16 = 168;
 pub const MIN_APP_SESSION_THUMBNAIL_SIZE: u16 = 132;
 /// Maximum accepted Library grid thumbnail size preference in pixels.
 pub const MAX_APP_SESSION_THUMBNAIL_SIZE: u16 = 220;
+/// Default UI scale preference in percent.
+pub const DEFAULT_APP_SESSION_UI_SCALE: u16 = 100;
+/// Minimum accepted UI scale preference in percent.
+pub const MIN_APP_SESSION_UI_SCALE: u16 = 90;
+/// Maximum accepted UI scale preference in percent.
+pub const MAX_APP_SESSION_UI_SCALE: u16 = 120;
 /// Maximum number of recent libraries retained in app-level session state.
 pub const APP_SESSION_RECENTS_LIMIT: usize = 10;
 
@@ -257,6 +263,38 @@ pub enum AppFileTypeFilter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMetadataFilter {
     HasDimensions,
+}
+
+/// Supported app theme preferences for the current tokenized shell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppAppearanceTheme {
+    Dark,
+    Light,
+}
+
+/// Supported app density preferences for the current tokenized shell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppAppearanceDensity {
+    Compact,
+    Comfortable,
+}
+
+/// App-level appearance preferences persisted outside every library.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppAppearancePreferences {
+    pub theme: AppAppearanceTheme,
+    pub density: AppAppearanceDensity,
+    pub ui_scale: u16,
+}
+
+impl Default for AppAppearancePreferences {
+    fn default() -> Self {
+        Self {
+            theme: AppAppearanceTheme::Dark,
+            density: AppAppearanceDensity::Compact,
+            ui_scale: DEFAULT_APP_SESSION_UI_SCALE,
+        }
+    }
 }
 
 /// Library grid filters persisted in app-level session state.
@@ -341,6 +379,7 @@ pub struct AppSession {
     pub last_library_root_path: Option<PathBuf>,
     pub last_mode: AppSessionMode,
     pub recents: Vec<AppRecentLibrary>,
+    pub appearance: AppAppearancePreferences,
     pub layout: AppLayoutPreferences,
     pub per_library: BTreeMap<String, AppPerLibrarySession>,
 }
@@ -353,6 +392,7 @@ impl Default for AppSession {
             last_library_root_path: None,
             last_mode: AppSessionMode::Library,
             recents: Vec::new(),
+            appearance: AppAppearancePreferences::default(),
             layout: AppLayoutPreferences::default(),
             per_library: BTreeMap::new(),
         }
@@ -1219,6 +1259,7 @@ pub fn load_app_session(session_path: impl AsRef<Path>) -> Result<AppSessionLoad
         ),
         last_mode: parse_app_session_mode(object.get("last_mode"), &mut invalid_values),
         recents: parse_app_session_recents(object.get("recents"), &mut invalid_values),
+        appearance: parse_app_appearance(object.get("appearance"), &mut invalid_values),
         layout: parse_app_layout(object.get("layout"), &mut invalid_values),
         per_library: parse_app_per_library(object.get("per_library"), &mut invalid_values),
     };
@@ -1270,6 +1311,11 @@ pub fn write_app_session(
 /// Return the documented default workspace layout preferences.
 pub fn default_app_layout_preferences() -> AppLayoutPreferences {
     AppLayoutPreferences::default()
+}
+
+/// Return the documented default appearance preferences.
+pub fn default_app_appearance_preferences() -> AppAppearancePreferences {
+    AppAppearancePreferences::default()
 }
 
 /// Record a successful library create/open in app-level desktop session state.
@@ -1324,6 +1370,24 @@ pub fn reset_app_session_layout(
     Ok(AppSessionLoadResult { session, warnings })
 }
 
+/// Reset only app appearance preferences in app-level desktop session state.
+pub fn reset_app_session_appearance(
+    session_path: impl AsRef<Path>,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    session.appearance = default_app_appearance_preferences();
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
 /// Record workspace layout preferences in app-level desktop session state.
 pub fn record_app_session_layout(
     session_path: impl AsRef<Path>,
@@ -1338,6 +1402,25 @@ pub fn record_app_session_layout(
 
     let mut session = loaded.session;
     session.layout = layout;
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
+/// Record app appearance preferences in app-level desktop session state.
+pub fn record_app_session_appearance(
+    session_path: impl AsRef<Path>,
+    appearance: AppAppearancePreferences,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    session.appearance = appearance;
     write_app_session(session_path, &session)?;
 
     Ok(AppSessionLoadResult { session, warnings })
@@ -4662,6 +4745,11 @@ fn app_session_to_json(session: &AppSession) -> serde_json::Value {
         "last_library_root_path": session.last_library_root_path.as_ref().map(|path| path.display().to_string()),
         "last_mode": app_session_mode_string(session.last_mode),
         "recents": recents,
+        "appearance": {
+            "theme": app_appearance_theme_string(session.appearance.theme),
+            "density": app_appearance_density_string(session.appearance.density),
+            "ui_scale": session.appearance.ui_scale,
+        },
         "layout": {
             "sidebar_collapsed": session.layout.sidebar_collapsed,
             "inspector_collapsed": session.layout.inspector_collapsed,
@@ -4791,6 +4879,48 @@ fn app_metadata_filter_string(filter: AppMetadataFilter) -> &'static str {
     }
 }
 
+fn parse_app_appearance_theme(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppAppearanceTheme {
+    match value.and_then(serde_json::Value::as_str) {
+        None | Some("dark") => AppAppearanceTheme::Dark,
+        Some("light") => AppAppearanceTheme::Light,
+        Some(_) => {
+            *invalid_values = true;
+            AppAppearanceTheme::Dark
+        }
+    }
+}
+
+fn app_appearance_theme_string(theme: AppAppearanceTheme) -> &'static str {
+    match theme {
+        AppAppearanceTheme::Dark => "dark",
+        AppAppearanceTheme::Light => "light",
+    }
+}
+
+fn parse_app_appearance_density(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppAppearanceDensity {
+    match value.and_then(serde_json::Value::as_str) {
+        None | Some("compact") => AppAppearanceDensity::Compact,
+        Some("comfortable") => AppAppearanceDensity::Comfortable,
+        Some(_) => {
+            *invalid_values = true;
+            AppAppearanceDensity::Compact
+        }
+    }
+}
+
+fn app_appearance_density_string(density: AppAppearanceDensity) -> &'static str {
+    match density {
+        AppAppearanceDensity::Compact => "compact",
+        AppAppearanceDensity::Comfortable => "comfortable",
+    }
+}
+
 fn parse_app_session_recents(
     value: Option<&serde_json::Value>,
     invalid_values: &mut bool,
@@ -4838,6 +4968,24 @@ fn parse_app_session_recents(
             })
         })
         .collect()
+}
+
+fn parse_app_appearance(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppAppearancePreferences {
+    let Some(object) = value.and_then(serde_json::Value::as_object) else {
+        if value.is_some() {
+            *invalid_values = true;
+        }
+        return AppAppearancePreferences::default();
+    };
+
+    AppAppearancePreferences {
+        theme: parse_app_appearance_theme(object.get("theme"), invalid_values),
+        density: parse_app_appearance_density(object.get("density"), invalid_values),
+        ui_scale: parse_ui_scale(object.get("ui_scale"), invalid_values),
+    }
 }
 
 fn parse_app_layout(
@@ -5022,6 +5170,23 @@ fn parse_thumbnail_size(value: Option<&serde_json::Value>, invalid_values: &mut 
     value.clamp(
         MIN_APP_SESSION_THUMBNAIL_SIZE as i64,
         MAX_APP_SESSION_THUMBNAIL_SIZE as i64,
+    ) as u16
+}
+
+fn parse_ui_scale(value: Option<&serde_json::Value>, invalid_values: &mut bool) -> u16 {
+    let Some(value) = value else {
+        return DEFAULT_APP_SESSION_UI_SCALE;
+    };
+    let Some(value) = value.as_i64() else {
+        *invalid_values = true;
+        return DEFAULT_APP_SESSION_UI_SCALE;
+    };
+    if value < MIN_APP_SESSION_UI_SCALE as i64 || value > MAX_APP_SESSION_UI_SCALE as i64 {
+        *invalid_values = true;
+    }
+    value.clamp(
+        MIN_APP_SESSION_UI_SCALE as i64,
+        MAX_APP_SESSION_UI_SCALE as i64,
     ) as u16
 }
 
@@ -7299,6 +7464,11 @@ mod tests {
               "last_library_root_path": "/tmp/SilicaRAW Library",
               "last_mode": "unknown-mode",
               "recents": [],
+              "appearance": {
+                "theme": "neon",
+                "density": "wide",
+                "ui_scale": 1000
+              },
               "layout": {
                 "sidebar_collapsed": true,
                 "inspector_collapsed": true,
@@ -7328,6 +7498,12 @@ mod tests {
         let loaded = load_app_session(&session_path).expect("load invalid value session");
 
         assert_eq!(loaded.session.last_mode, AppSessionMode::Library);
+        assert_eq!(loaded.session.appearance.theme, AppAppearanceTheme::Dark);
+        assert_eq!(
+            loaded.session.appearance.density,
+            AppAppearanceDensity::Compact
+        );
+        assert_eq!(loaded.session.appearance.ui_scale, MAX_APP_SESSION_UI_SCALE);
         assert_eq!(
             loaded.session.layout.thumbnail_size,
             MAX_APP_SESSION_THUMBNAIL_SIZE
@@ -7388,6 +7564,48 @@ mod tests {
         );
         let loaded = load_app_session(&session_path).expect("reload reset layout");
         assert_eq!(loaded.session.layout, defaults);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn appearance_preferences_defaults_and_reset_are_stable() {
+        let workspace = unique_library_root("appearance-preferences-reset");
+        let session_path = workspace.join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+        let defaults = default_app_appearance_preferences();
+
+        assert_eq!(defaults.theme, AppAppearanceTheme::Dark);
+        assert_eq!(defaults.density, AppAppearanceDensity::Compact);
+        assert_eq!(defaults.ui_scale, DEFAULT_APP_SESSION_UI_SCALE);
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_root.clone());
+        write_app_session(&session_path, &session).expect("write app session");
+
+        let changed = AppAppearancePreferences {
+            theme: AppAppearanceTheme::Light,
+            density: AppAppearanceDensity::Comfortable,
+            ui_scale: MAX_APP_SESSION_UI_SCALE,
+        };
+        let recorded = record_app_session_appearance(&session_path, changed.clone())
+            .expect("record appearance");
+        assert_eq!(recorded.session.appearance, changed);
+        assert_eq!(
+            recorded.session.last_library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
+
+        let reset = reset_app_session_appearance(&session_path).expect("reset appearance");
+
+        assert!(reset.warnings.is_empty());
+        assert_eq!(reset.session.appearance, defaults);
+        assert_eq!(
+            reset.session.last_library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
+        let loaded = load_app_session(&session_path).expect("reload reset appearance");
+        assert_eq!(loaded.session.appearance, defaults);
 
         remove_library_root(&workspace);
     }

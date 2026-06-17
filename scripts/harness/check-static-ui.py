@@ -335,6 +335,8 @@ def main():
         "preferencesAppearanceTheme",
         "preferencesAppearanceDensity",
         "preferencesAppearanceUiScale",
+        "preferencesAppearanceScaleValue",
+        "preferencesAppearanceReset",
         "preferencesLibraryDefaultPath",
         "preferencesLibraryStartupAction",
         "preferencesCacheClear",
@@ -479,12 +481,54 @@ def main():
         "function openPreferencesDialog",
         "function closePreferencesDialog",
         "function setPreferencesSection",
+        "function normalizeAppearancePreferences",
+        "function applyAppearancePreferences",
+        "function recordAppearancePreferences",
+        "function resetAppearancePreferences",
     ]:
         require(marker in source, f"preferences IA marker missing: {marker}", failures)
     for control_id in [
         "preferencesAppearanceTheme",
         "preferencesAppearanceDensity",
         "preferencesAppearanceUiScale",
+        "preferencesAppearanceReset",
+    ]:
+        require(
+            "disabled" not in parser.ids.get(control_id, {}),
+            f"#{control_id} must be enabled by Task 21.2",
+            failures,
+        )
+    require(
+        parser.ids.get("preferencesAppearanceTheme", {}).get("name") == "preferencesAppearanceTheme"
+        and '<option value="dark">Dark</option>' in source
+        and '<option value="light">Light</option>' in source,
+        "appearance theme preference must expose persisted dark/light choices",
+        failures,
+    )
+    require(
+        parser.ids.get("preferencesAppearanceDensity", {}).get("name") == "preferencesAppearanceDensity"
+        and '<option value="compact">Compact</option>' in source
+        and '<option value="comfortable">Comfortable</option>' in source,
+        "appearance density preference must expose compact/comfortable choices",
+        failures,
+    )
+    ui_scale = parser.ids.get("preferencesAppearanceUiScale", {})
+    require(
+        ui_scale.get("type") == "range"
+        and ui_scale.get("min") == "90"
+        and ui_scale.get("max") == "120"
+        and ui_scale.get("step") == "5",
+        "#preferencesAppearanceUiScale must be a bounded range control",
+        failures,
+    )
+    for marker in [
+        "record_app_session_appearance",
+        "reset_app_session_appearance",
+        "data-density",
+        "--sr-ui-scale",
+    ]:
+        require(marker in source or (APP_FRAME_CSS.is_file() and marker in APP_FRAME_CSS.read_text(encoding="utf-8")), f"appearance preference marker missing: {marker}", failures)
+    for control_id in [
         "preferencesLibraryDefaultPath",
         "preferencesLibraryStartupAction",
         "preferencesCacheClear",

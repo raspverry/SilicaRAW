@@ -549,6 +549,8 @@ struct DesktopAppSession {
     last_library_root_path: Option<String>,
     last_mode: String,
     recents: Vec<DesktopRecentLibrary>,
+    #[serde(default)]
+    appearance: DesktopAppearancePreferences,
     layout: DesktopLayoutPreferences,
     per_library: BTreeMap<String, DesktopPerLibrarySession>,
 }
@@ -573,6 +575,7 @@ impl DesktopAppSession {
                 .into_iter()
                 .map(DesktopRecentLibrary::from_core)
                 .collect(),
+            appearance: DesktopAppearancePreferences::from_core(session.appearance),
             layout: DesktopLayoutPreferences::from_core(session.layout),
             per_library: session
                 .per_library
@@ -606,6 +609,7 @@ impl DesktopAppSession {
                 .into_iter()
                 .map(DesktopRecentLibrary::into_core)
                 .collect(),
+            appearance: self.appearance.into_core()?,
             layout: self.layout.into_core()?,
             per_library: self
                 .per_library
@@ -668,6 +672,47 @@ impl DesktopPerLibrarySession {
             selected_photo_id: self.selected_photo_id,
             last_mode: parse_desktop_app_session_mode(&self.last_mode)?,
             last_opened_at: self.last_opened_at,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopAppearancePreferences {
+    theme: String,
+    density: String,
+    ui_scale: u16,
+}
+
+impl Default for DesktopAppearancePreferences {
+    fn default() -> Self {
+        Self::from_core(silica_core::AppAppearancePreferences::default())
+    }
+}
+
+impl DesktopAppearancePreferences {
+    fn from_core(appearance: silica_core::AppAppearancePreferences) -> Self {
+        Self {
+            theme: app_appearance_theme_string(appearance.theme).to_string(),
+            density: app_appearance_density_string(appearance.density).to_string(),
+            ui_scale: appearance.ui_scale,
+        }
+    }
+
+    fn into_core(self) -> Result<silica_core::AppAppearancePreferences, silica_core::CoreError> {
+        if self.ui_scale < silica_core::MIN_APP_SESSION_UI_SCALE
+            || self.ui_scale > silica_core::MAX_APP_SESSION_UI_SCALE
+        {
+            return Err(silica_core::CoreError::AppSession(format!(
+                "invalid app session ui scale: {}",
+                self.ui_scale
+            )));
+        }
+
+        Ok(silica_core::AppAppearancePreferences {
+            theme: parse_desktop_app_appearance_theme(&self.theme)?,
+            density: parse_desktop_app_appearance_density(&self.density)?,
+            ui_scale: self.ui_scale,
         })
     }
 }
@@ -991,6 +1036,33 @@ fn reset_app_session_layout(app: tauri::AppHandle) -> DesktopCommandResponse {
         Ok(session_path) => reset_app_session_layout_at_path(session_path),
         Err(error) => DesktopCommandResponse::error(
             "reset_app_session_layout",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn record_app_session_appearance(
+    app: tauri::AppHandle,
+    appearance: DesktopAppearancePreferences,
+) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => record_app_session_appearance_at_path(session_path, appearance),
+        Err(error) => DesktopCommandResponse::error(
+            "record_app_session_appearance",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn reset_app_session_appearance(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => reset_app_session_appearance_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "reset_app_session_appearance",
             error,
             DesktopCommandContext::default(),
         ),
@@ -3742,6 +3814,44 @@ fn reset_app_session_layout_at_path(session_path: PathBuf) -> DesktopCommandResp
     }
 }
 
+fn record_app_session_appearance_at_path(
+    session_path: PathBuf,
+    appearance: DesktopAppearancePreferences,
+) -> DesktopCommandResponse {
+    let command = "record_app_session_appearance";
+    let appearance = match appearance.into_core() {
+        Ok(appearance) => appearance,
+        Err(error) => {
+            return DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    };
+
+    match silica_core::record_app_session_appearance(&session_path, appearance) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session appearance recorded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn reset_app_session_appearance_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "reset_app_session_appearance";
+    match silica_core::reset_app_session_appearance(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session appearance reset.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
 fn inspect_app_session_at_path(session_path: PathBuf) -> DesktopCommandResponse {
     let command = "inspect_app_session";
     let exists = session_path.is_file();
@@ -4162,6 +4272,44 @@ fn app_metadata_filter_string(filter: silica_core::AppMetadataFilter) -> &'stati
     }
 }
 
+fn parse_desktop_app_appearance_theme(
+    theme: &str,
+) -> Result<silica_core::AppAppearanceTheme, silica_core::CoreError> {
+    match theme {
+        "dark" => Ok(silica_core::AppAppearanceTheme::Dark),
+        "light" => Ok(silica_core::AppAppearanceTheme::Light),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app appearance theme: {other}"
+        ))),
+    }
+}
+
+fn app_appearance_theme_string(theme: silica_core::AppAppearanceTheme) -> &'static str {
+    match theme {
+        silica_core::AppAppearanceTheme::Dark => "dark",
+        silica_core::AppAppearanceTheme::Light => "light",
+    }
+}
+
+fn parse_desktop_app_appearance_density(
+    density: &str,
+) -> Result<silica_core::AppAppearanceDensity, silica_core::CoreError> {
+    match density {
+        "compact" => Ok(silica_core::AppAppearanceDensity::Compact),
+        "comfortable" => Ok(silica_core::AppAppearanceDensity::Comfortable),
+        other => Err(silica_core::CoreError::AppSession(format!(
+            "invalid app appearance density: {other}"
+        ))),
+    }
+}
+
+fn app_appearance_density_string(density: silica_core::AppAppearanceDensity) -> &'static str {
+    match density {
+        silica_core::AppAppearanceDensity::Compact => "compact",
+        silica_core::AppAppearanceDensity::Comfortable => "comfortable",
+    }
+}
+
 fn parse_desktop_library_query_sort(
     sort: &str,
 ) -> Result<silica_core::LibraryQuerySort, silica_core::CoreError> {
@@ -4282,6 +4430,8 @@ fn main() {
             reset_app_session,
             record_app_session_layout,
             reset_app_session_layout,
+            record_app_session_appearance,
+            reset_app_session_appearance,
             inspect_app_session,
             resolve_launch_restore,
             record_app_session_selection,
@@ -4555,6 +4705,47 @@ mod tests {
                 assert_eq!(session.layout.filters.file_type, None);
                 assert_eq!(session.layout.filters.metadata, None);
                 assert_eq!(session.layout.filters.search, "");
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_appearance_commands_round_trip_and_reset() {
+        let workspace = unique_library_root("desktop-appearance-preferences");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+
+        let appearance = super::DesktopAppearancePreferences {
+            theme: "light".to_string(),
+            density: "comfortable".to_string(),
+            ui_scale: 120,
+        };
+
+        let recorded =
+            super::record_app_session_appearance_at_path(session_path.clone(), appearance);
+
+        assert!(recorded.ok);
+        assert_eq!(recorded.command, "record_app_session_appearance");
+        match response_data(&recorded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.appearance.theme, "light");
+                assert_eq!(session.appearance.density, "comfortable");
+                assert_eq!(session.appearance.ui_scale, 120);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let reset = super::reset_app_session_appearance_at_path(session_path);
+
+        assert!(reset.ok);
+        assert_eq!(reset.command, "reset_app_session_appearance");
+        match response_data(&reset) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.appearance.theme, "dark");
+                assert_eq!(session.appearance.density, "compact");
+                assert_eq!(session.appearance.ui_scale, 100);
             }
             other => panic!("unexpected response data: {other:?}"),
         }
