@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use image::ImageEncoder;
+use image::{ImageEncoder, ImageFormat};
 use sha2::{Digest, Sha256};
 
 /// Stable crate name used by scaffold verification.
@@ -21,6 +21,8 @@ pub const CRATE_NAME: &str = "silica-export";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportImageFormat {
     Jpeg,
+    Png,
+    Tiff,
 }
 
 /// Output color profile target recorded by the export contract.
@@ -65,6 +67,24 @@ pub struct JpegColorExportRequest {
     pub masks: Vec<ManualMaskAdjustment>,
     pub quality: u8,
     pub color_profile: ExportColorProfile,
+}
+
+/// Request to export an already-rendered raster source as sRGB PNG/TIFF.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RasterSrgbExportRequest {
+    pub source_path: PathBuf,
+    pub output_path: PathBuf,
+    pub format: ExportImageFormat,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub white_balance: WhiteBalanceAdjustment,
+    pub tone_recovery: ToneRecoveryAdjustment,
+    pub color_presence: ColorPresenceAdjustment,
+    pub tone_curve: ToneCurveAdjustment,
+    pub hsl_color_mixer: HslColorMixerAdjustment,
+    pub detail: DetailAdjustment,
+    pub geometry: GeometryAdjustment,
+    pub masks: Vec<ManualMaskAdjustment>,
 }
 
 /// White balance mode carried through local JPEG preview/export.
@@ -421,6 +441,19 @@ pub struct JpegExportResult {
 /// Backwards-compatible result name for the local alpha sRGB export path.
 pub type JpegSrgbExportResult = JpegExportResult;
 
+/// Result returned after a raster export is written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RasterExportResult {
+    pub output_path: PathBuf,
+    pub format: ExportImageFormat,
+    pub color_profile: ExportColorProfile,
+    pub bytes_written: u64,
+    pub source_sha256: String,
+    pub output_sha256: String,
+    pub icc_profile_embedded: bool,
+    pub icc_profile_sha256: Option<String>,
+}
+
 /// ICC inspection result for exported JPEG proof work.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JpegIccProfileInspection {
@@ -707,6 +740,94 @@ pub fn export_jpeg_with_color_profile(
         output_sha256,
         icc_profile_embedded: inspection.embedded,
         icc_profile_sha256,
+    })
+}
+
+/// Export an already-rendered raster source as a separate sRGB raster file.
+pub fn export_raster_srgb(
+    request: RasterSrgbExportRequest,
+) -> Result<RasterExportResult, ExportError> {
+    if request.format == ExportImageFormat::Jpeg {
+        let result = export_jpeg_srgb(JpegSrgbExportRequest {
+            source_path: request.source_path,
+            output_path: request.output_path,
+            exposure: request.exposure,
+            contrast: request.contrast,
+            white_balance: request.white_balance,
+            tone_recovery: request.tone_recovery,
+            color_presence: request.color_presence,
+            tone_curve: request.tone_curve,
+            hsl_color_mixer: request.hsl_color_mixer,
+            detail: request.detail,
+            geometry: request.geometry,
+            masks: request.masks,
+            quality: 90,
+        })?;
+        return Ok(RasterExportResult {
+            output_path: result.output_path,
+            format: result.format,
+            color_profile: result.color_profile,
+            bytes_written: result.bytes_written,
+            source_sha256: result.source_sha256,
+            output_sha256: result.output_sha256,
+            icc_profile_embedded: result.icc_profile_embedded,
+            icc_profile_sha256: Some(result.icc_profile_sha256),
+        });
+    }
+
+    if paths_match(&request.source_path, &request.output_path)? {
+        return Err(ExportError::SameSourceAndOutput(request.output_path));
+    }
+    if !adjustments_are_finite(
+        request.exposure,
+        request.contrast,
+        request.white_balance,
+        request.tone_recovery,
+        request.color_presence,
+        &request.tone_curve,
+        request.hsl_color_mixer,
+        request.detail,
+        &request.geometry,
+    ) {
+        return Err(ExportError::NonFiniteAdjustment);
+    }
+    validate_tone_curve_adjustment(&request.tone_curve)?;
+    validate_hsl_color_mixer_adjustment(request.hsl_color_mixer)?;
+    validate_detail_adjustment(request.detail)?;
+    validate_geometry_adjustment(&request.geometry)?;
+    validate_manual_mask_adjustments(&request.masks)?;
+
+    let source_sha256 = sha256_file(&request.source_path)?;
+    let decoded = image::ImageReader::open(&request.source_path)?
+        .with_guessed_format()?
+        .decode()?;
+    let mut rgb = decoded.to_rgb8();
+    apply_exposure_contrast(&mut rgb, request.exposure, request.contrast);
+    apply_white_balance(&mut rgb, request.white_balance);
+    apply_tone_recovery(&mut rgb, request.tone_recovery);
+    apply_tone_curve(&mut rgb, &request.tone_curve);
+    apply_color_presence(&mut rgb, request.color_presence);
+    apply_hsl_color_mixer(&mut rgb, request.hsl_color_mixer);
+    apply_manual_masks(&mut rgb, &request.masks);
+    let rgb = apply_supported_geometry(rgb, &request.geometry)?;
+
+    let image_format = match request.format {
+        ExportImageFormat::Png => ImageFormat::Png,
+        ExportImageFormat::Tiff => ImageFormat::Tiff,
+        ExportImageFormat::Jpeg => unreachable!("JPEG raster export returns above"),
+    };
+    image::DynamicImage::ImageRgb8(rgb).save_with_format(&request.output_path, image_format)?;
+
+    let output_sha256 = sha256_file(&request.output_path)?;
+    Ok(RasterExportResult {
+        bytes_written: fs::metadata(&request.output_path)?.len(),
+        output_path: request.output_path,
+        format: request.format,
+        color_profile: ExportColorProfile::Srgb,
+        source_sha256,
+        output_sha256,
+        icc_profile_embedded: false,
+        icc_profile_sha256: None,
     })
 }
 
@@ -1942,6 +2063,112 @@ mod tests {
             inspection.icc_profile_sha256.as_deref(),
             Some(result.icc_profile_sha256.as_str())
         );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn exports_png_without_mutating_original() {
+        let root = unique_export_root("png");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("edited.png");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::export_raster_srgb(super::RasterSrgbExportRequest {
+            source_path: source_path.clone(),
+            output_path: output_path.clone(),
+            format: super::ExportImageFormat::Png,
+            exposure: 0.5,
+            contrast: -8.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+        })
+        .expect("export png srgb");
+
+        assert_eq!(result.output_path, output_path);
+        assert_eq!(result.format, super::ExportImageFormat::Png);
+        assert_eq!(result.color_profile, super::ExportColorProfile::Srgb);
+        assert!(result.bytes_written > 0);
+        assert!(!result.icc_profile_embedded);
+        assert_eq!(result.icc_profile_sha256, None);
+        assert_eq!(
+            result.output_sha256,
+            super::sha256_file(&result.output_path).expect("hash exported png")
+        );
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        let exported = image::ImageReader::open(&result.output_path)
+            .expect("open exported png")
+            .with_guessed_format()
+            .expect("guess png format")
+            .decode()
+            .expect("decode exported png");
+        assert_eq!(exported.width(), 2);
+        assert_eq!(exported.height(), 2);
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn exports_tiff_without_mutating_original() {
+        let root = unique_export_root("tiff");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("edited.tiff");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::export_raster_srgb(super::RasterSrgbExportRequest {
+            source_path: source_path.clone(),
+            output_path: output_path.clone(),
+            format: super::ExportImageFormat::Tiff,
+            exposure: 0.25,
+            contrast: 4.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+        })
+        .expect("export tiff srgb");
+
+        assert_eq!(result.output_path, output_path);
+        assert_eq!(result.format, super::ExportImageFormat::Tiff);
+        assert_eq!(result.color_profile, super::ExportColorProfile::Srgb);
+        assert!(result.bytes_written > 0);
+        assert!(!result.icc_profile_embedded);
+        assert_eq!(result.icc_profile_sha256, None);
+        assert_eq!(
+            result.output_sha256,
+            super::sha256_file(&result.output_path).expect("hash exported tiff")
+        );
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+        let exported = image::ImageReader::open(&result.output_path)
+            .expect("open exported tiff")
+            .with_guessed_format()
+            .expect("guess tiff format")
+            .decode()
+            .expect("decode exported tiff");
+        assert_eq!(exported.width(), 2);
+        assert_eq!(exported.height(), 2);
 
         remove_export_root(&root);
     }

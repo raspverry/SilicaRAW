@@ -3014,6 +3014,46 @@ fn export_photo_jpeg(
 }
 
 #[tauri::command]
+fn export_photo_png(
+    library_path: String,
+    photo_id: String,
+    output_path: String,
+) -> DesktopCommandResponse {
+    let command = "export_photo_png";
+    desktop_photo_export_response(
+        command,
+        silica_core::export_photo_png(
+            PathBuf::from(&library_path),
+            &photo_id,
+            PathBuf::from(&output_path),
+        ),
+        library_path,
+        output_path,
+        photo_id,
+    )
+}
+
+#[tauri::command]
+fn export_photo_tiff(
+    library_path: String,
+    photo_id: String,
+    output_path: String,
+) -> DesktopCommandResponse {
+    let command = "export_photo_tiff";
+    desktop_photo_export_response(
+        command,
+        silica_core::export_photo_tiff(
+            PathBuf::from(&library_path),
+            &photo_id,
+            PathBuf::from(&output_path),
+        ),
+        library_path,
+        output_path,
+        photo_id,
+    )
+}
+
+#[tauri::command]
 fn get_export_settings(library_path: String) -> DesktopCommandResponse {
     let command = "get_export_settings";
     match silica_core::get_export_settings_catalog(PathBuf::from(&library_path)) {
@@ -3037,23 +3077,25 @@ fn get_export_settings(library_path: String) -> DesktopCommandResponse {
 fn save_export_settings(
     library_path: String,
     preset_id: Option<String>,
+    format: Option<String>,
     color_profile: Option<String>,
     quality: Option<u8>,
 ) -> DesktopCommandResponse {
     let command = "save_export_settings";
-    let settings = match export_settings_from_request(color_profile.as_deref(), quality) {
-        Ok(settings) => settings,
-        Err(error) => {
-            return DesktopCommandResponse::error(
-                command,
-                error,
-                DesktopCommandContext {
-                    library_path: Some(library_path),
-                    ..DesktopCommandContext::default()
-                },
-            )
-        }
-    };
+    let settings =
+        match export_settings_from_request(format.as_deref(), color_profile.as_deref(), quality) {
+            Ok(settings) => settings,
+            Err(error) => {
+                return DesktopCommandResponse::error(
+                    command,
+                    error,
+                    DesktopCommandContext {
+                        library_path: Some(library_path),
+                        ..DesktopCommandContext::default()
+                    },
+                )
+            }
+        };
 
     match silica_core::set_default_export_settings(
         PathBuf::from(&library_path),
@@ -3080,23 +3122,25 @@ fn save_export_settings(
 fn save_export_preset(
     library_path: String,
     name: String,
+    format: Option<String>,
     color_profile: Option<String>,
     quality: Option<u8>,
 ) -> DesktopCommandResponse {
     let command = "save_export_preset";
-    let settings = match export_settings_from_request(color_profile.as_deref(), quality) {
-        Ok(settings) => settings,
-        Err(error) => {
-            return DesktopCommandResponse::error(
-                command,
-                error,
-                DesktopCommandContext {
-                    library_path: Some(library_path),
-                    ..DesktopCommandContext::default()
-                },
-            )
-        }
-    };
+    let settings =
+        match export_settings_from_request(format.as_deref(), color_profile.as_deref(), quality) {
+            Ok(settings) => settings,
+            Err(error) => {
+                return DesktopCommandResponse::error(
+                    command,
+                    error,
+                    DesktopCommandContext {
+                        library_path: Some(library_path),
+                        ..DesktopCommandContext::default()
+                    },
+                )
+            }
+        };
 
     match silica_core::upsert_export_preset(PathBuf::from(&library_path), name, settings.clone()) {
         Ok(preset) => match silica_core::set_default_export_settings(
@@ -3141,13 +3185,31 @@ fn parse_export_color_profile(
     }
 }
 
+fn parse_export_format(format: Option<&str>) -> Result<&'static str, silica_core::CoreError> {
+    match format.unwrap_or("jpeg") {
+        "jpeg" => Ok("jpeg"),
+        "png" => Ok("png"),
+        "tiff" => Ok("tiff"),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported export format: {unsupported}. Supported formats: jpeg, png, tiff."
+        ))),
+    }
+}
+
 fn export_settings_from_request(
+    format: Option<&str>,
     color_profile: Option<&str>,
     quality: Option<u8>,
 ) -> Result<silica_core::ExportSettings, silica_core::CoreError> {
+    let format = parse_export_format(format)?;
     let color_profile = parse_export_color_profile(color_profile)?;
+    if format != "jpeg" && color_profile != silica_core::PhotoExportColorProfile::Srgb {
+        return Err(silica_core::CoreError::ExportBlocked(
+            "PNG and TIFF export settings currently require sRGB color profile.".to_string(),
+        ));
+    }
     Ok(silica_core::ExportSettings {
-        format: "jpeg".to_string(),
+        format: format.to_string(),
         color_profile: export_color_profile_request_string(color_profile).to_string(),
         quality: quality.unwrap_or(90),
         metadata_policy: "minimal".to_string(),
@@ -4161,6 +4223,8 @@ fn main() {
             get_photo_history,
             export_photo_jpeg_srgb,
             export_photo_jpeg,
+            export_photo_png,
+            export_photo_tiff,
             get_export_settings,
             save_export_settings,
             save_export_preset,
@@ -6116,6 +6180,7 @@ mod tests {
         let response = super::save_export_preset(
             library_root.display().to_string(),
             "Desktop Display P3 Review".to_string(),
+            Some("jpeg".to_string()),
             Some("display_p3".to_string()),
             Some(90),
         );
@@ -6153,6 +6218,49 @@ mod tests {
             }
             other => panic!("unexpected reloaded export settings data: {other:?}"),
         }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_saves_png_export_settings_and_rejects_display_p3() {
+        let workspace = unique_library_root("desktop-export-settings-format");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        silica_core::create_library(&library_root).expect("create library");
+
+        let response = super::save_export_settings(
+            library_root.display().to_string(),
+            None,
+            Some("png".to_string()),
+            None,
+            Some(90),
+        );
+        assert!(response.ok, "save PNG settings failed: {response:?}");
+        match response_data(&response) {
+            super::DesktopCommandData::ExportSettings {
+                default_settings, ..
+            } => {
+                assert_eq!(default_settings.format, "png");
+                assert_eq!(default_settings.color_profile, "srgb");
+                assert_eq!(default_settings.quality, 90);
+            }
+            other => panic!("unexpected export settings response data: {other:?}"),
+        }
+
+        let rejected = super::save_export_settings(
+            library_root.display().to_string(),
+            None,
+            Some("png".to_string()),
+            Some("display_p3".to_string()),
+            Some(90),
+        );
+        assert!(!rejected.ok);
+        let error = rejected.error.as_ref().expect("error payload");
+        assert_eq!(error.kind, "exportBlocked");
+        assert!(error
+            .message
+            .contains("PNG and TIFF export settings currently require sRGB"));
 
         remove_library_root(&workspace);
     }
@@ -6199,6 +6307,79 @@ mod tests {
             other => panic!("unexpected response data: {other:?}"),
         }
         assert!(output_path.is_file());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_exports_photo_png_and_tiff() {
+        let workspace = unique_library_root("desktop-export-raster-formats");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let png_output_path = export_root.join("sample-export.png");
+        let tiff_output_path = export_root.join("sample-export.tiff");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&supported_file);
+        let original_before = std::fs::read(&supported_file).expect("read original before");
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let png_export = super::export_photo_png(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            png_output_path.display().to_string(),
+        );
+        assert!(png_export.ok, "PNG export failed: {png_export:?}");
+        match response_data(&png_export) {
+            super::DesktopCommandData::Export {
+                format,
+                color_profile,
+                output_path,
+                icc_profile_embedded,
+                ..
+            } => {
+                assert_eq!(format, "png");
+                assert_eq!(color_profile, "srgb");
+                assert_eq!(output_path, &png_output_path.display().to_string());
+                assert!(!icc_profile_embedded);
+            }
+            other => panic!("unexpected PNG response data: {other:?}"),
+        }
+
+        let tiff_export = super::export_photo_tiff(
+            library_root.display().to_string(),
+            photo_id,
+            tiff_output_path.display().to_string(),
+        );
+        assert!(tiff_export.ok, "TIFF export failed: {tiff_export:?}");
+        match response_data(&tiff_export) {
+            super::DesktopCommandData::Export {
+                format,
+                color_profile,
+                output_path,
+                icc_profile_embedded,
+                ..
+            } => {
+                assert_eq!(format, "tiff");
+                assert_eq!(color_profile, "srgb");
+                assert_eq!(output_path, &tiff_output_path.display().to_string());
+                assert!(!icc_profile_embedded);
+            }
+            other => panic!("unexpected TIFF response data: {other:?}"),
+        }
+
+        assert!(png_output_path.is_file());
+        assert!(tiff_output_path.is_file());
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after"),
+            original_before
+        );
 
         remove_library_root(&workspace);
     }

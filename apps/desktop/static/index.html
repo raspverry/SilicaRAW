@@ -93,7 +93,7 @@
                 <span>RAW decode blocked</span>
                 <span>Local-first</span>
               </div>
-              <p class="sr-alpha-scope-note">JPEG/JPG previews and JPEG sRGB export are enabled. RAW decode is not enabled in this alpha; Metal viewer output and AI tools are also disabled.</p>
+              <p class="sr-alpha-scope-note">JPEG/JPG previews and JPEG, PNG, and TIFF export are enabled. RAW decode is not enabled in this alpha; Metal viewer output and AI tools are also disabled.</p>
               <section class="sr-recent-libraries" aria-label="Recent libraries">
                 <div class="sr-recent-header">
                   <h2>Recent Libraries</h2>
@@ -324,7 +324,7 @@
           <div class="sr-surface-header">
             <div>
               <h1 id="exportTitle">Export</h1>
-              <p>JPEG sRGB local alpha export</p>
+              <p>JPEG, PNG, and TIFF local alpha export</p>
             </div>
             <button class="primary" type="button" data-open-export-dialog>Export Selected</button>
           </div>
@@ -986,11 +986,15 @@
                   <button class="sr-path-picker-button" id="chooseExportOutputPath" type="button">Choose...</button>
                 </div>
               </div>
-              <div class="sr-export-fixed-grid" aria-label="JPEG settings">
+              <div class="sr-export-fixed-grid" aria-label="Raster export settings">
                 <label for="exportFormat">Format</label>
-                <input id="exportFormat" type="text" value="JPEG" readonly>
+                <select id="exportFormat" name="exportFormat">
+                  <option value="jpeg">JPEG</option>
+                  <option value="png">PNG</option>
+                  <option value="tiff">TIFF</option>
+                </select>
                 <label for="exportQuality">Quality</label>
-                <input id="exportQuality" type="number" value="90" min="90" max="90" readonly>
+                <input id="exportQuality" type="text" value="90" readonly>
               </div>
               <div class="sr-export-setting-row sr-export-color-options">
                 <label for="exportColorSpace">Color Space</label>
@@ -1330,14 +1334,18 @@
       const exportPresetName = document.querySelector("#exportPresetName");
       const saveExportPresetButton = document.querySelector("#saveExportPreset");
       const exportOutputPath = document.querySelector("#exportOutputPath");
+      const exportFormat = document.querySelector("#exportFormat");
+      const exportQuality = document.querySelector("#exportQuality");
       const exportColorSpace = document.querySelector("#exportColorSpace");
       const exportColorOptionButtons = Array.from(document.querySelectorAll("[data-export-color]"));
       const chooseExportOutputPathButton = document.querySelector("#chooseExportOutputPath");
       const exportStatus = document.querySelector("#exportStatus");
       const exportSafetyNote = document.querySelector("#exportSafetyNote");
+      const exportSummaryFormat = document.querySelector("#exportSummaryFormat");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
       const exportSummaryPreset = document.querySelector("#exportSummaryPreset");
       const exportSummaryColor = document.querySelector("#exportSummaryColor");
+      const exportSummaryQuality = document.querySelector("#exportSummaryQuality");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
@@ -1366,6 +1374,7 @@
       let selectedPhotoIds = new Set(selectedPhotoId ? [selectedPhotoId] : []);
       let selectionAnchorPhotoId = selectedPhotoId;
       let activeLibraryPath = "";
+      let selectedExportFormat = "jpeg";
       let selectedExportColorProfile = "srgb";
       let selectedExportPresetId = "jpeg-srgb-90";
       let exportSettingsCatalog = defaultExportSettingsCatalog();
@@ -2015,14 +2024,18 @@
           return;
         }
 
-        exportStatus.value = "Choose a JPEG output path.";
+        const formatLabel = exportFormatLabel(selectedExportFormat);
+        exportStatus.value = `Choose a ${formatLabel} output path.`;
         setStatus(exportStatus.value);
         try {
+          const extension = exportFormatExtension(selectedExportFormat);
+          const extensions = selectedExportFormat === "jpeg" ? ["jpg", "jpeg"] : [extension];
           const selection = await dialogApi.save({
+            defaultPath: defaultExportPath(selectedPhoto()),
             filters: [
               {
-                name: "JPEG",
-                extensions: ["jpg", "jpeg"],
+                name: formatLabel,
+                extensions,
               },
             ],
           });
@@ -2039,7 +2052,7 @@
             setStatus(exportStatus.value);
             return;
           }
-          exportStatus.value = "JPEG output path selected.";
+          exportStatus.value = `${formatLabel} output path selected.`;
           setStatus(exportStatus.value);
         } catch (error) {
           exportStatus.value = responseErrorMessage(error, "Export path selection failed.");
@@ -2961,7 +2974,7 @@
       }
 
       function defaultExportPath(photo) {
-        return `/Users/you/Pictures/Exports/${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
+        return `/Users/you/Pictures/Exports/${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedExportFormat)}`;
       }
 
       function isRasterExportCandidate(photo) {
@@ -4099,10 +4112,52 @@
         };
       }
 
+      function normalizeExportFormat(format) {
+        return ["jpeg", "png", "tiff"].includes(format) ? format : "jpeg";
+      }
+
+      function exportFormatLabel(format) {
+        const normalized = normalizeExportFormat(format);
+        if (normalized === "png") {
+          return "PNG";
+        }
+        if (normalized === "tiff") {
+          return "TIFF";
+        }
+        return "JPEG";
+      }
+
+      function exportFormatExtension(format) {
+        const normalized = normalizeExportFormat(format);
+        if (normalized === "png") {
+          return "png";
+        }
+        if (normalized === "tiff") {
+          return "tiff";
+        }
+        return "jpg";
+      }
+
+      function exportQualityLabel(format) {
+        return normalizeExportFormat(format) === "jpeg" ? "90" : "Lossless";
+      }
+
+      function exportCommandName(format) {
+        const normalized = normalizeExportFormat(format);
+        if (normalized === "png") {
+          return "export_photo_png";
+        }
+        if (normalized === "tiff") {
+          return "export_photo_tiff";
+        }
+        return "export_photo_jpeg";
+      }
+
       function normalizeExportSettings(settings = {}) {
+        const format = normalizeExportFormat(settings.format);
         return {
-          format: settings.format === "jpeg" ? "jpeg" : "jpeg",
-          colorProfile: settings.colorProfile === "display_p3" ? "display_p3" : "srgb",
+          format,
+          colorProfile: format === "jpeg" && settings.colorProfile === "display_p3" ? "display_p3" : "srgb",
           quality: Number(settings.quality) || 90,
           metadataPolicy: settings.metadataPolicy === "minimal" ? "minimal" : "minimal",
         };
@@ -4131,7 +4186,7 @@
 
       function currentExportSettings() {
         return {
-          format: "jpeg",
+          format: selectedExportFormat,
           colorProfile: selectedExportColorProfile,
           quality: 90,
           metadataPolicy: "minimal",
@@ -4160,7 +4215,7 @@
         exportPreset.replaceChildren(...options);
         exportPreset.value = preset?.id || "";
         if (syncName) {
-          exportPresetName.value = preset?.name || `Custom ${exportColorProfileLabel(selectedExportColorProfile)}`;
+          exportPresetName.value = preset?.name || `Custom ${exportFormatLabel(selectedExportFormat)} ${exportColorProfileLabel(selectedExportColorProfile)}`;
         }
         syncExportPresetSummary();
       }
@@ -4168,6 +4223,7 @@
       function applyExportSettingsCatalog(catalog) {
         exportSettingsCatalog = normalizeExportSettingsCatalog(catalog);
         selectedExportPresetId = exportSettingsCatalog.defaultPresetId || "";
+        setExportFormat(exportSettingsCatalog.defaultSettings.format);
         setExportColorProfile(exportSettingsCatalog.defaultSettings.colorProfile);
         renderExportPresetControls();
       }
@@ -4195,7 +4251,7 @@
       }
 
       function upsertStaticExportPreset(name, settings) {
-        const normalizedName = name.trim() || `Custom ${exportColorProfileLabel(settings.colorProfile)}`;
+        const normalizedName = name.trim() || `Custom ${exportFormatLabel(settings.format)} ${exportColorProfileLabel(settings.colorProfile)}`;
         const id = normalizedName === "JPEG sRGB 90"
           ? "jpeg-srgb-90"
           : `static-${normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "export-preset"}`;
@@ -4227,6 +4283,7 @@
           const response = await invoke("save_export_settings", {
             libraryPath: activeLibraryPath,
             presetId: presetId || null,
+            format: settings.format,
             colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
             quality: settings.quality,
           });
@@ -4257,6 +4314,7 @@
           const response = await invoke("save_export_preset", {
             libraryPath: activeLibraryPath,
             name,
+            format: settings.format,
             colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
             quality: settings.quality,
           });
@@ -4280,11 +4338,24 @@
 
       function exportColorSafetyText(profile) {
         const label = exportColorProfileLabel(profile);
-        return `Original files will not be modified. SilicaRAW writes a separate JPEG ${label} file to the output path.`;
+        return `Original files will not be modified. SilicaRAW writes a separate ${exportFormatLabel(selectedExportFormat)} ${label} file to the output path.`;
+      }
+
+      function setExportFormat(format) {
+        selectedExportFormat = normalizeExportFormat(format);
+        exportFormat.value = selectedExportFormat;
+        exportQuality.value = exportQualityLabel(selectedExportFormat);
+        exportSummaryFormat.textContent = exportFormatLabel(selectedExportFormat);
+        exportSummaryQuality.textContent = exportQualityLabel(selectedExportFormat);
+        runJpegExportButton.textContent = `Export ${exportFormatLabel(selectedExportFormat)}`;
+        if (selectedExportFormat !== "jpeg") {
+          selectedExportColorProfile = "srgb";
+        }
+        setExportColorProfile(selectedExportColorProfile);
       }
 
       function setExportColorProfile(profile) {
-        selectedExportColorProfile = profile === "display_p3" ? "display_p3" : "srgb";
+        selectedExportColorProfile = selectedExportFormat === "jpeg" && profile === "display_p3" ? "display_p3" : "srgb";
         const label = exportColorProfileLabel(selectedExportColorProfile);
         exportColorSpace.value = label;
         exportSummaryColor.textContent = label;
@@ -4293,7 +4364,16 @@
           const selected = button.dataset.exportColor === selectedExportColorProfile;
           button.classList.toggle("is-selected", selected);
           button.setAttribute("aria-pressed", String(selected));
+          const disabled = selectedExportFormat !== "jpeg" && button.dataset.exportColor !== "srgb";
+          button.disabled = disabled;
+          button.setAttribute("aria-disabled", String(disabled));
         });
+        const proof = document.querySelector("#exportColorProof");
+        if (proof) {
+          proof.textContent = selectedExportFormat === "jpeg"
+            ? "sRGB is the default export path. Display P3 requires explicit selection and writes ICC metadata."
+            : `${exportFormatLabel(selectedExportFormat)} export uses sRGB in this alpha. Display P3 is JPEG-only until color-managed PNG/TIFF proof exists.`;
+        }
         syncExportPresetSummary();
       }
 
@@ -4302,10 +4382,10 @@
         const hasPhoto = Boolean(photo);
         const state = photo ? developAdjustmentState(photo.photoId) : null;
         const detailUnsupported = hasUnsupportedCommittedDetail(state);
-        setExportColorProfile(selectedExportColorProfile);
+        setExportFormat(selectedExportFormat);
         exportSelectedPhotoName.textContent = photo?.fileName ?? "No photo selected";
         exportSelectedInline.textContent = photo?.fileName ?? "None";
-        exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg` : "None";
+        exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedExportFormat)}` : "None";
         exportPreviewArt.className = `sr-thumb-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
         renderExportPreviewImage(photo);
         if (photo && (!exportOutputPath.value || exportOutputPath.dataset.autofilled === "true")) {
@@ -4347,6 +4427,8 @@
       async function runJpegExport() {
         const photo = selectedPhoto();
         const outputPath = exportOutputPath.value.trim();
+        const selectedFormat = selectedExportFormat;
+        const exportFormatText = exportFormatLabel(selectedFormat);
         const exportColorProfile = selectedExportColorProfile;
         const exportColorLabel = exportColorProfileLabel(exportColorProfile);
         const state = photo ? developAdjustmentState(photo.photoId) : null;
@@ -4372,23 +4454,26 @@
         }
 
         if (!activeLibraryPath || !invoke) {
-          exportStatus.value = "Static export smoke passed; desktop runtime writes the JPEG and catalog record.";
+          exportStatus.value = `Static export smoke passed; desktop runtime writes the ${exportFormatText} and catalog record.`;
           setStatus(exportStatus.value);
           return;
         }
 
         setBusy(true);
-        exportStatus.value = `Exporting JPEG ${exportColorLabel}...`;
+        exportStatus.value = `Exporting ${exportFormatText} ${exportColorLabel}...`;
         setStatus(exportStatus.value);
         try {
-          const response = await invoke("export_photo_jpeg", {
+          const payload = {
             libraryPath: activeLibraryPath,
             photoId: photo.photoId,
             outputPath,
-            colorProfile: exportColorProfile === "srgb" ? null : exportColorProfile,
-          });
+          };
+          if (selectedFormat === "jpeg") {
+            payload.colorProfile = exportColorProfile === "srgb" ? null : exportColorProfile;
+          }
+          const response = await invoke(exportCommandName(selectedFormat), payload);
           if (commandFailed(response)) {
-            exportStatus.value = responseErrorMessage(response, `JPEG ${exportColorLabel} export failed.`);
+            exportStatus.value = responseErrorMessage(response, `${exportFormatText} ${exportColorLabel} export failed.`);
             setStatus(exportStatus.value);
             return;
           }
@@ -4398,11 +4483,11 @@
             return;
           }
           const exportedPath = response.data.outputPath;
-          exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.jpg`;
-          exportStatus.value = response.data.message || responseMessage(response, `JPEG ${exportColorLabel} export completed.`);
+          exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedFormat)}`;
+          exportStatus.value = response.data.message || responseMessage(response, `${exportFormatText} ${exportColorLabel} export completed.`);
           setStatus(responseMessage(response));
         } catch (error) {
-          exportStatus.value = responseErrorMessage(error, `JPEG ${exportColorLabel} export failed.`);
+          exportStatus.value = responseErrorMessage(error, `${exportFormatText} ${exportColorLabel} export failed.`);
           setStatus(exportStatus.value);
         } finally {
           setBusy(false);
@@ -6289,8 +6374,23 @@
       cancelExportButton.addEventListener("click", closeExportDialog);
       chooseExportOutputPathButton.addEventListener("click", () => chooseExportPath());
       runJpegExportButton.addEventListener("click", runJpegExport);
+      exportFormat.addEventListener("change", () => {
+        setExportFormat(exportFormat.value);
+        selectedExportPresetId = "";
+        if (exportOutputPath.dataset.autofilled === "true") {
+          const photo = selectedPhoto();
+          if (photo) {
+            exportOutputPath.value = defaultExportPath(photo);
+          }
+        }
+        void saveExportSettings(null);
+        syncExportDialog();
+      });
       exportColorOptionButtons.forEach((button) => {
         button.addEventListener("click", () => {
+          if (button.disabled) {
+            return;
+          }
           setExportColorProfile(button.dataset.exportColor);
           selectedExportPresetId = "";
           void saveExportSettings(null);
@@ -6306,6 +6406,7 @@
           return;
         }
         selectedExportPresetId = preset.id;
+        setExportFormat(preset.settings.format);
         setExportColorProfile(preset.settings.colorProfile);
         renderExportPresetControls();
         void saveExportSettings(preset.id);

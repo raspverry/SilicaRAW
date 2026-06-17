@@ -113,6 +113,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 ## Phase 20
 
 - [20.1: Export Settings Model and Presets](20.1-export-settings-model-presets.md)
+- [20.2: PNG and TIFF Export](20.2-png-tiff-export.md)
 
 ## Notes for LLM Agents
 

@@ -53,7 +53,7 @@ Local distribution is complete when:
   - open a preview
   - apply basic exposure/contrast edit
   - persist edit state
-  - export JPEG sRGB
+  - export JPEG sRGB, PNG sRGB, or TIFF sRGB
 - No original photo files are modified.
 - Checksums and release notes are published with the release.
 
@@ -696,7 +696,7 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Alpha copy accurately states blocked RAW/Metal/AI capabilities.
 - **Validation:** Static UI contract, culling persistence test, visual QA spot check, and harness pass.
 
-**Status:** Completed on 2026-06-10. The desktop UI no longer ships fictional recent library rows or demo photo cards; clean launch shows an explicit empty recent state and an empty catalog grid until a real library is opened/imported. The Library inspector now exposes 0-5 rating buttons, pick/reject toggles with mutual exclusion, and a clear culling action. Deferred controls are disabled with explicit titles or wired to status messages, and alpha copy states that RAW decode, Metal viewer output, and AI tools are disabled while JPEG/JPG preview/export is the enabled local alpha path.
+**Status:** Completed on 2026-06-10. The desktop UI no longer ships fictional recent library rows or demo photo cards; clean launch shows an explicit empty recent state and an empty catalog grid until a real library is opened/imported. The Library inspector now exposes 0-5 rating buttons, pick/reject toggles with mutual exclusion, and a clear culling action. Deferred controls are disabled with explicit titles or wired to status messages, and alpha copy states that RAW decode, Metal viewer output, and AI tools are disabled while JPEG/JPG preview with JPEG/PNG/TIFF export is the enabled local alpha path.
 
 ### Task 5.6.10: Legal QA Fixture Generator and Installed-App Preflight
 
