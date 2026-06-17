@@ -84,7 +84,7 @@ Agents must not invent parser-owned or color-profile fields outside `profile`. E
 
 The existing `exports.export_settings_json` field records export color metadata for local alpha proof work.
 
-Required color metadata keys for local raster exports:
+Required export evidence keys for local raster exports:
 
 ```txt
 color_profile
@@ -92,11 +92,28 @@ output_sha256
 icc_profile_embedded
 icc_profile_sha256
 profile_metadata_source
+metadata_policy
+source_metadata_segments
+output_metadata_segments
+source_metadata_copied
+gps_metadata_removed
 ```
 
 These fields are export evidence. They do not prove visual color correctness.
 
 For JPEG exports, `icc_profile_embedded` is `true` and `icc_profile_sha256` records the embedded sRGB or Display P3 ICC profile hash. For PNG and TIFF exports in Task 20.2, the current alpha records explicit sRGB intent, `icc_profile_embedded: false`, `icc_profile_sha256: null`, and `profile_metadata_source: "none"` until color-managed PNG/TIFF proof is implemented.
+
+Task 20.3 adds explicit export metadata policy evidence:
+
+```txt
+metadata_policy -> minimal | preserve | remove_gps | remove_all
+source_metadata_segments -> number of supported source metadata segments found
+output_metadata_segments -> number of supported source metadata segments inserted into output
+source_metadata_copied -> true when supported source metadata was copied into output
+gps_metadata_removed -> true when EXIF GPS IFD evidence was stripped for remove_gps
+```
+
+The current alpha metadata policy implementation is intentionally bounded. JPEG `preserve` copies supported source APP1/APP13 metadata segments while retaining SilicaRAW ICC ownership. JPEG `remove_gps` strips EXIF GPS IFD evidence from supported APP1 EXIF metadata. `minimal` and `remove_all` do not copy source metadata. PNG and TIFF currently record metadata policy evidence as output-owned only and do not copy source metadata.
 
 Task 20.1 adds catalog-owned export preference state outside the edit graph:
 
@@ -105,7 +122,7 @@ export_presets
 export_settings
 ```
 
-`export_presets` stores named local export presets. `export_settings` stores the current library default export settings. The conservative built-in default is JPEG, sRGB, quality 90, metadata policy `minimal`. Catalog schema version 10 allows `jpeg`, `png`, and `tiff` in export settings while keeping non-JPEG export settings sRGB-only.
+`export_presets` stores named local export presets. `export_settings` stores the current library default export settings. The conservative built-in default is JPEG, sRGB, quality 90, metadata policy `minimal`. Catalog schema version 11 allows `jpeg`, `png`, and `tiff` in export settings, keeps non-JPEG export settings sRGB-only, and allows metadata policy values `minimal`, `preserve`, `remove_gps`, and `remove_all`.
 
 These tables are preferences, not develop edits. Updating them must not write `edit_states`, `edit_history`, sidecars, or original photo files.
 
@@ -221,6 +238,14 @@ Task 20.2 export format status:
 catalog schema version -> 10
 export_presets.format -> jpeg | png | tiff
 export_settings.format -> jpeg | png | tiff
+```
+
+Task 20.3 export metadata status:
+
+```txt
+catalog schema version -> 11
+export_presets.metadata_policy -> minimal | preserve | remove_gps | remove_all
+export_settings.metadata_policy -> minimal | preserve | remove_gps | remove_all
 ```
 
 Task 16.6 sidecar status runtime:

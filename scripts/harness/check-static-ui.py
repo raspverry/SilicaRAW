@@ -819,6 +819,15 @@ def main():
         failures,
     )
     require(
+        parser.ids.get("exportMetadataPolicy", {}).get("name") == "exportMetadataPolicy"
+        and '<option value="minimal">Minimal</option>' in source
+        and '<option value="preserve">Preserve</option>' in source
+        and '<option value="remove_gps">Remove GPS</option>' in source
+        and '<option value="remove_all">Remove All</option>' in source,
+        "#exportMetadataPolicy must expose explicit metadata policy options",
+        failures,
+    )
+    require(
         parser.ids.get("exportPreset", {}).get("name") == "exportPreset",
         "#exportPreset must expose the current export preset",
         failures,

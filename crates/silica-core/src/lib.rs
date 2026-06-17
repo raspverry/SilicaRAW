@@ -841,6 +841,15 @@ pub enum PhotoExportColorProfile {
     DisplayP3,
 }
 
+/// Source metadata policy accepted by the core export boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoExportMetadataPolicy {
+    Minimal,
+    Preserve,
+    RemoveGps,
+    RemoveAll,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PhotoExportFormat {
     Jpeg,
@@ -3537,6 +3546,25 @@ pub fn export_photo_jpeg(
         output_path,
         PhotoExportFormat::Jpeg,
         color_profile,
+        PhotoExportMetadataPolicy::Minimal,
+    )
+}
+
+/// Export one edited catalog photo as a JPEG file with explicit metadata policy.
+pub fn export_photo_jpeg_with_metadata_policy(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+    color_profile: PhotoExportColorProfile,
+    metadata_policy: PhotoExportMetadataPolicy,
+) -> Result<Option<PhotoExportSession>, CoreError> {
+    export_photo_raster(
+        library_root_path,
+        photo_id,
+        output_path,
+        PhotoExportFormat::Jpeg,
+        color_profile,
+        metadata_policy,
     )
 }
 
@@ -3552,6 +3580,7 @@ pub fn export_photo_png(
         output_path,
         PhotoExportFormat::Png,
         PhotoExportColorProfile::Srgb,
+        PhotoExportMetadataPolicy::Minimal,
     )
 }
 
@@ -3567,6 +3596,7 @@ pub fn export_photo_tiff(
         output_path,
         PhotoExportFormat::Tiff,
         PhotoExportColorProfile::Srgb,
+        PhotoExportMetadataPolicy::Minimal,
     )
 }
 
@@ -3576,6 +3606,7 @@ fn export_photo_raster(
     output_path: impl AsRef<Path>,
     format: PhotoExportFormat,
     color_profile: PhotoExportColorProfile,
+    metadata_policy: PhotoExportMetadataPolicy,
 ) -> Result<Option<PhotoExportSession>, CoreError> {
     let library_root_path = library_root_path.as_ref();
     let output_path = output_path.as_ref();
@@ -3656,9 +3687,13 @@ fn export_photo_raster(
         output_sha256,
         icc_profile_embedded,
         icc_profile_sha256,
+        source_metadata_segments,
+        output_metadata_segments,
+        source_metadata_copied,
+        gps_metadata_removed,
     ) = match format {
         PhotoExportFormat::Jpeg => {
-            let export_result = silica_export::export_jpeg_with_color_profile(
+            let export_result = silica_export::export_jpeg_with_metadata_policy(
                 silica_export::JpegColorExportRequest {
                     source_path,
                     output_path: output_path.to_path_buf(),
@@ -3675,6 +3710,7 @@ fn export_photo_raster(
                     quality: render_request.quality,
                     color_profile: export_color_profile_to_export(color_profile),
                 },
+                export_metadata_policy_to_export(metadata_policy),
             )?;
             (
                 export_result.output_path,
@@ -3685,6 +3721,10 @@ fn export_photo_raster(
                 export_result.output_sha256,
                 export_result.icc_profile_embedded,
                 Some(export_result.icc_profile_sha256),
+                export_result.source_metadata_segments,
+                export_result.output_metadata_segments,
+                export_result.source_metadata_copied,
+                export_result.gps_metadata_removed,
             )
         }
         PhotoExportFormat::Png | PhotoExportFormat::Tiff => {
@@ -3713,6 +3753,10 @@ fn export_photo_raster(
                 export_result.output_sha256,
                 export_result.icc_profile_embedded,
                 export_result.icc_profile_sha256,
+                0,
+                0,
+                false,
+                false,
             )
         }
     };
@@ -3723,6 +3767,7 @@ fn export_photo_raster(
         "format": exported_format.clone(),
         "color_profile": exported_color_profile.clone(),
         "quality": render_request.quality,
+        "metadata_policy": export_metadata_policy_string(metadata_policy),
         "exposure": render_request.exposure,
         "contrast": render_request.contrast,
         "white_balance": white_balance_render_mode_string(render_request.white_balance.mode),
@@ -3746,6 +3791,10 @@ fn export_photo_raster(
         "icc_profile_embedded": icc_profile_embedded,
         "icc_profile_sha256": icc_profile_sha256_value,
         "profile_metadata_source": export_profile_metadata_source(format),
+        "source_metadata_segments": source_metadata_segments,
+        "output_metadata_segments": output_metadata_segments,
+        "source_metadata_copied": source_metadata_copied,
+        "gps_metadata_removed": gps_metadata_removed,
     });
     let settings_json = settings_value.to_string();
     let export_record = silica_storage::record_export(
@@ -5128,6 +5177,26 @@ fn export_color_profile_string(profile: silica_export::ExportColorProfile) -> &'
     match profile {
         silica_export::ExportColorProfile::Srgb => "srgb",
         silica_export::ExportColorProfile::DisplayP3 => "display_p3",
+    }
+}
+
+fn export_metadata_policy_to_export(
+    policy: PhotoExportMetadataPolicy,
+) -> silica_export::ExportMetadataPolicy {
+    match policy {
+        PhotoExportMetadataPolicy::Minimal => silica_export::ExportMetadataPolicy::Minimal,
+        PhotoExportMetadataPolicy::Preserve => silica_export::ExportMetadataPolicy::Preserve,
+        PhotoExportMetadataPolicy::RemoveGps => silica_export::ExportMetadataPolicy::RemoveGps,
+        PhotoExportMetadataPolicy::RemoveAll => silica_export::ExportMetadataPolicy::RemoveAll,
+    }
+}
+
+fn export_metadata_policy_string(policy: PhotoExportMetadataPolicy) -> &'static str {
+    match policy {
+        PhotoExportMetadataPolicy::Minimal => "minimal",
+        PhotoExportMetadataPolicy::Preserve => "preserve",
+        PhotoExportMetadataPolicy::RemoveGps => "remove_gps",
+        PhotoExportMetadataPolicy::RemoveAll => "remove_all",
     }
 }
 
@@ -10045,6 +10114,65 @@ mod tests {
     }
 
     #[test]
+    fn export_metadata_policy_removes_gps_and_records_evidence() {
+        let workspace = unique_library_root("core-export-metadata-policy");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-remove-gps.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg_with_exif(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let exported = export_photo_jpeg_with_metadata_policy(
+            &created.root_path,
+            &photo_id,
+            &output_path,
+            PhotoExportColorProfile::Srgb,
+            PhotoExportMetadataPolicy::RemoveGps,
+        )
+        .expect("export photo")
+        .expect("export result");
+
+        assert_eq!(exported.format, "jpeg");
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
+        assert!(jpeg_contains_exif_make(&exported.output_path));
+        assert!(!jpeg_has_exif_gps_ifd(&exported.output_path));
+
+        let latest =
+            silica_storage::get_latest_export_record(&created.root_path, &exported.photo_id)
+                .expect("read latest export")
+                .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["metadata_policy"], "remove_gps");
+        assert_eq!(settings["source_metadata_segments"], 1);
+        assert_eq!(settings["output_metadata_segments"], 1);
+        assert_eq!(settings["source_metadata_copied"], true);
+        assert_eq!(settings["gps_metadata_removed"], true);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn export_settings_defaults_and_presets_flow_through_core_without_edit_history() {
         let workspace = unique_library_root("core-export-settings");
         let library_root = workspace.join("SilicaRAW Library");
@@ -10424,6 +10552,68 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn write_source_jpeg_with_exif(path: &Path) {
+        write_source_jpeg(path);
+        let bytes = std::fs::read(path).expect("read source jpeg");
+        let with_exif = insert_app1_exif_segment(&bytes, &minimal_exif_with_gps());
+        std::fs::write(path, with_exif).expect("write source jpeg exif");
+    }
+
+    fn insert_app1_exif_segment(jpeg: &[u8], exif: &[u8]) -> Vec<u8> {
+        assert!(jpeg.starts_with(&[0xFF, 0xD8]));
+        let segment_len = exif.len() + 2;
+        let mut output = Vec::with_capacity(jpeg.len() + segment_len + 2);
+        output.extend_from_slice(&jpeg[..2]);
+        output.extend_from_slice(&[0xFF, 0xE1]);
+        output.extend_from_slice(&(segment_len as u16).to_be_bytes());
+        output.extend_from_slice(exif);
+        output.extend_from_slice(&jpeg[2..]);
+        output
+    }
+
+    fn minimal_exif_with_gps() -> Vec<u8> {
+        let make_offset = 38_u32;
+        let gps_offset = 48_u32;
+        let mut tiff = Vec::new();
+        tiff.extend_from_slice(b"II");
+        tiff.extend_from_slice(&42_u16.to_le_bytes());
+        tiff.extend_from_slice(&8_u32.to_le_bytes());
+        tiff.extend_from_slice(&2_u16.to_le_bytes());
+        tiff.extend_from_slice(&0x010F_u16.to_le_bytes());
+        tiff.extend_from_slice(&2_u16.to_le_bytes());
+        tiff.extend_from_slice(&10_u32.to_le_bytes());
+        tiff.extend_from_slice(&make_offset.to_le_bytes());
+        tiff.extend_from_slice(&0x8825_u16.to_le_bytes());
+        tiff.extend_from_slice(&4_u16.to_le_bytes());
+        tiff.extend_from_slice(&1_u32.to_le_bytes());
+        tiff.extend_from_slice(&gps_offset.to_le_bytes());
+        tiff.extend_from_slice(&0_u32.to_le_bytes());
+        tiff.extend_from_slice(b"SilicaCam\0");
+        tiff.extend_from_slice(&1_u16.to_le_bytes());
+        tiff.extend_from_slice(&1_u16.to_le_bytes());
+        tiff.extend_from_slice(&2_u16.to_le_bytes());
+        tiff.extend_from_slice(&2_u32.to_le_bytes());
+        tiff.extend_from_slice(b"N\0\0\0");
+        tiff.extend_from_slice(&0_u32.to_le_bytes());
+
+        let mut exif = b"Exif\0\0".to_vec();
+        exif.extend_from_slice(&tiff);
+        exif
+    }
+
+    fn jpeg_contains_exif_make(path: &Path) -> bool {
+        std::fs::read(path)
+            .expect("read jpeg")
+            .windows(b"SilicaCam".len())
+            .any(|window| window == b"SilicaCam")
+    }
+
+    fn jpeg_has_exif_gps_ifd(path: &Path) -> bool {
+        let bytes = std::fs::read(path).expect("read jpeg");
+        bytes.windows(2).any(|window| window == [0x25, 0x88])
+            || bytes.windows(2).any(|window| window == [0x88, 0x25])
     }
 
     fn write_geometry_source_jpeg(path: &Path) {

@@ -851,11 +851,12 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-export`, `crates/silica-core`, `apps/desktop/static/`
 - **Description:** Add preserve metadata, remove GPS, and remove all metadata options.
 - **Dependencies:** Tasks 11.7 and 20.2
+- **Status:** Completed on 2026-06-17. JPEG exports now support explicit `minimal`, `preserve`, `remove_gps`, and `remove_all` metadata policies, persist those policies in catalog export settings and presets with schema version 11, record metadata-copy evidence in export records, and surface bounded metadata behavior in the existing Export dialog.
 - **Acceptance Criteria:**
   - Metadata policy is explicit in UI.
   - Exported metadata behavior is tested.
   - Originals are not rewritten.
-- **Validation:** Export metadata tests.
+- **Validation:** Export metadata tests and `scripts/harness/check.sh`.
 
 ### Task 20.4: Batch Export Progress and Recent Exports
 

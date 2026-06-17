@@ -783,6 +783,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "export_settings_png_tiff_formats",
         sql: EXPORT_SETTINGS_PNG_TIFF_FORMATS_SQL,
     },
+    Migration {
+        version: 11,
+        name: "export_settings_metadata_policy",
+        sql: EXPORT_SETTINGS_METADATA_POLICY_SQL,
+    },
 ];
 
 /// Open a catalog database and apply all embedded migrations.
@@ -4530,7 +4535,10 @@ fn validate_export_settings(settings: &ExportSettings) -> Result<(), LibraryStor
             settings.quality
         )));
     }
-    if settings.metadata_policy != "minimal" {
+    if !matches!(
+        settings.metadata_policy.as_str(),
+        "minimal" | "preserve" | "remove_gps" | "remove_all"
+    ) {
         return Err(LibraryStorageError::ExportSettingsValidation(format!(
             "unsupported export metadata policy: {}",
             settings.metadata_policy
@@ -5343,6 +5351,76 @@ FROM export_settings_v9;
 
 DROP TABLE export_settings_v9;
 DROP TABLE export_presets_v9;
+"#;
+
+const EXPORT_SETTINGS_METADATA_POLICY_SQL: &str = r#"
+ALTER TABLE export_settings RENAME TO export_settings_v10;
+ALTER TABLE export_presets RENAME TO export_presets_v10;
+
+CREATE TABLE export_presets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  format TEXT NOT NULL DEFAULT 'jpeg' CHECK (format IN ('jpeg', 'png', 'tiff')),
+  color_profile TEXT NOT NULL DEFAULT 'srgb' CHECK (color_profile IN ('srgb', 'display_p3')),
+  quality INTEGER NOT NULL DEFAULT 90 CHECK (quality BETWEEN 1 AND 100),
+  metadata_policy TEXT NOT NULL DEFAULT 'minimal' CHECK (metadata_policy IN ('minimal', 'preserve', 'remove_gps', 'remove_all')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE export_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'default'),
+  preset_id TEXT,
+  format TEXT NOT NULL DEFAULT 'jpeg' CHECK (format IN ('jpeg', 'png', 'tiff')),
+  color_profile TEXT NOT NULL DEFAULT 'srgb' CHECK (color_profile IN ('srgb', 'display_p3')),
+  quality INTEGER NOT NULL DEFAULT 90 CHECK (quality BETWEEN 1 AND 100),
+  metadata_policy TEXT NOT NULL DEFAULT 'minimal' CHECK (metadata_policy IN ('minimal', 'preserve', 'remove_gps', 'remove_all')),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (preset_id) REFERENCES export_presets(id) ON DELETE SET NULL
+);
+
+INSERT INTO export_presets(
+  id,
+  name,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  created_at,
+  updated_at
+)
+SELECT
+  id,
+  name,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  created_at,
+  updated_at
+FROM export_presets_v10;
+
+INSERT INTO export_settings(
+  id,
+  preset_id,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  updated_at
+)
+SELECT
+  id,
+  preset_id,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  updated_at
+FROM export_settings_v10;
+
+DROP TABLE export_settings_v10;
+DROP TABLE export_presets_v10;
 "#;
 
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
@@ -8654,6 +8732,36 @@ mod tests {
             .presets
             .iter()
             .any(|candidate| candidate == &preset));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn export_settings_accept_metadata_policy_values_after_current_migration() {
+        let workspace = unique_library_root("export-settings-metadata-policy");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        for policy in ["preserve", "remove_gps", "remove_all"] {
+            let settings = ExportSettings {
+                metadata_policy: policy.to_string(),
+                ..ExportSettings::jpeg_srgb_default()
+            };
+            let catalog = set_default_export_settings(&library.root_path, None, settings.clone())
+                .expect("save metadata policy settings");
+            assert_eq!(catalog.default_settings, settings);
+        }
 
         let connection = open_catalog(&library.catalog_path).expect("open catalog");
         assert_eq!(count_edit_states(&connection), 0);
