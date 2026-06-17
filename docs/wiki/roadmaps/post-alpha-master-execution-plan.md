@@ -31,7 +31,7 @@ Allowed reasons to create a new phase-specific plan:
 
 ## Current Position
 
-As of 2026-06-13:
+As of 2026-06-17:
 
 - Phase 12 RAW proof is complete for fixture-backed Core Image support mapping.
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
@@ -56,7 +56,9 @@ As of 2026-06-13:
 - Phase 16 is complete.
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
-- Phase 19 is complete. Current next task is [Task 20.1 Export Settings Model and Presets](../tasks/20.1-export-settings-model-presets.md).
+- Phase 20 is complete.
+- Task 21.1 through Task 21.4 are complete.
+- Task 21.5 is gated by Phase 23 permission policy.
 
 ## Wave Map
 
@@ -387,8 +389,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Start [Task 20.1 Export Settings Model and Presets](../tasks/20.1-export-settings-model-presets.md).
-2. Continue Phase 20 in task-card order after each slice passes focused checks and the full harness.
+1. Do not start Task 21.5 runtime work until Phase 23 permission policy exists.
+2. Continue to Phase 22 hardening tasks unless a Phase 23 planning gate is explicitly selected.
 
 ## Links
 

@@ -16,7 +16,7 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 20 is complete. The current product area is **Phase 21: Preferences and App Settings**.
 
-Task 21.3 is complete. The next implementation task is **Task 21.4: Color and Export Defaults**.
+Task 21.4 is complete. The next listed task is **Task 21.5: Advanced Agent Access Preferences**, but it is gated by Phase 23 permission policy and must not start runtime work yet.
 
 ## Minimal Read Set
 
@@ -36,14 +36,14 @@ For Phase 21 task-card creation or implementation, read:
 - Task 21.1 created the compact Preferences shell and section IA only.
 - Task 21.2 implemented supported Appearance preferences in app-level session state.
 - Task 21.3 implemented Library default path preferences and disposable Cache status/clear controls.
-- Task 21.4 owns color and export default persistence.
+- Task 21.4 implements Color and Export defaults through the existing catalog export settings path.
 - Task 21.5 is gated by Phase 23 permission policy.
 
 ## Stop Rules
 
 - Do not enable an unimplemented Preferences control.
 - Do not add Preferences persistence outside the active scoped task.
-- Do not change export defaults before Task 21.4.
+- Do not create a second export preferences store; reuse catalog export settings.
 - Do not start agent, MCP, or plugin runtime from Preferences before Task 21.5 and Phase 23 policy.
 - Do not add MLX, MCP, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support.
 - Do not mutate original photo files.

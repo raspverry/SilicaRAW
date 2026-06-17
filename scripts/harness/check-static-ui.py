@@ -564,9 +564,34 @@ def main():
         require(marker in source, f"library/cache preference marker missing: {marker}", failures)
     for control_id in [
         "preferencesColorDefaultSpace",
-        "preferencesColorProfilePolicy",
         "preferencesExportDefaultFormat",
         "preferencesExportDefaultQuality",
+    ]:
+        require(
+            "disabled" not in parser.ids.get(control_id, {}),
+            f"#{control_id} must be enabled by Task 21.4",
+            failures,
+        )
+    require(
+        '<option value="srgb">sRGB</option>' in source
+        and '<option value="display_p3">Display P3</option>' in source
+        and '<option value="jpeg">JPEG</option>' in source
+        and '<option value="png">PNG</option>' in source
+        and '<option value="tiff">TIFF</option>' in source,
+        "Task 21.4 preferences must expose supported export default choices",
+        failures,
+    )
+    for marker in [
+        "function applyPreferencesExportSettings",
+        "function currentPreferencesExportSettings",
+        "function savePreferencesExportDefaults",
+        "save_export_settings",
+        "get_export_settings",
+        "Display P3 is JPEG-only",
+    ]:
+        require(marker in source, f"color/export preference marker missing: {marker}", failures)
+    for control_id in [
+        "preferencesColorProfilePolicy",
         "preferencesAdvancedAgentAccess",
         "preferencesAdvancedMcpAccess",
         "preferencesAdvancedPluginRuntime",

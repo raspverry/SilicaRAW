@@ -39,6 +39,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 16.6 marks already-written sidecars as `catalog_newer` after edit commits, flag commits, undo, and redo. It preserves `conflict` and `sidecar_newer`, writes no sidecar files, expands no `sidecar.flags`, and keeps original files untouched.
 - Task 20.1 stores export defaults and named presets in catalog-owned `export_settings` and `export_presets` tables only. Updating export preferences must not write `edit_states`, `edit_history`, sidecars, export output files, or original photo files.
 - Task 21.3 exposes disposable cache status and cache clear inside Preferences. Status is read-only over disposable cache directories, and clear remains limited to `thumbnails/`, `previews/`, `render-cache/`, and `ai-cache/`.
+- Task 21.4 routes Preferences Color/Export defaults through the existing export settings commands only. Defaults remain validated before save, Display P3 remains explicit and JPEG-only, and no original, sidecar, edit history, or export output files are written when defaults change.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -68,6 +69,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Sidecar status safety. Task 16.6 covers catalog-side stale status after history commits, conflict/newer preservation, reopen persistence, no hidden sidecar file writes, and no `sidecar.flags` schema expansion.
 - Export settings safety. Task 20.1 covers schema migration to version 9, conservative JPEG sRGB defaults, named preset reload, no edit history writes, and no original-file or export-output writes when preferences change.
 - Preferences cache safety. Task 21.3 covers read-only cache status, Preferences cache clear using the existing disposable boundary, and app-session Library default path persistence without launch behavior changes.
+- Preferences export defaults safety. Task 21.4 covers Preferences-driven default format, quality, and color-space updates through the existing export settings path, including unsupported-combination blocking and no second preferences store.
 
 ## Links
 

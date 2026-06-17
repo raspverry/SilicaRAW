@@ -1069,8 +1069,9 @@
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesColorDefaultSpace">Default Space</label>
-                  <select id="preferencesColorDefaultSpace" disabled>
-                    <option>sRGB</option>
+                  <select id="preferencesColorDefaultSpace">
+                    <option value="srgb">sRGB</option>
+                    <option value="display_p3">Display P3</option>
                   </select>
                 </div>
                 <div class="sr-preferences-row">
@@ -1083,17 +1084,19 @@
               <section class="sr-preferences-panel" id="preferencesPanelExport" role="tabpanel" data-preferences-panel="export" aria-labelledby="preferencesPanelExportTitle" hidden>
                 <div class="sr-preferences-panel-header">
                   <h3 id="preferencesPanelExportTitle">Export</h3>
-                  <p>Export dialog presets are live. Global defaults are scheduled for Task 21.4.</p>
+                  <p>Export dialog presets are live. Defaults save into the active local library.</p>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesExportDefaultFormat">Default Format</label>
-                  <select id="preferencesExportDefaultFormat" disabled>
-                    <option>JPEG</option>
+                  <select id="preferencesExportDefaultFormat">
+                    <option value="jpeg">JPEG</option>
+                    <option value="png">PNG</option>
+                    <option value="tiff">TIFF</option>
                   </select>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesExportDefaultQuality">Default Quality</label>
-                  <input id="preferencesExportDefaultQuality" type="number" min="1" max="100" value="90" disabled>
+                  <input id="preferencesExportDefaultQuality" type="number" min="1" max="100" value="90">
                 </div>
               </section>
               <section class="sr-preferences-panel" id="preferencesPanelAdvanced" role="tabpanel" data-preferences-panel="advanced" aria-labelledby="preferencesPanelAdvancedTitle" hidden>
@@ -1533,6 +1536,10 @@
       const preferencesCacheClear = document.querySelector("#preferencesCacheClear");
       const preferencesCacheRefresh = document.querySelector("#preferencesCacheRefresh");
       const preferencesCacheStatus = document.querySelector("#preferencesCacheStatus");
+      const preferencesColorDefaultSpace = document.querySelector("#preferencesColorDefaultSpace");
+      const preferencesColorProfilePolicy = document.querySelector("#preferencesColorProfilePolicy");
+      const preferencesExportDefaultFormat = document.querySelector("#preferencesExportDefaultFormat");
+      const preferencesExportDefaultQuality = document.querySelector("#preferencesExportDefaultQuality");
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -1597,6 +1604,7 @@
       let activeLibraryPath = "";
       let selectedExportFormat = "jpeg";
       let selectedExportColorProfile = "srgb";
+      let selectedExportQuality = 90;
       let selectedExportMetadataPolicy = "minimal";
       let selectedExportPresetId = "jpeg-srgb-90";
       let exportBatchFailures = [];
@@ -4652,7 +4660,7 @@
       }
 
       function exportQualityLabel(format) {
-        return normalizeExportFormat(format) === "jpeg" ? "90" : "Lossless";
+        return normalizeExportFormat(format) === "jpeg" ? String(selectedExportQuality) : "Lossless";
       }
 
       function exportCommandName(format) {
@@ -4684,12 +4692,20 @@
         return "Minimal";
       }
 
+      function clampExportQuality(value) {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isNaN(parsed)) {
+          return 90;
+        }
+        return Math.min(100, Math.max(1, parsed));
+      }
+
       function normalizeExportSettings(settings = {}) {
         const format = normalizeExportFormat(settings.format);
         return {
           format,
           colorProfile: format === "jpeg" && settings.colorProfile === "display_p3" ? "display_p3" : "srgb",
-          quality: Number(settings.quality) || 90,
+          quality: clampExportQuality(settings.quality),
           metadataPolicy: normalizeExportMetadataPolicy(settings.metadataPolicy),
         };
       }
@@ -4719,7 +4735,7 @@
         return {
           format: selectedExportFormat,
           colorProfile: selectedExportColorProfile,
-          quality: 90,
+          quality: selectedExportQuality,
           metadataPolicy: selectedExportMetadataPolicy,
         };
       }
@@ -4727,6 +4743,37 @@
       function syncExportPresetSummary() {
         const preset = selectedExportPreset();
         exportSummaryPreset.textContent = preset?.name || "Custom";
+      }
+
+      function syncPreferencesExportControlState() {
+        const disabled = controlsBusy || !activeLibraryPath;
+        const colorDisabled = disabled || preferencesExportDefaultFormat.value !== "jpeg";
+        preferencesColorDefaultSpace.disabled = colorDisabled;
+        preferencesColorDefaultSpace.setAttribute("aria-disabled", String(colorDisabled));
+        preferencesColorProfilePolicy.disabled = true;
+        preferencesExportDefaultFormat.disabled = disabled;
+        preferencesExportDefaultFormat.setAttribute("aria-disabled", String(disabled));
+        preferencesExportDefaultQuality.disabled = disabled;
+        preferencesExportDefaultQuality.setAttribute("aria-disabled", String(disabled));
+      }
+
+      function applyPreferencesExportSettings(settings = exportSettingsCatalog.defaultSettings) {
+        const normalized = normalizeExportSettings(settings);
+        preferencesExportDefaultFormat.value = normalized.format;
+        preferencesColorDefaultSpace.value = normalized.colorProfile;
+        preferencesExportDefaultQuality.value = String(normalized.quality);
+        syncPreferencesExportControlState();
+      }
+
+      function currentPreferencesExportSettings() {
+        const format = normalizeExportFormat(preferencesExportDefaultFormat.value);
+        const colorProfile = format === "jpeg" ? preferencesColorDefaultSpace.value : "srgb";
+        return normalizeExportSettings({
+          format,
+          colorProfile,
+          quality: preferencesExportDefaultQuality.value,
+          metadataPolicy: exportSettingsCatalog.defaultSettings.metadataPolicy,
+        });
       }
 
       function renderExportPresetControls({ syncName = true } = {}) {
@@ -4754,10 +4801,12 @@
       function applyExportSettingsCatalog(catalog) {
         exportSettingsCatalog = normalizeExportSettingsCatalog(catalog);
         selectedExportPresetId = exportSettingsCatalog.defaultPresetId || "";
+        selectedExportQuality = exportSettingsCatalog.defaultSettings.quality;
         setExportFormat(exportSettingsCatalog.defaultSettings.format);
         setExportColorProfile(exportSettingsCatalog.defaultSettings.colorProfile);
         setExportMetadataPolicy(exportSettingsCatalog.defaultSettings.metadataPolicy);
         renderExportPresetControls();
+        applyPreferencesExportSettings(exportSettingsCatalog.defaultSettings);
       }
 
       async function loadExportSettings() {
@@ -4796,6 +4845,7 @@
         };
         selectedExportPresetId = id;
         renderExportPresetControls();
+        applyPreferencesExportSettings(settings);
       }
 
       async function saveExportSettings(presetId = selectedExportPresetId) {
@@ -4804,6 +4854,7 @@
         exportSettingsCatalog.defaultPresetId = presetId || "";
         selectedExportPresetId = presetId || "";
         renderExportPresetControls({ syncName: Boolean(presetId) });
+        applyPreferencesExportSettings(settings);
 
         if (!activeLibraryPath || !invoke) {
           exportStatus.value = "Static export settings smoke passed; desktop runtime saves settings.";
@@ -4829,6 +4880,48 @@
         } catch (error) {
           exportStatus.value = responseErrorMessage(error, "Export settings could not be saved.");
           setStatus(exportStatus.value);
+        }
+      }
+
+      async function savePreferencesExportDefaults() {
+        const settings = currentPreferencesExportSettings();
+        exportSettingsCatalog.defaultSettings = settings;
+        exportSettingsCatalog.defaultPresetId = "";
+        selectedExportPresetId = "";
+        selectedExportQuality = settings.quality;
+        setExportFormat(settings.format);
+        setExportColorProfile(settings.colorProfile);
+        setExportMetadataPolicy(settings.metadataPolicy);
+        renderExportPresetControls({ syncName: false });
+        applyPreferencesExportSettings(settings);
+        syncExportDialog();
+
+        if (!activeLibraryPath || !invoke) {
+          preferencesStatus.value = "Static export defaults smoke passed; desktop runtime saves settings.";
+          setStatus(preferencesStatus.value);
+          return;
+        }
+
+        try {
+          const response = await invoke("save_export_settings", {
+            libraryPath: activeLibraryPath,
+            presetId: null,
+            format: settings.format,
+            colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
+            quality: settings.quality,
+            metadataPolicy: settings.metadataPolicy,
+          });
+          if (commandFailed(response)) {
+            preferencesStatus.value = responseErrorMessage(response, "Export defaults could not be saved.");
+            setStatus(preferencesStatus.value);
+            return;
+          }
+          applyExportSettingsCatalog(response.data);
+          preferencesStatus.value = "Export defaults saved.";
+          setStatus(preferencesStatus.value);
+        } catch (error) {
+          preferencesStatus.value = responseErrorMessage(error, "Export defaults could not be saved.");
+          setStatus(preferencesStatus.value);
         }
       }
 
@@ -4875,24 +4968,35 @@
         return `Original files will not be modified. SilicaRAW writes a separate ${exportFormatLabel(selectedExportFormat)} ${label} file to the output path.`;
       }
 
+      function setExportQuality(quality) {
+        selectedExportQuality = clampExportQuality(quality);
+        exportQuality.value = exportQualityLabel(selectedExportFormat);
+        exportSummaryQuality.textContent = exportQualityLabel(selectedExportFormat);
+        preferencesExportDefaultQuality.value = String(selectedExportQuality);
+      }
+
       function setExportFormat(format) {
         selectedExportFormat = normalizeExportFormat(format);
         exportFormat.value = selectedExportFormat;
-        exportQuality.value = exportQualityLabel(selectedExportFormat);
         exportSummaryFormat.textContent = exportFormatLabel(selectedExportFormat);
-        exportSummaryQuality.textContent = exportQualityLabel(selectedExportFormat);
         runJpegExportButton.textContent = `Export ${exportFormatLabel(selectedExportFormat)}`;
         if (selectedExportFormat !== "jpeg") {
           selectedExportColorProfile = "srgb";
           selectedExportMetadataPolicy = "minimal";
         }
+        setExportQuality(selectedExportQuality);
         setExportColorProfile(selectedExportColorProfile);
         setExportMetadataPolicy(selectedExportMetadataPolicy);
+        if (preferencesExportDefaultFormat) {
+          preferencesExportDefaultFormat.value = selectedExportFormat;
+          syncPreferencesExportControlState();
+        }
       }
 
       function setExportColorProfile(profile) {
         selectedExportColorProfile = selectedExportFormat === "jpeg" && profile === "display_p3" ? "display_p3" : "srgb";
         const label = exportColorProfileLabel(selectedExportColorProfile);
+        preferencesColorDefaultSpace.value = selectedExportColorProfile;
         exportColorSpace.value = label;
         exportSummaryColor.textContent = label;
         exportSafetyNote.textContent = exportColorSafetyText(selectedExportColorProfile);
@@ -5123,6 +5227,16 @@
           } else if (selectedSection === "cache") {
             preferencesStatus.value = "Cache controls affect disposable library caches only.";
             void refreshPreferencesCacheStatus();
+          } else if (selectedSection === "color") {
+            applyPreferencesExportSettings(exportSettingsCatalog.defaultSettings);
+            preferencesStatus.value = activeLibraryPath
+              ? "Color defaults save to the active library export settings."
+              : "Open a library to edit color defaults.";
+          } else if (selectedSection === "export") {
+            applyPreferencesExportSettings(exportSettingsCatalog.defaultSettings);
+            preferencesStatus.value = activeLibraryPath
+              ? "Export defaults save to the active library and update the export dialog."
+              : "Open a library to edit export defaults.";
           } else {
             preferencesStatus.value = `${label} settings are mapped; controls remain disabled until their scoped task.`;
           }
@@ -6704,6 +6818,7 @@
         preferencesLibraryStartupAction.disabled = true;
         preferencesCacheRefresh.disabled = isBusy || !activeLibraryPath;
         preferencesCacheClear.disabled = isBusy || !activeLibraryPath;
+        syncPreferencesExportControlState();
         updateCullingControls(selectedPhoto());
         const developDisabled = isBusy || !isDevelopable(selectedPhoto());
         [
@@ -7150,6 +7265,18 @@
       preferencesLibraryReset.addEventListener("click", resetLibraryPreferences);
       preferencesCacheRefresh.addEventListener("click", () => void refreshPreferencesCacheStatus());
       preferencesCacheClear.addEventListener("click", runPreferencesCacheClearCommand);
+      preferencesColorDefaultSpace.addEventListener("change", () => {
+        void savePreferencesExportDefaults();
+      });
+      preferencesExportDefaultFormat.addEventListener("change", () => {
+        const settings = currentPreferencesExportSettings();
+        applyPreferencesExportSettings(settings);
+        void savePreferencesExportDefaults();
+      });
+      preferencesExportDefaultQuality.addEventListener("change", () => {
+        preferencesExportDefaultQuality.value = String(clampExportQuality(preferencesExportDefaultQuality.value));
+        void savePreferencesExportDefaults();
+      });
       closePreferencesDialogButton.addEventListener("click", closePreferencesDialog);
       closePreferencesDialogFooterButton.addEventListener("click", closePreferencesDialog);
       openExportDialogButton.addEventListener("click", openExportDialog);
@@ -7192,6 +7319,7 @@
           return;
         }
         selectedExportPresetId = preset.id;
+        selectedExportQuality = preset.settings.quality;
         setExportFormat(preset.settings.format);
         setExportColorProfile(preset.settings.colorProfile);
         setExportMetadataPolicy(preset.settings.metadataPolicy);
