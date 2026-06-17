@@ -23,6 +23,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Task 21.5 adds disabled Preferences controls for Agent Access, MCP Tools, and Plugin Runtime. The controls explain future permission prompts, Core API boundaries, side effects, and action-log evidence, but they do not start any runtime.
 - Task 23.1 adds the core extension permission vocabulary and default-deny policy. `silica-plugin` and `silica-mcp` record matching permission IDs for boundary checks only; no plugin runtime dependency, MCP server, tool execution, or permission prompt is active yet.
 - Task 23.2 adds the static permission prompt UI contract in Preferences Advanced. It shows actor identity, requested permission, side effects, confirmation requirement, undo availability, deny behavior, and dangerous-permission unavailability without granting permissions or starting runtime behavior.
+- Task 23.3 adds Core action-log wrappers for permission grants, denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts. Storage rejects extension raw-SQL/direct-database bypass claims. This is evidence only; it does not enable plugin, MCP, AI, or agent runtime.
 
 ## Task 23.1 Permission Vocabulary
 
@@ -57,6 +58,21 @@ Future permission prompts must show:
 - Dangerous permissions: unavailable unless a future ADR approves them.
 
 This is a UI contract only. It does not add permission persistence, grant storage, plugin loading, MCP tools, background agents, or direct SQLite access.
+
+## Task 23.3 Action Log Contract
+
+Future extension-sensitive actions must enter Core before they can be logged:
+
+- `permission_grant`
+- `permission_denial`
+- `plugin_apply`
+- `ai_approval`
+- `mcp_read`
+- `export_attempt`
+
+Each row records actor, action type, subject, side-effect category, evidence reference, and JSON payload with the stable permission ID. Logged rows are evidence; they are not undo records and do not store active permission grants.
+
+Extension actors cannot log raw SQL or direct database access claims. Direct SQLite access from plugins, MCP tools, AI paths, and agents remains forbidden.
 
 ## Required Manifest Areas
 

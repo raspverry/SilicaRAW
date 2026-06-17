@@ -1905,6 +1905,169 @@ fn append_core_action_log(
     )
 }
 
+fn append_permissioned_action_log(
+    library_root_path: &Path,
+    actor_type: &str,
+    actor_id: Option<&str>,
+    action_type: &str,
+    subject_type: Option<&str>,
+    subject_id: Option<&str>,
+    side_effect_category: &str,
+    evidence_ref: Option<String>,
+    payload: serde_json::Value,
+) -> Result<ActionLogEntry, CoreError> {
+    let payload_json = serde_json::to_string(&payload).map_err(|error| {
+        CoreError::AppSession(format!(
+            "permission action log payload serialization failed: {error}"
+        ))
+    })?;
+    append_action_log_entry(
+        library_root_path,
+        NewActionLogEntry {
+            actor_type: actor_type.to_string(),
+            actor_id: actor_id.map(str::to_string),
+            action_type: action_type.to_string(),
+            subject_type: subject_type.map(str::to_string),
+            subject_id: subject_id.map(str::to_string),
+            side_effect_category: side_effect_category.to_string(),
+            evidence_ref,
+            payload_json,
+        },
+    )
+}
+
+/// Record a future extension permission grant or denial without storing a grant.
+pub fn record_permission_decision(
+    library_root_path: impl AsRef<Path>,
+    actor_type: impl AsRef<str>,
+    actor_id: Option<&str>,
+    permission: ExtensionPermission,
+    granted: bool,
+    reason: impl AsRef<str>,
+) -> Result<ActionLogEntry, CoreError> {
+    let action_type = if granted {
+        "permission_grant"
+    } else {
+        "permission_denial"
+    };
+    let permission_id = permission.stable_id();
+    append_permissioned_action_log(
+        library_root_path.as_ref(),
+        actor_type.as_ref(),
+        actor_id,
+        action_type,
+        Some("permission"),
+        Some(permission_id),
+        "permission_decision",
+        Some(format!("{action_type}:{permission_id}")),
+        serde_json::json!({
+            "permission_id": permission_id,
+            "granted": granted,
+            "reason": reason.as_ref(),
+        }),
+    )
+}
+
+/// Record that a plugin apply path reached permission review.
+pub fn record_plugin_apply_attempt(
+    library_root_path: impl AsRef<Path>,
+    plugin_id: impl AsRef<str>,
+    photo_id: Option<&str>,
+    permission: ExtensionPermission,
+) -> Result<ActionLogEntry, CoreError> {
+    let plugin_id = plugin_id.as_ref();
+    append_permissioned_action_log(
+        library_root_path.as_ref(),
+        "plugin",
+        Some(plugin_id),
+        "plugin_apply",
+        Some("photo"),
+        photo_id,
+        "extension_review",
+        Some(format!("plugin:{plugin_id}:apply")),
+        serde_json::json!({
+            "plugin_id": plugin_id,
+            "permission_id": permission.stable_id(),
+            "granted": false,
+        }),
+    )
+}
+
+/// Record an approved AI result boundary without running MLX or mutating edits.
+pub fn record_ai_approval(
+    library_root_path: impl AsRef<Path>,
+    model_id: impl AsRef<str>,
+    photo_id: Option<&str>,
+    permission: ExtensionPermission,
+) -> Result<ActionLogEntry, CoreError> {
+    let model_id = model_id.as_ref();
+    append_permissioned_action_log(
+        library_root_path.as_ref(),
+        "ai",
+        Some(model_id),
+        "ai_approval",
+        Some("photo"),
+        photo_id,
+        "ai_result",
+        Some(format!("ai:{model_id}:approval")),
+        serde_json::json!({
+            "model_id": model_id,
+            "permission_id": permission.stable_id(),
+        }),
+    )
+}
+
+/// Record a future MCP read through Core policy without starting an MCP server.
+pub fn record_mcp_read(
+    library_root_path: impl AsRef<Path>,
+    session_id: impl AsRef<str>,
+    subject_type: impl AsRef<str>,
+    subject_id: Option<&str>,
+    permission: ExtensionPermission,
+) -> Result<ActionLogEntry, CoreError> {
+    let session_id = session_id.as_ref();
+    append_permissioned_action_log(
+        library_root_path.as_ref(),
+        "mcp",
+        Some(session_id),
+        "mcp_read",
+        Some(subject_type.as_ref()),
+        subject_id,
+        "catalog_read",
+        Some(format!("mcp:{session_id}:read")),
+        serde_json::json!({
+            "session_id": session_id,
+            "permission_id": permission.stable_id(),
+        }),
+    )
+}
+
+/// Record a permissioned export attempt before any future extension export path runs.
+pub fn record_permissioned_export_attempt(
+    library_root_path: impl AsRef<Path>,
+    actor_type: impl AsRef<str>,
+    actor_id: Option<&str>,
+    photo_id: Option<&str>,
+    permission: ExtensionPermission,
+    output_path: impl AsRef<str>,
+) -> Result<ActionLogEntry, CoreError> {
+    let output_path = output_path.as_ref();
+    append_permissioned_action_log(
+        library_root_path.as_ref(),
+        actor_type.as_ref(),
+        actor_id,
+        "export_attempt",
+        Some("photo"),
+        photo_id,
+        "export_attempt",
+        Some(output_path.to_string()),
+        serde_json::json!({
+            "permission_id": permission.stable_id(),
+            "output_path": output_path,
+        }),
+    )
+}
+
 /// Scan a folder by reference through the core command boundary.
 pub fn import_folder(
     library_root_path: impl AsRef<Path>,
@@ -10454,6 +10617,97 @@ mod tests {
             .iter()
             .any(|entry| entry.action_type == "cache_clear"
                 && entry.side_effect_category == "cache_delete"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn permissioned_extension_actions_append_action_log_entries_without_state_mutation() {
+        let workspace = unique_library_root("core-permission-action-log");
+        let library_root = workspace.join("SilicaRAW Library");
+        let created = create_library(&library_root).expect("create library");
+        let before = durable_catalog_counts(&created.catalog_path);
+
+        record_permission_decision(
+            &created.root_path,
+            "plugin",
+            Some("preset-pack"),
+            ExtensionPermission::MetadataRead,
+            true,
+            "prompt-approved",
+        )
+        .expect("record permission grant");
+        record_permission_decision(
+            &created.root_path,
+            "plugin",
+            Some("preset-pack"),
+            ExtensionPermission::FilesystemLimitedWrite,
+            false,
+            "prompt-denied",
+        )
+        .expect("record permission denial");
+        record_plugin_apply_attempt(
+            &created.root_path,
+            "preset-pack",
+            Some("photo-1"),
+            ExtensionPermission::EditSuggestionApply,
+        )
+        .expect("record plugin apply");
+        record_ai_approval(
+            &created.root_path,
+            "quality-model",
+            Some("photo-1"),
+            ExtensionPermission::AiResultPropose,
+        )
+        .expect("record ai approval");
+        record_mcp_read(
+            &created.root_path,
+            "session-1",
+            "photo",
+            Some("photo-1"),
+            ExtensionPermission::McpReadOnly,
+        )
+        .expect("record mcp read");
+        record_permissioned_export_attempt(
+            &created.root_path,
+            "mcp",
+            Some("session-1"),
+            Some("photo-1"),
+            ExtensionPermission::ExportLocal,
+            "/tmp/silicaraw-export.jpg",
+        )
+        .expect("record export attempt");
+
+        let after = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after.edit_states, before.edit_states);
+        assert_eq!(after.edit_history, before.edit_history);
+        assert_eq!(after.exports, before.exports);
+        assert_eq!(after.cache_records, before.cache_records);
+        assert_eq!(after.action_log, before.action_log + 6);
+
+        let entries = list_action_log_entries(&created.root_path, 20).expect("list action log");
+        for action_type in [
+            "permission_grant",
+            "permission_denial",
+            "plugin_apply",
+            "ai_approval",
+            "mcp_read",
+            "export_attempt",
+        ] {
+            assert!(
+                entries.iter().any(|entry| entry.action_type == action_type),
+                "missing permissioned action log entry {action_type}"
+            );
+        }
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "permission_denial"
+                && entry.side_effect_category == "permission_decision"
+                && entry.payload_json.contains("filesystem:limited_write")
+                && entry.payload_json.contains("prompt-denied")));
+        assert!(entries.iter().any(|entry| entry.action_type == "mcp_read"
+            && entry.actor_type == "mcp"
+            && entry.side_effect_category == "catalog_read"));
 
         remove_library_root(&workspace);
     }

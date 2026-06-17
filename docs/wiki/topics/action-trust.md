@@ -138,7 +138,7 @@ Task 16.3 implements the first runtime form of this contract for edit commits an
 
 Task 16.4 exposes this state to the Develop history panel without adding a second mutation path. The panel lists only runtime `edit_history` checkpoints for the selected photo, hides invalidated redo rows, and enables selection only for the next valid undo or redo row. Row selection calls the same core undo/redo commands; it does not jump directly to arbitrary catalog states.
 
-Task 16.5 adds the append-only action log runtime surface for sensitive local actions. Core and storage expose append/read APIs that require actor, action type, subject, timestamp, side-effect category, evidence reference, and JSON object payload context. Current Core flows log import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear. The log is evidence only: it does not make logged-only actions undoable and it does not allow plugins, MCP, MLX, or UI code to write raw SQLite rows.
+Task 16.5 adds the append-only action log runtime surface for sensitive local actions. Core and storage expose append/read APIs that require actor, action type, subject, timestamp, side-effect category, evidence reference, and JSON object payload context. Current Core flows log import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear. Task 23.3 extends this with permission grants, denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts through Core wrappers only. The log is evidence only: it does not make logged-only actions undoable, does not store active permission grants, and does not allow plugins, MCP, MLX, or UI code to write raw SQLite rows.
 
 ## Schema Boundary
 

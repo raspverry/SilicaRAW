@@ -4740,6 +4740,11 @@ fn validate_new_action_log_entry(entry: &NewActionLogEntry) -> Result<(), Librar
             "original mutation action logging is blocked".to_string(),
         ));
     }
+    if extension_database_bypass_claim(entry) {
+        return Err(LibraryStorageError::ActionLogValidation(
+            "extension database bypass action logging is blocked".to_string(),
+        ));
+    }
     let payload: serde_json::Value = serde_json::from_str(&entry.payload_json)?;
     if !payload.is_object() {
         return Err(LibraryStorageError::ActionLogValidation(
@@ -4747,6 +4752,27 @@ fn validate_new_action_log_entry(entry: &NewActionLogEntry) -> Result<(), Librar
         ));
     }
     Ok(())
+}
+
+fn extension_database_bypass_claim(entry: &NewActionLogEntry) -> bool {
+    let actor_type = entry.actor_type.trim().to_ascii_lowercase();
+    if !matches!(actor_type.as_str(), "plugin" | "mcp" | "ai" | "agent") {
+        return false;
+    }
+    let subject_type = entry.subject_type.as_deref().unwrap_or_default();
+    [
+        entry.action_type.as_str(),
+        entry.side_effect_category.as_str(),
+        subject_type,
+    ]
+    .iter()
+    .any(|value| {
+        let normalized = value.trim().to_ascii_lowercase();
+        matches!(
+            normalized.as_str(),
+            "raw_sql" | "direct_sql" | "direct_database_access" | "database_write" | "sqlite"
+        )
+    })
 }
 
 fn action_log_id(entry: &NewActionLogEntry) -> String {
@@ -9570,6 +9596,31 @@ mod tests {
         )
         .expect_err("original mutation action log must be blocked");
         assert!(error.to_string().contains("original mutation"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn action_log_rejects_extension_raw_sql_bypass_claims() {
+        let workspace = unique_library_root("action-log-extension-bypass");
+        let library_root = workspace.join("SilicaRAW Library");
+        let library = create_local_library(&library_root).expect("create library");
+
+        let error = append_action_log_entry(
+            &library.root_path,
+            NewActionLogEntry {
+                actor_type: "plugin".to_string(),
+                actor_id: Some("preset-pack".to_string()),
+                action_type: "Raw_SQL".to_string(),
+                subject_type: Some("catalog".to_string()),
+                subject_id: Some("catalog.db".to_string()),
+                side_effect_category: "Direct_Database_Access".to_string(),
+                evidence_ref: None,
+                payload_json: "{}".to_string(),
+            },
+        )
+        .expect_err("extension raw SQL action log must be blocked");
+        assert!(error.to_string().contains("extension database bypass"));
 
         remove_library_root(&workspace);
     }

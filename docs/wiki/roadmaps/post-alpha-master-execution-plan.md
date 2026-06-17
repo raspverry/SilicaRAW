@@ -389,8 +389,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Continue Phase 23 permission foundation tasks.
-2. Do not start runtime permission, MCP, plugin, or agent bridge work until Phase 23 prompt and action-log work is complete.
+1. Phase 23 permission foundation is complete.
+2. Do not start MLX, MCP, plugin, or agent runtime unless the next selected roadmap task explicitly requires that scoped work.
 
 ## Links
 
