@@ -2,7 +2,7 @@
 title: Task Cards
 status: active
 audience: agents
-updated: 2026-06-16
+updated: 2026-06-17
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -133,6 +133,10 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [22.3: Migration and Backup Failure Tests](22.3-migration-backup-failure-tests.md)
 - [22.4: RAW and Metal Performance Profiling](22.4-raw-metal-performance-profiling.md)
 - [22.5: Manual Photographer QA Checklist](22.5-manual-photographer-qa-checklist.md)
+
+## Phase 24
+
+- [24.1: MLX Runtime Spike](24.1-mlx-runtime-spike.md)
 
 ## Notes for LLM Agents
 

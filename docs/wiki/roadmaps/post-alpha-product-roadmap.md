@@ -1078,6 +1078,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No model is bundled without manifest.
 - **Validation:** Spike report and `scripts/harness/check.sh`
 
+**Status:** Completed on 2026-06-17. ADR 0009 records MLX as a future optional runtime path, selects a provisional MLX C API bridge behind a future non-default Rust feature gate, rejects Python packaging for product runtime, keeps MLX Swift as an app-shell fallback, defines no-model behavior as AI-unavailable/editor-usable, documents bounded unified-memory and cooperative-cancellation policy, and confirms no model or runtime dependency is bundled without a manifest and dependency record.
+
 ### Task 24.2: Model Manifest Validation
 
 - **Location:** `crates/silica-mlx`, `schemas/model_manifest.schema.json`

@@ -2,7 +2,7 @@
 title: Decision Records
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-17
 source_of_truth: docs/wiki/conventions.md
 ---
 
@@ -26,6 +26,7 @@ Use ADRs for decisions that future contributors or LLM agents might otherwise re
 | [ADR 0006](adr-0006-unsigned-developer-preview-dmg.md) | accepted | Use unsigned developer-preview DMGs while Developer ID funding is blocked. |
 | [ADR 0007](adr-0007-homebrew-and-auto-update-deferral.md) | accepted | Defer Homebrew Cask and auto-update until local DMG alpha trust gates are met. |
 | [ADR 0008](adr-0008-project-license.md) | accepted | License SilicaRAW source code and project documentation under MIT. |
+| [ADR 0009](adr-0009-mlx-runtime-spike.md) | accepted | Record the Phase 24 MLX runtime spike without enabling a runtime or bundling models. |
 
 ## ADR Format
 
