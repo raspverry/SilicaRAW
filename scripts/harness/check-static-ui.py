@@ -324,9 +324,13 @@ def main():
         "cancelExport",
         "exportStatus",
         "exportSafetyNote",
+        "exportPreset",
+        "exportPresetName",
+        "saveExportPreset",
         "exportFormat",
         "exportColorSpace",
         "exportQuality",
+        "exportSummaryPreset",
         "exportSummaryFormat",
         "exportSummaryColor",
         "exportSummaryQuality",
@@ -809,6 +813,16 @@ def main():
     require(
         parser.ids.get("exportQuality", {}).get("value") == "90",
         "#exportQuality must expose local-alpha JPEG quality",
+        failures,
+    )
+    require(
+        parser.ids.get("exportPreset", {}).get("name") == "exportPreset",
+        "#exportPreset must expose the current export preset",
+        failures,
+    )
+    require(
+        parser.ids.get("exportPresetName", {}).get("type") == "text",
+        "#exportPresetName must allow editing a local preset name",
         failures,
     )
 

@@ -10,7 +10,7 @@ use std::fmt;
 pub const CRATE_NAME: &str = "silica-catalog";
 
 /// Current local alpha catalog schema version.
-pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 8;
+pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 9;
 
 /// Migration bookkeeping table required in every catalog database.
 pub const SCHEMA_MIGRATIONS_TABLE: &str = "schema_migrations";
@@ -31,6 +31,8 @@ pub const ALPHA_CATALOG_REQUIRED_TABLES: &[&str] = &[
     "cache_records",
     "ai_results",
     "exports",
+    "export_presets",
+    "export_settings",
     "action_log",
     SCHEMA_MIGRATIONS_TABLE,
 ];
@@ -459,7 +461,7 @@ mod tests {
 
     #[test]
     fn records_phase_4_1_catalog_schema_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 8);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 9);
         assert_eq!(ALPHA_CATALOG_SCHEMA.migration_table, "schema_migrations");
         assert_eq!(
             ALPHA_CATALOG_SCHEMA.required_tables,
@@ -478,6 +480,8 @@ mod tests {
                 "cache_records",
                 "ai_results",
                 "exports",
+                "export_presets",
+                "export_settings",
                 "action_log",
                 "schema_migrations",
             ]
@@ -594,7 +598,7 @@ mod tests {
 
     #[test]
     fn records_paged_query_index_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 8);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 9);
         for index_name in [
             "idx_photos_library_imported_id",
             "idx_photos_library_file_name_path_id",

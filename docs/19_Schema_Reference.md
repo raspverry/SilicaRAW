@@ -96,6 +96,17 @@ profile_metadata_source
 
 These fields are export evidence. They do not prove visual color correctness.
 
+Task 20.1 adds catalog-owned export preference state outside the edit graph:
+
+```txt
+export_presets
+export_settings
+```
+
+`export_presets` stores named local export presets. `export_settings` stores the current library default export settings. The conservative built-in default is JPEG, sRGB, quality 90, metadata policy `minimal`.
+
+These tables are preferences, not develop edits. Updating them must not write `edit_states`, `edit_history`, sidecars, or original photo files.
+
 ## Undo, History, and Action Trust
 
 Task 16.0 defines action trust before runtime undo/history changes.
@@ -193,6 +204,14 @@ idx_action_log_subject -> target lookup
 ```
 
 Core now exposes append/read action-log APIs and records local alpha sensitive actions for import by reference, sidecar write, JPEG export, RAW-derived export, and disposable cache clear. The action log is append-only through Core-facing APIs; it is not an undo stack and must not be used to authorize direct plugin/MCP database writes.
+
+Task 20.1 export settings status:
+
+```txt
+catalog schema version -> 9
+export_presets -> named local export presets
+export_settings -> current library default export settings
+```
 
 Task 16.6 sidecar status runtime:
 

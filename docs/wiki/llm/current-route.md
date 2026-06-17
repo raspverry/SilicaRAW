@@ -2,7 +2,7 @@
 title: Current LLM Route
 status: active
 audience: agents
-updated: 2026-06-16
+updated: 2026-06-17
 source_of_truth: docs/wiki/llm/index.md
 ---
 
@@ -16,13 +16,13 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 Phase 19 is complete. The current product area is **Phase 20: Export and Delivery Expansion**.
 
-The current next task is [Task 20.1 Export Settings Model and Presets](../tasks/20.1-export-settings-model-presets.md).
+Task 20.1 is complete. The next roadmap task is Task 20.2 PNG and TIFF Export, but create a dedicated task card before implementation.
 
 ## Minimal Read Set
 
 For Phase 20 task-card creation or implementation, read:
 
-- The selected Phase 20 task card under [Task Cards](../tasks/index.md)
+- The selected Phase 20 task card under [Task Cards](../tasks/index.md) if one exists; otherwise create it from the roadmap before implementation.
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 20](../roadmaps/post-alpha-product-roadmap.md#phase-20-export-and-delivery-expansion)
 - [Edit Graph](../topics/edit-graph.md)

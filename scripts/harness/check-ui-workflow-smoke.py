@@ -52,6 +52,9 @@ ALLOWED_COMMANDS = {
     "redo_last_history_action",
     "export_photo_jpeg_srgb",
     "export_photo_jpeg",
+    "get_export_settings",
+    "save_export_settings",
+    "save_export_preset",
     "clear_library_cache",
 }
 
@@ -423,14 +426,18 @@ WORKFLOW_STEPS = [
             "runJpegExport",
             "exportStatus",
             "exportSafetyNote",
+            "exportPreset",
+            "exportPresetName",
+            "saveExportPreset",
             "exportFormat",
             "exportColorSpace",
             "exportColorSrgb",
             "exportColorDisplayP3",
             "exportColorProof",
             "exportQuality",
+            "exportSummaryPreset",
         ],
-        "commands": ["export_photo_jpeg"],
+        "commands": ["export_photo_jpeg", "get_export_settings", "save_export_settings", "save_export_preset"],
         "text": [
             "JPEG",
             "sRGB",
@@ -863,6 +870,20 @@ def main():
         "export workflow must expose explicit sRGB and Display P3 color choices",
         failures,
     )
+    require(
+        parser.ids.get("exportPreset", {}).get("name") == "exportPreset"
+        and parser.ids.get("exportPresetName", {}).get("type") == "text",
+        "export workflow must expose persisted preset selection and naming controls",
+        failures,
+    )
+    for marker in [
+        "exportSettingsCatalog",
+        "loadExportSettings",
+        "applyExportSettingsCatalog",
+        "saveExportSettings",
+        "saveExportPreset",
+    ]:
+        require(marker in source, f"export settings marker missing: {marker}", failures)
 
     if failures:
         for failure in failures:

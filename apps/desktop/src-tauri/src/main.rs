@@ -217,6 +217,23 @@ struct DesktopEditClipboardFailure {
     message: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopExportSettings {
+    format: String,
+    color_profile: String,
+    quality: u8,
+    metadata_policy: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopExportPreset {
+    id: String,
+    name: String,
+    settings: DesktopExportSettings,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(
     rename_all = "camelCase",
@@ -430,6 +447,12 @@ enum DesktopCommandData {
         cache_path: String,
         message: String,
     },
+    ExportSettings {
+        default_preset_id: Option<String>,
+        default_settings: DesktopExportSettings,
+        presets: Vec<DesktopExportPreset>,
+        message: String,
+    },
     Export {
         photo_id: String,
         source_path: String,
@@ -479,6 +502,7 @@ impl DesktopCommandData {
             Self::HistoryCommand { .. } => "historyCommand",
             Self::HistoryPanel { .. } => "historyPanel",
             Self::Histogram { .. } => "histogram",
+            Self::ExportSettings { .. } => "exportSettings",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
         }
@@ -2989,6 +3013,122 @@ fn export_photo_jpeg(
     )
 }
 
+#[tauri::command]
+fn get_export_settings(library_path: String) -> DesktopCommandResponse {
+    let command = "get_export_settings";
+    match silica_core::get_export_settings_catalog(PathBuf::from(&library_path)) {
+        Ok(catalog) => DesktopCommandResponse::ok(
+            command,
+            "Export settings loaded.",
+            export_settings_catalog_data(catalog),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn save_export_settings(
+    library_path: String,
+    preset_id: Option<String>,
+    color_profile: Option<String>,
+    quality: Option<u8>,
+) -> DesktopCommandResponse {
+    let command = "save_export_settings";
+    let settings = match export_settings_from_request(color_profile.as_deref(), quality) {
+        Ok(settings) => settings,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+
+    match silica_core::set_default_export_settings(
+        PathBuf::from(&library_path),
+        preset_id.as_deref(),
+        settings,
+    ) {
+        Ok(catalog) => DesktopCommandResponse::ok(
+            command,
+            "Export settings saved.",
+            export_settings_catalog_data(catalog),
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn save_export_preset(
+    library_path: String,
+    name: String,
+    color_profile: Option<String>,
+    quality: Option<u8>,
+) -> DesktopCommandResponse {
+    let command = "save_export_preset";
+    let settings = match export_settings_from_request(color_profile.as_deref(), quality) {
+        Ok(settings) => settings,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
+
+    match silica_core::upsert_export_preset(PathBuf::from(&library_path), name, settings.clone()) {
+        Ok(preset) => match silica_core::set_default_export_settings(
+            PathBuf::from(&library_path),
+            Some(&preset.id),
+            settings,
+        ) {
+            Ok(catalog) => DesktopCommandResponse::ok(
+                command,
+                "Export preset saved.",
+                export_settings_catalog_data(catalog),
+            ),
+            Err(error) => DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            ),
+        },
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
 fn parse_export_color_profile(
     color_profile: Option<&str>,
 ) -> Result<silica_core::PhotoExportColorProfile, silica_core::CoreError> {
@@ -2998,6 +3138,28 @@ fn parse_export_color_profile(
         unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
             "Unsupported export color profile: {unsupported}. Supported profiles: srgb, display_p3."
         ))),
+    }
+}
+
+fn export_settings_from_request(
+    color_profile: Option<&str>,
+    quality: Option<u8>,
+) -> Result<silica_core::ExportSettings, silica_core::CoreError> {
+    let color_profile = parse_export_color_profile(color_profile)?;
+    Ok(silica_core::ExportSettings {
+        format: "jpeg".to_string(),
+        color_profile: export_color_profile_request_string(color_profile).to_string(),
+        quality: quality.unwrap_or(90),
+        metadata_policy: "minimal".to_string(),
+    })
+}
+
+fn export_color_profile_request_string(
+    color_profile: silica_core::PhotoExportColorProfile,
+) -> &'static str {
+    match color_profile {
+        silica_core::PhotoExportColorProfile::Srgb => "srgb",
+        silica_core::PhotoExportColorProfile::DisplayP3 => "display_p3",
     }
 }
 
@@ -3199,6 +3361,36 @@ fn parse_hsl_color_channel(
     channel: &str,
 ) -> Result<silica_core::HslColorChannel, silica_core::CoreError> {
     silica_core::HslColorChannel::try_from(channel).map_err(silica_core::CoreError::from)
+}
+
+fn export_settings_catalog_data(catalog: silica_core::ExportSettingsCatalog) -> DesktopCommandData {
+    DesktopCommandData::ExportSettings {
+        default_preset_id: catalog.default_preset_id,
+        default_settings: desktop_export_settings(catalog.default_settings),
+        presets: catalog
+            .presets
+            .into_iter()
+            .map(desktop_export_preset)
+            .collect(),
+        message: "Export settings loaded.".to_string(),
+    }
+}
+
+fn desktop_export_preset(preset: silica_core::ExportPreset) -> DesktopExportPreset {
+    DesktopExportPreset {
+        id: preset.id,
+        name: preset.name,
+        settings: desktop_export_settings(preset.settings),
+    }
+}
+
+fn desktop_export_settings(settings: silica_core::ExportSettings) -> DesktopExportSettings {
+    DesktopExportSettings {
+        format: settings.format,
+        color_profile: settings.color_profile,
+        quality: settings.quality,
+        metadata_policy: settings.metadata_policy,
+    }
 }
 
 fn desktop_photo_export_response(
@@ -3969,6 +4161,9 @@ fn main() {
             get_photo_history,
             export_photo_jpeg_srgb,
             export_photo_jpeg,
+            get_export_settings,
+            save_export_settings,
+            save_export_preset,
             clear_library_cache
         ])
         .run(tauri::generate_context!())
@@ -5876,6 +6071,87 @@ mod tests {
                 assert_eq!(items[0].history_state, "applied");
             }
             other => panic!("unexpected history response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_reads_export_settings_defaults() {
+        let workspace = unique_library_root("desktop-export-settings");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        silica_core::create_library(&library_root).expect("create library");
+
+        let response = super::get_export_settings(library_root.display().to_string());
+
+        assert!(response.ok);
+        match response_data(&response) {
+            super::DesktopCommandData::ExportSettings {
+                default_settings,
+                default_preset_id,
+                presets,
+                ..
+            } => {
+                assert_eq!(default_preset_id.as_deref(), Some("jpeg-srgb-90"));
+                assert_eq!(default_settings.format, "jpeg");
+                assert_eq!(default_settings.color_profile, "srgb");
+                assert_eq!(default_settings.quality, 90);
+                assert_eq!(default_settings.metadata_policy, "minimal");
+                assert!(presets.iter().any(|preset| preset.id == "jpeg-srgb-90"));
+            }
+            other => panic!("unexpected export settings response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_saves_export_preset_as_default() {
+        let workspace = unique_library_root("desktop-export-preset");
+        let library_root = workspace.join("SilicaRAW Library");
+
+        silica_core::create_library(&library_root).expect("create library");
+
+        let response = super::save_export_preset(
+            library_root.display().to_string(),
+            "Desktop Display P3 Review".to_string(),
+            Some("display_p3".to_string()),
+            Some(90),
+        );
+
+        assert!(response.ok);
+        let saved_preset_id = match response_data(&response) {
+            super::DesktopCommandData::ExportSettings {
+                default_settings,
+                default_preset_id,
+                presets,
+                ..
+            } => {
+                assert_eq!(default_settings.format, "jpeg");
+                assert_eq!(default_settings.color_profile, "display_p3");
+                let default_preset_id = default_preset_id
+                    .as_deref()
+                    .expect("default preset id")
+                    .to_string();
+                assert!(presets.iter().any(|preset| preset.id == default_preset_id));
+                default_preset_id
+            }
+            other => panic!("unexpected export preset response data: {other:?}"),
+        };
+
+        let reloaded = super::get_export_settings(library_root.display().to_string());
+        assert!(reloaded.ok);
+        match response_data(&reloaded) {
+            super::DesktopCommandData::ExportSettings {
+                default_settings,
+                default_preset_id,
+                ..
+            } => {
+                assert_eq!(default_preset_id.as_deref(), Some(saved_preset_id.as_str()));
+                assert_eq!(default_settings.color_profile, "display_p3");
+            }
+            other => panic!("unexpected reloaded export settings data: {other:?}"),
         }
 
         remove_library_root(&workspace);

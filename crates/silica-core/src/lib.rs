@@ -29,6 +29,9 @@ pub use silica_storage::CatalogRebuildDryRunIssue;
 pub use silica_storage::CatalogRebuildDryRunIssueKind;
 pub use silica_storage::CatalogRebuildDryRunReport;
 pub use silica_storage::CatalogRebuildFlagSource;
+pub use silica_storage::ExportPreset;
+pub use silica_storage::ExportSettings;
+pub use silica_storage::ExportSettingsCatalog;
 pub use silica_storage::FolderImportOptions;
 pub use silica_storage::HistoryCommandResult;
 pub use silica_storage::ImportIssue;
@@ -1497,6 +1500,32 @@ pub fn list_action_log_entries(
     limit: u16,
 ) -> Result<Vec<ActionLogEntry>, CoreError> {
     silica_storage::list_action_log_entries(library_root_path, limit).map_err(CoreError::from)
+}
+
+/// Read the library-wide export settings and named presets.
+pub fn get_export_settings_catalog(
+    library_root_path: impl AsRef<Path>,
+) -> Result<ExportSettingsCatalog, CoreError> {
+    silica_storage::get_export_settings_catalog(library_root_path).map_err(CoreError::from)
+}
+
+/// Create or update a named export preset.
+pub fn upsert_export_preset(
+    library_root_path: impl AsRef<Path>,
+    name: impl AsRef<str>,
+    settings: ExportSettings,
+) -> Result<ExportPreset, CoreError> {
+    silica_storage::upsert_export_preset(library_root_path, name, settings).map_err(CoreError::from)
+}
+
+/// Persist the current default export settings.
+pub fn set_default_export_settings(
+    library_root_path: impl AsRef<Path>,
+    preset_id: Option<&str>,
+    settings: ExportSettings,
+) -> Result<ExportSettingsCatalog, CoreError> {
+    silica_storage::set_default_export_settings(library_root_path, preset_id, settings)
+        .map_err(CoreError::from)
 }
 
 fn append_core_action_log(
@@ -9731,6 +9760,55 @@ mod tests {
         assert_eq!(settings["color_profile"], "display_p3");
         assert_eq!(settings["icc_profile_embedded"], true);
         assert_eq!(settings["icc_profile_sha256"], exported.icc_profile_sha256);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn export_settings_defaults_and_presets_flow_through_core_without_edit_history() {
+        let workspace = unique_library_root("core-export-settings");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+
+        let initial_catalog =
+            get_export_settings_catalog(&created.root_path).expect("read export settings");
+        assert_eq!(
+            initial_catalog.default_settings,
+            ExportSettings::jpeg_srgb_default()
+        );
+
+        let display_p3_settings = ExportSettings {
+            color_profile: "display_p3".to_string(),
+            ..ExportSettings::jpeg_srgb_default()
+        };
+        let preset = upsert_export_preset(
+            &created.root_path,
+            "Core Display P3 Review",
+            display_p3_settings.clone(),
+        )
+        .expect("upsert preset through core");
+        let updated_catalog = set_default_export_settings(
+            &created.root_path,
+            Some(&preset.id),
+            display_p3_settings.clone(),
+        )
+        .expect("set default export settings through core");
+        assert_eq!(updated_catalog.default_settings, display_p3_settings);
+        assert_eq!(
+            updated_catalog.default_preset_id.as_deref(),
+            Some(preset.id.as_str())
+        );
+
+        let counts = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(counts.edit_states, 0);
+        assert_eq!(counts.edit_history, 0);
 
         remove_library_root(&workspace);
     }

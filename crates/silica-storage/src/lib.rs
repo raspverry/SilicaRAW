@@ -132,6 +132,11 @@ pub const HISTOGRAM_CACHE_TYPE: &str = "histogram";
 /// Cache record type used for disposable manual brush alpha rasters.
 pub const MASK_RASTER_CACHE_TYPE: &str = "mask_raster";
 
+/// Singleton row id for library-wide export defaults.
+pub const DEFAULT_EXPORT_SETTINGS_ID: &str = "default";
+/// Built-in conservative JPEG sRGB preset id.
+pub const DEFAULT_EXPORT_PRESET_ID: &str = "jpeg-srgb-90";
+
 /// Stable action payload schema marker for undo/history records.
 pub const ACTION_SCHEMA: &str = "silica.action";
 
@@ -363,6 +368,42 @@ pub struct ExportRecord {
     pub export_settings_json: String,
 }
 
+/// Export-owned settings that are separate from edit graph state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportSettings {
+    pub format: String,
+    pub color_profile: String,
+    pub quality: u8,
+    pub metadata_policy: String,
+}
+
+impl ExportSettings {
+    pub fn jpeg_srgb_default() -> Self {
+        Self {
+            format: "jpeg".to_string(),
+            color_profile: "srgb".to_string(),
+            quality: 90,
+            metadata_policy: "minimal".to_string(),
+        }
+    }
+}
+
+/// Named export preset row stored in the catalog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportPreset {
+    pub id: String,
+    pub name: String,
+    pub settings: ExportSettings,
+}
+
+/// Library export settings state shown by the desktop export UI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportSettingsCatalog {
+    pub default_preset_id: Option<String>,
+    pub default_settings: ExportSettings,
+    pub presets: Vec<ExportPreset>,
+}
+
 /// Result returned after a sidecar is written successfully.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidecarWriteResult {
@@ -582,6 +623,7 @@ pub enum LibraryStorageError {
     BackupValidation(String),
     HistoryValidation(String),
     ActionLogValidation(String),
+    ExportSettingsValidation(String),
 }
 
 impl fmt::Display for LibraryStorageError {
@@ -622,6 +664,9 @@ impl fmt::Display for LibraryStorageError {
             Self::ActionLogValidation(message) => {
                 write!(formatter, "action log validation error: {message}")
             }
+            Self::ExportSettingsValidation(message) => {
+                write!(formatter, "export settings validation error: {message}")
+            }
         }
     }
 }
@@ -644,7 +689,8 @@ impl Error for LibraryStorageError {
             | Self::SidecarValidation(_)
             | Self::BackupValidation(_)
             | Self::HistoryValidation(_)
-            | Self::ActionLogValidation(_) => None,
+            | Self::ActionLogValidation(_)
+            | Self::ExportSettingsValidation(_) => None,
         }
     }
 }
@@ -726,6 +772,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 8,
         name: "action_log_side_effect_columns",
         sql: ACTION_LOG_SIDE_EFFECT_COLUMNS_SQL,
+    },
+    Migration {
+        version: 9,
+        name: "export_settings_presets",
+        sql: EXPORT_SETTINGS_PRESETS_SQL,
     },
 ];
 
@@ -3571,6 +3622,135 @@ fn validate_history_action_header(
     Ok(())
 }
 
+/// Read the library-wide export settings and named presets.
+pub fn get_export_settings_catalog(
+    library_root_path: impl AsRef<Path>,
+) -> Result<ExportSettingsCatalog, LibraryStorageError> {
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    export_settings_catalog_from_connection(&connection)
+}
+
+/// Create or update a named export preset.
+pub fn upsert_export_preset(
+    library_root_path: impl AsRef<Path>,
+    name: impl AsRef<str>,
+    settings: ExportSettings,
+) -> Result<ExportPreset, LibraryStorageError> {
+    let name = name.as_ref().trim();
+    if name.is_empty() {
+        return Err(LibraryStorageError::ExportSettingsValidation(
+            "export preset name must not be empty".to_string(),
+        ));
+    }
+    validate_export_settings(&settings)?;
+
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let preset_id = export_preset_id_for_name(name);
+    connection.execute(
+        r#"
+        INSERT INTO export_presets(
+          id,
+          name,
+          format,
+          color_profile,
+          quality,
+          metadata_policy,
+          created_at,
+          updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          format = excluded.format,
+          color_profile = excluded.color_profile,
+          quality = excluded.quality,
+          metadata_policy = excluded.metadata_policy,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            preset_id,
+            name,
+            &settings.format,
+            &settings.color_profile,
+            settings.quality,
+            &settings.metadata_policy
+        ],
+    )?;
+
+    Ok(ExportPreset {
+        id: export_preset_id_for_name(name),
+        name: name.to_string(),
+        settings,
+    })
+}
+
+/// Persist the current default export settings.
+pub fn set_default_export_settings(
+    library_root_path: impl AsRef<Path>,
+    preset_id: Option<&str>,
+    settings: ExportSettings,
+) -> Result<ExportSettingsCatalog, LibraryStorageError> {
+    validate_export_settings(&settings)?;
+    let preset_id = match preset_id.map(str::trim) {
+        Some("") => {
+            return Err(LibraryStorageError::ExportSettingsValidation(
+                "default export preset id must not be empty".to_string(),
+            ))
+        }
+        Some(value) => Some(value.to_string()),
+        None => None,
+    };
+
+    let library = open_local_library(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    if let Some(preset_id) = preset_id.as_deref() {
+        let preset_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM export_presets WHERE id = ?1",
+            params![preset_id],
+            |row| row.get(0),
+        )?;
+        if preset_count == 0 {
+            return Err(LibraryStorageError::ExportSettingsValidation(format!(
+                "unknown export preset: {preset_id}"
+            )));
+        }
+    }
+
+    connection.execute(
+        r#"
+        INSERT INTO export_settings(
+          id,
+          preset_id,
+          format,
+          color_profile,
+          quality,
+          metadata_policy,
+          updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          preset_id = excluded.preset_id,
+          format = excluded.format,
+          color_profile = excluded.color_profile,
+          quality = excluded.quality,
+          metadata_policy = excluded.metadata_policy,
+          updated_at = CURRENT_TIMESTAMP
+        "#,
+        params![
+            DEFAULT_EXPORT_SETTINGS_ID,
+            preset_id,
+            &settings.format,
+            &settings.color_profile,
+            settings.quality,
+            &settings.metadata_policy
+        ],
+    )?;
+
+    export_settings_catalog_from_connection(&connection)
+}
+
 /// Record a completed export and mark the source photo as exported.
 pub fn record_export(
     library_root_path: impl AsRef<Path>,
@@ -4254,6 +4434,101 @@ fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRec
     })
 }
 
+fn export_settings_catalog_from_connection(
+    connection: &Connection,
+) -> Result<ExportSettingsCatalog, LibraryStorageError> {
+    let (default_preset_id, default_settings) = connection.query_row(
+        r#"
+        SELECT preset_id, format, color_profile, quality, metadata_policy
+        FROM export_settings
+        WHERE id = ?1
+        "#,
+        params![DEFAULT_EXPORT_SETTINGS_ID],
+        |row| {
+            Ok((
+                row.get::<_, Option<String>>(0)?,
+                export_settings_from_row(row, 1)?,
+            ))
+        },
+    )?;
+
+    let mut statement = connection.prepare(
+        r#"
+        SELECT id, name, format, color_profile, quality, metadata_policy
+        FROM export_presets
+        ORDER BY
+          CASE WHEN id = 'jpeg-srgb-90' THEN 0 ELSE 1 END,
+          name ASC,
+          id ASC
+        "#,
+    )?;
+    let presets = statement
+        .query_map([], export_preset_from_row)?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(ExportSettingsCatalog {
+        default_preset_id,
+        default_settings,
+        presets,
+    })
+}
+
+fn export_preset_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportPreset> {
+    Ok(ExportPreset {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        settings: export_settings_from_row(row, 2)?,
+    })
+}
+
+fn export_settings_from_row(
+    row: &rusqlite::Row<'_>,
+    offset: usize,
+) -> rusqlite::Result<ExportSettings> {
+    Ok(ExportSettings {
+        format: row.get(offset)?,
+        color_profile: row.get(offset + 1)?,
+        quality: row.get(offset + 2)?,
+        metadata_policy: row.get(offset + 3)?,
+    })
+}
+
+fn export_preset_id_for_name(name: &str) -> String {
+    if name == "JPEG sRGB 90" {
+        DEFAULT_EXPORT_PRESET_ID.to_string()
+    } else {
+        stable_catalog_id("export-preset", name)
+    }
+}
+
+fn validate_export_settings(settings: &ExportSettings) -> Result<(), LibraryStorageError> {
+    if settings.format != "jpeg" {
+        return Err(LibraryStorageError::ExportSettingsValidation(format!(
+            "unsupported export format: {}",
+            settings.format
+        )));
+    }
+    if !matches!(settings.color_profile.as_str(), "srgb" | "display_p3") {
+        return Err(LibraryStorageError::ExportSettingsValidation(format!(
+            "unsupported export color profile: {}",
+            settings.color_profile
+        )));
+    }
+    if !(1..=100).contains(&settings.quality) {
+        return Err(LibraryStorageError::ExportSettingsValidation(format!(
+            "jpeg quality must be between 1 and 100, got {}",
+            settings.quality
+        )));
+    }
+    if settings.metadata_policy != "minimal" {
+        return Err(LibraryStorageError::ExportSettingsValidation(format!(
+            "unsupported export metadata policy: {}",
+            settings.metadata_policy
+        )));
+    }
+    Ok(())
+}
+
 fn action_log_entry_by_id(
     connection: &Connection,
     id: &str,
@@ -4934,6 +5209,62 @@ CREATE INDEX IF NOT EXISTS idx_action_log_subject
   ON action_log(subject_type, subject_id);
 "#;
 
+const EXPORT_SETTINGS_PRESETS_SQL: &str = r#"
+CREATE TABLE IF NOT EXISTS export_presets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  format TEXT NOT NULL DEFAULT 'jpeg' CHECK (format IN ('jpeg')),
+  color_profile TEXT NOT NULL DEFAULT 'srgb' CHECK (color_profile IN ('srgb', 'display_p3')),
+  quality INTEGER NOT NULL DEFAULT 90 CHECK (quality BETWEEN 1 AND 100),
+  metadata_policy TEXT NOT NULL DEFAULT 'minimal' CHECK (metadata_policy IN ('minimal')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS export_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'default'),
+  preset_id TEXT,
+  format TEXT NOT NULL DEFAULT 'jpeg' CHECK (format IN ('jpeg')),
+  color_profile TEXT NOT NULL DEFAULT 'srgb' CHECK (color_profile IN ('srgb', 'display_p3')),
+  quality INTEGER NOT NULL DEFAULT 90 CHECK (quality BETWEEN 1 AND 100),
+  metadata_policy TEXT NOT NULL DEFAULT 'minimal' CHECK (metadata_policy IN ('minimal')),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (preset_id) REFERENCES export_presets(id) ON DELETE SET NULL
+);
+
+INSERT OR IGNORE INTO export_presets(
+  id,
+  name,
+  format,
+  color_profile,
+  quality,
+  metadata_policy
+) VALUES (
+  'jpeg-srgb-90',
+  'JPEG sRGB 90',
+  'jpeg',
+  'srgb',
+  90,
+  'minimal'
+);
+
+INSERT OR IGNORE INTO export_settings(
+  id,
+  preset_id,
+  format,
+  color_profile,
+  quality,
+  metadata_policy
+) VALUES (
+  'default',
+  'jpeg-srgb-90',
+  'jpeg',
+  'srgb',
+  90,
+  'minimal'
+);
+"#;
+
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
 SELECT COUNT(*)
 FROM photos
@@ -5448,6 +5779,10 @@ mod tests {
         );
         assert!(catalog_object_exists(&connection, "idx_action_log_subject")
             .expect("action log subject index lookup"));
+        assert!(catalog_object_exists(&connection, "export_settings")
+            .expect("export settings table lookup"));
+        assert!(catalog_object_exists(&connection, "export_presets")
+            .expect("export presets table lookup"));
         run_migrations(&mut connection).expect("re-run migrations idempotently");
         assert_eq!(
             current_schema_version(&connection).expect("version after rerun"),
@@ -8141,6 +8476,129 @@ mod tests {
             .expect("read latest export")
             .expect("latest export row");
         assert_eq!(latest, record);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn export_settings_migration_upgrades_existing_catalog() {
+        let mut connection = Connection::open_in_memory().expect("open in-memory sqlite");
+        configure_connection(&connection).expect("configure sqlite");
+
+        run_migrations_through(&mut connection, 8).expect("run through v8");
+        assert!(!catalog_object_exists(&connection, "export_settings")
+            .expect("pre-v9 export settings table lookup"));
+
+        run_migrations(&mut connection).expect("upgrade to latest");
+        assert_eq!(
+            current_schema_version(&connection).expect("version"),
+            CURRENT_SCHEMA_VERSION
+        );
+        assert!(catalog_object_exists(&connection, "export_settings")
+            .expect("export settings table lookup"));
+        assert!(catalog_object_exists(&connection, "export_presets")
+            .expect("export presets table lookup"));
+
+        let (preset_id, format, color_profile, quality, metadata_policy): (
+            String,
+            String,
+            String,
+            u8,
+            String,
+        ) = connection
+            .query_row(
+                r#"
+                SELECT preset_id, format, color_profile, quality, metadata_policy
+                FROM export_settings
+                WHERE id = 'default'
+                "#,
+                [],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
+            )
+            .expect("default export settings");
+        assert_eq!(preset_id, DEFAULT_EXPORT_PRESET_ID);
+        assert_eq!(format, "jpeg");
+        assert_eq!(color_profile, "srgb");
+        assert_eq!(quality, 90);
+        assert_eq!(metadata_policy, "minimal");
+    }
+
+    #[test]
+    fn persists_export_settings_presets_without_edit_history() {
+        let workspace = unique_library_root("export-settings");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let initial_catalog =
+            get_export_settings_catalog(&library.root_path).expect("read export settings");
+        assert_eq!(
+            initial_catalog.default_settings,
+            ExportSettings::jpeg_srgb_default()
+        );
+        assert_eq!(
+            initial_catalog.default_preset_id.as_deref(),
+            Some(DEFAULT_EXPORT_PRESET_ID)
+        );
+        assert!(initial_catalog
+            .presets
+            .iter()
+            .any(|preset| preset.id == DEFAULT_EXPORT_PRESET_ID));
+
+        let display_p3_settings = ExportSettings {
+            color_profile: "display_p3".to_string(),
+            ..ExportSettings::jpeg_srgb_default()
+        };
+        let preset = upsert_export_preset(
+            &library.root_path,
+            "Display P3 Review",
+            display_p3_settings.clone(),
+        )
+        .expect("upsert export preset");
+        let updated_catalog = set_default_export_settings(
+            &library.root_path,
+            Some(&preset.id),
+            display_p3_settings.clone(),
+        )
+        .expect("set default export settings");
+        assert_eq!(
+            updated_catalog.default_preset_id.as_deref(),
+            Some(preset.id.as_str())
+        );
+        assert_eq!(updated_catalog.default_settings, display_p3_settings);
+
+        let reloaded_catalog =
+            get_export_settings_catalog(&library.root_path).expect("reload export settings");
+        assert_eq!(
+            reloaded_catalog.default_preset_id,
+            updated_catalog.default_preset_id
+        );
+        assert_eq!(
+            reloaded_catalog.default_settings,
+            updated_catalog.default_settings
+        );
+        assert!(reloaded_catalog
+            .presets
+            .iter()
+            .any(|candidate| candidate == &preset));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
 
         remove_library_root(&workspace);
     }
