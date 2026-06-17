@@ -39,7 +39,7 @@ check_deferred_crate_boundary "silica-mcp"
 check_deferred_crate_boundary "silica-plugin"
 
 if rg -n \
-  "posthog|sentry|telemetry|analytics|firebase|amplitude|segment|cloud sync|cloud-sync|upload_original|uploadPhoto|delete_original|overwrite_original" \
+  "posthog|sentry|telemetry|analytics|firebase|amplitude|segment\.io|segmentio|@segment|Segment Analytics|segment analytics|cloud sync|cloud-sync|upload_original|uploadPhoto|delete_original|overwrite_original" \
   apps crates scripts \
   -g '*.rs' -g '*.toml' -g '*.ts' -g '*.tsx' -g '*.js' -g '*.jsx' -g '*.sh' -g '*.py' \
   -g '!scripts/harness/check-scope-guardrails.sh'; then

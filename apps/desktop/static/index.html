@@ -1013,6 +1013,18 @@
                   <p class="sr-export-color-proof" id="exportColorProof">sRGB is the default export path. Display P3 requires explicit selection and writes ICC metadata.</p>
                 </div>
               </div>
+              <div class="sr-export-setting-row">
+                <label for="exportMetadataPolicy">Metadata</label>
+                <div class="sr-export-color-control">
+                  <select id="exportMetadataPolicy" name="exportMetadataPolicy">
+                    <option value="minimal">Minimal</option>
+                    <option value="preserve">Preserve</option>
+                    <option value="remove_gps">Remove GPS</option>
+                    <option value="remove_all">Remove All</option>
+                  </select>
+                  <p class="sr-export-color-proof" id="exportMetadataProof">Minimal keeps SilicaRAW output metadata only. Preserve and Remove GPS apply to JPEG source metadata in this alpha.</p>
+                </div>
+              </div>
               <div class="sr-export-safety" id="exportSafetyNote">
                 Original files will not be modified. SilicaRAW writes a separate JPEG sRGB file to the output path.
               </div>
@@ -1027,6 +1039,7 @@
               <div class="sr-export-row"><span>Preset</span><strong id="exportSummaryPreset">JPEG sRGB 90</strong></div>
               <div class="sr-export-row"><span>Color Space</span><strong id="exportSummaryColor">sRGB</strong></div>
               <div class="sr-export-row"><span>Quality</span><strong id="exportSummaryQuality">90</strong></div>
+              <div class="sr-export-row"><span>Metadata</span><strong id="exportSummaryMetadata">Minimal</strong></div>
               <div class="sr-export-row"><span>File</span><strong id="exportSummaryFile">None</strong></div>
             </aside>
           </div>
@@ -1338,6 +1351,8 @@
       const exportQuality = document.querySelector("#exportQuality");
       const exportColorSpace = document.querySelector("#exportColorSpace");
       const exportColorOptionButtons = Array.from(document.querySelectorAll("[data-export-color]"));
+      const exportMetadataPolicy = document.querySelector("#exportMetadataPolicy");
+      const exportMetadataProof = document.querySelector("#exportMetadataProof");
       const chooseExportOutputPathButton = document.querySelector("#chooseExportOutputPath");
       const exportStatus = document.querySelector("#exportStatus");
       const exportSafetyNote = document.querySelector("#exportSafetyNote");
@@ -1346,6 +1361,7 @@
       const exportSummaryPreset = document.querySelector("#exportSummaryPreset");
       const exportSummaryColor = document.querySelector("#exportSummaryColor");
       const exportSummaryQuality = document.querySelector("#exportSummaryQuality");
+      const exportSummaryMetadata = document.querySelector("#exportSummaryMetadata");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
@@ -1376,6 +1392,7 @@
       let activeLibraryPath = "";
       let selectedExportFormat = "jpeg";
       let selectedExportColorProfile = "srgb";
+      let selectedExportMetadataPolicy = "minimal";
       let selectedExportPresetId = "jpeg-srgb-90";
       let exportSettingsCatalog = defaultExportSettingsCatalog();
       let libraryGridPage = {
@@ -4153,13 +4170,31 @@
         return "export_photo_jpeg";
       }
 
+      function normalizeExportMetadataPolicy(policy) {
+        return ["minimal", "preserve", "remove_gps", "remove_all"].includes(policy) ? policy : "minimal";
+      }
+
+      function exportMetadataPolicyLabel(policy) {
+        const normalized = normalizeExportMetadataPolicy(policy);
+        if (normalized === "preserve") {
+          return "Preserve";
+        }
+        if (normalized === "remove_gps") {
+          return "Remove GPS";
+        }
+        if (normalized === "remove_all") {
+          return "Remove All";
+        }
+        return "Minimal";
+      }
+
       function normalizeExportSettings(settings = {}) {
         const format = normalizeExportFormat(settings.format);
         return {
           format,
           colorProfile: format === "jpeg" && settings.colorProfile === "display_p3" ? "display_p3" : "srgb",
           quality: Number(settings.quality) || 90,
-          metadataPolicy: settings.metadataPolicy === "minimal" ? "minimal" : "minimal",
+          metadataPolicy: normalizeExportMetadataPolicy(settings.metadataPolicy),
         };
       }
 
@@ -4189,7 +4224,7 @@
           format: selectedExportFormat,
           colorProfile: selectedExportColorProfile,
           quality: 90,
-          metadataPolicy: "minimal",
+          metadataPolicy: selectedExportMetadataPolicy,
         };
       }
 
@@ -4215,7 +4250,7 @@
         exportPreset.replaceChildren(...options);
         exportPreset.value = preset?.id || "";
         if (syncName) {
-          exportPresetName.value = preset?.name || `Custom ${exportFormatLabel(selectedExportFormat)} ${exportColorProfileLabel(selectedExportColorProfile)}`;
+          exportPresetName.value = preset?.name || `Custom ${exportFormatLabel(selectedExportFormat)} ${exportColorProfileLabel(selectedExportColorProfile)} ${exportMetadataPolicyLabel(selectedExportMetadataPolicy)}`;
         }
         syncExportPresetSummary();
       }
@@ -4225,6 +4260,7 @@
         selectedExportPresetId = exportSettingsCatalog.defaultPresetId || "";
         setExportFormat(exportSettingsCatalog.defaultSettings.format);
         setExportColorProfile(exportSettingsCatalog.defaultSettings.colorProfile);
+        setExportMetadataPolicy(exportSettingsCatalog.defaultSettings.metadataPolicy);
         renderExportPresetControls();
       }
 
@@ -4251,7 +4287,7 @@
       }
 
       function upsertStaticExportPreset(name, settings) {
-        const normalizedName = name.trim() || `Custom ${exportFormatLabel(settings.format)} ${exportColorProfileLabel(settings.colorProfile)}`;
+        const normalizedName = name.trim() || `Custom ${exportFormatLabel(settings.format)} ${exportColorProfileLabel(settings.colorProfile)} ${exportMetadataPolicyLabel(settings.metadataPolicy)}`;
         const id = normalizedName === "JPEG sRGB 90"
           ? "jpeg-srgb-90"
           : `static-${normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "export-preset"}`;
@@ -4286,6 +4322,7 @@
             format: settings.format,
             colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
             quality: settings.quality,
+            metadataPolicy: settings.metadataPolicy,
           });
           if (commandFailed(response)) {
             exportStatus.value = responseErrorMessage(response, "Export settings could not be saved.");
@@ -4301,7 +4338,7 @@
 
       async function saveExportPreset() {
         const settings = currentExportSettings();
-        const name = exportPresetName.value.trim() || `Custom ${exportColorProfileLabel(settings.colorProfile)}`;
+        const name = exportPresetName.value.trim() || `Custom ${exportFormatLabel(settings.format)} ${exportColorProfileLabel(settings.colorProfile)} ${exportMetadataPolicyLabel(settings.metadataPolicy)}`;
 
         if (!activeLibraryPath || !invoke) {
           upsertStaticExportPreset(name, settings);
@@ -4317,6 +4354,7 @@
             format: settings.format,
             colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
             quality: settings.quality,
+            metadataPolicy: settings.metadataPolicy,
           });
           if (commandFailed(response)) {
             exportStatus.value = responseErrorMessage(response, "Export preset could not be saved.");
@@ -4350,8 +4388,10 @@
         runJpegExportButton.textContent = `Export ${exportFormatLabel(selectedExportFormat)}`;
         if (selectedExportFormat !== "jpeg") {
           selectedExportColorProfile = "srgb";
+          selectedExportMetadataPolicy = "minimal";
         }
         setExportColorProfile(selectedExportColorProfile);
+        setExportMetadataPolicy(selectedExportMetadataPolicy);
       }
 
       function setExportColorProfile(profile) {
@@ -4375,6 +4415,19 @@
             : `${exportFormatLabel(selectedExportFormat)} export uses sRGB in this alpha. Display P3 is JPEG-only until color-managed PNG/TIFF proof exists.`;
         }
         syncExportPresetSummary();
+      }
+
+      function setExportMetadataPolicy(policy) {
+        selectedExportMetadataPolicy = selectedExportFormat === "jpeg"
+          ? normalizeExportMetadataPolicy(policy)
+          : "minimal";
+        exportMetadataPolicy.value = selectedExportMetadataPolicy;
+        exportMetadataPolicy.disabled = selectedExportFormat !== "jpeg";
+        exportMetadataPolicy.setAttribute("aria-disabled", String(exportMetadataPolicy.disabled));
+        exportSummaryMetadata.textContent = exportMetadataPolicyLabel(selectedExportMetadataPolicy);
+        exportMetadataProof.textContent = selectedExportFormat === "jpeg"
+          ? `${exportMetadataPolicyLabel(selectedExportMetadataPolicy)} metadata policy applies to JPEG source metadata. Original files remain unchanged.`
+          : `${exportFormatLabel(selectedExportFormat)} exports do not copy source metadata in this alpha.`;
       }
 
       function syncExportDialog() {
@@ -4470,6 +4523,7 @@
           };
           if (selectedFormat === "jpeg") {
             payload.colorProfile = exportColorProfile === "srgb" ? null : exportColorProfile;
+            payload.metadataPolicy = selectedExportMetadataPolicy;
           }
           const response = await invoke(exportCommandName(selectedFormat), payload);
           if (commandFailed(response)) {
@@ -6408,12 +6462,19 @@
         selectedExportPresetId = preset.id;
         setExportFormat(preset.settings.format);
         setExportColorProfile(preset.settings.colorProfile);
+        setExportMetadataPolicy(preset.settings.metadataPolicy);
         renderExportPresetControls();
         void saveExportSettings(preset.id);
         syncExportDialog();
       });
       saveExportPresetButton.addEventListener("click", () => {
         void saveExportPreset();
+      });
+      exportMetadataPolicy.addEventListener("change", () => {
+        setExportMetadataPolicy(exportMetadataPolicy.value);
+        selectedExportPresetId = "";
+        void saveExportSettings(null);
+        syncExportDialog();
       });
       exportOutputPath.addEventListener("input", () => {
         exportOutputPath.dataset.autofilled = "false";

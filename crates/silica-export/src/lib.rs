@@ -32,6 +32,15 @@ pub enum ExportColorProfile {
     DisplayP3,
 }
 
+/// Source metadata handling policy for raster exports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportMetadataPolicy {
+    Minimal,
+    Preserve,
+    RemoveGps,
+    RemoveAll,
+}
+
 /// Request to export an already-rendered raster source as JPEG sRGB.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JpegSrgbExportRequest {
@@ -431,11 +440,16 @@ pub struct JpegExportResult {
     pub output_path: PathBuf,
     pub format: ExportImageFormat,
     pub color_profile: ExportColorProfile,
+    pub metadata_policy: ExportMetadataPolicy,
     pub bytes_written: u64,
     pub source_sha256: String,
     pub output_sha256: String,
     pub icc_profile_embedded: bool,
     pub icc_profile_sha256: String,
+    pub source_metadata_segments: usize,
+    pub output_metadata_segments: usize,
+    pub source_metadata_copied: bool,
+    pub gps_metadata_removed: bool,
 }
 
 /// Backwards-compatible result name for the local alpha sRGB export path.
@@ -668,6 +682,14 @@ pub fn export_jpeg_srgb(
 pub fn export_jpeg_with_color_profile(
     request: JpegColorExportRequest,
 ) -> Result<JpegExportResult, ExportError> {
+    export_jpeg_with_metadata_policy(request, ExportMetadataPolicy::Minimal)
+}
+
+/// Export an already-rendered raster source as JPEG with explicit metadata policy.
+pub fn export_jpeg_with_metadata_policy(
+    request: JpegColorExportRequest,
+    metadata_policy: ExportMetadataPolicy,
+) -> Result<JpegExportResult, ExportError> {
     if paths_match(&request.source_path, &request.output_path)? {
         return Err(ExportError::SameSourceAndOutput(request.output_path));
     }
@@ -694,6 +716,7 @@ pub fn export_jpeg_with_color_profile(
     validate_manual_mask_adjustments(&request.masks)?;
 
     let source_sha256 = sha256_file(&request.source_path)?;
+    let source_metadata = prepare_jpeg_source_metadata(&request.source_path, metadata_policy)?;
     let icc_profile = export_icc_profile(request.color_profile)?;
     let decoded = image::ImageReader::open(&request.source_path)?
         .with_guessed_format()?
@@ -722,6 +745,7 @@ pub fn export_jpeg_with_color_profile(
     )?;
     drop(output);
 
+    insert_jpeg_metadata_segments(&request.output_path, &source_metadata.output_segments)?;
     let output_sha256 = sha256_file(&request.output_path)?;
     let inspection = inspect_jpeg_icc_profile(&request.output_path)?;
     if inspection.color_profile != Some(request.color_profile) {
@@ -736,10 +760,15 @@ pub fn export_jpeg_with_color_profile(
         output_path: request.output_path,
         format: ExportImageFormat::Jpeg,
         color_profile: request.color_profile,
+        metadata_policy,
         source_sha256,
         output_sha256,
         icc_profile_embedded: inspection.embedded,
         icc_profile_sha256,
+        source_metadata_segments: source_metadata.source_segment_count,
+        output_metadata_segments: source_metadata.output_segments.len(),
+        source_metadata_copied: !source_metadata.output_segments.is_empty(),
+        gps_metadata_removed: source_metadata.gps_removed,
     })
 }
 
@@ -829,6 +858,273 @@ pub fn export_raster_srgb(
         icc_profile_embedded: false,
         icc_profile_sha256: None,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PreparedJpegMetadata {
+    source_segment_count: usize,
+    output_segments: Vec<Vec<u8>>,
+    gps_removed: bool,
+}
+
+fn prepare_jpeg_source_metadata(
+    path: &Path,
+    policy: ExportMetadataPolicy,
+) -> Result<PreparedJpegMetadata, ExportError> {
+    let bytes = fs::read(path)?;
+    let source_segments = jpeg_metadata_segments(&bytes);
+    let source_segment_count = source_segments.len();
+    if matches!(
+        policy,
+        ExportMetadataPolicy::Minimal | ExportMetadataPolicy::RemoveAll
+    ) {
+        return Ok(PreparedJpegMetadata {
+            source_segment_count,
+            output_segments: Vec::new(),
+            gps_removed: false,
+        });
+    }
+
+    let mut gps_removed = false;
+    let output_segments = source_segments
+        .into_iter()
+        .map(|segment| {
+            if policy == ExportMetadataPolicy::RemoveGps && segment.payload.starts_with(b"Exif\0\0")
+            {
+                let (payload, removed) = strip_exif_gps_ifd(segment.payload);
+                gps_removed |= removed;
+                jpeg_segment_bytes(segment.marker, &payload)
+            } else {
+                jpeg_segment_bytes(segment.marker, segment.payload)
+            }
+        })
+        .collect();
+
+    Ok(PreparedJpegMetadata {
+        source_segment_count,
+        output_segments,
+        gps_removed,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct JpegMetadataSegment<'a> {
+    marker: u8,
+    payload: &'a [u8],
+}
+
+fn jpeg_metadata_segments(bytes: &[u8]) -> Vec<JpegMetadataSegment<'_>> {
+    if !bytes.starts_with(&[0xFF, 0xD8]) {
+        return Vec::new();
+    }
+
+    let mut cursor = 2;
+    let mut segments = Vec::new();
+    while cursor + 4 <= bytes.len() {
+        if bytes[cursor] != 0xFF {
+            break;
+        }
+        let marker = bytes[cursor + 1];
+        if marker == 0xDA || marker == 0xD9 {
+            break;
+        }
+        let length = u16::from_be_bytes([bytes[cursor + 2], bytes[cursor + 3]]) as usize;
+        if length < 2 || cursor + 2 + length > bytes.len() {
+            break;
+        }
+        let payload_start = cursor + 4;
+        let payload_end = cursor + 2 + length;
+        if matches!(marker, 0xE1 | 0xED) {
+            segments.push(JpegMetadataSegment {
+                marker,
+                payload: &bytes[payload_start..payload_end],
+            });
+        }
+        cursor = payload_end;
+    }
+    segments
+}
+
+fn jpeg_segment_bytes(marker: u8, payload: &[u8]) -> Vec<u8> {
+    let segment_length = payload.len() + 2;
+    let mut segment = Vec::with_capacity(segment_length + 2);
+    segment.push(0xFF);
+    segment.push(marker);
+    segment.extend_from_slice(&(segment_length as u16).to_be_bytes());
+    segment.extend_from_slice(payload);
+    segment
+}
+
+fn insert_jpeg_metadata_segments(path: &Path, segments: &[Vec<u8>]) -> Result<(), ExportError> {
+    if segments.is_empty() {
+        return Ok(());
+    }
+    let bytes = fs::read(path)?;
+    if !bytes.starts_with(&[0xFF, 0xD8]) {
+        return Ok(());
+    }
+    let mut output =
+        Vec::with_capacity(bytes.len() + segments.iter().map(std::vec::Vec::len).sum::<usize>());
+    output.extend_from_slice(&bytes[..2]);
+    for segment in segments {
+        output.extend_from_slice(segment);
+    }
+    output.extend_from_slice(&bytes[2..]);
+    fs::write(path, output)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExifEntry {
+    tag: u16,
+    field_type: u16,
+    count: u32,
+    value: [u8; 4],
+}
+
+fn strip_exif_gps_ifd(payload: &[u8]) -> (Vec<u8>, bool) {
+    if !payload.starts_with(b"Exif\0\0") || payload.len() < 14 {
+        return (payload.to_vec(), false);
+    }
+    let tiff = &payload[6..];
+    let endian = match &tiff[0..2] {
+        b"II" => ExifEndian::Little,
+        b"MM" => ExifEndian::Big,
+        _ => return (payload.to_vec(), false),
+    };
+    if read_u16(tiff, 2, endian) != Some(42) {
+        return (payload.to_vec(), false);
+    }
+    let Some(ifd_offset) = read_u32(tiff, 4, endian).map(|value| value as usize) else {
+        return (payload.to_vec(), false);
+    };
+    let Some(entry_count) = read_u16(tiff, ifd_offset, endian).map(usize::from) else {
+        return (payload.to_vec(), false);
+    };
+    let entries_start = ifd_offset + 2;
+    let entries_end = entries_start + (entry_count * 12);
+    if entries_end + 4 > tiff.len() {
+        return (payload.to_vec(), false);
+    }
+
+    let mut kept_entries = Vec::new();
+    let mut removed = false;
+    for index in 0..entry_count {
+        let offset = entries_start + (index * 12);
+        let Some(tag) = read_u16(tiff, offset, endian) else {
+            return (payload.to_vec(), false);
+        };
+        if tag == 0x8825 {
+            removed = true;
+            continue;
+        }
+        let Some(field_type) = read_u16(tiff, offset + 2, endian) else {
+            return (payload.to_vec(), false);
+        };
+        let Some(count) = read_u32(tiff, offset + 4, endian) else {
+            return (payload.to_vec(), false);
+        };
+        let mut value = [0_u8; 4];
+        value.copy_from_slice(&tiff[offset + 8..offset + 12]);
+        kept_entries.push(ExifEntry {
+            tag,
+            field_type,
+            count,
+            value,
+        });
+    }
+    if !removed {
+        return (payload.to_vec(), false);
+    }
+
+    let mut rebuilt_tiff = tiff[..ifd_offset].to_vec();
+    write_u16(&mut rebuilt_tiff, kept_entries.len() as u16, endian);
+    let entry_offsets_start = rebuilt_tiff.len();
+    for entry in &kept_entries {
+        write_u16(&mut rebuilt_tiff, entry.tag, endian);
+        write_u16(&mut rebuilt_tiff, entry.field_type, endian);
+        write_u32(&mut rebuilt_tiff, entry.count, endian);
+        rebuilt_tiff.extend_from_slice(&entry.value);
+    }
+    write_u32(&mut rebuilt_tiff, 0, endian);
+
+    for (index, entry) in kept_entries.iter().enumerate() {
+        let data_len = exif_type_size(entry.field_type)
+            .and_then(|size| size.checked_mul(entry.count as usize))
+            .unwrap_or(0);
+        if data_len <= 4 {
+            continue;
+        }
+        let Some(old_data_offset) = read_u32(&entry.value, 0, endian).map(|value| value as usize)
+        else {
+            continue;
+        };
+        if old_data_offset + data_len > tiff.len() {
+            continue;
+        }
+        let new_data_offset = rebuilt_tiff.len() as u32;
+        rebuilt_tiff.extend_from_slice(&tiff[old_data_offset..old_data_offset + data_len]);
+        let patch_offset = entry_offsets_start + (index * 12) + 8;
+        write_u32_at(&mut rebuilt_tiff, patch_offset, new_data_offset, endian);
+    }
+
+    let mut output = b"Exif\0\0".to_vec();
+    output.extend_from_slice(&rebuilt_tiff);
+    (output, true)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExifEndian {
+    Little,
+    Big,
+}
+
+fn read_u16(bytes: &[u8], offset: usize, endian: ExifEndian) -> Option<u16> {
+    let slice = bytes.get(offset..offset + 2)?;
+    Some(match endian {
+        ExifEndian::Little => u16::from_le_bytes([slice[0], slice[1]]),
+        ExifEndian::Big => u16::from_be_bytes([slice[0], slice[1]]),
+    })
+}
+
+fn read_u32(bytes: &[u8], offset: usize, endian: ExifEndian) -> Option<u32> {
+    let slice = bytes.get(offset..offset + 4)?;
+    Some(match endian {
+        ExifEndian::Little => u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]),
+        ExifEndian::Big => u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]),
+    })
+}
+
+fn write_u16(output: &mut Vec<u8>, value: u16, endian: ExifEndian) {
+    match endian {
+        ExifEndian::Little => output.extend_from_slice(&value.to_le_bytes()),
+        ExifEndian::Big => output.extend_from_slice(&value.to_be_bytes()),
+    }
+}
+
+fn write_u32(output: &mut Vec<u8>, value: u32, endian: ExifEndian) {
+    match endian {
+        ExifEndian::Little => output.extend_from_slice(&value.to_le_bytes()),
+        ExifEndian::Big => output.extend_from_slice(&value.to_be_bytes()),
+    }
+}
+
+fn write_u32_at(output: &mut [u8], offset: usize, value: u32, endian: ExifEndian) {
+    let bytes = match endian {
+        ExifEndian::Little => value.to_le_bytes(),
+        ExifEndian::Big => value.to_be_bytes(),
+    };
+    output[offset..offset + 4].copy_from_slice(&bytes);
+}
+
+fn exif_type_size(field_type: u16) -> Option<usize> {
+    match field_type {
+        1 | 2 | 6 | 7 => Some(1),
+        3 | 8 => Some(2),
+        4 | 9 | 11 => Some(4),
+        5 | 10 | 12 => Some(8),
+        _ => None,
+    }
 }
 
 /// Inspect the first embedded ICC profile in a JPEG file.
@@ -2068,6 +2364,98 @@ mod tests {
     }
 
     #[test]
+    fn exports_jpeg_preserves_source_exif_when_requested() {
+        let root = unique_export_root("metadata-preserve");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("preserve.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg_with_exif(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::export_jpeg_with_metadata_policy(
+            jpeg_metadata_request(source_path.clone(), output_path.clone()),
+            super::ExportMetadataPolicy::Preserve,
+        )
+        .expect("export jpeg with preserved metadata");
+
+        assert_eq!(result.output_path, output_path);
+        assert_eq!(
+            result.metadata_policy,
+            super::ExportMetadataPolicy::Preserve
+        );
+        assert!(result.source_metadata_copied);
+        assert_eq!(result.source_metadata_segments, 1);
+        assert!(jpeg_contains_exif_make(&result.output_path));
+        assert!(jpeg_has_exif_gps_ifd(&result.output_path));
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn exports_jpeg_removes_gps_metadata_when_requested() {
+        let root = unique_export_root("metadata-remove-gps");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("remove-gps.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg_with_exif(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+
+        let result = super::export_jpeg_with_metadata_policy(
+            jpeg_metadata_request(source_path.clone(), output_path.clone()),
+            super::ExportMetadataPolicy::RemoveGps,
+        )
+        .expect("export jpeg without gps metadata");
+
+        assert_eq!(
+            result.metadata_policy,
+            super::ExportMetadataPolicy::RemoveGps
+        );
+        assert!(result.source_metadata_copied);
+        assert!(result.gps_metadata_removed);
+        assert!(jpeg_contains_exif_make(&result.output_path));
+        assert!(!jpeg_has_exif_gps_ifd(&result.output_path));
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[test]
+    fn exports_jpeg_removes_source_metadata_when_requested() {
+        let root = unique_export_root("metadata-remove-all");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("export").join("remove-all.jpg");
+        std::fs::create_dir_all(output_path.parent().expect("output parent"))
+            .expect("create output directory");
+        write_source_jpeg_with_exif(&source_path);
+
+        let result = super::export_jpeg_with_metadata_policy(
+            jpeg_metadata_request(source_path, output_path),
+            super::ExportMetadataPolicy::RemoveAll,
+        )
+        .expect("export jpeg without source metadata");
+
+        assert_eq!(
+            result.metadata_policy,
+            super::ExportMetadataPolicy::RemoveAll
+        );
+        assert!(!result.source_metadata_copied);
+        assert_eq!(result.source_metadata_segments, 1);
+        assert!(!jpeg_contains_exif_make(&result.output_path));
+        assert!(!jpeg_has_exif_gps_ifd(&result.output_path));
+
+        remove_export_root(&root);
+    }
+
+    #[test]
     fn exports_png_without_mutating_original() {
         let root = unique_export_root("png");
         let source_path = root.join("source.jpg");
@@ -3191,6 +3579,90 @@ mod tests {
         image
             .save_with_format(path, image::ImageFormat::Jpeg)
             .expect("write source jpeg");
+    }
+
+    fn write_source_jpeg_with_exif(path: &Path) {
+        write_source_jpeg(path);
+        let bytes = std::fs::read(path).expect("read source jpeg");
+        let with_exif = insert_app1_exif_segment(&bytes, &minimal_exif_with_gps());
+        std::fs::write(path, with_exif).expect("write source jpeg exif");
+    }
+
+    fn jpeg_metadata_request(
+        source_path: PathBuf,
+        output_path: PathBuf,
+    ) -> super::JpegColorExportRequest {
+        super::JpegColorExportRequest {
+            source_path,
+            output_path,
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+            quality: 90,
+            color_profile: super::ExportColorProfile::Srgb,
+        }
+    }
+
+    fn insert_app1_exif_segment(jpeg: &[u8], exif: &[u8]) -> Vec<u8> {
+        assert!(jpeg.starts_with(&[0xFF, 0xD8]));
+        let segment_len = exif.len() + 2;
+        let mut output = Vec::with_capacity(jpeg.len() + segment_len + 2);
+        output.extend_from_slice(&jpeg[..2]);
+        output.extend_from_slice(&[0xFF, 0xE1]);
+        output.extend_from_slice(&(segment_len as u16).to_be_bytes());
+        output.extend_from_slice(exif);
+        output.extend_from_slice(&jpeg[2..]);
+        output
+    }
+
+    fn minimal_exif_with_gps() -> Vec<u8> {
+        let make_offset = 38_u32;
+        let gps_offset = 48_u32;
+        let mut tiff = Vec::new();
+        tiff.extend_from_slice(b"II");
+        tiff.extend_from_slice(&42_u16.to_le_bytes());
+        tiff.extend_from_slice(&8_u32.to_le_bytes());
+        tiff.extend_from_slice(&2_u16.to_le_bytes());
+        tiff.extend_from_slice(&0x010F_u16.to_le_bytes());
+        tiff.extend_from_slice(&2_u16.to_le_bytes());
+        tiff.extend_from_slice(&10_u32.to_le_bytes());
+        tiff.extend_from_slice(&make_offset.to_le_bytes());
+        tiff.extend_from_slice(&0x8825_u16.to_le_bytes());
+        tiff.extend_from_slice(&4_u16.to_le_bytes());
+        tiff.extend_from_slice(&1_u32.to_le_bytes());
+        tiff.extend_from_slice(&gps_offset.to_le_bytes());
+        tiff.extend_from_slice(&0_u32.to_le_bytes());
+        tiff.extend_from_slice(b"SilicaCam\0");
+        tiff.extend_from_slice(&1_u16.to_le_bytes());
+        tiff.extend_from_slice(&1_u16.to_le_bytes());
+        tiff.extend_from_slice(&2_u16.to_le_bytes());
+        tiff.extend_from_slice(&2_u32.to_le_bytes());
+        tiff.extend_from_slice(b"N\0\0\0");
+        tiff.extend_from_slice(&0_u32.to_le_bytes());
+
+        let mut exif = b"Exif\0\0".to_vec();
+        exif.extend_from_slice(&tiff);
+        exif
+    }
+
+    fn jpeg_contains_exif_make(path: &Path) -> bool {
+        std::fs::read(path)
+            .expect("read jpeg")
+            .windows(b"SilicaCam".len())
+            .any(|window| window == b"SilicaCam")
+    }
+
+    fn jpeg_has_exif_gps_ifd(path: &Path) -> bool {
+        let bytes = std::fs::read(path).expect("read jpeg");
+        bytes.windows(2).any(|window| window == [0x25, 0x88])
+            || bytes.windows(2).any(|window| window == [0x88, 0x25])
     }
 
     fn write_geometry_source_jpeg(path: &Path) {

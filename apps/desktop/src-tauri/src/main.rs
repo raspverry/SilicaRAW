@@ -2981,6 +2981,7 @@ fn export_photo_jpeg(
     photo_id: String,
     output_path: String,
     color_profile: Option<String>,
+    metadata_policy: Option<String>,
 ) -> DesktopCommandResponse {
     let command = "export_photo_jpeg";
     let requested_profile = match parse_export_color_profile(color_profile.as_deref()) {
@@ -2998,14 +2999,30 @@ fn export_photo_jpeg(
             )
         }
     };
+    let requested_metadata_policy = match parse_export_metadata_policy(metadata_policy.as_deref()) {
+        Ok(policy) => policy,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    output_path: Some(output_path),
+                    photo_id: Some(photo_id),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
 
     desktop_photo_export_response(
         command,
-        silica_core::export_photo_jpeg(
+        silica_core::export_photo_jpeg_with_metadata_policy(
             PathBuf::from(&library_path),
             &photo_id,
             PathBuf::from(&output_path),
             requested_profile,
+            requested_metadata_policy,
         ),
         library_path,
         output_path,
@@ -3080,22 +3097,27 @@ fn save_export_settings(
     format: Option<String>,
     color_profile: Option<String>,
     quality: Option<u8>,
+    metadata_policy: Option<String>,
 ) -> DesktopCommandResponse {
     let command = "save_export_settings";
-    let settings =
-        match export_settings_from_request(format.as_deref(), color_profile.as_deref(), quality) {
-            Ok(settings) => settings,
-            Err(error) => {
-                return DesktopCommandResponse::error(
-                    command,
-                    error,
-                    DesktopCommandContext {
-                        library_path: Some(library_path),
-                        ..DesktopCommandContext::default()
-                    },
-                )
-            }
-        };
+    let settings = match export_settings_from_request(
+        format.as_deref(),
+        color_profile.as_deref(),
+        quality,
+        metadata_policy.as_deref(),
+    ) {
+        Ok(settings) => settings,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
 
     match silica_core::set_default_export_settings(
         PathBuf::from(&library_path),
@@ -3125,22 +3147,27 @@ fn save_export_preset(
     format: Option<String>,
     color_profile: Option<String>,
     quality: Option<u8>,
+    metadata_policy: Option<String>,
 ) -> DesktopCommandResponse {
     let command = "save_export_preset";
-    let settings =
-        match export_settings_from_request(format.as_deref(), color_profile.as_deref(), quality) {
-            Ok(settings) => settings,
-            Err(error) => {
-                return DesktopCommandResponse::error(
-                    command,
-                    error,
-                    DesktopCommandContext {
-                        library_path: Some(library_path),
-                        ..DesktopCommandContext::default()
-                    },
-                )
-            }
-        };
+    let settings = match export_settings_from_request(
+        format.as_deref(),
+        color_profile.as_deref(),
+        quality,
+        metadata_policy.as_deref(),
+    ) {
+        Ok(settings) => settings,
+        Err(error) => {
+            return DesktopCommandResponse::error(
+                command,
+                error,
+                DesktopCommandContext {
+                    library_path: Some(library_path),
+                    ..DesktopCommandContext::default()
+                },
+            )
+        }
+    };
 
     match silica_core::upsert_export_preset(PathBuf::from(&library_path), name, settings.clone()) {
         Ok(preset) => match silica_core::set_default_export_settings(
@@ -3196,13 +3223,40 @@ fn parse_export_format(format: Option<&str>) -> Result<&'static str, silica_core
     }
 }
 
+fn parse_export_metadata_policy(
+    metadata_policy: Option<&str>,
+) -> Result<silica_core::PhotoExportMetadataPolicy, silica_core::CoreError> {
+    match metadata_policy.unwrap_or("minimal") {
+        "minimal" => Ok(silica_core::PhotoExportMetadataPolicy::Minimal),
+        "preserve" => Ok(silica_core::PhotoExportMetadataPolicy::Preserve),
+        "remove_gps" => Ok(silica_core::PhotoExportMetadataPolicy::RemoveGps),
+        "remove_all" => Ok(silica_core::PhotoExportMetadataPolicy::RemoveAll),
+        unsupported => Err(silica_core::CoreError::ExportBlocked(format!(
+            "Unsupported export metadata policy: {unsupported}. Supported policies: minimal, preserve, remove_gps, remove_all."
+        ))),
+    }
+}
+
+fn export_metadata_policy_request_string(
+    metadata_policy: silica_core::PhotoExportMetadataPolicy,
+) -> &'static str {
+    match metadata_policy {
+        silica_core::PhotoExportMetadataPolicy::Minimal => "minimal",
+        silica_core::PhotoExportMetadataPolicy::Preserve => "preserve",
+        silica_core::PhotoExportMetadataPolicy::RemoveGps => "remove_gps",
+        silica_core::PhotoExportMetadataPolicy::RemoveAll => "remove_all",
+    }
+}
+
 fn export_settings_from_request(
     format: Option<&str>,
     color_profile: Option<&str>,
     quality: Option<u8>,
+    metadata_policy: Option<&str>,
 ) -> Result<silica_core::ExportSettings, silica_core::CoreError> {
     let format = parse_export_format(format)?;
     let color_profile = parse_export_color_profile(color_profile)?;
+    let metadata_policy = parse_export_metadata_policy(metadata_policy)?;
     if format != "jpeg" && color_profile != silica_core::PhotoExportColorProfile::Srgb {
         return Err(silica_core::CoreError::ExportBlocked(
             "PNG and TIFF export settings currently require sRGB color profile.".to_string(),
@@ -3212,7 +3266,7 @@ fn export_settings_from_request(
         format: format.to_string(),
         color_profile: export_color_profile_request_string(color_profile).to_string(),
         quality: quality.unwrap_or(90),
-        metadata_policy: "minimal".to_string(),
+        metadata_policy: export_metadata_policy_request_string(metadata_policy).to_string(),
     })
 }
 
@@ -6183,6 +6237,7 @@ mod tests {
             Some("jpeg".to_string()),
             Some("display_p3".to_string()),
             Some(90),
+            Some("preserve".to_string()),
         );
 
         assert!(response.ok);
@@ -6195,6 +6250,7 @@ mod tests {
             } => {
                 assert_eq!(default_settings.format, "jpeg");
                 assert_eq!(default_settings.color_profile, "display_p3");
+                assert_eq!(default_settings.metadata_policy, "preserve");
                 let default_preset_id = default_preset_id
                     .as_deref()
                     .expect("default preset id")
@@ -6235,6 +6291,7 @@ mod tests {
             Some("png".to_string()),
             None,
             Some(90),
+            Some("remove_all".to_string()),
         );
         assert!(response.ok, "save PNG settings failed: {response:?}");
         match response_data(&response) {
@@ -6244,6 +6301,7 @@ mod tests {
                 assert_eq!(default_settings.format, "png");
                 assert_eq!(default_settings.color_profile, "srgb");
                 assert_eq!(default_settings.quality, 90);
+                assert_eq!(default_settings.metadata_policy, "remove_all");
             }
             other => panic!("unexpected export settings response data: {other:?}"),
         }
@@ -6254,6 +6312,7 @@ mod tests {
             Some("png".to_string()),
             Some("display_p3".to_string()),
             Some(90),
+            Some("minimal".to_string()),
         );
         assert!(!rejected.ok);
         let error = rejected.error.as_ref().expect("error payload");
@@ -6261,6 +6320,21 @@ mod tests {
         assert!(error
             .message
             .contains("PNG and TIFF export settings currently require sRGB"));
+
+        let invalid_policy = super::save_export_settings(
+            library_root.display().to_string(),
+            None,
+            Some("jpeg".to_string()),
+            None,
+            Some(90),
+            Some("gps_only".to_string()),
+        );
+        assert!(!invalid_policy.ok);
+        let error = invalid_policy.error.as_ref().expect("error payload");
+        assert_eq!(error.kind, "exportBlocked");
+        assert!(error
+            .message
+            .contains("Unsupported export metadata policy: gps_only"));
 
         remove_library_root(&workspace);
     }
@@ -6406,6 +6480,7 @@ mod tests {
             photo_id,
             output_path.display().to_string(),
             Some("display_p3".to_string()),
+            None,
         );
 
         assert!(export.ok);
@@ -6434,6 +6509,7 @@ mod tests {
             "photo-1".to_string(),
             "/tmp/output.jpg".to_string(),
             Some("adobe_rgb".to_string()),
+            None,
         );
 
         assert!(!rejected.ok);
