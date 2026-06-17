@@ -51,6 +51,35 @@ Required fixture guardrails:
 - Fixture paths must be relative POSIX paths without absolute prefixes, dot segments, backslashes, or double slashes.
 ```
 
+## Plugin Manifest v1
+
+`schemas/plugin_manifest.schema.json` is the authoritative contract for plugin manifests.
+
+Task 25.1 status:
+
+```txt
+schema -> silica.plugin
+version -> 1
+required identity -> plugin_id, name, description, author, plugin_version, minimum_silica_version
+required provenance -> license
+type -> preset_pack | export_preset | ai_model | workflow
+permissions -> non-empty unique array of allowed plugin permission IDs
+enabled_by_default -> false in the validated runtime model
+```
+
+Allowed plugin manifest permissions are currently:
+
+```txt
+metadata:read
+edit_suggestion:read
+edit_suggestion:apply
+export:local
+filesystem:limited_read
+ai_result:read
+```
+
+Raw SQL, direct database access, filesystem write, and original-file mutation permissions are not valid plugin manifest permissions. Validation does not load plugins, execute code, persist grants, or enable a plugin runtime.
+
 ## Model Manifest v1
 
 `schemas/model_manifest.schema.json` is the authoritative contract for optional MLX model manifests.
@@ -354,7 +383,7 @@ Unknown fields must not be silently discarded.
 ```txt
 [x] edit graph serialization validates in crates/silica-edit for Phase 5.2
 [ ] sidecar serialization validates
-[ ] plugin manifest rejects missing license
+[x] plugin manifest rejects missing license, missing minimum app version, empty/missing permissions, raw SQL, and unknown permissions
 [ ] model manifest rejects missing hash/license
 [ ] MCP tool schema rejects missing permission/side-effect declarations
 ```

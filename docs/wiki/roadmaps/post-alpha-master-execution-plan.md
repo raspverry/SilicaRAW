@@ -274,7 +274,7 @@ Phase 24:
 
 Phase 25:
 
-- Declarative plugin manifest first.
+- Task 25.1 complete: declarative plugin manifest validation first, plugins disabled by default.
 - Data-only preset plugins before executable plugin models.
 - Plugin applies require explicit approval and action logging.
 

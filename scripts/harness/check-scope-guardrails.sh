@@ -48,7 +48,7 @@ check_deferred_crate_boundary() {
 
 check_deferred_crate_boundary "silica-mlx" "serde_json|sha2"
 check_deferred_crate_boundary "silica-mcp"
-check_deferred_crate_boundary "silica-plugin"
+check_deferred_crate_boundary "silica-plugin" "serde_json"
 
 if rg -n \
   "posthog|sentry|telemetry|analytics|firebase|amplitude|segment\.io|segmentio|@segment|Segment Analytics|segment analytics|cloud sync|cloud-sync|upload_original|uploadPhoto|delete_original|overwrite_original" \

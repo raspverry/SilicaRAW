@@ -1147,6 +1147,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Plugin manifests cannot request raw SQL.
 - **Validation:** `cargo test -p silica-plugin`
 
+**Status:** Completed on 2026-06-18. Added `silica-plugin` manifest validation for `silica.plugin` v1 JSON. Validation rejects missing license, missing minimum app version, missing/empty permissions, duplicate permissions, unknown permissions, raw SQL, direct database access, and write-like permissions. Valid manifests return typed data with `enabled_by_default = false`. The plugin manifest schema now requires non-empty allowlisted permissions. No plugin runtime, executable loading, permission persistence, Core mutation path, UI, or MCP behavior was added.
+
 ### Task 25.2: Declarative Preset Plugin
 
 - **Location:** `crates/silica-plugin`, `crates/silica-core`, `crates/silica-edit`

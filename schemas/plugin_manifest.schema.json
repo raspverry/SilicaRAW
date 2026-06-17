@@ -26,25 +26,32 @@
       "const": 1
     },
     "plugin_id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "name": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "description": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "author": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "license": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "plugin_version": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "minimum_silica_version": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "type": {
       "type": "string",
@@ -58,8 +65,17 @@
     "permissions": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "enum": [
+          "metadata:read",
+          "edit_suggestion:read",
+          "edit_suggestion:apply",
+          "export:local",
+          "filesystem:limited_read",
+          "ai_result:read"
+        ]
       },
+      "minItems": 1,
       "uniqueItems": true
     },
     "entry": {

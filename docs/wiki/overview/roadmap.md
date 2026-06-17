@@ -85,6 +85,7 @@ The current implementation order starts with:
 - Task 24.3 is complete: AI result rows are stored separately from edit graph/history and catalog flags, default to unapproved, remain local-only and permissioned, and reject direct edit/flag mutation payloads.
 - Task 24.4 is complete: the first AI review surface reads stored blur review results, shows model-unavailable/editor-usable behavior when no result exists, and keeps approval/mutation deferred.
 - Task 24.5 is complete: explicit approval converts scoped AI suggestions into undoable edit checkpoints with provenance, while rejection leaves edit state unchanged.
+- Task 25.1 is complete: plugin manifests validate identity, trust fields, type, and safe allowlisted permissions while plugins remain disabled by default and no runtime starts.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

@@ -2,7 +2,7 @@
 title: Completed LLM Context
 status: active
 audience: agents
-updated: 2026-06-17
+updated: 2026-06-18
 source_of_truth: docs/wiki/llm/index.md
 ---
 
@@ -25,6 +25,7 @@ Use this page when a task needs historical context. It keeps [Current LLM Route]
 - Phase 18 is complete. Read [Phase 18 Summary](../phases/phase-18-summary.md), [Phase 18 Professional Editing Baseline Brief](../phases/phase-18-professional-editing-baseline.md), and [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) instead of replaying Phase 18 task cards.
 - Phase 23 is complete. Read [Plugins and MCP](../topics/plugins-and-mcp.md) and [Action Trust](../topics/action-trust.md) only when changing permission or extension action-log behavior.
 - Phase 24 is complete. Read [MLX](../topics/mlx.md), [24.3 AI Result Store and Read Path](../tasks/24.3-ai-result-store-read-path.md), [24.4 First Non-Mutating AI Review Feature](../tasks/24.4-first-non-mutating-ai-review.md), and [24.5 Explicit AI Suggestion Approval](../tasks/24.5-explicit-ai-suggestion-approval.md) instead of replaying the full Phase 24 history.
+- Task 25.1 is complete. Read [Plugins and MCP](../topics/plugins-and-mcp.md), [Schema Reference](../../19_Schema_Reference.md), and [25.1 Plugin Manifest Validation](../tasks/25.1-plugin-manifest-validation.md) when changing plugin manifest validation.
 
 ## Read Avoidance Rules
 
