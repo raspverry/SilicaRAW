@@ -14,36 +14,35 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20 and Phase 21 are complete. The current product area is **Phase 22: Performance, Migration, and Visual Hardening**.
+Phase 20, Phase 21, and Task 22.1 are complete. The current product area is **Phase 22: Performance, Migration, and Visual Hardening**.
 
 Task 21.5 is complete as a disabled-by-default Preferences surface. Runtime permission policy, prompts, MCP/plugin runtime, and agent bridges remain gated by Phase 23.
 
 ## Minimal Read Set
 
-For Phase 21 task-card creation or implementation, read:
+For Phase 22 task-card creation or implementation, read:
 
-- The selected Phase 21 task card under [Task Cards](../tasks/index.md).
+- The selected Phase 22 task card under [Task Cards](../tasks/index.md), if it exists.
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap: Phase 21](../roadmaps/post-alpha-product-roadmap.md#phase-21-preferences-and-app-settings)
-- [UI Mockups](../topics/ui-mockups.md)
+- [Post-Alpha Product Roadmap: Phase 22](../roadmaps/post-alpha-product-roadmap.md#phase-22-performance-migration-and-visual-hardening)
+- [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
-## Phase 21 Context
+## Phase 22 Context
 
-- Task 21.1 created the compact Preferences shell and section IA only.
-- Task 21.2 implemented supported Appearance preferences in app-level session state.
-- Task 21.3 implemented Library default path preferences and disposable Cache status/clear controls.
-- Task 21.4 implements Color and Export defaults through the existing catalog export settings path.
-- Task 21.5 completed disabled Advanced controls and explanatory permission text only; Phase 23 still owns runtime permission policy.
+- Task 22.1 expanded final visual QA to 22 surfaces across compact, desktop, and large widths.
+- Task 22.2 should add library scale benchmarks without marketing them as universal performance guarantees.
+- Task 22.3 should focus migration, backup, missing-file, conflict, and partial-failure recovery tests.
+- Task 22.4 remains profiling evidence only and depends on RAW/Metal work.
+- Task 22.5 should become a manual photographer QA checklist using licensed or user-provided local assets.
 
 ## Stop Rules
 
-- Do not enable an unimplemented Preferences control.
-- Do not add Preferences persistence outside the active scoped task.
-- Do not create a second export preferences store; reuse catalog export settings.
-- Do not start agent, MCP, or plugin runtime from Preferences before Phase 23 policy.
+- Do not treat visual QA screenshots as product feature implementation.
+- Do not add broad fallback systems for performance, migration, or profiling work.
+- Do not start agent, MCP, or plugin runtime before Phase 23 policy.
 - Do not add MLX, MCP, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support.
 - Do not mutate original photo files.

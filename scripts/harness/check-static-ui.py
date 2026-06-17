@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "apps/desktop/static/index.html"
 BASE_CSS = ROOT / "apps/desktop/static/styles/base.css"
 APP_FRAME_CSS = ROOT / "apps/desktop/static/styles/app-frame.css"
+FINAL_VISUAL_QA = ROOT / "scripts/harness/run-final-visual-qa.py"
 
 
 class StaticUiParser(HTMLParser):
@@ -469,6 +470,25 @@ def main():
             "app-frame.css must consume color tokens instead of raw color literals",
             failures,
         )
+
+    require(FINAL_VISUAL_QA.is_file(), "missing scripts/harness/run-final-visual-qa.py", failures)
+    if FINAL_VISUAL_QA.is_file():
+        visual_qa_source = FINAL_VISUAL_QA.read_text(encoding="utf-8")
+        for surface_name in [
+            "M015-library-filters",
+            "M016-library-metadata",
+            "M017-develop-history",
+            "M018-develop-expanded",
+            "M019-mask-editor",
+            "M020-preferences-appearance",
+            "M021-preferences-advanced",
+            "M022-export-workflow",
+        ]:
+            require(
+                surface_name in visual_qa_source,
+                f"final visual QA must include expanded Phase 22 surface {surface_name}",
+                failures,
+            )
 
     preferences_dialog = parser.ids.get("preferencesDialog", {})
     require(

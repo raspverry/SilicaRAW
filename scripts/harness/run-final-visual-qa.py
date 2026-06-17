@@ -42,6 +42,14 @@ SURFACES = [
     ("M010-layout-sidebar-collapsed", "layout-sidebar-collapsed"),
     ("M011-layout-inspector-collapsed", "layout-inspector-collapsed"),
     ("M012-layout-reset", "layout-reset"),
+    ("M015-library-filters", "library-filters"),
+    ("M016-library-metadata", "library-metadata"),
+    ("M017-develop-history", "develop-history"),
+    ("M018-develop-expanded", "develop-expanded"),
+    ("M019-mask-editor", "mask-editor"),
+    ("M020-preferences-appearance", "preferences-appearance"),
+    ("M021-preferences-advanced", "preferences-advanced"),
+    ("M022-export-workflow", "export-workflow"),
 ]
 
 
@@ -513,6 +521,54 @@ def state_script(state):
     document.querySelector("#rejectSelectedPhoto").setAttribute("aria-pressed", "false");
   }}
 
+  function setLibraryFilters() {{
+    document.querySelector("#librarySearch").value = "synthetic";
+    document.querySelector("#fileTypeFilter").value = "jpeg";
+    document.querySelector("#metadataFilter").value = "has_dimensions";
+    document.querySelector("#minRatingFilter").value = "3";
+    document.querySelector("#cullingFilter").value = "picked";
+    document.querySelector("#librarySort").value = "rating_desc";
+    document.querySelector("#gridStateNote").textContent = "Filtered to picked JPEG/JPG photos with stored dimensions.";
+    document.querySelector("#gridPageStatus").textContent = "Filtered page 1";
+  }}
+
+  function setMetadataReadback() {{
+    document.querySelector("#selectedPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#metadataFileType").textContent = "JPG";
+    document.querySelector("#metadataFileType").dataset.metadataState = "known";
+    document.querySelector("#metadataDimensions").textContent = "1600 x 1067";
+    document.querySelector("#metadataDimensions").dataset.metadataState = "known";
+    document.querySelector("#metadataCaptureTime").textContent = "2026-06-16 09:30";
+    document.querySelector("#metadataCaptureTime").dataset.metadataState = "known";
+    document.querySelector("#metadataCamera").textContent = "SilicaRAW Fixture";
+    document.querySelector("#metadataCamera").dataset.metadataState = "known";
+    document.querySelector("#metadataLens").textContent = "Synthetic 50mm";
+    document.querySelector("#metadataLens").dataset.metadataState = "known";
+    document.querySelector("#metadataModifiedAt").textContent = "2026-06-16 09:35";
+    document.querySelector("#metadataModifiedAt").dataset.metadataState = "known";
+    document.querySelector("#metadataFileSize").textContent = "184 KB";
+    document.querySelector("#metadataFileSize").dataset.metadataState = "known";
+    document.querySelector("#metadataStatus").value = "Metadata loaded from catalog.";
+    document.querySelector("#metadataStatus").textContent = "Metadata loaded from catalog.";
+  }}
+
+  function setPreferenceSection(section) {{
+    document.querySelector("#preferencesDialog").hidden = false;
+    document.querySelectorAll("[data-preferences-section]").forEach((button) => {{
+      const selected = button.dataset.preferencesSection === section;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-selected", String(selected));
+    }});
+    document.querySelectorAll("[data-preferences-panel]").forEach((panel) => {{
+      panel.hidden = panel.dataset.preferencesPanel !== section;
+    }});
+    const status = section === "advanced"
+      ? "Advanced access remains off until Phase 23 permission policy exists."
+      : "Appearance settings save automatically.";
+    document.querySelector("#preferencesStatus").value = status;
+    document.querySelector("#preferencesStatus").textContent = status;
+  }}
+
   function setHistogramState(withPhotos) {{
     const histogram = document.querySelector("#photoHistogram");
     const bars = document.querySelector("#photoHistogramBars");
@@ -583,10 +639,15 @@ def state_script(state):
     document.querySelector("#welcomeStatus").value = "Enter a local library folder path to begin.";
   }} else if (state === "empty") {{
     openLibraryBase(false);
-  }} else if (state === "grid" || state === "maintenance") {{
+  }} else if (state === "grid" || state === "maintenance" || state === "library-filters" || state === "library-metadata") {{
     openLibraryBase(true);
     if (state === "maintenance") {{
       document.querySelector("#cacheClearStatus").value = "Cache clear removes only disposable previews and thumbnails.";
+    }} else if (state === "library-filters") {{
+      setLibraryFilters();
+    }} else if (state === "library-metadata") {{
+      setMetadataReadback();
+      document.querySelector("#rightInspector").scrollTop = 0;
     }}
   }} else if (state === "import") {{
     openLibraryBase(true);
@@ -664,7 +725,7 @@ def state_script(state):
     loupeViewer.dataset.previewStatus = "ready";
     loupeViewer.querySelectorAll(".sr-loupe-image").forEach((image) => image.remove());
     loupeViewer.prepend(thumb(imagePath, "sr-loupe-image"));
-  }} else if (state === "develop" || state === "mask-active") {{
+  }} else if (state === "develop" || state === "develop-expanded" || state === "develop-history" || state === "mask-active" || state === "mask-editor") {{
     openLibraryBase(true);
     setMode("develop");
     document.querySelector("#developPhotoName").textContent = "synthetic-gradient.jpg";
@@ -820,7 +881,30 @@ def state_script(state):
     developSurface.dataset.hasPreviewImage = "true";
     developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
     developSurface.prepend(thumb(imagePath, "sr-develop-image"));
-    if (state === "mask-active") {{
+    if (state === "develop-history") {{
+      document.querySelector("#developHistoryPanel").dataset.historyState = "ready";
+      document.querySelector("#developHistoryStatus").value = "3 committed history entries.";
+      document.querySelector("#developHistoryStatus").textContent = "3 committed history entries.";
+      document.querySelector("#developUndoHistory").disabled = false;
+      document.querySelector("#developRedoHistory").disabled = false;
+      const historyList = document.querySelector("#developHistoryList");
+      historyList.replaceChildren(
+        ...[
+          ["Current", "Exposure +0.40, Contrast +12"],
+          ["Previous", "Tone curve midpoint 0.62"],
+          ["Base", "Import reference"],
+        ].map(([label, summary]) => {{
+          const item = document.createElement("li");
+          const strong = document.createElement("strong");
+          strong.textContent = label;
+          const small = document.createElement("small");
+          small.textContent = summary;
+          item.append(strong, small);
+          return item;
+        }})
+      );
+      document.querySelector("#developHistoryPanel").scrollIntoView({{ block: "center" }});
+    }} else if (state === "mask-active" || state === "mask-editor") {{
       const maskRows = {{
         brush: ["#developMaskBrushRow", "#developMaskBrushName", "#developMaskBrushSummary", "#developMaskBrushState"],
         linear: ["#developMaskLinearRow", "#developMaskLinearName", "#developMaskLinearSummary", "#developMaskLinearState"],
@@ -883,6 +967,8 @@ def state_script(state):
         if (control) control.disabled = true;
       }});
       document.querySelector("#developMaskPanel").scrollIntoView({{ block: "start" }});
+    }} else if (state === "develop-expanded") {{
+      document.querySelector("#developHslPanel").scrollIntoView({{ block: "center" }});
     }} else {{
       document.querySelector("#developLensGeometryPanel").scrollIntoView({{ block: "center" }});
     }}
@@ -939,7 +1025,17 @@ def state_script(state):
     developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
     developSurface.prepend(thumb(imagePath, "sr-develop-image"));
     document.querySelector("#developClipboardPanel").scrollIntoView({{ block: "center" }});
-  }} else if (state === "export") {{
+  }} else if (state === "preferences-appearance") {{
+    openLibraryBase(true);
+    setPreferenceSection("appearance");
+    document.querySelector("#preferencesAppearanceTheme").value = "dark";
+    document.querySelector("#preferencesAppearanceDensity").value = "compact";
+    document.querySelector("#preferencesAppearanceUiScale").value = "105";
+    document.querySelector("#preferencesAppearanceScaleValue").textContent = "105%";
+  }} else if (state === "preferences-advanced") {{
+    openLibraryBase(true);
+    setPreferenceSection("advanced");
+  }} else if (state === "export" || state === "export-workflow") {{
     openLibraryBase(true);
     setMode("export");
     exportDialog.hidden = false;
@@ -949,6 +1045,55 @@ def state_script(state):
     document.querySelector("#exportStatus").value = "Enter an output path, then export the selected photo.";
     document.querySelector("#exportSummaryFile").textContent = "synthetic-gradient_SilicaRAW.jpg";
     renderExportPreview();
+    if (state === "export-workflow") {{
+      document.querySelector("#selectionSummary").dataset.multiSelectionState = "multi";
+      document.querySelector("#primarySelectedPhotoName").textContent = "synthetic-gradient.jpg";
+      document.querySelector("#multiSelectionCount").value = "2 selected";
+      document.querySelector("#multiSelectionCount").textContent = "2 selected";
+      document.querySelector("#exportSelectedPhotoName").textContent = "2 photos, primary synthetic-gradient.jpg";
+      document.querySelector("#exportSelectedInline").textContent = "2 photos";
+      document.querySelector("#exportPresetName").value = "JPEG Display P3 Preserve";
+      document.querySelector("#exportColorSrgb").classList.remove("is-selected");
+      document.querySelector("#exportColorSrgb").setAttribute("aria-pressed", "false");
+      document.querySelector("#exportColorDisplayP3").classList.add("is-selected");
+      document.querySelector("#exportColorDisplayP3").setAttribute("aria-pressed", "true");
+      document.querySelector("#exportColorSpace").value = "Display P3";
+      document.querySelector("#exportMetadataPolicy").value = "preserve";
+      document.querySelector("#exportBatchProgress").value = 50;
+      document.querySelector("#exportBatchProgressLabel").textContent = "1 / 2";
+      document.querySelector("#exportStatus").value = "1 of 2 exports completed. Review failures above.";
+      document.querySelector("#exportSummaryColor").textContent = "Display P3";
+      document.querySelector("#exportSummaryMetadata").textContent = "Preserve";
+      document.querySelector("#exportSummaryBatch").textContent = "2 photos";
+      const failures = document.querySelector("#exportBatchFailureList");
+      failures.replaceChildren(...[
+        ["blocked-raw.DNG", "RAW decode is required before export."],
+      ].map(([name, message]) => {{
+        const item = document.createElement("li");
+        const strong = document.createElement("strong");
+        strong.textContent = name;
+        const small = document.createElement("small");
+        small.textContent = message;
+        item.append(strong, small);
+        return item;
+      }}));
+      document.querySelector("#recentExportsEmpty").hidden = true;
+      const recent = document.querySelector("#recentExportsList");
+      recent.replaceChildren(...[
+        ["/Users/you/Pictures/Exports/synthetic-gradient_SilicaRAW.jpg", "Exists"],
+        ["/Users/you/Pictures/Exports/synthetic-checker_SilicaRAW.jpg", "Missing"],
+      ].map(([path, stateText]) => {{
+        const item = document.createElement("li");
+        item.className = "sr-recent-export-row";
+        const strong = document.createElement("strong");
+        strong.textContent = path;
+        const span = document.createElement("span");
+        span.className = "sr-recent-export-state";
+        span.textContent = stateText;
+        item.append(strong, span);
+        return item;
+      }}));
+    }}
   }} else if (state === "layout-sidebar-collapsed") {{
     openLibraryBase(true);
     setLayout(true, false, true, 168);
@@ -979,6 +1124,7 @@ def metric_script(surface):
     return {{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }};
   }};
   const text = (selector) => (document.querySelector(selector)?.textContent || "").trim();
+  const value = (selector) => document.querySelector(selector)?.value || "";
   const disabled = (selector) => Boolean(document.querySelector(selector)?.disabled);
   const mode = box("#modeNavigation");
   const actions = box(".sr-toolbar-actions");
@@ -992,6 +1138,7 @@ def metric_script(surface):
   }})
     .slice(0, 12);
   const dialog = box("#exportDialog");
+  const preferencesDialog = box("#preferencesDialog");
   const app = document.querySelector("#appFrame");
   const presetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
   return {{
@@ -1013,6 +1160,25 @@ def metric_script(surface):
     filmstripVisible: app.dataset.filmstripVisible,
     sidebarVisible: Boolean(box("#leftSidebar")),
     inspectorVisible: Boolean(box("#rightInspector")),
+    libraryFilters: {{
+      search: value("#librarySearch"),
+      fileType: value("#fileTypeFilter"),
+      metadata: value("#metadataFilter"),
+      minRating: value("#minRatingFilter"),
+      culling: value("#cullingFilter"),
+      sort: value("#librarySort"),
+      note: text("#gridStateNote"),
+    }},
+    metadataState: {{
+      fileName: text("#selectedPhotoName"),
+      fileType: text("#metadataFileType"),
+      dimensions: text("#metadataDimensions"),
+      captureTime: text("#metadataCaptureTime"),
+      camera: text("#metadataCamera"),
+      lens: text("#metadataLens"),
+      status: text("#metadataStatus"),
+      knownFields: Array.from(document.querySelectorAll("[data-metadata-state='known']")).filter(visible).length,
+    }},
     developState: {{
       photoName: text("#developPhotoName"),
       histogramStatus: text("#photoHistogramStatus"),
@@ -1117,6 +1283,51 @@ def metric_script(surface):
       pasteDisabled: disabled("#pasteEditClipboard"),
       syncDisabled: disabled("#syncEditClipboard"),
     }},
+    historyState: {{
+      visible: Boolean(box("#developHistoryPanel")),
+      panelState: document.querySelector("#developHistoryPanel")?.dataset.historyState || "",
+      status: text("#developHistoryStatus"),
+      rows: Array.from(document.querySelectorAll("#developHistoryList li")).filter(visible).length,
+      undoDisabled: disabled("#developUndoHistory"),
+      redoDisabled: disabled("#developRedoHistory"),
+    }},
+    preferencesState: {{
+      visible: Boolean(preferencesDialog),
+      dialogWithinViewport: !preferencesDialog || (
+        preferencesDialog.left >= 0
+        && preferencesDialog.right <= innerWidth
+        && preferencesDialog.top >= 0
+        && preferencesDialog.bottom <= innerHeight
+      ),
+      selectedSection: document.querySelector("[data-preferences-section][aria-selected='true']")?.dataset.preferencesSection || "",
+      visiblePanel: Array.from(document.querySelectorAll("[data-preferences-panel]")).find(visible)?.dataset.preferencesPanel || "",
+      theme: value("#preferencesAppearanceTheme"),
+      density: value("#preferencesAppearanceDensity"),
+      uiScale: value("#preferencesAppearanceUiScale"),
+      advancedAgentOff: !document.querySelector("#preferencesAdvancedAgentAccess")?.checked,
+      advancedMcpOff: !document.querySelector("#preferencesAdvancedMcpAccess")?.checked,
+      advancedPluginOff: !document.querySelector("#preferencesAdvancedPluginRuntime")?.checked,
+      advancedControlsDisabled: [
+        "#preferencesAdvancedAgentAccess",
+        "#preferencesAdvancedMcpAccess",
+        "#preferencesAdvancedPluginRuntime",
+      ].every((selector) => disabled(selector)),
+      status: text("#preferencesStatus"),
+    }},
+    exportWorkflow: {{
+      dialogVisible: Boolean(dialog),
+      colorSpace: value("#exportColorSpace"),
+      displayP3Selected: document.querySelector("#exportColorDisplayP3")?.getAttribute("aria-pressed") === "true",
+      metadataPolicy: value("#exportMetadataPolicy"),
+      progress: value("#exportBatchProgress"),
+      progressLabel: text("#exportBatchProgressLabel"),
+      failureRows: Array.from(document.querySelectorAll("#exportBatchFailureList li")).filter(visible).length,
+      recentRows: Array.from(document.querySelectorAll("#recentExportsList li")).filter(visible).length,
+      batchSummary: text("#exportSummaryBatch"),
+      metadataSummary: text("#exportSummaryMetadata"),
+      colorSummary: text("#exportSummaryColor"),
+      selectedPhoto: text("#exportSelectedPhotoName"),
+    }},
   }};
 }})()
 """
@@ -1149,10 +1360,28 @@ def capture(url):
                     )
                 if not metrics["exportDialogWithinViewport"]:
                     failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
+                if state.startswith("preferences-") and not metrics["preferencesState"]["dialogWithinViewport"]:
+                    failures.append(f"{viewport_name} {surface_name}: preferences dialog leaves viewport")
                 if state == "import-review" and (
                     not metrics["importIssueReviewVisible"] or metrics["visibleImportIssueRows"] < 3
                 ):
                     failures.append(f"{viewport_name} {surface_name}: import issue review not visible")
+                if state == "library-filters":
+                    filters = metrics["libraryFilters"]
+                    if filters["search"] != "synthetic" or filters["fileType"] != "jpeg" or filters["metadata"] != "has_dimensions":
+                        failures.append(f"{viewport_name} {surface_name}: library filter controls not seeded")
+                    if filters["minRating"] != "3" or filters["culling"] != "picked" or filters["sort"] != "rating_desc":
+                        failures.append(f"{viewport_name} {surface_name}: library rating/culling/sort filters not visible")
+                    if "Filtered" not in filters["note"]:
+                        failures.append(f"{viewport_name} {surface_name}: library filtered state note missing")
+                if state == "library-metadata":
+                    metadata = metrics["metadataState"]
+                    if metadata["fileName"] != "synthetic-gradient.jpg" or metadata["fileType"] != "JPG":
+                        failures.append(f"{viewport_name} {surface_name}: metadata selected photo not visible")
+                    if metadata["dimensions"] != "1600 x 1067" or metadata["knownFields"] < 7:
+                        failures.append(f"{viewport_name} {surface_name}: metadata readback fields not populated")
+                    if metadata["status"] != "Metadata loaded from catalog.":
+                        failures.append(f"{viewport_name} {surface_name}: metadata status missing")
                 if state == "layout-sidebar-collapsed" and (
                     metrics["sidebarCollapsed"] != "true" or metrics["sidebarVisible"]
                 ):
@@ -1169,7 +1398,7 @@ def capture(url):
                     or not metrics["inspectorVisible"]
                 ):
                     failures.append(f"{viewport_name} {surface_name}: layout reset state not applied")
-                if state == "develop":
+                if state in {"develop", "develop-expanded", "develop-history"}:
                     develop_state = metrics["developState"]
                     if develop_state["photoName"] != "synthetic-gradient.jpg":
                         failures.append(f"{viewport_name} {surface_name}: develop photo selection not visible")
@@ -1205,7 +1434,17 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: lens unsupported state copy wrong")
                     if develop_state["geometryTransformStatus"] != "Transform unsupported." or not develop_state["geometryUnsupportedDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: unsupported geometry/lens controls enabled")
-                if state == "mask-active":
+                if state == "develop-history":
+                    history_state = metrics["historyState"]
+                    if not history_state["visible"] or history_state["panelState"] != "ready":
+                        failures.append(f"{viewport_name} {surface_name}: history panel state not visible")
+                    if history_state["rows"] < 3:
+                        failures.append(f"{viewport_name} {surface_name}: history entries missing")
+                    if history_state["undoDisabled"] or history_state["redoDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: history commands disabled")
+                    if history_state["status"] != "3 committed history entries.":
+                        failures.append(f"{viewport_name} {surface_name}: history status wrong")
+                if state in {"mask-active", "mask-editor"}:
                     mask_state = metrics["maskState"]
                     if not mask_state["visible"] or mask_state["panelState"] != "active":
                         failures.append(f"{viewport_name} {surface_name}: mask panel active state not visible")
@@ -1239,6 +1478,39 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: mask local adjustment readback is editable")
                     if mask_state["rawBoundary"] != "RAW masked export blocks before output until RAW decode is implemented.":
                         failures.append(f"{viewport_name} {surface_name}: RAW mask blocked boundary missing")
+                if state == "preferences-appearance":
+                    preferences_state = metrics["preferencesState"]
+                    if not preferences_state["visible"]:
+                        failures.append(f"{viewport_name} {surface_name}: preferences dialog not visible")
+                    if preferences_state["selectedSection"] != "appearance" or preferences_state["visiblePanel"] != "appearance":
+                        failures.append(f"{viewport_name} {surface_name}: appearance preferences panel not active")
+                    if preferences_state["theme"] != "dark" or preferences_state["density"] != "compact" or preferences_state["uiScale"] != "105":
+                        failures.append(f"{viewport_name} {surface_name}: appearance preferences values not visible")
+                if state == "preferences-advanced":
+                    preferences_state = metrics["preferencesState"]
+                    if preferences_state["selectedSection"] != "advanced" or preferences_state["visiblePanel"] != "advanced":
+                        failures.append(f"{viewport_name} {surface_name}: advanced preferences panel not active")
+                    if not (
+                        preferences_state["advancedAgentOff"]
+                        and preferences_state["advancedMcpOff"]
+                        and preferences_state["advancedPluginOff"]
+                        and preferences_state["advancedControlsDisabled"]
+                    ):
+                        failures.append(f"{viewport_name} {surface_name}: advanced access gates not off and disabled")
+                    if "Phase 23 permission policy" not in preferences_state["status"]:
+                        failures.append(f"{viewport_name} {surface_name}: advanced access status missing")
+                if state == "export-workflow":
+                    export_workflow = metrics["exportWorkflow"]
+                    if not export_workflow["dialogVisible"] or "2 photos" not in export_workflow["selectedPhoto"]:
+                        failures.append(f"{viewport_name} {surface_name}: export workflow selection not visible")
+                    if export_workflow["colorSpace"] != "Display P3" or not export_workflow["displayP3Selected"]:
+                        failures.append(f"{viewport_name} {surface_name}: export Display P3 state not visible")
+                    if export_workflow["metadataPolicy"] != "preserve" or export_workflow["metadataSummary"] != "Preserve":
+                        failures.append(f"{viewport_name} {surface_name}: export metadata policy not visible")
+                    if str(export_workflow["progress"]) != "50" or export_workflow["progressLabel"] != "1 / 2":
+                        failures.append(f"{viewport_name} {surface_name}: export batch progress not visible")
+                    if export_workflow["failureRows"] < 1 or export_workflow["recentRows"] < 2:
+                        failures.append(f"{viewport_name} {surface_name}: export failure/recent rows missing")
                 if state == "clipboard":
                     clipboard_state = metrics["clipboardState"]
                     if not clipboard_state["visible"]:
