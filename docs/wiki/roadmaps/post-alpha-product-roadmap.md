@@ -875,6 +875,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-export`, `apps/desktop/static/`
 - **Description:** Enable Display P3 export only after color proof.
 - **Dependencies:** Tasks 13.4 and 20.2
+- **Status:** Completed on 2026-06-17. Phase 20 keeps Display P3 export enabled only as an explicit JPEG ICC/profile path, keeps sRGB as the default, keeps PNG/TIFF Display P3 blocked, and updates the color QA checklist/harness language so this is not treated as visual color correctness.
 - **Acceptance Criteria:**
   - P3 export embeds expected ICC.
   - UI distinguishes sRGB default from P3 explicit choice.
