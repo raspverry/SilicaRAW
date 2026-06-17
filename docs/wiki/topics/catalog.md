@@ -2,7 +2,7 @@
 title: Catalog
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-17
 source_of_truth: docs/10_Data_Model_and_Storage_Specification.md
 ---
 
@@ -10,7 +10,7 @@ source_of_truth: docs/10_Data_Model_and_Storage_Specification.md
 
 ## Summary
 
-The catalog is the local SQLite-backed record of libraries, folders, photos, metadata, flags, edit states, sidecar status, caches, exports, and action history.
+The catalog is the local SQLite-backed record of libraries, folders, photos, metadata, flags, edit states, sidecar status, caches, exports, export settings, and action history.
 
 ## Current Stance
 
@@ -35,12 +35,13 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.5 adds catalog schema version 8 for append-only action log evidence: `action_log.side_effect_category`, `action_log.evidence_ref`, `idx_action_log_action_type_created_at`, and `idx_action_log_subject`.
 - Task 16.6 adds catalog-side sidecar status updates after history commits without a new migration: clean sidecars become `catalog_newer`, while conflict/newer states remain preserved.
 - Task 18.5.2 adds atomic batch edit sync for typed clipboard payloads: Core plans target readiness first, storage commits ready changed graphs in one transaction with one `edit_history` row per affected photo, unchanged targets are skipped, blocked targets stop all writes, and existing clean sidecars are only marked `catalog_newer`.
+- Task 20.1 adds catalog schema version 9 for export-owned defaults and named presets: `export_settings` and `export_presets`.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
 ## Implemented Foundation
 
-- Current alpha schema version: `8`.
+- Current alpha schema version: `9`.
 - Migration table: `schema_migrations`.
 - Migration 1 creates the initial catalog tables.
 - Migration 2 creates the required initial indexes from the storage specification.
@@ -50,6 +51,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Migration 6 adds edit history checkpoint columns and the `idx_edit_history_photo_sequence` index.
 - Migration 7 adds `edit_history.history_state` and `idx_edit_history_photo_state_sequence` for undo/redo lookup.
 - Migration 8 adds action log side-effect/evidence columns plus lookup indexes for action type/time and subject.
+- Migration 9 adds export preference tables for current defaults and named presets. It seeds `JPEG sRGB 90` as the conservative default.
 - Tests cover empty catalog creation, migration upgrade from version 1 to latest, required table/index existence, foreign key enforcement, and file-backed WAL/foreign key configuration.
 - Library create/open creates the selected library folder, `catalog.db`, and required support directories.
 - Reopening a library migrates the same `catalog.db` and returns the active root/catalog/schema status.

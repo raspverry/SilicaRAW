@@ -1754,6 +1754,20 @@ progress::-webkit-progress-value {
   min-width: 0;
 }
 
+.sr-export-preset-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(132px, 0.75fr) minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: var(--sr-space-xs);
+}
+
+.sr-export-preset-control select,
+.sr-export-preset-control input {
+  min-width: 0;
+  min-height: 36px;
+}
+
 .sr-export-fixed-grid input[readonly] {
   color: var(--sr-text-secondary);
 }
@@ -3066,6 +3080,10 @@ progress::-webkit-progress-value {
   }
 
   .sr-export-color-choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-export-preset-control {
     grid-template-columns: minmax(0, 1fr);
   }
 

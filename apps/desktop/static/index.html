@@ -969,6 +969,16 @@
           </header>
           <div class="sr-export-dialog-body">
             <section class="sr-export-settings" aria-label="Export settings">
+              <div class="sr-export-setting-row sr-export-preset-row">
+                <label for="exportPreset">Preset</label>
+                <div class="sr-export-preset-control">
+                  <select id="exportPreset" name="exportPreset">
+                    <option value="jpeg-srgb-90">JPEG sRGB 90</option>
+                  </select>
+                  <input id="exportPresetName" type="text" value="JPEG sRGB 90" autocomplete="off" spellcheck="false" aria-label="Export preset name">
+                  <button id="saveExportPreset" type="button">Save Preset</button>
+                </div>
+              </div>
               <div class="sr-export-setting-row">
                 <label for="exportOutputPath">Output Path</label>
                 <div class="sr-path-picker-row sr-export-path-picker">
@@ -1010,6 +1020,7 @@
               </div>
               <h3>Summary</h3>
               <div class="sr-export-row"><span>Format</span><strong id="exportSummaryFormat">JPEG</strong></div>
+              <div class="sr-export-row"><span>Preset</span><strong id="exportSummaryPreset">JPEG sRGB 90</strong></div>
               <div class="sr-export-row"><span>Color Space</span><strong id="exportSummaryColor">sRGB</strong></div>
               <div class="sr-export-row"><span>Quality</span><strong id="exportSummaryQuality">90</strong></div>
               <div class="sr-export-row"><span>File</span><strong id="exportSummaryFile">None</strong></div>
@@ -1315,6 +1326,9 @@
       const runJpegExportButton = document.querySelector("#runJpegExport");
       const exportSelectedPhotoName = document.querySelector("#exportSelectedPhotoName");
       const exportSelectedInline = document.querySelector("#exportSelectedInline");
+      const exportPreset = document.querySelector("#exportPreset");
+      const exportPresetName = document.querySelector("#exportPresetName");
+      const saveExportPresetButton = document.querySelector("#saveExportPreset");
       const exportOutputPath = document.querySelector("#exportOutputPath");
       const exportColorSpace = document.querySelector("#exportColorSpace");
       const exportColorOptionButtons = Array.from(document.querySelectorAll("[data-export-color]"));
@@ -1322,6 +1336,7 @@
       const exportStatus = document.querySelector("#exportStatus");
       const exportSafetyNote = document.querySelector("#exportSafetyNote");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
+      const exportSummaryPreset = document.querySelector("#exportSummaryPreset");
       const exportSummaryColor = document.querySelector("#exportSummaryColor");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
@@ -1352,6 +1367,8 @@
       let selectionAnchorPhotoId = selectedPhotoId;
       let activeLibraryPath = "";
       let selectedExportColorProfile = "srgb";
+      let selectedExportPresetId = "jpeg-srgb-90";
+      let exportSettingsCatalog = defaultExportSettingsCatalog();
       let libraryGridPage = {
         offset: 0,
         limit: LIBRARY_GRID_PAGE_LIMIT,
@@ -1909,6 +1926,7 @@
           activeLibraryPath = restore.libraryRootPath;
           pathInput.value = restore.libraryRootPath;
           setLibraryState("open");
+          await loadExportSettings();
           await loadLibraryGrid({
             preferredPhotoId: restore.selectedPhotoId || "",
             allowDefaultSelection: restore.selectedPhotoStatus !== "missing",
@@ -4057,6 +4075,205 @@
         }));
       }
 
+      function defaultExportSettingsCatalog() {
+        return {
+          defaultPresetId: "jpeg-srgb-90",
+          defaultSettings: {
+            format: "jpeg",
+            colorProfile: "srgb",
+            quality: 90,
+            metadataPolicy: "minimal",
+          },
+          presets: [
+            {
+              id: "jpeg-srgb-90",
+              name: "JPEG sRGB 90",
+              settings: {
+                format: "jpeg",
+                colorProfile: "srgb",
+                quality: 90,
+                metadataPolicy: "minimal",
+              },
+            },
+          ],
+        };
+      }
+
+      function normalizeExportSettings(settings = {}) {
+        return {
+          format: settings.format === "jpeg" ? "jpeg" : "jpeg",
+          colorProfile: settings.colorProfile === "display_p3" ? "display_p3" : "srgb",
+          quality: Number(settings.quality) || 90,
+          metadataPolicy: settings.metadataPolicy === "minimal" ? "minimal" : "minimal",
+        };
+      }
+
+      function normalizeExportSettingsCatalog(catalog = {}) {
+        const fallback = defaultExportSettingsCatalog();
+        const presets = Array.isArray(catalog.presets) && catalog.presets.length
+          ? catalog.presets.map((preset) => ({
+            id: String(preset.id || ""),
+            name: String(preset.name || "Untitled Export Preset"),
+            settings: normalizeExportSettings(preset.settings),
+          })).filter((preset) => preset.id)
+          : fallback.presets;
+        const defaultSettings = normalizeExportSettings(catalog.defaultSettings || presets[0]?.settings || fallback.defaultSettings);
+        return {
+          defaultPresetId: catalog.defaultPresetId || presets.find((preset) => preset.id === fallback.defaultPresetId)?.id || "",
+          defaultSettings,
+          presets,
+        };
+      }
+
+      function selectedExportPreset() {
+        return exportSettingsCatalog.presets.find((preset) => preset.id === selectedExportPresetId) || null;
+      }
+
+      function currentExportSettings() {
+        return {
+          format: "jpeg",
+          colorProfile: selectedExportColorProfile,
+          quality: 90,
+          metadataPolicy: "minimal",
+        };
+      }
+
+      function syncExportPresetSummary() {
+        const preset = selectedExportPreset();
+        exportSummaryPreset.textContent = preset?.name || "Custom";
+      }
+
+      function renderExportPresetControls({ syncName = true } = {}) {
+        const preset = selectedExportPreset();
+        const options = exportSettingsCatalog.presets.map((candidate) => {
+          const option = document.createElement("option");
+          option.value = candidate.id;
+          option.textContent = candidate.name;
+          return option;
+        });
+        if (!preset) {
+          const custom = document.createElement("option");
+          custom.value = "";
+          custom.textContent = "Custom";
+          options.unshift(custom);
+        }
+        exportPreset.replaceChildren(...options);
+        exportPreset.value = preset?.id || "";
+        if (syncName) {
+          exportPresetName.value = preset?.name || `Custom ${exportColorProfileLabel(selectedExportColorProfile)}`;
+        }
+        syncExportPresetSummary();
+      }
+
+      function applyExportSettingsCatalog(catalog) {
+        exportSettingsCatalog = normalizeExportSettingsCatalog(catalog);
+        selectedExportPresetId = exportSettingsCatalog.defaultPresetId || "";
+        setExportColorProfile(exportSettingsCatalog.defaultSettings.colorProfile);
+        renderExportPresetControls();
+      }
+
+      async function loadExportSettings() {
+        if (!activeLibraryPath || !invoke) {
+          applyExportSettingsCatalog(defaultExportSettingsCatalog());
+          return;
+        }
+
+        try {
+          const response = await invoke("get_export_settings", {
+            libraryPath: activeLibraryPath,
+          });
+          if (commandFailed(response)) {
+            exportStatus.value = responseErrorMessage(response, "Export settings could not be loaded.");
+            setStatus(exportStatus.value);
+            return;
+          }
+          applyExportSettingsCatalog(response.data);
+        } catch (error) {
+          exportStatus.value = responseErrorMessage(error, "Export settings could not be loaded.");
+          setStatus(exportStatus.value);
+        }
+      }
+
+      function upsertStaticExportPreset(name, settings) {
+        const normalizedName = name.trim() || `Custom ${exportColorProfileLabel(settings.colorProfile)}`;
+        const id = normalizedName === "JPEG sRGB 90"
+          ? "jpeg-srgb-90"
+          : `static-${normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "export-preset"}`;
+        const preset = { id, name: normalizedName, settings };
+        const presets = exportSettingsCatalog.presets.filter((candidate) => candidate.id !== id);
+        exportSettingsCatalog = {
+          defaultPresetId: id,
+          defaultSettings: settings,
+          presets: [...presets, preset],
+        };
+        selectedExportPresetId = id;
+        renderExportPresetControls();
+      }
+
+      async function saveExportSettings(presetId = selectedExportPresetId) {
+        const settings = currentExportSettings();
+        exportSettingsCatalog.defaultSettings = settings;
+        exportSettingsCatalog.defaultPresetId = presetId || "";
+        selectedExportPresetId = presetId || "";
+        renderExportPresetControls({ syncName: Boolean(presetId) });
+
+        if (!activeLibraryPath || !invoke) {
+          exportStatus.value = "Static export settings smoke passed; desktop runtime saves settings.";
+          setStatus(exportStatus.value);
+          return;
+        }
+
+        try {
+          const response = await invoke("save_export_settings", {
+            libraryPath: activeLibraryPath,
+            presetId: presetId || null,
+            colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
+            quality: settings.quality,
+          });
+          if (commandFailed(response)) {
+            exportStatus.value = responseErrorMessage(response, "Export settings could not be saved.");
+            setStatus(exportStatus.value);
+            return;
+          }
+          applyExportSettingsCatalog(response.data);
+        } catch (error) {
+          exportStatus.value = responseErrorMessage(error, "Export settings could not be saved.");
+          setStatus(exportStatus.value);
+        }
+      }
+
+      async function saveExportPreset() {
+        const settings = currentExportSettings();
+        const name = exportPresetName.value.trim() || `Custom ${exportColorProfileLabel(settings.colorProfile)}`;
+
+        if (!activeLibraryPath || !invoke) {
+          upsertStaticExportPreset(name, settings);
+          exportStatus.value = "Static export preset smoke passed; desktop runtime saves presets.";
+          setStatus(exportStatus.value);
+          return;
+        }
+
+        try {
+          const response = await invoke("save_export_preset", {
+            libraryPath: activeLibraryPath,
+            name,
+            colorProfile: settings.colorProfile === "srgb" ? null : settings.colorProfile,
+            quality: settings.quality,
+          });
+          if (commandFailed(response)) {
+            exportStatus.value = responseErrorMessage(response, "Export preset could not be saved.");
+            setStatus(exportStatus.value);
+            return;
+          }
+          applyExportSettingsCatalog(response.data);
+          exportStatus.value = responseMessage(response, "Export preset saved.");
+          setStatus(exportStatus.value);
+        } catch (error) {
+          exportStatus.value = responseErrorMessage(error, "Export preset could not be saved.");
+          setStatus(exportStatus.value);
+        }
+      }
+
       function exportColorProfileLabel(profile) {
         return profile === "display_p3" ? "Display P3" : "sRGB";
       }
@@ -4077,6 +4294,7 @@
           button.classList.toggle("is-selected", selected);
           button.setAttribute("aria-pressed", String(selected));
         });
+        syncExportPresetSummary();
       }
 
       function syncExportDialog() {
@@ -5757,6 +5975,7 @@
           setLibraryState("open");
           cacheClearStatus.value = "Ready to clear disposable caches.";
           setStatus(responseMessage(response));
+          await loadExportSettings();
           await loadLibraryGrid();
           await loadAppSession();
         } catch (error) {
@@ -6073,8 +6292,27 @@
       exportColorOptionButtons.forEach((button) => {
         button.addEventListener("click", () => {
           setExportColorProfile(button.dataset.exportColor);
+          selectedExportPresetId = "";
+          void saveExportSettings(null);
           syncExportDialog();
         });
+      });
+      exportPreset.addEventListener("change", () => {
+        const preset = exportSettingsCatalog.presets.find((candidate) => candidate.id === exportPreset.value);
+        if (!preset) {
+          selectedExportPresetId = "";
+          renderExportPresetControls({ syncName: false });
+          void saveExportSettings(null);
+          return;
+        }
+        selectedExportPresetId = preset.id;
+        setExportColorProfile(preset.settings.colorProfile);
+        renderExportPresetControls();
+        void saveExportSettings(preset.id);
+        syncExportDialog();
+      });
+      saveExportPresetButton.addEventListener("click", () => {
+        void saveExportPreset();
       });
       exportOutputPath.addEventListener("input", () => {
         exportOutputPath.dataset.autofilled = "false";

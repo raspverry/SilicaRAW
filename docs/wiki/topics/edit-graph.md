@@ -2,7 +2,7 @@
 title: Edit Graph
 status: active
 audience: all
-updated: 2026-06-16
+updated: 2026-06-17
 source_of_truth: schemas/edit_graph.schema.json
 ---
 
@@ -43,6 +43,7 @@ The edit graph is the authoritative portable structure for non-destructive edit 
 - Task 18.5.2 applies typed edit clipboard payloads through Core batch planning and storage all-or-none commit. Unsupported detail, lens, geometry, and Basic runtime-only fields are blocked before writes; successful sync preserves each target graph identity and records one undoable catalog checkpoint per changed photo.
 - Task 18.5.3 exposes edit clipboard copy, paste-to-primary, and batch sync in the Develop UI with explicit selected-page scope, JPEG/JPG Develop target gating, and disabled unsupported clipboard subsets.
 - Task 19.1 completes the mask schema audit before mask behavior is added. Manual gradient masks use schema-owned `masks[].geometry`, not hidden `mask.source` properties. Task 19.3 adds schema-owned `masks[].brush` for durable manual brush strokes. `mask.source.kind = "manual"` is provenance-only; AI/model/cache fields stay reserved for future non-manual provenance. Raster/cache bytes must not become the brush source of truth.
+- Task 20.1 keeps export defaults and named presets out of the edit graph. Export preferences live in catalog `export_settings` and `export_presets`; completed export evidence remains in `exports.export_settings_json`.
 
 ## Required Sections
 

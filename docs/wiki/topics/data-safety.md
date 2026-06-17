@@ -2,7 +2,7 @@
 title: Data Safety
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-17
 source_of_truth: docs/10_Data_Model_and_Storage_Specification.md
 ---
 
@@ -37,6 +37,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 16.4 adds the Develop history panel as a read-only view of real `edit_history` checkpoints plus buttons that call existing undo/redo commands. It does not add raw SQL to the UI, arbitrary state jumps, export deletion, sidecar writes, cache restoration, or original-file access.
 - Task 16.5 adds append-only action log evidence for sensitive local actions through Core and storage APIs. It records import by reference, sidecar write, JPEG export, RAW-derived JPEG export, and disposable cache clear without allowing original mutation claims, plugin/MCP raw DB writes, or hidden reversibility.
 - Task 16.6 marks already-written sidecars as `catalog_newer` after edit commits, flag commits, undo, and redo. It preserves `conflict` and `sidecar_newer`, writes no sidecar files, expands no `sidecar.flags`, and keeps original files untouched.
+- Task 20.1 stores export defaults and named presets in catalog-owned `export_settings` and `export_presets` tables only. Updating export preferences must not write `edit_states`, `edit_history`, sidecars, export output files, or original photo files.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 
@@ -64,6 +65,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - History panel safety. Task 16.4 covers real-checkpoint-only UI data, empty/loading/error/disabled states, and row selection through core undo/redo commands only.
 - Action log safety. Task 16.5 covers append-only action log rows, required side-effect/evidence fields, Core logging for sensitive local actions, and rejection of original mutation claims.
 - Sidecar status safety. Task 16.6 covers catalog-side stale status after history commits, conflict/newer preservation, reopen persistence, no hidden sidecar file writes, and no `sidecar.flags` schema expansion.
+- Export settings safety. Task 20.1 covers schema migration to version 9, conservative JPEG sRGB defaults, named preset reload, no edit history writes, and no original-file or export-output writes when preferences change.
 
 ## Links
 

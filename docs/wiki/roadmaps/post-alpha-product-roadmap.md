@@ -827,6 +827,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-export`, `crates/silica-storage`, `apps/desktop/static/`
 - **Description:** Add persistent export settings and presets separate from edit graph state.
 - **Dependencies:** Phase 17
+- **Status:** Completed on 2026-06-17. Catalog schema version 9 now stores export defaults and named presets separately from edit graph state, with JPEG sRGB 90 seeded as the conservative default and surfaced in the existing Export dialog.
 - **Acceptance Criteria:**
   - Export settings do not modify develop edits.
   - Presets are editable and persisted.
