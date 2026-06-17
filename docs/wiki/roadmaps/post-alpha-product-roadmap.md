@@ -897,6 +897,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No unimplemented setting appears enabled.
 - **Validation:** Static UI and visual QA.
 
+**Status:** Completed on 2026-06-17. The static desktop shell now exposes a compact Preferences dialog from the toolbar and welcome screen. It defines Appearance, Library, Cache, Color, Export, and Advanced sections against `M008_Preferences_Appearance.png`; section navigation is active, while unimplemented settings remain disabled and Advanced agent access, MCP tools, and plugin runtime are unchecked/off by default.
+
 ### Task 21.2: Appearance Preferences
 
 - **Location:** `apps/desktop/static/`, `crates/silica-core`

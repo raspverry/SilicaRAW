@@ -14,30 +14,37 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 19 is complete. The current product area is **Phase 20: Export and Delivery Expansion**.
+Phase 20 is complete. The current product area is **Phase 21: Preferences and App Settings**.
 
-Phase 20 is complete. The current next work area is **Phase 21: Preferences and App Settings**.
+Task 21.1 is complete. The next implementation task is **Task 21.2: Appearance Preferences**.
 
 ## Minimal Read Set
 
-For Phase 20 task-card creation or implementation, read:
+For Phase 21 task-card creation or implementation, read:
 
-- The selected Phase 20 task card under [Task Cards](../tasks/index.md).
+- The selected Phase 21 task card under [Task Cards](../tasks/index.md).
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap: Phase 20](../roadmaps/post-alpha-product-roadmap.md#phase-20-export-and-delivery-expansion)
-- [Edit Graph](../topics/edit-graph.md)
+- [Post-Alpha Product Roadmap: Phase 21](../roadmaps/post-alpha-product-roadmap.md#phase-21-preferences-and-app-settings)
+- [UI Mockups](../topics/ui-mockups.md)
 - [Catalog](../topics/catalog.md)
 - [Data Safety](../topics/data-safety.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
-## Phase 19 Context
+## Phase 21 Context
 
-Use [Phase 19 Manual Masks](../phases/phase-19-manual-masks.md) for completed mask context. Do not read every Phase 19 task card unless the task directly changes completed mask behavior.
+- Task 21.1 created the compact Preferences shell and section IA only.
+- Task 21.2 may implement supported Appearance preferences.
+- Task 21.3 owns cache preferences and cache-clear relocation.
+- Task 21.4 owns color and export default persistence.
+- Task 21.5 is gated by Phase 23 permission policy.
 
 ## Stop Rules
 
-- Do not mix export settings into edit graph state.
-- Do not add metadata controls, batch export, or Display P3 PNG/TIFF behavior before their scoped tasks.
+- Do not enable an unimplemented Preferences control.
+- Do not add Preference persistence outside the active scoped task.
+- Do not move cache clear or cache mutation into Preferences before Task 21.3.
+- Do not change export defaults before Task 21.4.
+- Do not start agent, MCP, or plugin runtime from Preferences before Task 21.5 and Phase 23 policy.
 - Do not add MLX, MCP, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support.
 - Do not mutate original photo files.
