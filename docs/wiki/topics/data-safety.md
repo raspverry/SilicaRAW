@@ -40,6 +40,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 20.1 stores export defaults and named presets in catalog-owned `export_settings` and `export_presets` tables only. Updating export preferences must not write `edit_states`, `edit_history`, sidecars, export output files, or original photo files.
 - Task 21.3 exposes disposable cache status and cache clear inside Preferences. Status is read-only over disposable cache directories, and clear remains limited to `thumbnails/`, `previews/`, `render-cache/`, and `ai-cache/`.
 - Task 21.4 routes Preferences Color/Export defaults through the existing export settings commands only. Defaults remain validated before save, Display P3 remains explicit and JPEG-only, and no original, sidecar, edit history, or export output files are written when defaults change.
+- Task 22.3 hardens restore failure safety: corrupt backup catalogs fail with backup/target context, staging is cleaned, existing targets stay recoverable, rollback is not created before staging validation, and disposable cache records can be cleared and recorded again after restore.
 - Sidecars provide portable recovery state.
 - Caches may be deleted without losing originals, edits, ratings, collections, presets, or sidecars.
 

@@ -1169,7 +1169,11 @@ pub fn restore_library_backup(
         Ok(library) => library,
         Err(error) => {
             let _ = fs::remove_dir_all(&staging_root);
-            return Err(error);
+            return Err(LibraryStorageError::BackupValidation(format!(
+                "restore staging validation failed for backup {} targeting {}: {error}",
+                backup_path.display(),
+                target_root_path.display()
+            )));
         }
     };
     drop(staging_library);
@@ -7330,6 +7334,32 @@ mod tests {
             r#"{"format":"jpeg","color_profile":"srgb"}"#,
         )
         .expect("record export");
+        let thumbnail_path = library
+            .root_path
+            .join("thumbnails")
+            .join("sample-thumb.jpg");
+        let preview_path = library
+            .root_path
+            .join("previews")
+            .join("sample-preview.jpg");
+        std::fs::write(&thumbnail_path, b"thumbnail cache bytes").expect("write thumbnail cache");
+        std::fs::write(&preview_path, b"preview cache bytes").expect("write preview cache");
+        record_thumbnail_cache(
+            &library.root_path,
+            &photo_id,
+            "restore-thumbnail-key",
+            &thumbnail_path,
+            21,
+        )
+        .expect("record thumbnail cache");
+        record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "restore-preview-key",
+            &preview_path,
+            19,
+        )
+        .expect("record preview cache");
         let backup =
             create_library_backup(&library.root_path, "0.1.0-alpha.1").expect("create backup");
 
@@ -7385,6 +7415,85 @@ mod tests {
         assert_eq!(schema_version, CURRENT_SCHEMA_VERSION);
         assert_eq!(edited_flag, 1);
         assert_eq!(exported_flag, 1);
+        assert!(
+            !restore_root
+                .join("thumbnails")
+                .join("sample-thumb.jpg")
+                .exists(),
+            "restore must not copy thumbnail cache bytes"
+        );
+        assert!(
+            !restore_root
+                .join("previews")
+                .join("sample-preview.jpg")
+                .exists(),
+            "restore must not copy preview cache bytes"
+        );
+        let cache_status =
+            get_disposable_cache_status(&restored_library.root_path).expect("cache status");
+        assert_eq!(cache_status.cache_record_count, 2);
+        let cache_clear =
+            clear_disposable_cache(&restored_library.root_path).expect("clear restored caches");
+        assert_eq!(cache_clear.removed_cache_records, 2);
+        for directory in DISPOSABLE_CACHE_DIRECTORIES {
+            assert!(
+                restored_library.root_path.join(directory).is_dir(),
+                "{directory} should be recreated after restored cache clear"
+            );
+        }
+        let regenerated_thumbnail_path = restored_library
+            .root_path
+            .join("thumbnails")
+            .join("regenerated-thumb.jpg");
+        let regenerated_preview_path = restored_library
+            .root_path
+            .join("previews")
+            .join("regenerated-preview.jpg");
+        std::fs::write(&regenerated_thumbnail_path, b"regenerated thumbnail")
+            .expect("write regenerated thumbnail");
+        std::fs::write(&regenerated_preview_path, b"regenerated preview")
+            .expect("write regenerated preview");
+        let regenerated_thumbnail = record_thumbnail_cache(
+            &restored_library.root_path,
+            &photo_id,
+            "restore-regenerated-thumbnail-key",
+            &regenerated_thumbnail_path,
+            23,
+        )
+        .expect("record regenerated thumbnail cache");
+        let regenerated_preview = record_preview_cache(
+            &restored_library.root_path,
+            &photo_id,
+            "restore-regenerated-preview-key",
+            &regenerated_preview_path,
+            21,
+        )
+        .expect("record regenerated preview cache");
+        assert_eq!(
+            regenerated_thumbnail.path,
+            path_to_string(&regenerated_thumbnail_path).expect("thumbnail path string")
+        );
+        assert_eq!(
+            regenerated_preview.path,
+            path_to_string(&regenerated_preview_path).expect("preview path string")
+        );
+        assert_eq!(
+            get_photo_cache_record(&restored_library.root_path, &photo_id, THUMBNAIL_CACHE_TYPE)
+                .expect("read regenerated thumbnail")
+                .expect("regenerated thumbnail record")
+                .cache_key,
+            "restore-regenerated-thumbnail-key"
+        );
+        assert_eq!(
+            get_photo_cache_record(&restored_library.root_path, &photo_id, PREVIEW_CACHE_TYPE)
+                .expect("read regenerated preview")
+                .expect("regenerated preview record")
+                .cache_key,
+            "restore-regenerated-preview-key"
+        );
+        let regenerated_cache_status = get_disposable_cache_status(&restored_library.root_path)
+            .expect("regenerated cache status");
+        assert_eq!(regenerated_cache_status.cache_record_count, 2);
 
         remove_library_root(&workspace);
     }
@@ -7531,6 +7640,78 @@ mod tests {
             .join(BACKUPS_DIRECTORY)
             .join("restore-rollback")
             .exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn restore_corrupt_backup_catalog_preserves_existing_target_with_context_error() {
+        let workspace = unique_library_root("restore-corrupt-backup");
+        let source_root = workspace.join("Source Library");
+        let target_root = workspace.join("Target Library");
+        let source_import = workspace.join("Source Originals");
+        let target_import = workspace.join("Target Originals");
+        let source_file = source_import.join("source.jpg");
+        let target_file = target_import.join("target.jpg");
+
+        std::fs::create_dir_all(&source_import).expect("create source import");
+        std::fs::create_dir_all(&target_import).expect("create target import");
+        std::fs::write(&source_file, b"source jpeg bytes").expect("write source");
+        std::fs::write(&target_file, b"target jpeg bytes").expect("write target");
+
+        let source_library = create_local_library(&source_root).expect("create source library");
+        import_folder(&source_library.root_path, &source_import).expect("import source");
+        let backup =
+            create_library_backup(&source_library.root_path, "0.1.0-alpha.1").expect("backup");
+        std::fs::write(
+            backup.backup_path.join(CATALOG_DATABASE_FILE),
+            b"not a sqlite catalog",
+        )
+        .expect("corrupt backup catalog");
+
+        let target_library = create_local_library(&target_root).expect("create target library");
+        import_folder(&target_library.root_path, &target_import).expect("import target");
+        let target_photo_id = stable_catalog_id("photo", &target_file.display().to_string());
+        set_photo_flags(
+            &target_library.root_path,
+            target_photo_id.clone(),
+            3,
+            false,
+            true,
+            Some("red".to_string()),
+        )
+        .expect("set target flags");
+
+        let error = restore_library_backup(&backup.backup_path, &target_root)
+            .expect_err("corrupt backup catalog restore must fail");
+        let message = error.to_string();
+        assert!(message.contains(&backup.backup_path.display().to_string()));
+        assert!(message.contains(&target_root.display().to_string()));
+
+        let target_flags = get_photo_flags(&target_root, &target_photo_id)
+            .expect("read target flags")
+            .expect("target flags still present");
+        assert_eq!(target_flags.rating, 3);
+        assert!(target_flags.rejected);
+        assert_eq!(target_flags.color_label.as_deref(), Some("red"));
+        assert!(
+            !restore_staging_path(&target_root).exists(),
+            "failed staging restore should be cleaned up"
+        );
+        let rollback_entries = std::fs::read_dir(target_root.join(BACKUPS_DIRECTORY))
+            .expect("read target backups")
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("restore-rollback-")
+            })
+            .count();
+        assert_eq!(
+            rollback_entries, 0,
+            "rollback should not be created before staging validation succeeds"
+        );
 
         remove_library_root(&workspace);
     }
