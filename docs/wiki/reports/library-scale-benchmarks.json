@@ -1,0 +1,128 @@
+{
+  "datasets": [
+    {
+      "photo_count": 1000,
+      "query_limit": 100,
+      "query_runs": 3,
+      "seed_catalog_ms": 34.493,
+      "shape": {
+        "filters": [
+          "file_type=jpeg",
+          "metadata=has_dimensions",
+          "search=photo-000"
+        ],
+        "folders": 1,
+        "jpeg_count": 800,
+        "metadata_dimensions_count": 400,
+        "picked_count": 143,
+        "query_limit": 100,
+        "raw_count": 150,
+        "rejected_count": 59,
+        "sorts": [
+          "imported_at_desc",
+          "file_name_asc",
+          "rating_desc"
+        ],
+        "unsupported_count": 50
+      },
+      "timings": {
+        "query_filtered_jpeg_ms": 2.094,
+        "query_filtered_jpeg_rows": 100,
+        "query_imported_page_ms": 1.651,
+        "query_imported_page_rows": 100,
+        "query_metadata_dimensions_ms": 1.742,
+        "query_metadata_dimensions_rows": 100,
+        "query_search_ms": 1.708,
+        "query_search_rows": 100,
+        "render_adjacent_page_model_ms": 1.424,
+        "render_adjacent_page_model_rows": 100
+      }
+    },
+    {
+      "photo_count": 10000,
+      "query_limit": 100,
+      "query_runs": 3,
+      "seed_catalog_ms": 193.078,
+      "shape": {
+        "filters": [
+          "file_type=jpeg",
+          "metadata=has_dimensions",
+          "search=photo-000"
+        ],
+        "folders": 1,
+        "jpeg_count": 8000,
+        "metadata_dimensions_count": 4000,
+        "picked_count": 1429,
+        "query_limit": 100,
+        "raw_count": 1500,
+        "rejected_count": 589,
+        "sorts": [
+          "imported_at_desc",
+          "file_name_asc",
+          "rating_desc"
+        ],
+        "unsupported_count": 500
+      },
+      "timings": {
+        "query_filtered_jpeg_ms": 13.424,
+        "query_filtered_jpeg_rows": 100,
+        "query_imported_page_ms": 7.071,
+        "query_imported_page_rows": 100,
+        "query_metadata_dimensions_ms": 8.532,
+        "query_metadata_dimensions_rows": 100,
+        "query_search_ms": 6.184,
+        "query_search_rows": 100,
+        "render_adjacent_page_model_ms": 6.878,
+        "render_adjacent_page_model_rows": 100
+      }
+    },
+    {
+      "photo_count": 50000,
+      "query_limit": 100,
+      "query_runs": 3,
+      "seed_catalog_ms": 1000.282,
+      "shape": {
+        "filters": [
+          "file_type=jpeg",
+          "metadata=has_dimensions",
+          "search=photo-000"
+        ],
+        "folders": 1,
+        "jpeg_count": 40000,
+        "metadata_dimensions_count": 20000,
+        "picked_count": 7143,
+        "query_limit": 100,
+        "raw_count": 7500,
+        "rejected_count": 2942,
+        "sorts": [
+          "imported_at_desc",
+          "file_name_asc",
+          "rating_desc"
+        ],
+        "unsupported_count": 2500
+      },
+      "timings": {
+        "query_filtered_jpeg_ms": 71.514,
+        "query_filtered_jpeg_rows": 100,
+        "query_imported_page_ms": 38.291,
+        "query_imported_page_rows": 100,
+        "query_metadata_dimensions_ms": 46.148,
+        "query_metadata_dimensions_rows": 100,
+        "query_search_ms": 26.78,
+        "query_search_rows": 100,
+        "render_adjacent_page_model_ms": 38.266,
+        "render_adjacent_page_model_rows": 100
+      }
+    }
+  ],
+  "generated_unix_seconds": 1781687123,
+  "machine": {
+    "arch": "aarch64",
+    "cpu_count": 18,
+    "os": "macos",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "schema_version": 1,
+  "scope_note": "Local benchmark evidence for this machine only; results are not universal performance guarantees.",
+  "workdir": ".tmp/library-scale-benchmark"
+}

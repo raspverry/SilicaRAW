@@ -36,6 +36,9 @@ python3 scripts/harness/check-sidecar-contract.py
 echo "==> Checking recovery policy"
 python3 scripts/harness/check-recovery-policy.py
 
+echo "==> Checking library scale benchmark report"
+python3 scripts/harness/check-library-scale-benchmark.py
+
 echo "==> Checking public trust package"
 python3 scripts/harness/check-public-trust-package.py
 

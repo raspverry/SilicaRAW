@@ -87,6 +87,11 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [MLX](topics/mlx.md)
 - [Plugins and MCP](topics/plugins-and-mcp.md)
 
+### Reports
+
+- [Reports Index](reports/index.md)
+- [Library Scale Benchmarks](reports/library-scale-benchmarks.md)
+
 ### Contributing
 
 - [Git and PR Workflow](contributing/git-and-pr-workflow.md): branch naming, PR flow, merge policy, and release branch rules.
