@@ -1061,6 +1061,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Extension layers cannot bypass Core APIs.
 - **Validation:** Permission bypass tests.
 
+**Status:** Completed on 2026-06-17. Added Core action-log wrappers for permission grants, permission denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts. Storage rejects extension raw-SQL/direct-database bypass claims case-insensitively. The implementation logs evidence only and does not add permission persistence, plugin runtime, MCP server, MLX runtime, agent bridge, direct SQLite access, or original-file mutation.
+
 ## Phase 24: MLX and AI Preview
 
 **Goal:** Add local AI as an optional enhancement after editor trust gates.
