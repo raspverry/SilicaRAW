@@ -563,7 +563,7 @@ def state_script(state):
       panel.hidden = panel.dataset.preferencesPanel !== section;
     }});
     const status = section === "advanced"
-      ? "Advanced access remains off until Phase 23 permission policy exists."
+      ? "Advanced access remains off until permission prompts and action-log integration exist."
       : "Appearance settings save automatically.";
     document.querySelector("#preferencesStatus").value = status;
     document.querySelector("#preferencesStatus").textContent = status;
@@ -1312,6 +1312,8 @@ def metric_script(surface):
         "#preferencesAdvancedMcpAccess",
         "#preferencesAdvancedPluginRuntime",
       ].every((selector) => disabled(selector)),
+      promptContractVisible: visible(document.querySelector("#permissionPromptContract")),
+      promptContractText: text("#permissionPromptContract"),
       status: text("#preferencesStatus"),
     }},
     exportWorkflow: {{
@@ -1497,8 +1499,21 @@ def capture(url):
                         and preferences_state["advancedControlsDisabled"]
                     ):
                         failures.append(f"{viewport_name} {surface_name}: advanced access gates not off and disabled")
-                    if "Phase 23 permission policy" not in preferences_state["status"]:
+                    if "permission prompts and action-log integration" not in preferences_state["status"]:
                         failures.append(f"{viewport_name} {surface_name}: advanced access status missing")
+                    if not preferences_state["promptContractVisible"]:
+                        failures.append(f"{viewport_name} {surface_name}: permission prompt contract not visible")
+                    for marker in [
+                        "Actor",
+                        "Requested permission",
+                        "Side effects",
+                        "Confirmation",
+                        "Undo availability",
+                        "Deny keeps the requested extension disabled",
+                        "Dangerous permissions are unavailable",
+                    ]:
+                        if marker not in preferences_state["promptContractText"]:
+                            failures.append(f"{viewport_name} {surface_name}: permission prompt contract missing {marker}")
                 if state == "export-workflow":
                     export_workflow = metrics["exportWorkflow"]
                     if not export_workflow["dialogVisible"] or "2 photos" not in export_workflow["selectedPhoto"]:

@@ -1798,6 +1798,10 @@ progress::-webkit-progress-value {
   gap: var(--sr-space-md);
 }
 
+.sr-preferences-panel[data-preferences-panel="advanced"] {
+  gap: var(--sr-space-sm);
+}
+
 .sr-preferences-row {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
@@ -1860,6 +1864,11 @@ progress::-webkit-progress-value {
   padding: var(--sr-space-sm) var(--sr-space-md);
 }
 
+.sr-preferences-panel[data-preferences-panel="advanced"] .sr-preferences-toggle {
+  min-height: 48px;
+  padding: var(--sr-space-xs) var(--sr-space-md);
+}
+
 .sr-preferences-toggle span {
   display: grid;
   gap: var(--sr-space-2xs);
@@ -1888,6 +1897,77 @@ progress::-webkit-progress-value {
 
 .sr-preferences-note strong {
   color: var(--sr-text-secondary);
+}
+
+.sr-permission-contract {
+  min-width: 0;
+  display: grid;
+  gap: var(--sr-space-sm);
+  border: 1px solid var(--sr-border-default);
+  border-radius: var(--sr-radius-md);
+  background: var(--sr-surface-card);
+  padding: var(--sr-space-sm);
+}
+
+.sr-permission-contract-header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--sr-space-sm);
+}
+
+.sr-permission-contract-header span {
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
+  text-transform: uppercase;
+}
+
+.sr-permission-contract-header h4 {
+  margin: var(--sr-space-2xs) 0 0;
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+}
+
+.sr-permission-contract-header strong {
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-xs);
+  color: var(--sr-text-secondary);
+  padding: var(--sr-space-2xs) var(--sr-space-xs);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
+  white-space: nowrap;
+}
+
+.sr-permission-contract-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sr-space-sm);
+  margin: 0;
+}
+
+.sr-permission-contract-grid div {
+  min-width: 0;
+  border: 1px solid var(--sr-border-subtle);
+  border-radius: var(--sr-radius-sm);
+  padding: var(--sr-space-xs);
+}
+
+.sr-permission-contract-grid dt {
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
+  font-weight: 700;
+}
+
+.sr-permission-contract-grid dd,
+.sr-permission-contract p {
+  margin: var(--sr-space-2xs) 0 0;
+  color: var(--sr-text-tertiary);
+  font-size: var(--sr-type-caption);
+  line-height: var(--sr-line-caption);
 }
 
 .sr-preferences-dialog-footer {
@@ -3432,6 +3512,11 @@ progress::-webkit-progress-value {
 
   .sr-preferences-scale-control output {
     text-align: left;
+  }
+
+  .sr-permission-contract-header,
+  .sr-permission-contract-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sr-export-color-choices {
