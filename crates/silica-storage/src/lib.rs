@@ -778,6 +778,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "export_settings_presets",
         sql: EXPORT_SETTINGS_PRESETS_SQL,
     },
+    Migration {
+        version: 10,
+        name: "export_settings_png_tiff_formats",
+        sql: EXPORT_SETTINGS_PNG_TIFF_FORMATS_SQL,
+    },
 ];
 
 /// Open a catalog database and apply all embedded migrations.
@@ -4502,7 +4507,7 @@ fn export_preset_id_for_name(name: &str) -> String {
 }
 
 fn validate_export_settings(settings: &ExportSettings) -> Result<(), LibraryStorageError> {
-    if settings.format != "jpeg" {
+    if !matches!(settings.format.as_str(), "jpeg" | "png" | "tiff") {
         return Err(LibraryStorageError::ExportSettingsValidation(format!(
             "unsupported export format: {}",
             settings.format
@@ -4514,9 +4519,14 @@ fn validate_export_settings(settings: &ExportSettings) -> Result<(), LibraryStor
             settings.color_profile
         )));
     }
+    if settings.format != "jpeg" && settings.color_profile != "srgb" {
+        return Err(LibraryStorageError::ExportSettingsValidation(
+            "PNG and TIFF export settings currently require sRGB color profile".to_string(),
+        ));
+    }
     if !(1..=100).contains(&settings.quality) {
         return Err(LibraryStorageError::ExportSettingsValidation(format!(
-            "jpeg quality must be between 1 and 100, got {}",
+            "export quality must be between 1 and 100, got {}",
             settings.quality
         )));
     }
@@ -5263,6 +5273,76 @@ INSERT OR IGNORE INTO export_settings(
   90,
   'minimal'
 );
+"#;
+
+const EXPORT_SETTINGS_PNG_TIFF_FORMATS_SQL: &str = r#"
+ALTER TABLE export_settings RENAME TO export_settings_v9;
+ALTER TABLE export_presets RENAME TO export_presets_v9;
+
+CREATE TABLE export_presets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  format TEXT NOT NULL DEFAULT 'jpeg' CHECK (format IN ('jpeg', 'png', 'tiff')),
+  color_profile TEXT NOT NULL DEFAULT 'srgb' CHECK (color_profile IN ('srgb', 'display_p3')),
+  quality INTEGER NOT NULL DEFAULT 90 CHECK (quality BETWEEN 1 AND 100),
+  metadata_policy TEXT NOT NULL DEFAULT 'minimal' CHECK (metadata_policy IN ('minimal')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE export_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'default'),
+  preset_id TEXT,
+  format TEXT NOT NULL DEFAULT 'jpeg' CHECK (format IN ('jpeg', 'png', 'tiff')),
+  color_profile TEXT NOT NULL DEFAULT 'srgb' CHECK (color_profile IN ('srgb', 'display_p3')),
+  quality INTEGER NOT NULL DEFAULT 90 CHECK (quality BETWEEN 1 AND 100),
+  metadata_policy TEXT NOT NULL DEFAULT 'minimal' CHECK (metadata_policy IN ('minimal')),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (preset_id) REFERENCES export_presets(id) ON DELETE SET NULL
+);
+
+INSERT INTO export_presets(
+  id,
+  name,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  created_at,
+  updated_at
+)
+SELECT
+  id,
+  name,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  created_at,
+  updated_at
+FROM export_presets_v9;
+
+INSERT INTO export_settings(
+  id,
+  preset_id,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  updated_at
+)
+SELECT
+  id,
+  preset_id,
+  format,
+  color_profile,
+  quality,
+  metadata_policy,
+  updated_at
+FROM export_settings_v9;
+
+DROP TABLE export_settings_v9;
+DROP TABLE export_presets_v9;
 "#;
 
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
@@ -8529,6 +8609,57 @@ mod tests {
         assert_eq!(color_profile, "srgb");
         assert_eq!(quality, 90);
         assert_eq!(metadata_policy, "minimal");
+    }
+
+    #[test]
+    fn export_settings_accept_png_and_tiff_after_current_migration() {
+        let workspace = unique_library_root("export-settings-formats");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let png_settings = ExportSettings {
+            format: "png".to_string(),
+            color_profile: "srgb".to_string(),
+            quality: 90,
+            metadata_policy: "minimal".to_string(),
+        };
+        let png_catalog =
+            set_default_export_settings(&library.root_path, None, png_settings.clone())
+                .expect("save png default settings");
+        assert_eq!(png_catalog.default_settings, png_settings);
+
+        let tiff_settings = ExportSettings {
+            format: "tiff".to_string(),
+            color_profile: "srgb".to_string(),
+            quality: 90,
+            metadata_policy: "minimal".to_string(),
+        };
+        let preset = upsert_export_preset(&library.root_path, "TIFF sRGB", tiff_settings.clone())
+            .expect("save tiff preset");
+        let reloaded = set_default_export_settings(
+            &library.root_path,
+            Some(&preset.id),
+            tiff_settings.clone(),
+        )
+        .expect("save tiff default settings");
+        assert_eq!(reloaded.default_settings, tiff_settings);
+        assert!(reloaded
+            .presets
+            .iter()
+            .any(|candidate| candidate == &preset));
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        assert_eq!(count_edit_states(&connection), 0);
+        assert_eq!(count_edit_history(&connection), 0);
+
+        remove_library_root(&workspace);
     }
 
     #[test]

@@ -801,8 +801,11 @@ def main():
         failures,
     )
     require(
-        parser.ids.get("exportFormat", {}).get("value") == "JPEG",
-        "#exportFormat must lock the MVP to JPEG",
+        parser.ids.get("exportFormat", {}).get("name") == "exportFormat"
+        and '<option value="jpeg">JPEG</option>' in source
+        and '<option value="png">PNG</option>' in source
+        and '<option value="tiff">TIFF</option>' in source,
+        "#exportFormat must expose JPEG, PNG, and TIFF export options",
         failures,
     )
     require(
@@ -812,7 +815,7 @@ def main():
     )
     require(
         parser.ids.get("exportQuality", {}).get("value") == "90",
-        "#exportQuality must expose local-alpha JPEG quality",
+        "#exportQuality must expose local-alpha JPEG default quality",
         failures,
     )
     require(

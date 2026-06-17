@@ -22,4 +22,4 @@ silica-storage = { path = "../silica-storage" }
 serde_json = "1.0.150"
 
 [dev-dependencies]
-image = { version = "=0.25.6", default-features = false, features = ["jpeg"] }
+image = { version = "=0.25.6", default-features = false, features = ["jpeg", "png", "tiff"] }

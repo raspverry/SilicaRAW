@@ -52,6 +52,8 @@ ALLOWED_COMMANDS = {
     "redo_last_history_action",
     "export_photo_jpeg_srgb",
     "export_photo_jpeg",
+    "export_photo_png",
+    "export_photo_tiff",
     "get_export_settings",
     "save_export_settings",
     "save_export_preset",
@@ -437,7 +439,7 @@ WORKFLOW_STEPS = [
             "exportQuality",
             "exportSummaryPreset",
         ],
-        "commands": ["export_photo_jpeg", "get_export_settings", "save_export_settings", "save_export_preset"],
+        "commands": ["export_photo_jpeg", "export_photo_png", "export_photo_tiff", "get_export_settings", "save_export_settings", "save_export_preset"],
         "text": [
             "JPEG",
             "sRGB",
@@ -494,7 +496,10 @@ def command_names(source):
     delegated_library_commands = set(
         re.findall(r"""runLibraryCommand\(\s*["']([^"']+)["']""", source)
     )
-    return direct_invokes | delegated_library_commands
+    export_command_literals = set(
+        re.findall(r"""return\s+["'](export_photo_[^"']+)["']""", source)
+    )
+    return direct_invokes | delegated_library_commands | export_command_literals
 
 
 def has_text(text_blob, expected):
@@ -782,7 +787,7 @@ def main():
         failures,
     )
     require(
-        "desktop runtime writes the JPEG and catalog record" in source,
+        "desktop runtime writes the ${exportFormatText} and catalog record" in source,
         "static export path must not claim to write files",
         failures,
     )
@@ -858,10 +863,13 @@ def main():
         failures,
     )
     require(
-        parser.ids.get("exportFormat", {}).get("value") == "JPEG"
+        parser.ids.get("exportFormat", {}).get("name") == "exportFormat"
+        and '<option value="jpeg">JPEG</option>' in source
+        and '<option value="png">PNG</option>' in source
+        and '<option value="tiff">TIFF</option>' in source
         and parser.ids.get("exportColorSpace", {}).get("value") == "sRGB"
         and parser.ids.get("exportQuality", {}).get("value") == "90",
-        "export workflow must keep JPEG quality 90 and sRGB as default",
+        "export workflow must keep JPEG quality 90 and sRGB as default while exposing PNG/TIFF",
         failures,
     )
     require(
@@ -882,6 +890,8 @@ def main():
         "applyExportSettingsCatalog",
         "saveExportSettings",
         "saveExportPreset",
+        "export_photo_png",
+        "export_photo_tiff",
     ]:
         require(marker in source, f"export settings marker missing: {marker}", failures)
 

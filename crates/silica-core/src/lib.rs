@@ -841,6 +841,13 @@ pub enum PhotoExportColorProfile {
     DisplayP3,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PhotoExportFormat {
+    Jpeg,
+    Png,
+    Tiff,
+}
+
 impl PhotoExportSession {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
@@ -3524,6 +3531,52 @@ pub fn export_photo_jpeg(
     output_path: impl AsRef<Path>,
     color_profile: PhotoExportColorProfile,
 ) -> Result<Option<PhotoExportSession>, CoreError> {
+    export_photo_raster(
+        library_root_path,
+        photo_id,
+        output_path,
+        PhotoExportFormat::Jpeg,
+        color_profile,
+    )
+}
+
+/// Export one edited catalog photo as a PNG sRGB file and record the export.
+pub fn export_photo_png(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+) -> Result<Option<PhotoExportSession>, CoreError> {
+    export_photo_raster(
+        library_root_path,
+        photo_id,
+        output_path,
+        PhotoExportFormat::Png,
+        PhotoExportColorProfile::Srgb,
+    )
+}
+
+/// Export one edited catalog photo as a TIFF sRGB file and record the export.
+pub fn export_photo_tiff(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+) -> Result<Option<PhotoExportSession>, CoreError> {
+    export_photo_raster(
+        library_root_path,
+        photo_id,
+        output_path,
+        PhotoExportFormat::Tiff,
+        PhotoExportColorProfile::Srgb,
+    )
+}
+
+fn export_photo_raster(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    output_path: impl AsRef<Path>,
+    format: PhotoExportFormat,
+    color_profile: PhotoExportColorProfile,
+) -> Result<Option<PhotoExportSession>, CoreError> {
     let library_root_path = library_root_path.as_ref();
     let output_path = output_path.as_ref();
     let (photo_id, _file_name, render_plan) =
@@ -3585,32 +3638,90 @@ pub fn export_photo_jpeg(
     record_brush_mask_raster_caches(library_root_path, &photo_id, &render_masks)?;
     let export_masks = export_manual_masks_from_render(&render_masks);
 
-    let export_result =
-        silica_export::export_jpeg_with_color_profile(silica_export::JpegColorExportRequest {
-            source_path: PathBuf::from(&render_request.source_path),
-            output_path: output_path.to_path_buf(),
-            exposure: render_request.exposure,
-            contrast: render_request.contrast,
-            white_balance: export_white_balance_from_render(render_request.white_balance),
-            tone_recovery: export_tone_recovery_from_render(render_request.tone_recovery),
-            color_presence: export_color_presence_from_render(render_request.color_presence),
-            tone_curve: export_tone_curve_from_render(render_request.tone_curve.clone()),
-            hsl_color_mixer: export_hsl_color_mixer_from_render(render_request.hsl_color_mixer),
-            detail: export_detail_from_render(render_request.detail),
-            geometry: export_geometry_from_render(render_request.geometry.clone()),
-            masks: export_masks,
-            quality: render_request.quality,
-            color_profile: export_color_profile_to_export(color_profile),
-        })?;
-    let format = export_format_string(export_result.format).to_string();
-    let exported_color_profile =
-        export_color_profile_string(export_result.color_profile).to_string();
-    let source_sha256 = export_result.source_sha256.clone();
-    let output_sha256 = export_result.output_sha256.clone();
-    let icc_profile_sha256 = export_result.icc_profile_sha256.clone();
+    let source_path = PathBuf::from(&render_request.source_path);
+    let export_white_balance = export_white_balance_from_render(render_request.white_balance);
+    let export_tone_recovery = export_tone_recovery_from_render(render_request.tone_recovery);
+    let export_color_presence = export_color_presence_from_render(render_request.color_presence);
+    let export_tone_curve = export_tone_curve_from_render(render_request.tone_curve.clone());
+    let export_hsl_color_mixer = export_hsl_color_mixer_from_render(render_request.hsl_color_mixer);
+    let export_detail = export_detail_from_render(render_request.detail);
+    let export_geometry = export_geometry_from_render(render_request.geometry.clone());
+
+    let (
+        exported_output_path,
+        exported_format,
+        exported_color_profile,
+        bytes_written,
+        source_sha256,
+        output_sha256,
+        icc_profile_embedded,
+        icc_profile_sha256,
+    ) = match format {
+        PhotoExportFormat::Jpeg => {
+            let export_result = silica_export::export_jpeg_with_color_profile(
+                silica_export::JpegColorExportRequest {
+                    source_path,
+                    output_path: output_path.to_path_buf(),
+                    exposure: render_request.exposure,
+                    contrast: render_request.contrast,
+                    white_balance: export_white_balance,
+                    tone_recovery: export_tone_recovery,
+                    color_presence: export_color_presence,
+                    tone_curve: export_tone_curve,
+                    hsl_color_mixer: export_hsl_color_mixer,
+                    detail: export_detail,
+                    geometry: export_geometry,
+                    masks: export_masks,
+                    quality: render_request.quality,
+                    color_profile: export_color_profile_to_export(color_profile),
+                },
+            )?;
+            (
+                export_result.output_path,
+                export_format_string(export_result.format).to_string(),
+                export_color_profile_string(export_result.color_profile).to_string(),
+                export_result.bytes_written,
+                export_result.source_sha256,
+                export_result.output_sha256,
+                export_result.icc_profile_embedded,
+                Some(export_result.icc_profile_sha256),
+            )
+        }
+        PhotoExportFormat::Png | PhotoExportFormat::Tiff => {
+            let export_result =
+                silica_export::export_raster_srgb(silica_export::RasterSrgbExportRequest {
+                    source_path,
+                    output_path: output_path.to_path_buf(),
+                    format: export_raster_format_to_export(format),
+                    exposure: render_request.exposure,
+                    contrast: render_request.contrast,
+                    white_balance: export_white_balance,
+                    tone_recovery: export_tone_recovery,
+                    color_presence: export_color_presence,
+                    tone_curve: export_tone_curve,
+                    hsl_color_mixer: export_hsl_color_mixer,
+                    detail: export_detail,
+                    geometry: export_geometry,
+                    masks: export_masks,
+                })?;
+            (
+                export_result.output_path,
+                export_format_string(export_result.format).to_string(),
+                export_color_profile_string(export_result.color_profile).to_string(),
+                export_result.bytes_written,
+                export_result.source_sha256,
+                export_result.output_sha256,
+                export_result.icc_profile_embedded,
+                export_result.icc_profile_sha256,
+            )
+        }
+    };
+    let icc_profile_sha256_value = icc_profile_sha256
+        .as_deref()
+        .map_or(serde_json::Value::Null, serde_json::Value::from);
     let settings_value = serde_json::json!({
-        "format": format,
-        "color_profile": exported_color_profile,
+        "format": exported_format.clone(),
+        "color_profile": exported_color_profile.clone(),
         "quality": render_request.quality,
         "exposure": render_request.exposure,
         "contrast": render_request.contrast,
@@ -3632,15 +3743,15 @@ pub fn export_photo_jpeg(
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
         "output_sha256": output_sha256.clone(),
-        "icc_profile_embedded": export_result.icc_profile_embedded,
-        "icc_profile_sha256": icc_profile_sha256.clone(),
-        "profile_metadata_source": "silica-export",
+        "icc_profile_embedded": icc_profile_embedded,
+        "icc_profile_sha256": icc_profile_sha256_value,
+        "profile_metadata_source": export_profile_metadata_source(format),
     });
     let settings_json = settings_value.to_string();
     let export_record = silica_storage::record_export(
         library_root_path,
         &photo_id,
-        &export_result.output_path,
+        &exported_output_path,
         settings_json,
     )?;
     let export_record_id = export_record.id;
@@ -3657,19 +3768,19 @@ pub fn export_photo_jpeg(
     Ok(Some(PhotoExportSession {
         photo_id,
         source_path: render_plan.source_path,
-        output_path: export_result.output_path,
-        format,
+        output_path: exported_output_path,
+        format: exported_format,
         color_profile: exported_color_profile,
-        bytes_written: export_result.bytes_written,
+        bytes_written,
         source_sha256: Some(source_sha256),
         output_sha256,
-        icc_profile_embedded: export_result.icc_profile_embedded,
-        icc_profile_sha256,
+        icc_profile_embedded,
+        icc_profile_sha256: icc_profile_sha256.unwrap_or_default(),
         decoder_backend: None,
         input_profile: None,
         working_space: None,
         export_record_id,
-        message: export_color_profile_message(color_profile).to_string(),
+        message: export_raster_message(format, color_profile).to_string(),
     }))
 }
 
@@ -4991,6 +5102,16 @@ fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> Pho
 fn export_format_string(format: silica_export::ExportImageFormat) -> &'static str {
     match format {
         silica_export::ExportImageFormat::Jpeg => "jpeg",
+        silica_export::ExportImageFormat::Png => "png",
+        silica_export::ExportImageFormat::Tiff => "tiff",
+    }
+}
+
+fn export_raster_format_to_export(format: PhotoExportFormat) -> silica_export::ExportImageFormat {
+    match format {
+        PhotoExportFormat::Jpeg => silica_export::ExportImageFormat::Jpeg,
+        PhotoExportFormat::Png => silica_export::ExportImageFormat::Png,
+        PhotoExportFormat::Tiff => silica_export::ExportImageFormat::Tiff,
     }
 }
 
@@ -6239,6 +6360,24 @@ fn export_color_profile_message(profile: PhotoExportColorProfile) -> &'static st
     match profile {
         PhotoExportColorProfile::Srgb => "JPEG sRGB export completed.",
         PhotoExportColorProfile::DisplayP3 => "JPEG Display P3 export completed.",
+    }
+}
+
+fn export_raster_message(
+    format: PhotoExportFormat,
+    color_profile: PhotoExportColorProfile,
+) -> &'static str {
+    match format {
+        PhotoExportFormat::Jpeg => export_color_profile_message(color_profile),
+        PhotoExportFormat::Png => "PNG sRGB export completed.",
+        PhotoExportFormat::Tiff => "TIFF sRGB export completed.",
+    }
+}
+
+fn export_profile_metadata_source(format: PhotoExportFormat) -> &'static str {
+    match format {
+        PhotoExportFormat::Jpeg => "silica-export",
+        PhotoExportFormat::Png | PhotoExportFormat::Tiff => "none",
     }
 }
 
@@ -8674,6 +8813,147 @@ mod tests {
             )
             .expect("exported flag");
         assert_eq!(exported_flag, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn exports_edited_photo_to_png_and_records_catalog_row() {
+        let workspace = unique_library_root("core-export-png");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.png");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, -8.0)
+            .expect("commit edit")
+            .expect("edit commit");
+
+        let exported = export_photo_png(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+
+        assert_eq!(exported.photo_id, photo_id);
+        assert_eq!(exported.output_path, output_path);
+        assert_eq!(exported.format, "png");
+        assert_eq!(exported.color_profile, "srgb");
+        assert!(exported.bytes_written > 0);
+        assert_eq!(exported.output_sha256.len(), 64);
+        assert!(!exported.icc_profile_embedded);
+        assert_eq!(exported.icc_profile_sha256, "");
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
+
+        let decoded = image::ImageReader::open(&exported.output_path)
+            .expect("open exported png")
+            .with_guessed_format()
+            .expect("guess exported format")
+            .decode()
+            .expect("decode exported png");
+        assert_eq!(decoded.width(), 2);
+        assert_eq!(decoded.height(), 2);
+
+        let latest =
+            silica_storage::get_latest_export_record(&created.root_path, &exported.photo_id)
+                .expect("read latest export")
+                .expect("latest export");
+        assert_eq!(latest.id, exported.export_record_id);
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["format"], "png");
+        assert_eq!(settings["color_profile"], "srgb");
+        assert_eq!(settings["icc_profile_embedded"], false);
+        assert_eq!(settings["icc_profile_sha256"], serde_json::Value::Null);
+        assert_eq!(settings["output_sha256"], exported.output_sha256);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn exports_edited_photo_to_tiff_and_records_catalog_row() {
+        let workspace = unique_library_root("core-export-tiff");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.tiff");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import through core");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let exported = export_photo_tiff(&created.root_path, &photo_id, &output_path)
+            .expect("export photo")
+            .expect("export result");
+
+        assert_eq!(exported.photo_id, photo_id);
+        assert_eq!(exported.output_path, output_path);
+        assert_eq!(exported.format, "tiff");
+        assert_eq!(exported.color_profile, "srgb");
+        assert!(exported.bytes_written > 0);
+        assert_eq!(exported.output_sha256.len(), 64);
+        assert!(!exported.icc_profile_embedded);
+        assert_eq!(exported.icc_profile_sha256, "");
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
+
+        let decoded = image::ImageReader::open(&exported.output_path)
+            .expect("open exported tiff")
+            .with_guessed_format()
+            .expect("guess exported format")
+            .decode()
+            .expect("decode exported tiff");
+        assert_eq!(decoded.width(), 2);
+        assert_eq!(decoded.height(), 2);
+
+        let latest =
+            silica_storage::get_latest_export_record(&created.root_path, &exported.photo_id)
+                .expect("read latest export")
+                .expect("latest export");
+        let settings: serde_json::Value =
+            serde_json::from_str(&latest.export_settings_json).expect("parse export settings");
+        assert_eq!(settings["format"], "tiff");
+        assert_eq!(settings["color_profile"], "srgb");
+        assert_eq!(settings["icc_profile_embedded"], false);
+        assert_eq!(settings["icc_profile_sha256"], serde_json::Value::Null);
+        assert_eq!(settings["output_sha256"], exported.output_sha256);
 
         remove_library_root(&workspace);
     }

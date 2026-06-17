@@ -836,9 +836,10 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 ### Task 20.2: PNG and TIFF Export
 
-- **Location:** `crates/silica-export`, `crates/silica-core`, `apps/desktop/static/`
+- **Location:** `crates/silica-export`, `crates/silica-core`, `crates/silica-storage`, `apps/desktop/src-tauri`, `apps/desktop/static/`
 - **Description:** Add PNG and TIFF export after codec behavior is tested.
 - **Dependencies:** Task 20.1
+- **Status:** Completed on 2026-06-17. PNG and TIFF now use the same committed raster adjustment/export path as local JPEG exports, write separate sRGB output files, preserve original overwrite protection, record catalog export evidence, and surface explicit format choices in the existing Export dialog. Catalog schema version 10 extends export settings and presets to `jpeg`, `png`, and `tiff` while keeping JPEG sRGB 90 as the default.
 - **Acceptance Criteria:**
   - Outputs are separate files.
   - Overwrite guard remains active.

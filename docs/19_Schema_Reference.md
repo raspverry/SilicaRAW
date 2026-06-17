@@ -84,7 +84,7 @@ Agents must not invent parser-owned or color-profile fields outside `profile`. E
 
 The existing `exports.export_settings_json` field records export color metadata for local alpha proof work.
 
-Required color metadata keys for JPEG exports:
+Required color metadata keys for local raster exports:
 
 ```txt
 color_profile
@@ -96,6 +96,8 @@ profile_metadata_source
 
 These fields are export evidence. They do not prove visual color correctness.
 
+For JPEG exports, `icc_profile_embedded` is `true` and `icc_profile_sha256` records the embedded sRGB or Display P3 ICC profile hash. For PNG and TIFF exports in Task 20.2, the current alpha records explicit sRGB intent, `icc_profile_embedded: false`, `icc_profile_sha256: null`, and `profile_metadata_source: "none"` until color-managed PNG/TIFF proof is implemented.
+
 Task 20.1 adds catalog-owned export preference state outside the edit graph:
 
 ```txt
@@ -103,7 +105,7 @@ export_presets
 export_settings
 ```
 
-`export_presets` stores named local export presets. `export_settings` stores the current library default export settings. The conservative built-in default is JPEG, sRGB, quality 90, metadata policy `minimal`.
+`export_presets` stores named local export presets. `export_settings` stores the current library default export settings. The conservative built-in default is JPEG, sRGB, quality 90, metadata policy `minimal`. Catalog schema version 10 allows `jpeg`, `png`, and `tiff` in export settings while keeping non-JPEG export settings sRGB-only.
 
 These tables are preferences, not develop edits. Updating them must not write `edit_states`, `edit_history`, sidecars, or original photo files.
 
@@ -211,6 +213,14 @@ Task 20.1 export settings status:
 catalog schema version -> 9
 export_presets -> named local export presets
 export_settings -> current library default export settings
+```
+
+Task 20.2 export format status:
+
+```txt
+catalog schema version -> 10
+export_presets.format -> jpeg | png | tiff
+export_settings.format -> jpeg | png | tiff
 ```
 
 Task 16.6 sidecar status runtime:
