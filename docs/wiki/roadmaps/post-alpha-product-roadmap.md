@@ -1019,6 +1019,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Known limitations are recorded.
 - **Validation:** Completed checklist record.
 
+**Status:** Completed on 2026-06-17. Added [Photographer Workflow QA](../../../checklists/PHOTOGRAPHER_WORKFLOW_QA.md) plus a harness checker. The checklist covers licensed or user-provided local assets, culling, metadata, undo, Develop, masks, export, responsiveness, data safety, color/export observations, and known limitations without committing private media or expanding unsupported feature claims.
+
 ## Phase 23: Permission and Audit Foundation
 
 **Goal:** Build the permission layer before MLX, plugins, or MCP.
