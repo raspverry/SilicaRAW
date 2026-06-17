@@ -82,6 +82,7 @@ The current implementation order starts with:
 - Phase 23 is complete: default-deny permission policy, static prompt contract, and permissioned action-log evidence are implemented without starting plugin, MCP, AI, or agent runtime.
 - Task 24.1 is complete: the MLX runtime spike records a future optional MLX C API bridge path, no-model behavior, memory/cancellation posture, and manifest-first model packaging without adding an MLX dependency, model loader, or AI runtime.
 - Task 24.2 is complete: model manifests validate license/source/hash/preprocessing/output metadata and deterministic SHA-256 file hashes while models remain optional and no runtime/inference path is enabled.
+- Task 24.3 is complete: AI result rows are stored separately from edit graph/history and catalog flags, default to unapproved, remain local-only and permissioned, and reject direct edit/flag mutation payloads.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

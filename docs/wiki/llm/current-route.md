@@ -14,13 +14,13 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, and Task 24.2 are complete. The next roadmap task is **Task 24.3: AI Result Store and Read Path**.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, and Task 24.3 are complete. The next roadmap task is **Task 24.4: First Non-Mutating AI Review Feature**.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. MCP/plugin runtime and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. MCP/plugin runtime and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For Task 24.3, read:
+For Task 24.4, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 24](../roadmaps/post-alpha-product-roadmap.md#phase-24-mlx-and-ai-preview)
@@ -49,6 +49,9 @@ For Task 24.3, read:
 - No model can be bundled or enabled without license, source, hash, preprocessing, and output metadata in a model manifest.
 - Task 24.2 validates `silica.model` v1 manifests, rejects missing license/source/hash/preprocessing/output metadata, and compares deterministic `sha256:` model hashes against candidate bytes.
 - Model validation does not load a model, run inference, create a worker, or require AI.
+- Task 24.3 stores `silica.ai_result` v1 rows in `ai_results`, unapproved by default, with `local_only = true` and `permission_id = ai_result:propose`.
+- Task 24.3 rejects AI result payloads that directly carry edit graph or photo flag mutation keys.
+- AI result storage/read is local-only through Core and Storage APIs; it does not load models, run inference, approve suggestions, or write edit history.
 - MLX memory policy is bounded worker use under unified-memory pressure; cancellation is cooperative at task boundaries until proven otherwise.
 
 ## Stop Rules
@@ -56,5 +59,5 @@ For Task 24.3, read:
 - Do not treat visual QA screenshots as product feature implementation.
 - Do not add broad fallback systems for performance, migration, or profiling work.
 - Do not start agent, MCP, or plugin runtime.
-- Do not add MLX runtime, model loading, MCP runtime, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support unless the selected roadmap task explicitly requires it. Task 24.3 allows local AI result storage/read contracts only.
+- Do not add MLX runtime, model loading, MCP runtime, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support unless the selected roadmap task explicitly requires it. Task 24.4 allows a non-mutating review surface only.
 - Do not mutate original photo files.

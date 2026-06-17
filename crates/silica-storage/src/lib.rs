@@ -104,6 +104,15 @@ pub const SIDECAR_SCHEMA: &str = "silica.sidecar";
 /// Stable sidecar schema version for v0.1.
 pub const SIDECAR_VERSION: i64 = 1;
 
+/// Stable AI result schema marker for Task 24.3 local result records.
+pub const AI_RESULT_SCHEMA: &str = "silica.ai_result";
+
+/// Stable AI result schema version for Task 24.3.
+pub const AI_RESULT_VERSION: i64 = 1;
+
+/// Permission required before a future model can propose local AI result data.
+pub const AI_RESULT_PROPOSE_PERMISSION_ID: &str = "ai_result:propose";
+
 /// Stable local alpha library row id for single-library catalog databases.
 pub const LOCAL_LIBRARY_ID: &str = "local";
 
@@ -621,6 +630,26 @@ pub struct ActionLogEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewAiResult {
+    pub photo_id: String,
+    pub task_type: String,
+    pub model_id: String,
+    pub permission_id: String,
+    pub output_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiResult {
+    pub id: String,
+    pub photo_id: String,
+    pub task_type: String,
+    pub model_id: String,
+    pub result_json: String,
+    pub approved: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct HistoryActionRow {
     id: String,
     action_kind: String,
@@ -653,6 +682,7 @@ pub enum LibraryStorageError {
     BackupValidation(String),
     HistoryValidation(String),
     ActionLogValidation(String),
+    AiResultValidation(String),
     ExportSettingsValidation(String),
 }
 
@@ -694,6 +724,9 @@ impl fmt::Display for LibraryStorageError {
             Self::ActionLogValidation(message) => {
                 write!(formatter, "action log validation error: {message}")
             }
+            Self::AiResultValidation(message) => {
+                write!(formatter, "AI result validation error: {message}")
+            }
             Self::ExportSettingsValidation(message) => {
                 write!(formatter, "export settings validation error: {message}")
             }
@@ -720,6 +753,7 @@ impl Error for LibraryStorageError {
             | Self::BackupValidation(_)
             | Self::HistoryValidation(_)
             | Self::ActionLogValidation(_)
+            | Self::AiResultValidation(_)
             | Self::ExportSettingsValidation(_) => None,
         }
     }
@@ -3553,6 +3587,61 @@ pub fn list_action_log_entries(
     entries
 }
 
+pub fn append_ai_result(
+    library_root_path: impl AsRef<Path>,
+    result: NewAiResult,
+) -> Result<AiResult, LibraryStorageError> {
+    let result_json = build_ai_result_json(&result)?;
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let id = unique_catalog_id("ai-result");
+    connection.execute(
+        r#"
+        INSERT INTO ai_results(
+          id,
+          photo_id,
+          task_type,
+          model_id,
+          result_json,
+          approved
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, 0)
+        "#,
+        params![
+            id,
+            result.photo_id,
+            result.task_type,
+            result.model_id,
+            result_json,
+        ],
+    )?;
+    ai_result_by_id(&connection, &id)
+}
+
+pub fn list_ai_results_for_photo(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+    limit: u16,
+) -> Result<Vec<AiResult>, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let limit = i64::from(limit.clamp(1, 500));
+    let mut statement = connection.prepare(
+        r#"
+        SELECT id, photo_id, task_type, model_id, result_json, approved, created_at
+        FROM ai_results
+        WHERE photo_id = ?1
+        ORDER BY rowid DESC
+        LIMIT ?2
+        "#,
+    )?;
+    let results = statement
+        .query_map(params![photo_id, limit], ai_result_from_row)?
+        .map(|row| row.map_err(LibraryStorageError::from))
+        .collect();
+    results
+}
+
 fn apply_history_action(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
@@ -4561,6 +4650,107 @@ fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRec
         output_path: row.get(2)?,
         export_settings_json: row.get(3)?,
     })
+}
+
+fn ai_result_by_id(connection: &Connection, id: &str) -> Result<AiResult, LibraryStorageError> {
+    connection
+        .query_row(
+            r#"
+            SELECT id, photo_id, task_type, model_id, result_json, approved, created_at
+            FROM ai_results
+            WHERE id = ?1
+            "#,
+            params![id],
+            ai_result_from_row,
+        )
+        .map_err(LibraryStorageError::from)
+}
+
+fn ai_result_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AiResult> {
+    let approved: i64 = row.get(5)?;
+    Ok(AiResult {
+        id: row.get(0)?,
+        photo_id: row.get(1)?,
+        task_type: row.get(2)?,
+        model_id: row.get(3)?,
+        result_json: row.get(4)?,
+        approved: approved != 0,
+        created_at: row.get(6)?,
+    })
+}
+
+fn build_ai_result_json(result: &NewAiResult) -> Result<String, LibraryStorageError> {
+    validate_new_ai_result(result)?;
+    let output: serde_json::Value = serde_json::from_str(&result.output_json)?;
+    let payload = serde_json::json!({
+        "schema": AI_RESULT_SCHEMA,
+        "version": AI_RESULT_VERSION,
+        "local_only": true,
+        "permission_id": result.permission_id,
+        "photo_id": result.photo_id,
+        "task_type": result.task_type,
+        "model_id": result.model_id,
+        "output": output,
+    });
+    serde_json::to_string(&payload).map_err(LibraryStorageError::from)
+}
+
+fn validate_new_ai_result(result: &NewAiResult) -> Result<(), LibraryStorageError> {
+    validate_sidecar_photo_id(&result.photo_id)?;
+    for (field, value) in [
+        ("task_type", result.task_type.as_str()),
+        ("model_id", result.model_id.as_str()),
+        ("permission_id", result.permission_id.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(LibraryStorageError::AiResultValidation(format!(
+                "{field} must not be empty"
+            )));
+        }
+    }
+    if result.permission_id != AI_RESULT_PROPOSE_PERMISSION_ID {
+        return Err(LibraryStorageError::AiResultValidation(format!(
+            "AI result permission must be {AI_RESULT_PROPOSE_PERMISSION_ID}"
+        )));
+    }
+
+    let output: serde_json::Value = serde_json::from_str(&result.output_json)?;
+    let output_object = output.as_object().ok_or_else(|| {
+        LibraryStorageError::AiResultValidation("AI result output must be an object".to_string())
+    })?;
+    if output_object.is_empty() {
+        return Err(LibraryStorageError::AiResultValidation(
+            "AI result output must not be empty".to_string(),
+        ));
+    }
+    if contains_direct_ai_mutation_claim(&output) {
+        return Err(LibraryStorageError::AiResultValidation(
+            "direct edit mutation is not allowed in AI result output".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn contains_direct_ai_mutation_claim(value: &serde_json::Value) -> bool {
+    const BLOCKED_KEYS: &[&str] = &[
+        "edit_graph",
+        "edit_state",
+        "edit_states",
+        "photo_flags",
+        "rating",
+        "picked",
+        "rejected",
+        "color_label",
+    ];
+
+    match value {
+        serde_json::Value::Object(object) => object.iter().any(|(key, value)| {
+            BLOCKED_KEYS.contains(&key.as_str()) || contains_direct_ai_mutation_claim(value)
+        }),
+        serde_json::Value::Array(values) => values.iter().any(contains_direct_ai_mutation_claim),
+        _ => false,
+    }
 }
 
 fn recent_export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RecentExportRecord> {
@@ -9621,6 +9811,114 @@ mod tests {
         )
         .expect_err("extension raw SQL action log must be blocked");
         assert!(error.to_string().contains("extension database bypass"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_results_store_unapproved_local_permissioned_results_without_edit_or_flag_mutation() {
+        let workspace = unique_library_root("ai-result-store");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        let flags_before: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_flags", [], |row| row.get(0))
+            .expect("count flags");
+        assert_eq!(count_edit_states(&connection), 0);
+        drop(connection);
+
+        let result = append_ai_result(
+            &library.root_path,
+            NewAiResult {
+                photo_id: photo_id.clone(),
+                task_type: "blur_score".to_string(),
+                model_id: "silicaraw.blur-review.test".to_string(),
+                permission_id: "ai_result:propose".to_string(),
+                output_json: r#"{"review":{"score":0.25,"label":"usable"}}"#.to_string(),
+            },
+        )
+        .expect("append ai result");
+
+        assert_eq!(result.photo_id, photo_id);
+        assert_eq!(result.task_type, "blur_score");
+        assert_eq!(result.model_id, "silicaraw.blur-review.test");
+        assert!(!result.approved);
+
+        let payload: serde_json::Value =
+            serde_json::from_str(&result.result_json).expect("parse ai result payload");
+        assert_eq!(payload["schema"], "silica.ai_result");
+        assert_eq!(payload["permission_id"], "ai_result:propose");
+        assert_eq!(payload["local_only"], true);
+
+        let listed =
+            list_ai_results_for_photo(&library.root_path, &result.photo_id, 10).expect("list ai");
+        assert_eq!(listed, vec![result]);
+
+        let connection = open_catalog(&library.catalog_path).expect("reopen catalog");
+        assert_eq!(count_edit_states(&connection), 0);
+        let flags_after: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_flags", [], |row| row.get(0))
+            .expect("count flags after");
+        assert_eq!(flags_after, flags_before);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_results_reject_direct_edit_graph_or_flag_payloads() {
+        let workspace = unique_library_root("ai-result-reject-mutation");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        for output_json in [
+            r#"{"edit_graph":{"basic":{"exposure":1.0}}}"#,
+            r#"{"photo_flags":{"rating":5}}"#,
+        ] {
+            let error = append_ai_result(
+                &library.root_path,
+                NewAiResult {
+                    photo_id: photo_id.clone(),
+                    task_type: "blur_score".to_string(),
+                    model_id: "silicaraw.blur-review.test".to_string(),
+                    permission_id: "ai_result:propose".to_string(),
+                    output_json: output_json.to_string(),
+                },
+            )
+            .expect_err("direct mutation payload rejected");
+            assert!(error.to_string().contains("direct edit mutation"));
+        }
 
         remove_library_root(&workspace);
     }

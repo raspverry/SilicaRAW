@@ -119,6 +119,15 @@ pub struct MlxModelManifestPolicy {
     pub require_manifest_before_enablement: bool,
 }
 
+/// Task 24.3 AI result storage policy without enabling inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MlxAiResultPolicy {
+    pub local_only: bool,
+    pub unapproved_by_default: bool,
+    pub loads_model: bool,
+    pub mutates_edit_graph: bool,
+}
+
 /// Parsed and validated model manifest metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MlxModelManifest {
@@ -183,6 +192,14 @@ pub const TASK_24_1_MLX_RUNTIME_SPIKE: MlxRuntimeSpike = MlxRuntimeSpike {
 pub const TASK_24_2_MODEL_MANIFEST_POLICY: MlxModelManifestPolicy = MlxModelManifestPolicy {
     models_optional: true,
     require_manifest_before_enablement: true,
+};
+
+/// Task 24.3 AI result policy for downstream crates and tests.
+pub const TASK_24_3_AI_RESULT_POLICY: MlxAiResultPolicy = MlxAiResultPolicy {
+    local_only: true,
+    unapproved_by_default: true,
+    loads_model: false,
+    mutates_edit_graph: false,
 };
 
 impl MlxRuntimeSpike {
@@ -509,5 +526,15 @@ mod tests {
             super::compute_model_sha256_hash(model_bytes),
             super::compute_model_sha256_hash(model_bytes)
         );
+    }
+
+    #[test]
+    fn records_task_24_3_ai_result_storage_policy_without_inference() {
+        let policy = super::TASK_24_3_AI_RESULT_POLICY;
+
+        assert!(policy.local_only);
+        assert!(policy.unapproved_by_default);
+        assert!(!policy.loads_model);
+        assert!(!policy.mutates_edit_graph);
     }
 }

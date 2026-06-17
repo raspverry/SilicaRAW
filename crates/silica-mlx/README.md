@@ -18,3 +18,8 @@ Task 24.2 adds model manifest validation only:
 - Validates `silica.model` v1 identity, provenance, preprocessing, output metadata, and `sha256:` file hash fields.
 - Compares the manifest hash to candidate model bytes deterministically.
 - Does not load a model, run inference, start a worker, or make models required.
+
+Task 24.3 records the AI result policy:
+
+- AI results are local-only and unapproved by default.
+- AI result storage does not load a model or mutate edit graph state.
