@@ -57,8 +57,8 @@ As of 2026-06-17:
 - Tasks 17.1.1 through 17.5 are complete.
 - Phase 17 is complete.
 - Phase 20 is complete.
-- Task 21.1 through Task 21.4 are complete.
-- Task 21.5 is gated by Phase 23 permission policy.
+- Phase 21 is complete as a Preferences surface.
+- Task 21.5 completed disabled Advanced controls and explanatory permission text only; runtime permission implementation remains Phase 23.
 
 ## Wave Map
 
@@ -389,8 +389,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Do not start Task 21.5 runtime work until Phase 23 permission policy exists.
-2. Continue to Phase 22 hardening tasks unless a Phase 23 planning gate is explicitly selected.
+1. Continue to Phase 22 hardening tasks.
+2. Do not start runtime permission, MCP, plugin, or agent bridge work until Phase 23 permission policy exists.
 
 ## Links
 

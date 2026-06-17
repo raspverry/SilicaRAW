@@ -1102,19 +1102,19 @@
               <section class="sr-preferences-panel" id="preferencesPanelAdvanced" role="tabpanel" data-preferences-panel="advanced" aria-labelledby="preferencesPanelAdvancedTitle" hidden>
                 <div class="sr-preferences-panel-header">
                   <h3 id="preferencesPanelAdvancedTitle">Advanced</h3>
-                  <p>Agent and extension access stays off until the permission model is implemented.</p>
+                  <p>No plugin runtime, MCP server, or agent bridge starts from Preferences.</p>
                 </div>
                 <label class="sr-preferences-toggle" for="preferencesAdvancedAgentAccess">
                   <input id="preferencesAdvancedAgentAccess" type="checkbox" disabled>
-                  <span><strong>Agent Access</strong><small>Off by default. No agent bridge starts from preferences in this task.</small></span>
+                  <span><strong>Agent Access</strong><small>Off by default. Local library, catalog, sidecar, edit, and export actions require explicit permission.</small></span>
                 </label>
                 <label class="sr-preferences-toggle" for="preferencesAdvancedMcpAccess">
                   <input id="preferencesAdvancedMcpAccess" type="checkbox" disabled>
-                  <span><strong>MCP Tools</strong><small>Disabled until Phase 23 permission policy.</small></span>
+                  <span><strong>MCP Tools</strong><small>Disabled until Phase 23 permission policy. Direct SQLite writes stay forbidden.</small></span>
                 </label>
                 <label class="sr-preferences-toggle" for="preferencesAdvancedPluginRuntime">
                   <input id="preferencesAdvancedPluginRuntime" type="checkbox" disabled>
-                  <span><strong>Plugin Runtime</strong><small>Disabled in the local alpha.</small></span>
+                  <span><strong>Plugin Runtime</strong><small>Disabled in the local alpha. Permission prompts, Core API boundaries, and action-log evidence are required before future access.</small></span>
                 </label>
               </section>
             </div>
@@ -5237,6 +5237,8 @@
             preferencesStatus.value = activeLibraryPath
               ? "Export defaults save to the active library and update the export dialog."
               : "Open a library to edit export defaults.";
+          } else if (selectedSection === "advanced") {
+            preferencesStatus.value = "Advanced access remains off until Phase 23 permission policy exists.";
           } else {
             preferencesStatus.value = `${label} settings are mapped; controls remain disabled until their scoped task.`;
           }
