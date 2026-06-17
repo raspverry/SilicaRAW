@@ -14,13 +14,13 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, and Task 23.3 are complete. Phase 23 is complete. The next roadmap area is **Phase 24: MLX and AI Preview**, but do not start it unless a maintainer explicitly selects that task.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, and Task 24.1 are complete. The next roadmap task is **Task 24.2: Model Manifest Validation**.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. MCP/plugin runtime and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. MCP/plugin runtime and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For any Phase 24 planning or implementation, read:
+For Task 24.2, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 24](../roadmaps/post-alpha-product-roadmap.md#phase-24-mlx-and-ai-preview)
@@ -29,6 +29,8 @@ For any Phase 24 planning or implementation, read:
 - [Action Trust](../topics/action-trust.md)
 - [Data Safety](../topics/data-safety.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
+- [Schema Reference](../../19_Schema_Reference.md)
+- [Model Manifest Schema](../../../schemas/model_manifest.schema.json)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
 ## Phase 23 Context
@@ -39,10 +41,18 @@ For any Phase 24 planning or implementation, read:
 - Task 23.3 records permission grants, denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts through Core action-log wrappers. Storage rejects extension raw-SQL/direct-database bypass claims.
 - There is no raw SQL permission, no original-mutation permission, no permission persistence, and no runtime server or plugin execution.
 
+## Phase 24 Context
+
+- Task 24.1 records ADR 0009: provisional future MLX C API bridge behind a non-default Rust feature gate.
+- Task 24.1 does not add MLX dependency, model loading, inference, model assets, background workers, or AI UI.
+- No manifest or no model means AI features are unavailable while the core editor remains usable.
+- No model can be bundled or enabled without license, source, hash, preprocessing, and output metadata in a model manifest.
+- MLX memory policy is bounded worker use under unified-memory pressure; cancellation is cooperative at task boundaries until proven otherwise.
+
 ## Stop Rules
 
 - Do not treat visual QA screenshots as product feature implementation.
 - Do not add broad fallback systems for performance, migration, or profiling work.
 - Do not start agent, MCP, or plugin runtime.
-- Do not add MLX runtime, model loading, MCP runtime, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support unless the selected roadmap task explicitly requires it.
+- Do not add MLX runtime, model loading, MCP runtime, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support unless the selected roadmap task explicitly requires it. Task 24.2 allows manifest validation only.
 - Do not mutate original photo files.

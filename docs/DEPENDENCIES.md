@@ -17,6 +17,7 @@ Future model weights, sample assets, binary tools, or bundled runtime components
 ## Deferred Dependency Decisions
 
 - Task 11.7.1 does not add an EXIF or metadata parser dependency. Camera make, camera model, lens model, orientation, and capture-time metadata remain explicitly unavailable until a later task adds a parser and records it in this file.
+- Task 24.1 does not add an MLX runtime dependency, model loader, model asset, or inference worker. The provisional future runtime path is the official MLX C API behind a non-default Rust feature gate. Any future MLX runtime package, C/Swift bridge, model file, or bundled binary must add a full entry in this file before shipping and must pair every model with a valid model manifest.
 
 ## Required Entry Format
 
@@ -470,7 +471,7 @@ Risk notes: Model weights have separate licenses. Rust bindings may have separat
 Binary size impact: TBD
 Security notes: Model downloads must be opt-in, license/source/hash recorded.
 Verification source: MLX repository license; selected binding must be checked separately.
-Status after ADR 0005: deferred from local alpha. No MLX dependency, model loader, model asset, or inference runtime has been added.
+Status after Task 24.1: deferred from local alpha. The provisional future binding path is the official MLX C API behind a non-default Rust feature gate. No MLX dependency, model loader, model asset, or inference runtime has been added.
 ```
 
 ## Prohibited Without Review
