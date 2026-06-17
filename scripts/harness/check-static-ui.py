@@ -612,6 +612,21 @@ def main():
             f"#{control_id} must default off",
             failures,
         )
+    for marker in [
+        "No plugin runtime, MCP server, or agent bridge starts from Preferences.",
+        "Permission prompts, Core API boundaries, and action-log evidence are required before future access.",
+        "Direct SQLite writes stay forbidden.",
+        "Local library, catalog, sidecar, edit, and export actions require explicit permission.",
+    ]:
+        require(marker in source, f"advanced access preference explanation missing: {marker}", failures)
+    for forbidden_marker in [
+        'invoke("start_mcp',
+        'invoke("start_plugin',
+        'invoke("start_agent',
+        "create_mcp_server",
+        "load_plugin_runtime",
+    ]:
+        require(forbidden_marker not in source, f"advanced preferences must not start runtime path: {forbidden_marker}", failures)
 
     exposure_slider = parser.ids.get("developExposureSlider", {})
     require(exposure_slider.get("type") == "range", "#developExposureSlider must be a range input", failures)

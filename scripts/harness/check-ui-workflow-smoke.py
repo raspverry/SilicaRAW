@@ -787,6 +787,16 @@ def main():
     ]:
         require(marker in source, f"preferences color/export marker missing: {marker}", failures)
     for marker in [
+        "preferencesAdvancedAgentAccess",
+        "preferencesAdvancedMcpAccess",
+        "preferencesAdvancedPluginRuntime",
+        "No plugin runtime, MCP server, or agent bridge starts from Preferences.",
+        "Permission prompts, Core API boundaries, and action-log evidence are required before future access.",
+        "Direct SQLite writes stay forbidden.",
+        "Local library, catalog, sidecar, edit, and export actions require explicit permission.",
+    ]:
+        require(marker in source, f"preferences advanced access marker missing: {marker}", failures)
+    for marker in [
         "recentEmptyState",
         "recentLibraryList",
         "renderRecentLibraries",

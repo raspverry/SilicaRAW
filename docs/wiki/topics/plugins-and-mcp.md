@@ -20,6 +20,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Dangerous tools and arbitrary executable plugins are forbidden without explicit approval.
 - MCP is off by default.
 - Task 16.5 adds append-only action log groundwork for future permissioned extension work, but it does not add plugin runtime, MCP runtime, MLX execution, or extension write permissions.
+- Task 21.5 adds disabled Preferences controls for Agent Access, MCP Tools, and Plugin Runtime. The controls explain future permission prompts, Core API boundaries, side effects, and action-log evidence, but they do not start any runtime.
 
 ## Required Manifest Areas
 

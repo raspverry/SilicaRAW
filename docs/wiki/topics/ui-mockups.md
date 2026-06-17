@@ -56,7 +56,7 @@ Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders 
 
 ## Phase 21 Relationship
 
-Phase 21 replaces the minimal maintenance surface with a complete Preferences surface. Task 21.1 uses `M008_Preferences_Appearance.png` for the compact section-list and pane structure only. Task 21.2 enables supported Appearance controls through app-session state and tokenized CSS. Task 21.3 moves supported Library default path storage and disposable Cache status/clear controls into Preferences. Task 21.4 wires supported Color and Export defaults to the existing catalog export settings path. Advanced agent access remains gated by Phase 23.
+Phase 21 replaces the minimal maintenance surface with a complete Preferences surface. Task 21.1 uses `M008_Preferences_Appearance.png` for the compact section-list and pane structure only. Task 21.2 enables supported Appearance controls through app-session state and tokenized CSS. Task 21.3 moves supported Library default path storage and disposable Cache status/clear controls into Preferences. Task 21.4 wires supported Color and Export defaults to the existing catalog export settings path. Task 21.5 keeps Advanced agent, MCP, and plugin access visible but disabled and explains the Phase 23 permission gate.
 
 ## Links
 

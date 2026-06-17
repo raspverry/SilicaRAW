@@ -949,6 +949,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - No MCP server or plugin runtime is started by this task.
 - **Validation:** Scope guardrails and static UI check.
 
+**Status:** Completed on 2026-06-17 as a disabled-by-default Preferences surface only. The Advanced pane keeps Agent Access, MCP Tools, and Plugin Runtime unchecked and disabled, explains future permission prompts, Core API boundaries, action-log evidence, side effects, and the direct-SQLite ban, and starts no runtime. Actual permission policy, prompts, MCP/plugin runtime, and agent bridge implementation remain Phase 23 work.
+
 ## Phase 22: Performance, Migration, and Visual Hardening
 
 **Goal:** Keep the larger editor stable and coherent.
