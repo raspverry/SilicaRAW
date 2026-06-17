@@ -162,6 +162,7 @@ pub use silica_edit::EditClipboardSelection;
 pub use silica_edit::HslColorChannel;
 pub use silica_edit::WhiteBalance;
 pub use silica_storage::ActionLogEntry;
+pub use silica_storage::AiResult;
 pub use silica_storage::CatalogRebuildDryRunAction;
 pub use silica_storage::CatalogRebuildDryRunEntry;
 pub use silica_storage::CatalogRebuildDryRunIssue;
@@ -1850,6 +1851,37 @@ pub fn list_action_log_entries(
     limit: u16,
 ) -> Result<Vec<ActionLogEntry>, CoreError> {
     silica_storage::list_action_log_entries(library_root_path, limit).map_err(CoreError::from)
+}
+
+/// Store local AI result data without loading a model or mutating edit state.
+pub fn store_ai_result(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+    task_type: impl AsRef<str>,
+    model_id: impl AsRef<str>,
+    output_json: impl AsRef<str>,
+) -> Result<AiResult, CoreError> {
+    silica_storage::append_ai_result(
+        library_root_path,
+        silica_storage::NewAiResult {
+            photo_id: photo_id.as_ref().to_string(),
+            task_type: task_type.as_ref().to_string(),
+            model_id: model_id.as_ref().to_string(),
+            permission_id: ExtensionPermission::AiResultPropose.stable_id().to_string(),
+            output_json: output_json.as_ref().to_string(),
+        },
+    )
+    .map_err(CoreError::from)
+}
+
+/// Read local AI result rows for one photo through the Core boundary.
+pub fn list_ai_results_for_photo(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+    limit: u16,
+) -> Result<Vec<AiResult>, CoreError> {
+    silica_storage::list_ai_results_for_photo(library_root_path, photo_id.as_ref(), limit)
+        .map_err(CoreError::from)
 }
 
 /// Read the library-wide export settings and named presets.
@@ -10713,6 +10745,67 @@ mod tests {
     }
 
     #[test]
+    fn ai_result_store_flows_through_core_without_edit_or_flag_mutation() {
+        let workspace = unique_library_root("core-ai-result-store");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        let flags_before: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_flags", [], |row| row.get(0))
+            .expect("count flags");
+        drop(connection);
+
+        let before = durable_catalog_counts(&created.catalog_path);
+        let result = store_ai_result(
+            &created.root_path,
+            &photo_id,
+            "blur_score",
+            "silicaraw.blur-review.test",
+            r#"{"review":{"score":0.25,"label":"usable"}}"#,
+        )
+        .expect("store ai result");
+
+        assert!(!result.approved);
+        let payload: serde_json::Value =
+            serde_json::from_str(&result.result_json).expect("parse ai result payload");
+        assert_eq!(payload["local_only"], true);
+        assert_eq!(payload["permission_id"], "ai_result:propose");
+
+        let results =
+            list_ai_results_for_photo(&created.root_path, &photo_id, 10).expect("list ai results");
+        assert_eq!(results, vec![result]);
+
+        let after = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after.edit_states, before.edit_states);
+        assert_eq!(after.edit_history, before.edit_history);
+        assert_eq!(after.exports, before.exports);
+        assert_eq!(after.cache_records, before.cache_records);
+        assert_eq!(after.ai_results, before.ai_results + 1);
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let flags_after: i64 = connection
+            .query_row("SELECT COUNT(*) FROM photo_flags", [], |row| row.get(0))
+            .expect("count flags after");
+        assert_eq!(flags_after, flags_before);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn raw_derived_jpeg_srgb_export_rejects_original_overwrite_before_decode() {
         let workspace = unique_library_root("core-raw-export-overwrite");
         let library_root = workspace.join("SilicaRAW Library");
@@ -11467,6 +11560,7 @@ mod tests {
         action_log: i64,
         exports: i64,
         cache_records: i64,
+        ai_results: i64,
     }
 
     fn durable_catalog_counts(catalog_path: &Path) -> DurableCatalogCounts {
@@ -11487,6 +11581,9 @@ mod tests {
             cache_records: connection
                 .query_row("SELECT COUNT(*) FROM cache_records", [], |row| row.get(0))
                 .expect("count cache records"),
+            ai_results: connection
+                .query_row("SELECT COUNT(*) FROM ai_results", [], |row| row.get(0))
+                .expect("count ai results"),
         }
     }
 

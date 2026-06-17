@@ -1104,6 +1104,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Results are local-only and permissioned.
 - **Validation:** `cargo test -p silica-storage -p silica-core -p silica-mlx`
 
+**Status:** Completed on 2026-06-17. `silica-storage` now stores local AI result payloads in `ai_results` with `approved = 0` by default, validates `silica.ai_result` v1 payload construction through the `ai_result:propose` permission, rejects output payloads that directly carry edit graph or photo flag mutation keys, and lists results per photo. `silica-core` exposes the store/read path while keeping AI output separate from edit state, edit history, catalog flags, model loading, and inference.
+
 ### Task 24.4: First Non-Mutating AI Review Feature
 
 - **Location:** `crates/silica-mlx`, `crates/silica-core`, `apps/desktop/static/`, `MockupUI/M010_AI_Review.png`

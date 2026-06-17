@@ -2,7 +2,7 @@
 title: Action Trust
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-06-17
 source_of_truth: docs/wiki/phases/phase-16-undo-history-action-trust.md
 ---
 
@@ -65,6 +65,7 @@ External file effects are not inside undo/redo transactions. Export files, sidec
 | Cache clear | Non-reversible and logged-only | Deletes only disposable cache directories and `cache_records`. Undo must not reconstruct cache bytes. |
 | Sidecar write | Logged-only | Writes only library-local sidecars under `sidecars/`, then updates `sidecar_status` after successful validation/write. Undo must not delete sidecar files. |
 | Sidecar conflict resolution | Blocked until explicit task | No silent overwrite of newer sidecars or unresolved conflicts. |
+| AI result proposal | Logged/local result state, unapproved by default | Store local review/suggestion output in `ai_results` only. Do not write edit graph, edit history, or photo flags. Approval remains a later explicit user action. |
 | Original photo mutation | Blocked | No undo class may touch, rewrite, move, or delete original referenced files. |
 | Extension, plugin, or MCP mutation | Blocked until permission/action-log phases | Future mutations must enter through Core APIs and append-only action logging, never direct DB or file writes. |
 

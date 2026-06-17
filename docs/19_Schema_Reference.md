@@ -69,6 +69,25 @@ required output metadata -> output.metadata object
 
 Model manifests validate before any model can be enabled. Hash checks are deterministic SHA-256 comparisons against the candidate model bytes. Passing validation does not load a model, run inference, or make AI features required.
 
+## AI Result Payload v1
+
+Task 24.3 stores AI outputs in the existing `ai_results` catalog table, separate from edit graph, edit history, and photo flags.
+
+Current stored payload shape:
+
+```txt
+schema -> silica.ai_result
+version -> 1
+local_only -> true
+permission_id -> ai_result:propose
+photo_id -> catalog photo id
+task_type -> model task type string
+model_id -> model manifest id
+output -> local review/suggestion object
+```
+
+AI result rows are unapproved by default. Output payloads that directly carry edit graph or photo flag mutation keys are rejected. Approval and conversion into edit graph data remain later explicit tasks.
+
 ## Edit Graph v0.1 Required Sections
 
 ```txt
