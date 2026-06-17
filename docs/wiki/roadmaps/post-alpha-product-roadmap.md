@@ -923,6 +923,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Status reflects real cache paths and sizes.
 - **Validation:** Cache clear smoke and original hash checks.
 
+**Status:** Completed on 2026-06-17. Preferences now expose Library default path storage through app-session state and Cache status/clear controls for the active library. Cache status reports real disposable cache paths, byte sizes, and cache record count. Cache clear remains limited to `thumbnails/`, `previews/`, `render-cache/`, and `ai-cache/` and continues to preserve originals, catalog data, sidecars, backups, exports, and logs.
+
 ### Task 21.4: Color and Export Defaults
 
 - **Location:** `crates/silica-core`, `crates/silica-export`, `apps/desktop/static/`

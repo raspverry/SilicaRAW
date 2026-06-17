@@ -338,8 +338,11 @@ def main():
         "preferencesAppearanceScaleValue",
         "preferencesAppearanceReset",
         "preferencesLibraryDefaultPath",
+        "preferencesLibraryUseCurrent",
+        "preferencesLibraryReset",
         "preferencesLibraryStartupAction",
         "preferencesCacheClear",
+        "preferencesCacheRefresh",
         "preferencesColorDefaultSpace",
         "preferencesColorProfilePolicy",
         "preferencesExportDefaultFormat",
@@ -530,8 +533,36 @@ def main():
         require(marker in source or (APP_FRAME_CSS.is_file() and marker in APP_FRAME_CSS.read_text(encoding="utf-8")), f"appearance preference marker missing: {marker}", failures)
     for control_id in [
         "preferencesLibraryDefaultPath",
-        "preferencesLibraryStartupAction",
+        "preferencesLibraryUseCurrent",
+        "preferencesLibraryReset",
         "preferencesCacheClear",
+        "preferencesCacheRefresh",
+    ]:
+        require(
+            "disabled" not in parser.ids.get(control_id, {}),
+            f"#{control_id} must be enabled by Task 21.3",
+            failures,
+        )
+    require(
+        "disabled" in parser.ids.get("preferencesLibraryStartupAction", {}),
+        "#preferencesLibraryStartupAction must stay disabled because Task 21.3 does not change launch behavior",
+        failures,
+    )
+    for marker in [
+        "function refreshPreferencesCacheStatus",
+        "function runPreferencesCacheClearCommand",
+        "function currentLibraryPreferences",
+        "function recordLibraryPreferences",
+        "function resetLibraryPreferences",
+        "get_library_cache_status",
+        "clear_library_cache",
+        "record_app_session_library_preferences",
+        "reset_app_session_library_preferences",
+        "response.data.totalBytes",
+        "response.data.cacheRecordCount",
+    ]:
+        require(marker in source, f"library/cache preference marker missing: {marker}", failures)
+    for control_id in [
         "preferencesColorDefaultSpace",
         "preferencesColorProfilePolicy",
         "preferencesExportDefaultFormat",

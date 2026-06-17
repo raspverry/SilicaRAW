@@ -297,6 +297,20 @@ impl Default for AppAppearancePreferences {
     }
 }
 
+/// Library storage preferences persisted outside every library.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppLibraryPreferences {
+    pub default_library_root_path: Option<PathBuf>,
+}
+
+impl Default for AppLibraryPreferences {
+    fn default() -> Self {
+        Self {
+            default_library_root_path: None,
+        }
+    }
+}
+
 /// Library grid filters persisted in app-level session state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppSessionFilters {
@@ -380,6 +394,7 @@ pub struct AppSession {
     pub last_mode: AppSessionMode,
     pub recents: Vec<AppRecentLibrary>,
     pub appearance: AppAppearancePreferences,
+    pub library: AppLibraryPreferences,
     pub layout: AppLayoutPreferences,
     pub per_library: BTreeMap<String, AppPerLibrarySession>,
 }
@@ -393,6 +408,7 @@ impl Default for AppSession {
             last_mode: AppSessionMode::Library,
             recents: Vec::new(),
             appearance: AppAppearancePreferences::default(),
+            library: AppLibraryPreferences::default(),
             layout: AppLayoutPreferences::default(),
             per_library: BTreeMap::new(),
         }
@@ -957,6 +973,48 @@ pub struct LibraryCacheClearSession {
     pub message: String,
 }
 
+/// Read-only status for one disposable cache directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryCacheDirectoryStatus {
+    pub name: String,
+    pub path: PathBuf,
+    pub exists: bool,
+    pub byte_size: u64,
+    pub file_count: u64,
+}
+
+/// Read-only status for all disposable cache directories in one library.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryCacheStatusSession {
+    pub library_root_path: PathBuf,
+    pub directories: Vec<LibraryCacheDirectoryStatus>,
+    pub total_bytes: u64,
+    pub cache_record_count: usize,
+    pub message: String,
+}
+
+impl From<silica_storage::CacheStatusSummary> for LibraryCacheStatusSession {
+    fn from(summary: silica_storage::CacheStatusSummary) -> Self {
+        Self {
+            library_root_path: summary.library_root_path,
+            directories: summary
+                .directories
+                .into_iter()
+                .map(|directory| LibraryCacheDirectoryStatus {
+                    name: directory.name,
+                    path: directory.path,
+                    exists: directory.exists,
+                    byte_size: directory.byte_size,
+                    file_count: directory.file_count,
+                })
+                .collect(),
+            total_bytes: summary.total_bytes,
+            cache_record_count: summary.cache_record_count,
+            message: summary.message,
+        }
+    }
+}
+
 impl LibraryCacheClearSession {
     /// Compact status string for the minimal desktop shell entry point.
     pub fn status_text(&self) -> String {
@@ -1260,6 +1318,7 @@ pub fn load_app_session(session_path: impl AsRef<Path>) -> Result<AppSessionLoad
         last_mode: parse_app_session_mode(object.get("last_mode"), &mut invalid_values),
         recents: parse_app_session_recents(object.get("recents"), &mut invalid_values),
         appearance: parse_app_appearance(object.get("appearance"), &mut invalid_values),
+        library: parse_app_library_preferences(object.get("library"), &mut invalid_values),
         layout: parse_app_layout(object.get("layout"), &mut invalid_values),
         per_library: parse_app_per_library(object.get("per_library"), &mut invalid_values),
     };
@@ -1316,6 +1375,11 @@ pub fn default_app_layout_preferences() -> AppLayoutPreferences {
 /// Return the documented default appearance preferences.
 pub fn default_app_appearance_preferences() -> AppAppearancePreferences {
     AppAppearancePreferences::default()
+}
+
+/// Return the documented default library preferences.
+pub fn default_app_library_preferences() -> AppLibraryPreferences {
+    AppLibraryPreferences::default()
 }
 
 /// Record a successful library create/open in app-level desktop session state.
@@ -1388,6 +1452,24 @@ pub fn reset_app_session_appearance(
     Ok(AppSessionLoadResult { session, warnings })
 }
 
+/// Reset only library storage preferences in app-level desktop session state.
+pub fn reset_app_session_library_preferences(
+    session_path: impl AsRef<Path>,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    session.library = default_app_library_preferences();
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
 /// Record workspace layout preferences in app-level desktop session state.
 pub fn record_app_session_layout(
     session_path: impl AsRef<Path>,
@@ -1421,6 +1503,25 @@ pub fn record_app_session_appearance(
 
     let mut session = loaded.session;
     session.appearance = appearance;
+    write_app_session(session_path, &session)?;
+
+    Ok(AppSessionLoadResult { session, warnings })
+}
+
+/// Record library storage preferences in app-level desktop session state.
+pub fn record_app_session_library_preferences(
+    session_path: impl AsRef<Path>,
+    library: AppLibraryPreferences,
+) -> Result<AppSessionLoadResult, CoreError> {
+    let session_path = session_path.as_ref();
+    let loaded = load_app_session(session_path)?;
+    let mut warnings = loaded.warnings;
+    if warnings.as_slice() == [AppSessionWarning::Missing] {
+        warnings.clear();
+    }
+
+    let mut session = loaded.session;
+    session.library = library;
     write_app_session(session_path, &session)?;
 
     Ok(AppSessionLoadResult { session, warnings })
@@ -4138,6 +4239,15 @@ pub fn export_raw_photo_jpeg_srgb_from_probe(
     }))
 }
 
+/// Read disposable library cache status without removing catalog or original files.
+pub fn get_library_cache_status(
+    library_root_path: impl AsRef<Path>,
+) -> Result<LibraryCacheStatusSession, CoreError> {
+    silica_storage::get_disposable_cache_status(library_root_path)
+        .map(LibraryCacheStatusSession::from)
+        .map_err(CoreError::from)
+}
+
 /// Clear disposable library cache data without removing catalog or original files.
 pub fn clear_library_cache(
     library_root_path: impl AsRef<Path>,
@@ -4750,6 +4860,9 @@ fn app_session_to_json(session: &AppSession) -> serde_json::Value {
             "density": app_appearance_density_string(session.appearance.density),
             "ui_scale": session.appearance.ui_scale,
         },
+        "library": {
+            "default_library_root_path": session.library.default_library_root_path.as_ref().map(|path| path.display().to_string()),
+        },
         "layout": {
             "sidebar_collapsed": session.layout.sidebar_collapsed,
             "inspector_collapsed": session.layout.inspector_collapsed,
@@ -4985,6 +5098,25 @@ fn parse_app_appearance(
         theme: parse_app_appearance_theme(object.get("theme"), invalid_values),
         density: parse_app_appearance_density(object.get("density"), invalid_values),
         ui_scale: parse_ui_scale(object.get("ui_scale"), invalid_values),
+    }
+}
+
+fn parse_app_library_preferences(
+    value: Option<&serde_json::Value>,
+    invalid_values: &mut bool,
+) -> AppLibraryPreferences {
+    let Some(object) = value.and_then(serde_json::Value::as_object) else {
+        if value.is_some() {
+            *invalid_values = true;
+        }
+        return AppLibraryPreferences::default();
+    };
+
+    AppLibraryPreferences {
+        default_library_root_path: parse_optional_path(
+            object.get("default_library_root_path"),
+            invalid_values,
+        ),
     }
 }
 
@@ -7606,6 +7738,72 @@ mod tests {
         );
         let loaded = load_app_session(&session_path).expect("reload reset appearance");
         assert_eq!(loaded.session.appearance, defaults);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn library_cache_status_and_preferences_are_scoped() {
+        let workspace = unique_library_root("library-cache-preferences");
+        let session_path = workspace.join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+        let defaults = default_app_library_preferences();
+
+        assert_eq!(defaults.default_library_root_path, None);
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+        create_library(&library_root).expect("create library");
+        import_folder(&library_root, &import_root).expect("import folder");
+        std::fs::write(
+            library_root.join("thumbnails").join("status-thumb.cache"),
+            b"cache bytes",
+        )
+        .expect("write cache bytes");
+        std::fs::create_dir_all(library_root.join("exports")).expect("create exports");
+        std::fs::write(library_root.join("exports").join("keep.jpg"), b"not cache")
+            .expect("write export");
+
+        let status = get_library_cache_status(&library_root).expect("cache status");
+
+        assert_eq!(status.total_bytes, 11);
+        assert_eq!(
+            status
+                .directories
+                .iter()
+                .map(|directory| directory.name.as_str())
+                .collect::<Vec<_>>(),
+            silica_storage::DISPOSABLE_CACHE_DIRECTORIES
+        );
+        assert!(status
+            .directories
+            .iter()
+            .all(|directory| directory.path.starts_with(&library_root)));
+        assert!(library_root.join("exports").join("keep.jpg").is_file());
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_root.clone());
+        write_app_session(&session_path, &session).expect("write app session");
+        let changed = AppLibraryPreferences {
+            default_library_root_path: Some(library_root.clone()),
+        };
+        let recorded = record_app_session_library_preferences(&session_path, changed.clone())
+            .expect("record library preferences");
+        assert_eq!(recorded.session.library, changed);
+        assert_eq!(
+            recorded.session.last_library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
+
+        let reset =
+            reset_app_session_library_preferences(&session_path).expect("reset library prefs");
+        assert_eq!(reset.session.library, defaults);
+        assert_eq!(
+            reset.session.last_library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
 
         remove_library_root(&workspace);
     }

@@ -1032,27 +1032,34 @@
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesLibraryDefaultPath">Default Library</label>
-                  <input id="preferencesLibraryDefaultPath" type="text" value="Ask on launch" disabled>
+                  <input id="preferencesLibraryDefaultPath" type="text" value="No default library set" readonly>
+                </div>
+                <div class="sr-preferences-action-row">
+                  <button id="preferencesLibraryUseCurrent" type="button">Use Current Library</button>
+                  <button id="preferencesLibraryReset" type="button">Reset Library</button>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesLibraryStartupAction">Startup Action</label>
                   <select id="preferencesLibraryStartupAction" disabled>
-                    <option>Open welcome screen</option>
+                    <option>Unchanged in this task</option>
                   </select>
                 </div>
               </section>
               <section class="sr-preferences-panel" id="preferencesPanelCache" role="tabpanel" data-preferences-panel="cache" aria-labelledby="preferencesPanelCacheTitle" hidden>
                 <div class="sr-preferences-panel-header">
                   <h3 id="preferencesPanelCacheTitle">Cache</h3>
-                  <p>Cache controls remain scoped to disposable thumbnails, previews, render cache, and AI cache.</p>
+                  <p>Cache controls remain scoped to disposable thumbnails, previews, render cache, and AI cache. Original files are never touched.</p>
                 </div>
                 <div class="sr-preferences-row">
                   <label for="preferencesCacheClear">Disposable Cache</label>
-                  <button id="preferencesCacheClear" type="button" disabled>Clear Cache...</button>
+                  <div class="sr-preferences-action-row">
+                    <button id="preferencesCacheRefresh" type="button">Refresh Status</button>
+                    <button id="preferencesCacheClear" type="button">Clear Cache...</button>
+                  </div>
                 </div>
                 <div class="sr-preferences-note">
                   <strong>Status</strong>
-                  <output id="preferencesCacheStatus">Cache size and clear action move here in Task 21.3.</output>
+                  <output id="preferencesCacheStatus" aria-live="polite">Open a library to inspect disposable cache size.</output>
                 </div>
               </section>
               <section class="sr-preferences-panel" id="preferencesPanelColor" role="tabpanel" data-preferences-panel="color" aria-labelledby="preferencesPanelColorTitle" hidden>
@@ -1519,6 +1526,13 @@
       const preferencesAppearanceUiScale = document.querySelector("#preferencesAppearanceUiScale");
       const preferencesAppearanceScaleValue = document.querySelector("#preferencesAppearanceScaleValue");
       const preferencesAppearanceReset = document.querySelector("#preferencesAppearanceReset");
+      const preferencesLibraryDefaultPath = document.querySelector("#preferencesLibraryDefaultPath");
+      const preferencesLibraryUseCurrent = document.querySelector("#preferencesLibraryUseCurrent");
+      const preferencesLibraryReset = document.querySelector("#preferencesLibraryReset");
+      const preferencesLibraryStartupAction = document.querySelector("#preferencesLibraryStartupAction");
+      const preferencesCacheClear = document.querySelector("#preferencesCacheClear");
+      const preferencesCacheRefresh = document.querySelector("#preferencesCacheRefresh");
+      const preferencesCacheStatus = document.querySelector("#preferencesCacheStatus");
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -1929,6 +1943,184 @@
         }
       }
 
+      function formatBytes(value) {
+        const bytes = Number(value ?? 0);
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+          return "0 B";
+        }
+        const units = ["B", "KB", "MB", "GB"];
+        let size = bytes;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+          size /= 1024;
+          unitIndex += 1;
+        }
+        const digits = unitIndex === 0 ? 0 : 1;
+        return `${size.toFixed(digits)} ${units[unitIndex]}`;
+      }
+
+      function normalizeLibraryPreferences(library = {}) {
+        const path = library.defaultLibraryRootPath ?? library.default_library_root_path ?? "";
+        return {
+          defaultLibraryRootPath: typeof path === "string" && path.length ? path : null,
+        };
+      }
+
+      function applyLibraryPreferences(library = {}) {
+        const normalized = normalizeLibraryPreferences(library);
+        preferencesLibraryDefaultPath.value = normalized.defaultLibraryRootPath ?? "No default library set";
+        preferencesLibraryDefaultPath.dataset.defaultLibraryRootPath = normalized.defaultLibraryRootPath ?? "";
+      }
+
+      function currentLibraryPreferences() {
+        const path = preferencesLibraryDefaultPath.dataset.defaultLibraryRootPath || "";
+        return {
+          defaultLibraryRootPath: path || null,
+        };
+      }
+
+      async function recordLibraryPreferences(preferences = currentLibraryPreferences()) {
+        if (!invoke) {
+          applyLibraryPreferences(preferences);
+          preferencesStatus.value = "Library preferences updated locally.";
+          setStatus(preferencesStatus.value);
+          return;
+        }
+        try {
+          const response = await invoke("record_app_session_library_preferences", {
+            library: preferences,
+          });
+          if (commandFailed(response)) {
+            preferencesStatus.value = responseErrorMessage(response, "Library preferences failed to save.");
+            setStatus(preferencesStatus.value);
+            return;
+          }
+          applyLibraryPreferences(response.data?.session?.library ?? preferences);
+          preferencesStatus.value = "Library preferences saved.";
+          setStatus(preferencesStatus.value);
+        } catch (error) {
+          preferencesStatus.value = responseErrorMessage(error, "Library preferences failed to save.");
+          setStatus(preferencesStatus.value);
+        }
+      }
+
+      async function useCurrentLibraryAsDefault() {
+        if (!activeLibraryPath) {
+          preferencesStatus.value = "Open or create a library before setting a default library.";
+          setStatus(preferencesStatus.value);
+          return;
+        }
+        const preferences = {
+          defaultLibraryRootPath: activeLibraryPath,
+        };
+        applyLibraryPreferences(preferences);
+        await recordLibraryPreferences(preferences);
+      }
+
+      async function resetLibraryPreferences() {
+        if (!invoke) {
+          applyLibraryPreferences({});
+          preferencesStatus.value = "Library preferences reset.";
+          setStatus(preferencesStatus.value);
+          return;
+        }
+        try {
+          const response = await invoke("reset_app_session_library_preferences");
+          if (commandFailed(response)) {
+            preferencesStatus.value = responseErrorMessage(response, "Library preferences reset failed.");
+            setStatus(preferencesStatus.value);
+            return;
+          }
+          applyLibraryPreferences(response.data?.session?.library ?? {});
+          preferencesStatus.value = "Library preferences reset.";
+          setStatus(preferencesStatus.value);
+        } catch (error) {
+          preferencesStatus.value = responseErrorMessage(error, "Library preferences reset failed.");
+          setStatus(preferencesStatus.value);
+        }
+      }
+
+      function cacheStatusText(data = {}) {
+        const directories = (data.directories ?? [])
+          .map((directory) => `${directory.name}: ${formatBytes(directory.byteSize)}`)
+          .join(" · ");
+        const total = formatBytes(data.totalBytes);
+        const records = data.cacheRecordCount ?? 0;
+        return `${responseMessage({ message: data.message }, "Cache status covers disposable library caches only.")} Total: ${total}. Cache records: ${records}.${directories ? ` ${directories}.` : ""}`;
+      }
+
+      async function refreshPreferencesCacheStatus() {
+        if (!activeLibraryPath) {
+          preferencesCacheStatus.value = "Open a library to inspect disposable cache size.";
+          return;
+        }
+        if (!invoke) {
+          preferencesCacheStatus.value = "Desktop runtime unavailable; cache status was not read.";
+          setStatus(preferencesCacheStatus.value);
+          return;
+        }
+        try {
+          const response = await invoke("get_library_cache_status", {
+            libraryPath: activeLibraryPath,
+          });
+          if (commandFailed(response)) {
+            preferencesCacheStatus.value = responseErrorMessage(response, "Cache status failed.");
+            setStatus(preferencesCacheStatus.value);
+            return;
+          }
+          const totalBytes = response.data.totalBytes;
+          const cacheRecordCount = response.data.cacheRecordCount;
+          preferencesCacheStatus.value = cacheStatusText({
+            ...(response.data ?? {}),
+            totalBytes,
+            cacheRecordCount,
+          });
+        } catch (error) {
+          preferencesCacheStatus.value = responseErrorMessage(error, "Cache status failed.");
+          setStatus(preferencesCacheStatus.value);
+        }
+      }
+
+      async function runPreferencesCacheClearCommand() {
+        if (!activeLibraryPath) {
+          preferencesCacheStatus.value = "Open or create a library before clearing disposable caches.";
+          setStatus(preferencesCacheStatus.value);
+          return;
+        }
+        if (!invoke) {
+          preferencesCacheStatus.value = "Desktop runtime unavailable; cache clear was not run.";
+          setStatus(preferencesCacheStatus.value);
+          return;
+        }
+
+        setBusy(true);
+        preferencesCacheStatus.value = "Clearing thumbnails, previews, render-cache, and ai-cache only...";
+        setStatus(preferencesCacheStatus.value);
+        try {
+          const response = await invoke("clear_library_cache", {
+            libraryPath: activeLibraryPath,
+          });
+          if (commandFailed(response)) {
+            preferencesCacheStatus.value = responseErrorMessage(response, "Cache clear failed.");
+            setStatus(preferencesCacheStatus.value);
+            return;
+          }
+          const cleared = response.data.clearedDirectories.join(", ");
+          const removed = response.data.removedCacheRecords;
+          const message = `${responseMessage(response, "Cache clear removed only disposable library caches.")} Cleared: ${cleared}. Cache records removed: ${removed}.`;
+          preferencesCacheStatus.value = message;
+          cacheClearStatus.value = message;
+          await loadLibraryGrid();
+          await refreshPreferencesCacheStatus();
+          setStatus(message);
+        } catch (error) {
+          preferencesCacheStatus.value = responseErrorMessage(error, "Cache clear failed.");
+          setStatus(preferencesCacheStatus.value);
+        } finally {
+          setBusy(false);
+        }
+      }
+
       function normalizeLayoutPreferences(layout = {}) {
         const filters = layout.filters ?? {};
         return {
@@ -2172,6 +2364,7 @@
         if (!invoke) {
           renderRecentLibraries([]);
           applyAppearancePreferences({}, { persist: false });
+          applyLibraryPreferences({});
           return;
         }
         try {
@@ -2179,15 +2372,18 @@
           if (commandFailed(response)) {
             renderRecentLibraries([]);
             applyAppearancePreferences({}, { persist: false });
+            applyLibraryPreferences({});
             return;
           }
           const session = response.data?.session ?? {};
           renderRecentLibraries(session.recents ?? []);
           applyAppearancePreferences(session.appearance ?? {}, { persist: false });
+          applyLibraryPreferences(session.library ?? {});
           applyLayoutPreferences(session.layout ?? {}, { persist: false });
         } catch (_error) {
           renderRecentLibraries([]);
           applyAppearancePreferences({}, { persist: false });
+          applyLibraryPreferences({});
         }
       }
 
@@ -2210,6 +2406,7 @@
         if (!invoke) {
           renderRecentLibraries([]);
           applyAppearancePreferences({}, { persist: false });
+          applyLibraryPreferences({});
           applyLayoutPreferences({}, { persist: false });
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
@@ -2222,6 +2419,7 @@
           if (commandFailed(response)) {
             renderRecentLibraries([]);
             applyAppearancePreferences({}, { persist: false });
+            applyLibraryPreferences({});
             applyLayoutPreferences({}, { persist: false });
             renderLibraryGrid(initialGridPhotos);
             setLibraryState("welcome");
@@ -2233,6 +2431,7 @@
           const restore = response.data ?? {};
           renderRecentLibraries(restore.session?.recents ?? []);
           applyAppearancePreferences(restore.session?.appearance ?? {}, { persist: false });
+          applyLibraryPreferences(restore.session?.library ?? {});
           applyLayoutPreferences(restore.session?.layout ?? {}, { persist: false });
           if (restore.state !== "library" || !restore.libraryRootPath) {
             activeLibraryPath = "";
@@ -2252,6 +2451,7 @@
             allowDefaultSelection: restore.selectedPhotoStatus !== "missing",
             persistSelection: false,
           });
+          await refreshPreferencesCacheStatus();
           setMode(restore.resolvedMode || "library", { persist: false });
           setStatus(
             restore.selectedPhotoStatus === "missing"
@@ -2261,6 +2461,7 @@
         } catch (error) {
           renderRecentLibraries([]);
           applyAppearancePreferences({}, { persist: false });
+          applyLibraryPreferences({});
           applyLayoutPreferences({}, { persist: false });
           renderLibraryGrid(initialGridPhotos);
           setLibraryState("welcome");
@@ -4915,9 +5116,16 @@
         const selectedButton = preferencesSectionButtons.find((button) => button.dataset.preferencesSection === selectedSection);
         if (preferencesStatus && selectedButton) {
           const label = selectedButton.querySelector("span")?.textContent ?? "Preferences";
-          preferencesStatus.value = selectedSection === "appearance"
-            ? "Appearance settings save automatically. Other sections stay disabled until scoped tasks."
-            : `${label} settings are mapped; controls remain disabled until their scoped task.`;
+          if (selectedSection === "appearance") {
+            preferencesStatus.value = "Appearance settings save automatically.";
+          } else if (selectedSection === "library") {
+            preferencesStatus.value = "Library preferences store default path state only; launch behavior is unchanged.";
+          } else if (selectedSection === "cache") {
+            preferencesStatus.value = "Cache controls affect disposable library caches only.";
+            void refreshPreferencesCacheStatus();
+          } else {
+            preferencesStatus.value = `${label} settings are mapped; controls remain disabled until their scoped task.`;
+          }
         }
       }
 
@@ -6491,6 +6699,11 @@
         importRecursiveInput.disabled = isBusy;
         openLoupeButton.disabled = isBusy;
         clearLibraryCacheButton.disabled = isBusy || !activeLibraryPath;
+        preferencesLibraryUseCurrent.disabled = isBusy || !activeLibraryPath;
+        preferencesLibraryReset.disabled = isBusy;
+        preferencesLibraryStartupAction.disabled = true;
+        preferencesCacheRefresh.disabled = isBusy || !activeLibraryPath;
+        preferencesCacheClear.disabled = isBusy || !activeLibraryPath;
         updateCullingControls(selectedPhoto());
         const developDisabled = isBusy || !isDevelopable(selectedPhoto());
         [
@@ -6617,6 +6830,7 @@
           await loadExportSettings();
           await loadLibraryGrid();
           await loadAppSession();
+          await refreshPreferencesCacheStatus();
         } catch (error) {
           setStatus(responseErrorMessage(error, "Library command failed."));
         } finally {
@@ -6932,6 +7146,10 @@
         });
       });
       preferencesAppearanceReset.addEventListener("click", resetAppearancePreferences);
+      preferencesLibraryUseCurrent.addEventListener("click", useCurrentLibraryAsDefault);
+      preferencesLibraryReset.addEventListener("click", resetLibraryPreferences);
+      preferencesCacheRefresh.addEventListener("click", () => void refreshPreferencesCacheStatus());
+      preferencesCacheClear.addEventListener("click", runPreferencesCacheClearCommand);
       closePreferencesDialogButton.addEventListener("click", closePreferencesDialog);
       closePreferencesDialogFooterButton.addEventListener("click", closePreferencesDialog);
       openExportDialogButton.addEventListener("click", openExportDialog);

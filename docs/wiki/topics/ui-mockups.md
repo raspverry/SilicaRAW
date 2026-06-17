@@ -56,7 +56,7 @@ Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders 
 
 ## Phase 21 Relationship
 
-Phase 21 replaces the minimal maintenance surface with a complete Preferences surface. Task 21.1 uses `M008_Preferences_Appearance.png` for the compact section-list and pane structure only. Task 21.2 enables supported Appearance controls through app-session state and tokenized CSS. Cache actions, export defaults, and advanced agent access are owned by later Phase 21 tasks.
+Phase 21 replaces the minimal maintenance surface with a complete Preferences surface. Task 21.1 uses `M008_Preferences_Appearance.png` for the compact section-list and pane structure only. Task 21.2 enables supported Appearance controls through app-session state and tokenized CSS. Task 21.3 moves supported Library default path storage and disposable Cache status/clear controls into Preferences. Color defaults, Export defaults, and advanced agent access remain owned by later Phase 21 tasks.
 
 ## Links
 
