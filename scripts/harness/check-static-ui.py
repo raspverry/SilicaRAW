@@ -324,6 +324,11 @@ def main():
         "cancelExport",
         "exportStatus",
         "exportSafetyNote",
+        "exportBatchProgress",
+        "exportBatchProgressLabel",
+        "exportBatchFailureList",
+        "recentExportsList",
+        "recentExportsEmpty",
         "exportPreset",
         "exportPresetName",
         "saveExportPreset",
@@ -334,6 +339,8 @@ def main():
         "exportSummaryFormat",
         "exportSummaryColor",
         "exportSummaryQuality",
+        "exportSummaryMetadata",
+        "exportSummaryBatch",
         "exportSummaryFile",
     ]
     for element_id in required_ids:
@@ -830,6 +837,15 @@ def main():
     require(
         parser.ids.get("exportPreset", {}).get("name") == "exportPreset",
         "#exportPreset must expose the current export preset",
+        failures,
+    )
+    require(
+        parser.ids.get("exportBatchProgress", {}).get("max") == "100"
+        and parser.ids.get("exportBatchProgress", {}).get("value") == "0"
+        and "function runBatchExport" in source
+        and "exportBatchFailures" in source
+        and "function loadRecentExports" in source,
+        "export workflow must expose batch progress, failures, and recent export loading",
         failures,
     )
     require(

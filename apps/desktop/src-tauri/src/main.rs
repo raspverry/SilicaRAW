@@ -234,6 +234,17 @@ struct DesktopExportPreset {
     settings: DesktopExportSettings,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopRecentExport {
+    export_record_id: String,
+    photo_id: String,
+    output_path: String,
+    export_settings_json: String,
+    created_at: String,
+    output_exists: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(
     rename_all = "camelCase",
@@ -453,6 +464,10 @@ enum DesktopCommandData {
         presets: Vec<DesktopExportPreset>,
         message: String,
     },
+    RecentExports {
+        exports: Vec<DesktopRecentExport>,
+        message: String,
+    },
     Export {
         photo_id: String,
         source_path: String,
@@ -503,6 +518,7 @@ impl DesktopCommandData {
             Self::HistoryPanel { .. } => "historyPanel",
             Self::Histogram { .. } => "histogram",
             Self::ExportSettings { .. } => "exportSettings",
+            Self::RecentExports { .. } => "recentExports",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
         }
@@ -3091,6 +3107,30 @@ fn get_export_settings(library_path: String) -> DesktopCommandResponse {
 }
 
 #[tauri::command]
+fn get_recent_exports(library_path: String, limit: Option<usize>) -> DesktopCommandResponse {
+    let command = "get_recent_exports";
+    let limit = limit.unwrap_or(10).min(50);
+    match silica_core::list_recent_exports(PathBuf::from(&library_path), limit) {
+        Ok(exports) => DesktopCommandResponse::ok(
+            command,
+            "Recent exports loaded.",
+            DesktopCommandData::RecentExports {
+                exports: exports.into_iter().map(desktop_recent_export).collect(),
+                message: "Recent exports loaded.".to_string(),
+            },
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn save_export_settings(
     library_path: String,
     preset_id: Option<String>,
@@ -3506,6 +3546,17 @@ fn desktop_export_settings(settings: silica_core::ExportSettings) -> DesktopExpo
         color_profile: settings.color_profile,
         quality: settings.quality,
         metadata_policy: settings.metadata_policy,
+    }
+}
+
+fn desktop_recent_export(export: silica_core::PhotoRecentExport) -> DesktopRecentExport {
+    DesktopRecentExport {
+        export_record_id: export.export_record_id,
+        photo_id: export.photo_id,
+        output_path: export.output_path,
+        export_settings_json: export.export_settings_json,
+        created_at: export.created_at,
+        output_exists: export.output_exists,
     }
 }
 
@@ -4280,6 +4331,7 @@ fn main() {
             export_photo_png,
             export_photo_tiff,
             get_export_settings,
+            get_recent_exports,
             save_export_settings,
             save_export_preset,
             clear_library_cache
@@ -6454,6 +6506,58 @@ mod tests {
             std::fs::read(&supported_file).expect("read original after"),
             original_before
         );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_lists_recent_exports_with_missing_evidence() {
+        let workspace = unique_library_root("desktop-recent-exports");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let supported_file = import_root.join("sample.jpg");
+        let existing_output = export_root.join("sample-existing.jpg");
+        let missing_output = export_root.join("sample-missing.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&supported_file);
+
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let first = super::export_photo_jpeg_srgb(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            existing_output.display().to_string(),
+        );
+        assert!(first.ok, "first export failed: {first:?}");
+        let second = super::export_photo_jpeg_srgb(
+            library_root.display().to_string(),
+            photo_id,
+            missing_output.display().to_string(),
+        );
+        assert!(second.ok, "second export failed: {second:?}");
+        std::fs::remove_file(&missing_output).expect("remove exported output");
+
+        let recent = super::get_recent_exports(library_root.display().to_string(), Some(2));
+
+        assert!(recent.ok, "recent exports failed: {recent:?}");
+        match response_data(&recent) {
+            super::DesktopCommandData::RecentExports { exports, .. } => {
+                assert_eq!(exports.len(), 2);
+                assert_eq!(exports[0].output_path, missing_output.display().to_string());
+                assert!(!exports[0].output_exists);
+                assert_eq!(
+                    exports[1].output_path,
+                    existing_output.display().to_string()
+                );
+                assert!(exports[1].output_exists);
+            }
+            other => panic!("unexpected recent exports data: {other:?}"),
+        }
 
         remove_library_root(&workspace);
     }

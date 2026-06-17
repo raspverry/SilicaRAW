@@ -368,6 +368,16 @@ pub struct ExportRecord {
     pub export_settings_json: String,
 }
 
+/// Catalog export row used by recent export views.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecentExportRecord {
+    pub id: String,
+    pub photo_id: String,
+    pub output_path: String,
+    pub export_settings_json: String,
+    pub created_at: String,
+}
+
 /// Export-owned settings that are separate from edit graph state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportSettings {
@@ -3839,6 +3849,30 @@ pub fn get_latest_export_record(
         .map_err(LibraryStorageError::from)
 }
 
+/// Read recent export records for the library.
+pub fn list_recent_export_records(
+    library_root_path: impl AsRef<Path>,
+    limit: usize,
+) -> Result<Vec<RecentExportRecord>, LibraryStorageError> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    let mut statement = connection.prepare(
+        r#"
+        SELECT id, photo_id, output_path, export_settings_json, created_at
+        FROM exports
+        ORDER BY datetime(created_at) DESC, rowid DESC
+        LIMIT ?1
+        "#,
+    )?;
+    let rows = statement.query_map(params![limit as i64], recent_export_record_from_row)?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(LibraryStorageError::from)
+}
+
 /// Apply connection-local safety and durability settings.
 pub fn configure_connection(connection: &Connection) -> rusqlite::Result<()> {
     connection.busy_timeout(Duration::from_secs(5))?;
@@ -4441,6 +4475,16 @@ fn export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExportRec
         photo_id: row.get(1)?,
         output_path: row.get(2)?,
         export_settings_json: row.get(3)?,
+    })
+}
+
+fn recent_export_record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RecentExportRecord> {
+    Ok(RecentExportRecord {
+        id: row.get(0)?,
+        photo_id: row.get(1)?,
+        output_path: row.get(2)?,
+        export_settings_json: row.get(3)?,
+        created_at: row.get(4)?,
     })
 }
 
@@ -8634,6 +8678,58 @@ mod tests {
             .expect("read latest export")
             .expect("latest export row");
         assert_eq!(latest, record);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recent_export_records_are_limited_and_ordered() {
+        let workspace = unique_library_root("recent-export-records");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let first_file = import_root.join("first.jpg");
+        let second_file = import_root.join("second.jpg");
+        let first_output = workspace.join("Exports").join("first-export.jpg");
+        let second_output = workspace.join("Exports").join("second-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(first_output.parent().expect("output parent"))
+            .expect("create export directory");
+        std::fs::write(&first_file, b"jpeg placeholder bytes").expect("write first");
+        std::fs::write(&second_file, b"jpeg placeholder bytes").expect("write second");
+        std::fs::write(&first_output, b"first export bytes").expect("write first output");
+        std::fs::write(&second_output, b"second export bytes").expect("write second output");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let first_photo_id = stable_catalog_id("photo", &first_file.display().to_string());
+        let second_photo_id = stable_catalog_id("photo", &second_file.display().to_string());
+
+        let first = record_export(
+            &library.root_path,
+            &first_photo_id,
+            &first_output,
+            r#"{"format":"jpeg"}"#,
+        )
+        .expect("record first export");
+        let second = record_export(
+            &library.root_path,
+            &second_photo_id,
+            &second_output,
+            r#"{"format":"png"}"#,
+        )
+        .expect("record second export");
+
+        let recent =
+            list_recent_export_records(&library.root_path, 1).expect("list recent exports");
+
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].id, second.id);
+        assert_eq!(recent[0].photo_id, second.photo_id);
+        assert_eq!(recent[0].output_path, second.output_path);
+        assert_eq!(recent[0].export_settings_json, second.export_settings_json);
+        assert!(!recent[0].created_at.is_empty());
+        assert_ne!(recent[0].id, first.id);
 
         remove_library_root(&workspace);
     }
