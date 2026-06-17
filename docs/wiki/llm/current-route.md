@@ -14,13 +14,13 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, and Task 24.3 are complete. The next roadmap task is **Task 24.4: First Non-Mutating AI Review Feature**.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, and Task 24.4 are complete. The next roadmap task is **Task 24.5: Explicit AI Suggestion Approval**.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. MCP/plugin runtime and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. MCP/plugin runtime and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For Task 24.4, read:
+For Task 24.5, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 24](../roadmaps/post-alpha-product-roadmap.md#phase-24-mlx-and-ai-preview)
@@ -28,9 +28,11 @@ For Task 24.4, read:
 - [Plugins and MCP](../topics/plugins-and-mcp.md)
 - [Action Trust](../topics/action-trust.md)
 - [Data Safety](../topics/data-safety.md)
+- [Task 19.4: Mask Compositing in Preview and Export](../tasks/19.4-mask-compositing-preview-export.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Schema Reference](../../19_Schema_Reference.md)
 - [Model Manifest Schema](../../../schemas/model_manifest.schema.json)
+- [Task 24.4: First Non-Mutating AI Review Feature](../tasks/24.4-first-non-mutating-ai-review.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
 ## Phase 23 Context
@@ -52,6 +54,8 @@ For Task 24.4, read:
 - Task 24.3 stores `silica.ai_result` v1 rows in `ai_results`, unapproved by default, with `local_only = true` and `permission_id = ai_result:propose`.
 - Task 24.3 rejects AI result payloads that directly carry edit graph or photo flag mutation keys.
 - AI result storage/read is local-only through Core and Storage APIs; it does not load models, run inference, approve suggestions, or write edit history.
+- Task 24.4 builds the first AI review panel from stored blur review results only. Missing models or missing stored results produce a model-unavailable/editor-usable state.
+- Task 24.4 desktop UI presents AI review as information only; approval remains disabled until Task 24.5.
 - MLX memory policy is bounded worker use under unified-memory pressure; cancellation is cooperative at task boundaries until proven otherwise.
 
 ## Stop Rules
@@ -59,5 +63,5 @@ For Task 24.4, read:
 - Do not treat visual QA screenshots as product feature implementation.
 - Do not add broad fallback systems for performance, migration, or profiling work.
 - Do not start agent, MCP, or plugin runtime.
-- Do not add MLX runtime, model loading, MCP runtime, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support unless the selected roadmap task explicitly requires it. Task 24.4 allows a non-mutating review surface only.
+- Do not add MLX runtime, model loading, MCP runtime, plugin runtime, cloud sync, telemetry, auto-update, or broad RAW support unless the selected roadmap task explicitly requires it. Task 24.5 allows explicit approval conversion only through the documented Core/history boundary.
 - Do not mutate original photo files.

@@ -445,6 +445,17 @@ enum DesktopCommandData {
         status: String,
         message: String,
     },
+    AiReviewPanel {
+        photo_id: String,
+        task_type: String,
+        status: &'static str,
+        message: String,
+        editor_remains_usable: bool,
+        requires_explicit_approval: bool,
+        writes_edit_graph: bool,
+        writes_photo_flags: bool,
+        items: Vec<DesktopAiReviewItem>,
+    },
     Histogram {
         photo_id: String,
         source_path: String,
@@ -523,6 +534,7 @@ impl DesktopCommandData {
             Self::EditClipboardSync { .. } => "editClipboardSync",
             Self::HistoryCommand { .. } => "historyCommand",
             Self::HistoryPanel { .. } => "historyPanel",
+            Self::AiReviewPanel { .. } => "aiReviewPanel",
             Self::Histogram { .. } => "histogram",
             Self::ExportSettings { .. } => "exportSettings",
             Self::RecentExports { .. } => "recentExports",
@@ -981,6 +993,18 @@ struct DesktopHistoryItem {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct DesktopAiReviewItem {
+    result_id: String,
+    model_id: String,
+    label: String,
+    recommendation: String,
+    confidence_percent: Option<u8>,
+    approved: bool,
+    created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DesktopMetadataField<T> {
     state: &'static str,
     value: Option<T>,
@@ -1019,6 +1043,20 @@ impl From<silica_core::PhotoHistoryItem> for DesktopHistoryItem {
             history_state: item.history_state,
             can_undo: item.can_undo,
             can_redo: item.can_redo,
+            created_at: item.created_at,
+        }
+    }
+}
+
+impl From<silica_core::AiReviewItem> for DesktopAiReviewItem {
+    fn from(item: silica_core::AiReviewItem) -> Self {
+        Self {
+            result_id: item.result_id,
+            model_id: item.model_id,
+            label: item.label,
+            recommendation: item.recommendation,
+            confidence_percent: item.confidence_percent,
+            approved: item.approved,
             created_at: item.created_at,
         }
     }
@@ -1482,6 +1520,25 @@ fn get_photo_metadata(library_path: String, photo_id: String) -> DesktopCommandR
             photo_metadata_data(metadata),
         ),
         Ok(None) => DesktopCommandResponse::empty(command, "Catalog photo was not found."),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn get_ai_review_panel(library_path: String, photo_id: String) -> DesktopCommandResponse {
+    let command = "get_ai_review_panel";
+    match silica_core::get_ai_review_panel(PathBuf::from(&library_path), &photo_id) {
+        Ok(panel) => {
+            DesktopCommandResponse::ok(command, panel.message.clone(), ai_review_panel_data(panel))
+        }
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -4244,6 +4301,31 @@ fn photo_history_panel_data(panel: silica_core::PhotoHistoryPanel) -> DesktopCom
     }
 }
 
+fn ai_review_panel_data(panel: silica_core::AiReviewPanel) -> DesktopCommandData {
+    DesktopCommandData::AiReviewPanel {
+        photo_id: panel.photo_id,
+        task_type: panel.task_type,
+        status: ai_review_status_text(panel.status),
+        message: panel.message,
+        editor_remains_usable: panel.editor_remains_usable,
+        requires_explicit_approval: panel.requires_explicit_approval,
+        writes_edit_graph: panel.writes_edit_graph,
+        writes_photo_flags: panel.writes_photo_flags,
+        items: panel
+            .items
+            .into_iter()
+            .map(DesktopAiReviewItem::from)
+            .collect(),
+    }
+}
+
+fn ai_review_status_text(status: silica_core::AiReviewPanelStatus) -> &'static str {
+    match status {
+        silica_core::AiReviewPanelStatus::ModelUnavailable => "modelUnavailable",
+        silica_core::AiReviewPanelStatus::ReviewAvailable => "reviewAvailable",
+    }
+}
+
 fn photo_metadata_data(metadata: silica_core::PhotoMetadata) -> DesktopCommandData {
     DesktopCommandData::PhotoMetadata {
         photo_id: metadata.photo_id,
@@ -4535,6 +4617,7 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
         silica_core::CoreError::Export(_) => "export",
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
         silica_core::CoreError::AppSession(_) => "appSession",
+        silica_core::CoreError::AiReview(_) => "aiReview",
     }
 }
 
@@ -4595,6 +4678,7 @@ fn main() {
             set_photo_flags,
             get_photo_flags,
             get_photo_metadata,
+            get_ai_review_panel,
             open_photo_preview,
             preview_exposure_contrast_edit,
             preview_white_balance_edit,
@@ -6664,6 +6748,58 @@ mod tests {
                 assert_eq!(items[0].history_state, "applied");
             }
             other => panic!("unexpected history response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_returns_ai_review_panel_without_mutating_edits() {
+        let workspace = unique_library_root("desktop-ai-review");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        let created = silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        silica_core::store_ai_result(
+            &created.root_path,
+            &photo_id,
+            "blur_score",
+            "silicaraw.blur-review.test",
+            r#"{"review":{"label":"Motion blur likely","recommendation":"review","confidence":0.91}}"#,
+        )
+        .expect("store ai review");
+
+        let response =
+            super::get_ai_review_panel(library_root.display().to_string(), photo_id.clone());
+
+        assert!(response.ok, "AI review command failed: {response:?}");
+        assert_eq!(response.command, "get_ai_review_panel");
+        match response_data(&response) {
+            super::DesktopCommandData::AiReviewPanel {
+                photo_id: returned_photo_id,
+                status,
+                items,
+                writes_edit_graph,
+                writes_photo_flags,
+                requires_explicit_approval,
+                ..
+            } => {
+                assert_eq!(returned_photo_id, &photo_id);
+                assert_eq!(*status, "reviewAvailable");
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0].label, "Motion blur likely");
+                assert_eq!(items[0].confidence_percent, Some(91));
+                assert!(!*writes_edit_graph);
+                assert!(!*writes_photo_flags);
+                assert!(*requires_explicit_approval);
+            }
+            other => panic!("unexpected AI review response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

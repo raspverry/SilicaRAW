@@ -50,6 +50,7 @@ SURFACES = [
     ("M020-preferences-appearance", "preferences-appearance"),
     ("M021-preferences-advanced", "preferences-advanced"),
     ("M022-export-workflow", "export-workflow"),
+    ("M023-ai-review", "ai-review"),
 ]
 
 
@@ -401,15 +402,19 @@ def state_script(state):
   const imagePath = {json.dumps(image_path)};
   const secondaryPath = {json.dumps(secondary_path)};
   const app = document.querySelector("#appFrame");
+  const libraryHeader = document.querySelector("#librarySurfaceHeader");
   const gridShell = document.querySelector(".sr-library-grid-shell");
+  const cacheMaintenance = document.querySelector("#cacheMaintenance");
   const grid = document.querySelector("#libraryGrid");
   const empty = document.querySelector("#gridEmptyState");
   const loading = document.querySelector("#gridLoadingState");
   const importPanel = document.querySelector("#importPanel");
   const loupeSurface = document.querySelector("#loupeSurface");
+  const aiReviewSurface = document.querySelector("#aiReviewSurface");
   const loupeViewer = document.querySelector("#loupeViewer");
   const developSurface = document.querySelector("#developPreviewSurface");
   const exportDialog = document.querySelector("#exportDialog");
+  const preferencesDialog = document.querySelector("#preferencesDialog");
 
   function setLayout(sidebarCollapsed, inspectorCollapsed, filmstripVisible, thumbnailSize = 168) {{
     app.dataset.sidebarCollapsed = String(sidebarCollapsed);
@@ -607,6 +612,53 @@ def state_script(state):
     }}));
   }}
 
+  function aiReviewCard(label, recommendation, confidence, modelId) {{
+    const card = document.createElement("article");
+    card.className = "sr-ai-review-card";
+    card.setAttribute("role", "listitem");
+    const title = document.createElement("strong");
+    title.textContent = label;
+    const rec = document.createElement("span");
+    rec.textContent = `Recommendation: ${{recommendation}}`;
+    const meter = document.createElement("span");
+    meter.className = "sr-ai-review-meter";
+    meter.style.setProperty("--sr-ai-review-confidence", `${{confidence}}%`);
+    const fill = document.createElement("span");
+    meter.append(fill);
+    const meta = document.createElement("small");
+    meta.textContent = `${{confidence}}% confidence · ${{modelId}} · unapproved`;
+    card.append(title, rec, meter, meta);
+    return card;
+  }}
+
+  function setAiReviewState() {{
+    openLibraryBase(true);
+    gridShell.hidden = true;
+    libraryHeader.hidden = true;
+    cacheMaintenance.hidden = true;
+    loupeSurface.hidden = true;
+    aiReviewSurface.hidden = false;
+    aiReviewSurface.dataset.aiReviewState = "review-available";
+    document.querySelector("#aiReviewSelectedPhoto").textContent = "Selected photo: synthetic-gradient.jpg";
+    const status = "Blur review suggestions are information only until explicit approval is implemented. Review information only; this does not write edits, flags, or originals.";
+    document.querySelector("#aiReviewStatus").value = status;
+    document.querySelector("#aiReviewStatus").textContent = status;
+    document.querySelector("#aiReviewSummaryStatus").textContent = "Review available";
+    document.querySelector("#aiReviewSummaryCount").textContent = "3";
+    document.querySelector("#aiReviewSummaryTask").textContent = "Blur score";
+    document.querySelector("#aiReviewSidebarCount").textContent = "3";
+    document.querySelector("#libraryAllPhotosNav").classList.remove("is-active");
+    document.querySelector("#openAiReview").classList.add("is-active");
+    document.querySelector("#aiReviewEmptyState").hidden = true;
+    document.querySelector("#aiReviewList").hidden = false;
+    document.querySelector("#aiReviewApprovalDeferred").disabled = true;
+    document.querySelector("#aiReviewList").replaceChildren(
+      aiReviewCard("Motion blur likely", "review", 91, "silicaraw.blur-review.test"),
+      aiReviewCard("Focus missed", "review", 86, "silicaraw.blur-review.test"),
+      aiReviewCard("Usable detail", "keep", 74, "silicaraw.blur-review.test"),
+    );
+  }}
+
   function renderExportPreview() {{
     const card = document.querySelector(".sr-export-preview-card");
     card.querySelectorAll(".sr-export-preview-image").forEach((image) => image.remove());
@@ -619,8 +671,14 @@ def state_script(state):
     setLibraryState("open");
     importPanel.hidden = true;
     loupeSurface.hidden = true;
+    aiReviewSurface.hidden = true;
+    libraryHeader.hidden = false;
+    cacheMaintenance.hidden = false;
+    document.querySelector("#libraryAllPhotosNav").classList.add("is-active");
+    document.querySelector("#openAiReview").classList.remove("is-active");
     gridShell.hidden = false;
     exportDialog.hidden = true;
+    preferencesDialog.hidden = true;
     populateGrid(withPhotos);
     setHistogramState(withPhotos);
     populateFilmstrip("#loupeFilmstrip");
@@ -634,6 +692,7 @@ def state_script(state):
   setLibraryState("welcome");
   setLayout(false, false, true);
   exportDialog.hidden = true;
+  preferencesDialog.hidden = true;
 
   if (state === "welcome") {{
     document.querySelector("#welcomeStatus").value = "Enter a local library folder path to begin.";
@@ -649,6 +708,8 @@ def state_script(state):
       setMetadataReadback();
       document.querySelector("#rightInspector").scrollTop = 0;
     }}
+  }} else if (state === "ai-review") {{
+    setAiReviewState();
   }} else if (state === "import") {{
     openLibraryBase(true);
     importPanel.hidden = false;
@@ -1291,6 +1352,17 @@ def metric_script(surface):
       undoDisabled: disabled("#developUndoHistory"),
       redoDisabled: disabled("#developRedoHistory"),
     }},
+    aiReviewState: {{
+      visible: Boolean(box("#aiReviewSurface")),
+      panelState: document.querySelector("#aiReviewSurface")?.dataset.aiReviewState || "",
+      selectedPhoto: text("#aiReviewSelectedPhoto"),
+      status: text("#aiReviewStatus"),
+      resultCards: Array.from(document.querySelectorAll(".sr-ai-review-card")).filter(visible).length,
+      summaryStatus: text("#aiReviewSummaryStatus"),
+      summaryCount: text("#aiReviewSummaryCount"),
+      approvalDisabled: disabled("#aiReviewApprovalDeferred"),
+      actionPreview: text("#aiReviewActionPreview"),
+    }},
     preferencesState: {{
       visible: Boolean(preferencesDialog),
       dialogWithinViewport: !preferencesDialog || (
@@ -1446,6 +1518,20 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: history commands disabled")
                     if history_state["status"] != "3 committed history entries.":
                         failures.append(f"{viewport_name} {surface_name}: history status wrong")
+                if state == "ai-review":
+                    ai_review = metrics["aiReviewState"]
+                    if not ai_review["visible"] or ai_review["panelState"] != "review-available":
+                        failures.append(f"{viewport_name} {surface_name}: AI review panel state not visible")
+                    if ai_review["selectedPhoto"] != "Selected photo: synthetic-gradient.jpg":
+                        failures.append(f"{viewport_name} {surface_name}: AI review selected-photo scope unclear")
+                    if ai_review["resultCards"] < 3 or ai_review["summaryCount"] != "3":
+                        failures.append(f"{viewport_name} {surface_name}: AI review result cards missing")
+                    if ai_review["summaryStatus"] != "Review available":
+                        failures.append(f"{viewport_name} {surface_name}: AI review summary status wrong")
+                    if not ai_review["approvalDisabled"]:
+                        failures.append(f"{viewport_name} {surface_name}: AI review approval must stay disabled")
+                    if "Review information only" not in ai_review["status"] or "does not write edits" not in ai_review["actionPreview"]:
+                        failures.append(f"{viewport_name} {surface_name}: AI review non-mutating copy missing")
                 if state in {"mask-active", "mask-editor"}:
                     mask_state = metrics["maskState"]
                     if not mask_state["visible"] or mask_state["panelState"] != "active":

@@ -1180,6 +1180,7 @@ pub enum CoreError {
     ExportBlocked(String),
     UnsupportedEdit(String),
     AppSession(String),
+    AiReview(String),
 }
 
 impl fmt::Display for CoreError {
@@ -1194,6 +1195,7 @@ impl fmt::Display for CoreError {
             Self::ExportBlocked(message) => write!(formatter, "export blocked: {message}"),
             Self::UnsupportedEdit(message) => write!(formatter, "unsupported edit: {message}"),
             Self::AppSession(message) => write!(formatter, "app session error: {message}"),
+            Self::AiReview(message) => write!(formatter, "AI review error: {message}"),
         }
     }
 }
@@ -1210,6 +1212,7 @@ impl Error for CoreError {
             Self::ExportBlocked(_) => None,
             Self::UnsupportedEdit(_) => None,
             Self::AppSession(_) => None,
+            Self::AiReview(_) => None,
         }
     }
 }
@@ -1882,6 +1885,114 @@ pub fn list_ai_results_for_photo(
 ) -> Result<Vec<AiResult>, CoreError> {
     silica_storage::list_ai_results_for_photo(library_root_path, photo_id.as_ref(), limit)
         .map_err(CoreError::from)
+}
+
+pub const AI_REVIEW_BLUR_TASK_TYPE: &str = "blur_score";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiReviewPanelStatus {
+    ModelUnavailable,
+    ReviewAvailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiReviewPanel {
+    pub photo_id: String,
+    pub task_type: String,
+    pub status: AiReviewPanelStatus,
+    pub message: String,
+    pub editor_remains_usable: bool,
+    pub requires_explicit_approval: bool,
+    pub writes_edit_graph: bool,
+    pub writes_photo_flags: bool,
+    pub items: Vec<AiReviewItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiReviewItem {
+    pub result_id: String,
+    pub model_id: String,
+    pub label: String,
+    pub recommendation: String,
+    pub confidence_percent: Option<u8>,
+    pub approved: bool,
+    pub created_at: String,
+}
+
+/// Build the first non-mutating AI review panel from stored local AI result rows only.
+pub fn get_ai_review_panel(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+) -> Result<AiReviewPanel, CoreError> {
+    let photo_id = photo_id.as_ref();
+    let results = silica_storage::list_ai_results_for_photo(library_root_path, photo_id, 20)?;
+    let items = results
+        .into_iter()
+        .filter(|result| result.task_type == AI_REVIEW_BLUR_TASK_TYPE)
+        .map(ai_review_item_from_result)
+        .collect::<Result<Vec<_>, _>>()?;
+    let status = if items.is_empty() {
+        AiReviewPanelStatus::ModelUnavailable
+    } else {
+        AiReviewPanelStatus::ReviewAvailable
+    };
+    let message = match status {
+        AiReviewPanelStatus::ModelUnavailable => {
+            "No local blur review model or stored result is available."
+        }
+        AiReviewPanelStatus::ReviewAvailable => {
+            "Blur review suggestions are information only until explicit approval is implemented."
+        }
+    };
+
+    Ok(AiReviewPanel {
+        photo_id: photo_id.to_string(),
+        task_type: AI_REVIEW_BLUR_TASK_TYPE.to_string(),
+        status,
+        message: message.to_string(),
+        editor_remains_usable: true,
+        requires_explicit_approval: true,
+        writes_edit_graph: false,
+        writes_photo_flags: false,
+        items,
+    })
+}
+
+fn ai_review_item_from_result(result: AiResult) -> Result<AiReviewItem, CoreError> {
+    let payload: serde_json::Value = serde_json::from_str(&result.result_json)
+        .map_err(|error| CoreError::AiReview(format!("invalid result JSON: {error}")))?;
+    let output = payload
+        .get("output")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| CoreError::AiReview("stored result missing output object".to_string()))?;
+    let review = output
+        .get("review")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| CoreError::AiReview("stored result missing review object".to_string()))?;
+    let label = review
+        .get("label")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("Review available")
+        .to_string();
+    let recommendation = review
+        .get("recommendation")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("review")
+        .to_string();
+    let confidence_percent = review
+        .get("confidence")
+        .and_then(serde_json::Value::as_f64)
+        .map(|confidence| (confidence.clamp(0.0, 1.0) * 100.0).round() as u8);
+
+    Ok(AiReviewItem {
+        result_id: result.id,
+        model_id: result.model_id,
+        label,
+        recommendation,
+        confidence_percent,
+        approved: result.approved,
+        created_at: result.created_at,
+    })
 }
 
 /// Read the library-wide export settings and named presets.
@@ -10801,6 +10912,106 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM photo_flags", [], |row| row.get(0))
             .expect("count flags after");
         assert_eq!(flags_after, flags_before);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_blur_review_panel_reads_result_without_edit_or_original_mutation() {
+        let workspace = unique_library_root("core-ai-review-panel");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let before = durable_catalog_counts(&created.catalog_path);
+        store_ai_result(
+            &created.root_path,
+            &photo_id,
+            "blur_score",
+            "silicaraw.blur-review.test",
+            r#"{"review":{"label":"Motion blur likely","recommendation":"review","confidence":0.91}}"#,
+        )
+        .expect("store blur review result");
+
+        let panel = get_ai_review_panel(&created.root_path, &photo_id).expect("read ai review");
+
+        assert_eq!(panel.status, AiReviewPanelStatus::ReviewAvailable);
+        assert_eq!(panel.task_type, "blur_score");
+        assert!(!panel.writes_edit_graph);
+        assert!(!panel.writes_photo_flags);
+        assert!(panel.requires_explicit_approval);
+        assert_eq!(panel.items.len(), 1);
+        assert_eq!(panel.items[0].label, "Motion blur likely");
+        assert_eq!(panel.items[0].recommendation, "review");
+        assert_eq!(panel.items[0].confidence_percent, Some(91));
+        assert!(!panel.items[0].approved);
+
+        let after = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after.edit_states, before.edit_states);
+        assert_eq!(after.edit_history, before.edit_history);
+        assert_eq!(after.action_log, before.action_log);
+        assert_eq!(after.exports, before.exports);
+        assert_eq!(after.cache_records, before.cache_records);
+        assert_eq!(after.ai_results, before.ai_results + 1);
+        assert_original_hash(&jpeg_file, &original_hash, "AI blur review panel read");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_blur_review_panel_is_unavailable_but_editor_usable_when_model_missing() {
+        let workspace = unique_library_root("core-ai-review-missing-model");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let before = durable_catalog_counts(&created.catalog_path);
+        let panel =
+            get_ai_review_panel(&created.root_path, &photo_id).expect("read missing review panel");
+
+        assert_eq!(panel.status, AiReviewPanelStatus::ModelUnavailable);
+        assert!(panel.items.is_empty());
+        assert!(panel.editor_remains_usable);
+        assert_eq!(
+            panel.message,
+            "No local blur review model or stored result is available."
+        );
+        assert!(!panel.writes_edit_graph);
+        assert!(!panel.writes_photo_flags);
+        assert_eq!(durable_catalog_counts(&created.catalog_path), before);
+        assert_original_hash(&jpeg_file, &original_hash, "missing AI review model");
 
         remove_library_root(&workspace);
     }

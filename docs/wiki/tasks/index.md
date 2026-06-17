@@ -139,6 +139,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [24.1: MLX Runtime Spike](24.1-mlx-runtime-spike.md)
 - [24.2: Model Manifest Validation](24.2-model-manifest-validation.md)
 - [24.3: AI Result Store and Read Path](24.3-ai-result-store-read-path.md)
+- [24.4: First Non-Mutating AI Review Feature](24.4-first-non-mutating-ai-review.md)
 
 ## Notes for LLM Agents
 

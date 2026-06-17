@@ -26,6 +26,7 @@ MLX is planned as a local Apple Silicon enhancement layer, not the core editor. 
 - Models remain optional; manifest validation does not load a model or run inference.
 - Task 24.3 stores AI results separately in `ai_results`, unapproved by default, local-only, and tagged with the `ai_result:propose` permission.
 - AI result payloads cannot directly carry edit graph or photo flag mutation keys.
+- Task 24.4 adds blur review as the first AI review presentation. It reads stored local results only, reports model-unavailable/editor-usable when no result exists, and keeps approval disabled until a later explicit task.
 - Treat MLX unified memory as app-global memory pressure; future runtime work should use a bounded worker lane.
 - Cancellation is cooperative at queue/task boundaries until a runtime probe proves stronger behavior.
 - MLX should not own final image state.
@@ -38,7 +39,7 @@ MLX is planned as a local Apple Silicon enhancement layer, not the core editor. 
 - Subject mask.
 - Sky mask.
 - Auto tone.
-- Blur detection.
+- New blur inference or model execution beyond reading stored blur review results.
 - Quality score.
 - MLX denoise or upscale structures.
 
@@ -53,4 +54,4 @@ MLX is planned as a local Apple Silicon enhancement layer, not the core editor. 
 
 ## Notes for LLM Agents
 
-Do not add MLX runtime dependencies, model downloads, model loaders, inference code, model assets, or MLX UI unless the selected task explicitly requires that scoped work. Task 24.3 adds storage/read contracts only; passing validation or storing a result is not permission to load or run a model.
+Do not add MLX runtime dependencies, model downloads, model loaders, inference code, model assets, or mutating MLX UI unless the selected task explicitly requires that scoped work. Task 24.4 adds a read-only blur review surface only; passing validation, storing a result, or showing review information is not permission to load a model, run inference, or mutate edit state.

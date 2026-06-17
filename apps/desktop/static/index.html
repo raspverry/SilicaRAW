@@ -45,12 +45,15 @@
       <aside class="sr-sidebar" id="leftSidebar" aria-label="Left sidebar">
         <section class="sr-sidebar-section" data-mode-panel="library">
           <div class="sr-panel-heading">Library</div>
-          <button class="sr-sidebar-item is-active" type="button"><span>All Photos</span><span id="allPhotosCount">0</span></button>
+          <button class="sr-sidebar-item is-active" id="libraryAllPhotosNav" type="button"><span>All Photos</span><span id="allPhotosCount">0</span></button>
           <button class="sr-sidebar-item" type="button" disabled title="Recent import filters are deferred until real recents exist."><span>Recent Imports</span><span id="recentImportCount">0</span></button>
           <button class="sr-sidebar-item" type="button" disabled title="Favorites filter is deferred for the local alpha."><span>Favorites</span><span>0</span></button>
           <button class="sr-sidebar-item" type="button" disabled title="Rejected filter is deferred until culling filters are implemented."><span>Rejected</span><span>0</span></button>
           <div class="sr-panel-heading sr-panel-heading-spaced">Folders</div>
           <button class="sr-sidebar-item" type="button" disabled title="Folder browsing is deferred for the local alpha."><span>Local Library</span><span>0</span></button>
+          <div class="sr-panel-heading sr-panel-heading-spaced">AI Tools</div>
+          <button class="sr-sidebar-item" id="openAiReview" type="button"><span>AI Review</span><span id="aiReviewSidebarCount">0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="AI suggestions require explicit approval in a later task."><span>AI Suggestions</span><span>Later</span></button>
         </section>
         <section class="sr-sidebar-section" data-mode-panel="develop" hidden>
           <div class="sr-panel-heading">Presets</div>
@@ -113,7 +116,7 @@
           </section>
 
           <section class="sr-library-workbench" data-library-state-panel="open" hidden aria-labelledby="libraryTitle">
-            <div class="sr-surface-header">
+            <div class="sr-surface-header" id="librarySurfaceHeader">
               <div>
                 <h1 id="libraryTitle">Library</h1>
                 <p id="gridStateNote">Catalog grid waits for a local library.</p>
@@ -266,6 +269,41 @@
               </div>
               <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" tabindex="0" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0" data-grid-keyboard-navigation="roving-focus"></div>
             </div>
+            <section class="sr-ai-review-surface" id="aiReviewSurface" hidden aria-labelledby="aiReviewTitle" data-ai-review-state="model-unavailable">
+              <div class="sr-ai-review-header">
+                <button id="aiReviewBackToGrid" type="button">Grid</button>
+                <div>
+                  <h2 id="aiReviewTitle">AI Review</h2>
+                  <p id="aiReviewSelectedPhoto">Selected photo: None</p>
+                </div>
+              </div>
+              <output class="sr-ai-review-status" id="aiReviewStatus" aria-live="polite">Review information only. No local blur review model or stored result is available; this does not write edits, flags, or originals.</output>
+              <div class="sr-ai-review-layout">
+                <div class="sr-ai-review-main">
+                  <div class="sr-ai-review-tabs" role="tablist" aria-label="AI review categories">
+                    <button class="is-active" id="aiReviewBlurTab" type="button" role="tab" aria-selected="true">Blur</button>
+                    <button id="aiReviewQualityTab" type="button" role="tab" aria-selected="false" disabled>Quality</button>
+                    <button id="aiReviewDuplicateTab" type="button" role="tab" aria-selected="false" disabled>Duplicates</button>
+                  </div>
+                  <div class="sr-ai-review-list" id="aiReviewList" role="list" aria-label="Stored AI review results"></div>
+                  <div class="sr-grid-state" id="aiReviewEmptyState">
+                    <strong>No review result</strong>
+                    <span>Model missing or no stored local AI result for the selected photo. The editor remains usable.</span>
+                  </div>
+                </div>
+                <aside class="sr-ai-review-summary" id="aiReviewSummary" aria-label="AI review summary">
+                  <div class="sr-panel-heading">Summary</div>
+                  <div class="sr-ai-review-summary-row"><span>Status</span><strong id="aiReviewSummaryStatus">Unavailable</strong></div>
+                  <div class="sr-ai-review-summary-row"><span>Result count</span><strong id="aiReviewSummaryCount">0</strong></div>
+                  <div class="sr-ai-review-summary-row"><span>Task</span><strong id="aiReviewSummaryTask">Blur score</strong></div>
+                  <div class="sr-ai-review-action-preview" id="aiReviewActionPreview">
+                    <strong>Action Preview</strong>
+                    <span>Review information only. Approval is deferred; this does not write edits, flags, or originals.</span>
+                  </div>
+                  <button class="primary" id="aiReviewApprovalDeferred" type="button" disabled>Approval Deferred</button>
+                </aside>
+              </div>
+            </section>
             <section class="sr-loupe-surface" id="loupeSurface" aria-label="Library loupe preview" hidden>
               <div class="sr-loupe-header">
                 <button id="closeLoupe" type="button">Grid</button>
@@ -1292,6 +1330,8 @@
       const importIssueReviewSummary = document.querySelector("#importIssueReviewSummary");
       const importIssueList = document.querySelector("#importIssueList");
       const libraryGrid = document.querySelector("#libraryGrid");
+      const librarySurfaceHeader = document.querySelector("#librarySurfaceHeader");
+      const libraryAllPhotosNav = document.querySelector("#libraryAllPhotosNav");
       const gridEmptyState = document.querySelector("#gridEmptyState");
       const gridLoadingState = document.querySelector("#gridLoadingState");
       const gridErrorState = document.querySelector("#gridErrorState");
@@ -1345,6 +1385,7 @@
       const showImportPanelButton = document.querySelector("#showImportPanel");
       const minimizeImportButton = document.querySelector("#minimizeImport");
       const clearLibraryCacheButton = document.querySelector("#clearLibraryCache");
+      const cacheMaintenance = document.querySelector("#cacheMaintenance");
       const cacheClearStatus = document.querySelector("#cacheClearStatus");
       const ratingButtons = Array.from(document.querySelectorAll("[data-rating-value]"));
       const pickSelectedButton = document.querySelector("#pickSelectedPhoto");
@@ -1623,6 +1664,18 @@
       const minRatingFilterInput = document.querySelector("#minRatingFilter");
       const cullingFilterInput = document.querySelector("#cullingFilter");
       const librarySortInput = document.querySelector("#librarySort");
+      const openAiReviewButton = document.querySelector("#openAiReview");
+      const aiReviewSurface = document.querySelector("#aiReviewSurface");
+      const aiReviewBackToGridButton = document.querySelector("#aiReviewBackToGrid");
+      const aiReviewStatus = document.querySelector("#aiReviewStatus");
+      const aiReviewSelectedPhoto = document.querySelector("#aiReviewSelectedPhoto");
+      const aiReviewList = document.querySelector("#aiReviewList");
+      const aiReviewEmptyState = document.querySelector("#aiReviewEmptyState");
+      const aiReviewSummaryStatus = document.querySelector("#aiReviewSummaryStatus");
+      const aiReviewSummaryCount = document.querySelector("#aiReviewSummaryCount");
+      const aiReviewSummaryTask = document.querySelector("#aiReviewSummaryTask");
+      const aiReviewSidebarCount = document.querySelector("#aiReviewSidebarCount");
+      const aiReviewApprovalDeferred = document.querySelector("#aiReviewApprovalDeferred");
 
       const invoke = window.__TAURI__?.core?.invoke;
       const dialogApi = window.__TAURI__?.dialog;
@@ -4539,6 +4592,9 @@
         if (!loupeSurface.hidden) {
           previewSelectedPhoto();
         }
+        if (!aiReviewSurface.hidden) {
+          void loadAiReviewPanel();
+        }
         if (appFrame.dataset.activeMode === "develop") {
           readPersistedDevelopState(selected).then(() => previewDevelopEdit());
           void loadDevelopHistory();
@@ -6650,6 +6706,7 @@
         }
         document.querySelector("#importPanel").hidden = true;
         libraryGridShell.hidden = true;
+        aiReviewSurface.hidden = true;
         loupeSurface.hidden = false;
         renderLoupeFilmstrip();
         await previewSelectedPhoto();
@@ -6657,6 +6714,117 @@
 
       function closeLoupeView() {
         loupeSurface.hidden = true;
+        aiReviewSurface.hidden = true;
+        libraryGridShell.hidden = false;
+        setLibraryWorkbenchChromeVisible(true);
+        setStatus("Library grid loaded.");
+      }
+
+      function setLibraryWorkbenchChromeVisible(visible) {
+        librarySurfaceHeader.hidden = !visible;
+        cacheMaintenance.hidden = !visible;
+      }
+
+      function renderAiReviewCard(item) {
+        const confidence = Number.isFinite(item.confidencePercent) ? item.confidencePercent : 0;
+        const card = document.createElement("article");
+        card.className = "sr-ai-review-card";
+        card.setAttribute("role", "listitem");
+
+        const title = document.createElement("strong");
+        title.textContent = item.label || "Review available";
+        const recommendation = document.createElement("span");
+        recommendation.textContent = `Recommendation: ${item.recommendation || "review"}`;
+        const meter = document.createElement("span");
+        meter.className = "sr-ai-review-meter";
+        meter.style.setProperty("--sr-ai-review-confidence", `${confidence}%`);
+        const meterFill = document.createElement("span");
+        meter.append(meterFill);
+        const meta = document.createElement("small");
+        const approvalState = item.approved ? "approved" : "unapproved";
+        meta.textContent = `${confidence}% confidence · ${item.modelId || "local model"} · ${approvalState}`;
+
+        card.append(title, recommendation, meter, meta);
+        return card;
+      }
+
+      function renderAiReviewPanel(panel = null) {
+        const selected = selectedPhoto();
+        const items = Array.isArray(panel?.items) ? panel.items : [];
+        const status = panel?.status || "modelUnavailable";
+        const baseMessage = panel?.message || "No local blur review model or stored result is available.";
+        const reviewOnlyMessage = `${baseMessage} Review information only; this does not write edits, flags, or originals.`;
+
+        aiReviewSurface.dataset.aiReviewState = status === "reviewAvailable" ? "review-available" : "model-unavailable";
+        aiReviewSelectedPhoto.textContent = `Selected photo: ${selected?.fileName ?? "None"}`;
+        aiReviewStatus.value = reviewOnlyMessage;
+        aiReviewStatus.textContent = reviewOnlyMessage;
+        aiReviewSummaryStatus.textContent = status === "reviewAvailable" ? "Review available" : "Unavailable";
+        aiReviewSummaryCount.textContent = String(items.length);
+        aiReviewSummaryTask.textContent = "Blur score";
+        aiReviewSidebarCount.textContent = String(items.length);
+        aiReviewApprovalDeferred.disabled = true;
+
+        aiReviewList.replaceChildren(...items.map(renderAiReviewCard));
+        aiReviewList.hidden = items.length === 0;
+        aiReviewEmptyState.hidden = items.length > 0;
+      }
+
+      async function loadAiReviewPanel() {
+        const selected = selectedPhoto();
+        if (!selected) {
+          renderAiReviewPanel();
+          setStatus("Select a photo before AI review.");
+          return;
+        }
+        if (!activeLibraryPath || !invoke) {
+          renderAiReviewPanel();
+          setStatus("AI review unavailable without a local model or stored result.");
+          return;
+        }
+
+        setBusy(true);
+        setStatus("Loading AI review...");
+        try {
+          const response = await invoke("get_ai_review_panel", {
+            libraryPath: activeLibraryPath,
+            photoId: selected.photoId,
+          });
+          if (commandFailed(response)) {
+            const message = responseErrorMessage(response, "AI review failed.");
+            renderAiReviewPanel({ message, items: [] });
+            setStatus(message);
+            return;
+          }
+          renderAiReviewPanel(response.data);
+          setStatus(responseMessage(response, "AI review loaded."));
+        } catch (error) {
+          const message = responseErrorMessage(error, "AI review failed.");
+          renderAiReviewPanel({ message, items: [] });
+          setStatus(message);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function openAiReviewView() {
+        document.querySelector("#importPanel").hidden = true;
+        loupeSurface.hidden = true;
+        libraryGridShell.hidden = true;
+        setLibraryWorkbenchChromeVisible(false);
+        libraryAllPhotosNav.classList.remove("is-active");
+        openAiReviewButton.classList.add("is-active");
+        aiReviewSurface.hidden = false;
+        renderAiReviewPanel();
+        await loadAiReviewPanel();
+      }
+
+      function closeAiReviewView() {
+        aiReviewSurface.hidden = true;
+        loupeSurface.hidden = true;
+        setLibraryWorkbenchChromeVisible(true);
+        openAiReviewButton.classList.remove("is-active");
+        libraryAllPhotosNav.classList.add("is-active");
         libraryGridShell.hidden = false;
         setStatus("Library grid loaded.");
       }
@@ -7409,6 +7577,8 @@
         setStatus("Import panel minimized.");
       });
       openRecentButton.addEventListener("click", () => openRecentLibrary());
+      openAiReviewButton.addEventListener("click", () => void openAiReviewView());
+      aiReviewBackToGridButton.addEventListener("click", closeAiReviewView);
       welcomeActionButtons.forEach((button) => {
         button.addEventListener("click", () => {
           setStatus(`${button.dataset.welcomeAction} will be wired after the local alpha runtime loop is complete.`);

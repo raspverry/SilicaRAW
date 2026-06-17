@@ -18,6 +18,7 @@ source_of_truth: MockupUI/MANIFEST.md
 - M003 Library Grid is the primary catalog browsing target screen.
 - M007 Export Dialog is the primary export workflow target screen.
 - M008 Preferences Appearance is the Phase 21 preferences information-architecture target.
+- M010 AI Review is the Phase 24.4 read-only AI review target screen.
 - Compact and large variants define responsive expectations for later UI work.
 
 ## Phase 5.1 Relationship
@@ -52,7 +53,11 @@ Task 5.5.1 establishes the token and source hierarchy baseline before screen imp
 
 ## Phase 5.6 Relationship
 
-Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders with product runtime behavior. M001, M002, M003, M004, M005, M007, M008-minimal, and M009 remain the relevant visual references for the local alpha. M006 mask active and M010 AI Review remain out of scope until mask and AI/MLX work are explicitly scheduled.
+Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders with product runtime behavior. M001, M002, M003, M004, M005, M007, M008-minimal, and M009 remain the relevant visual references for the local alpha. M006 mask active and M010 AI Review were out of scope during Phase 5.6 until mask and AI/MLX work became explicitly scheduled.
+
+## Phase 24 Relationship
+
+Task 24.4 implements the first M010-inspired AI Review surface as read-only blur review. The visible structure follows the mockup's AI Tools navigation, review list, summary, and action-preview areas, but approval controls stay disabled because explicit AI suggestion approval belongs to Task 24.5.
 
 ## Phase 21 Relationship
 
