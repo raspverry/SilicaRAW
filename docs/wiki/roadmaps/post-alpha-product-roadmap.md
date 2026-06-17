@@ -1091,6 +1091,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Models remain optional.
 - **Validation:** `cargo test -p silica-mlx`
 
+**Status:** Completed on 2026-06-17. `silica-mlx` validates `silica.model` v1 manifests, rejects missing license/source/hash/input preprocessing/output metadata, verifies `sha256:` hashes against candidate model bytes deterministically, and records that models remain optional. The schema now requires `input.preprocessing`, `output.metadata`, and lowercase SHA-256 hashes. This does not load models, run inference, add MLX runtime, or make AI required.
+
 ### Task 24.3: AI Result Store and Read Path
 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `crates/silica-mlx`
