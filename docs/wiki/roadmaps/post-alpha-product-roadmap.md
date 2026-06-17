@@ -1036,6 +1036,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Original mutation remains forbidden.
 - **Validation:** `cargo test -p silica-core -p silica-plugin -p silica-mcp`
 
+**Status:** Completed on 2026-06-17. Added `ExtensionPermission`, `ExtensionPermissionCategory`, `ExtensionPermissionPolicy`, and `McpMode` in `silica-core`; recorded matching permission ID boundaries in `silica-plugin` and `silica-mcp` without adding runtime dependencies or starting any runtime. The permission vocabulary covers metadata, edit suggestions, export, limited filesystem access, AI result proposals, and MCP modes. Raw SQL and original mutation are not available permissions.
+
 ### Task 23.2: Permission Prompt UI Contract
 
 - **Location:** `apps/desktop/static/`, `docs/wiki/topics/plugins-and-mcp.md`

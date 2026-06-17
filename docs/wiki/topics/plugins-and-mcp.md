@@ -2,7 +2,7 @@
 title: Plugins and MCP
 status: active
 audience: all
-updated: 2026-06-08
+updated: 2026-06-17
 source_of_truth: docs/12_Plugin_and_MCP_Specification.md
 ---
 
@@ -21,6 +21,27 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - MCP is off by default.
 - Task 16.5 adds append-only action log groundwork for future permissioned extension work, but it does not add plugin runtime, MCP runtime, MLX execution, or extension write permissions.
 - Task 21.5 adds disabled Preferences controls for Agent Access, MCP Tools, and Plugin Runtime. The controls explain future permission prompts, Core API boundaries, side effects, and action-log evidence, but they do not start any runtime.
+- Task 23.1 adds the core extension permission vocabulary and default-deny policy. `silica-plugin` and `silica-mcp` record matching permission IDs for boundary checks only; no plugin runtime dependency, MCP server, tool execution, or permission prompt is active yet.
+
+## Task 23.1 Permission Vocabulary
+
+Core permission IDs currently cover:
+
+- `metadata:read`
+- `metadata:write`
+- `edit_suggestion:read`
+- `edit_suggestion:apply`
+- `export:local`
+- `filesystem:limited_read`
+- `filesystem:limited_write`
+- `ai_result:read`
+- `ai_result:propose`
+- `mcp:read_only`
+- `mcp:review`
+- `mcp:edit`
+- `mcp:export`
+
+The default policy grants none of these permissions. There is no `raw_sql` permission, no permission to mutate original photo files, and no MCP mode that can change permissions.
 
 ## Required Manifest Areas
 
