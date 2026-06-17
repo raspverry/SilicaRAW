@@ -129,6 +129,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 ## Phase 22
 
 - [22.1: Expanded Visual QA Surface Set](22.1-expanded-visual-qa-surface-set.md)
+- [22.2: Library Scale Benchmarks](22.2-library-scale-benchmarks.md)
 
 ## Notes for LLM Agents
 

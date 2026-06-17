@@ -14,7 +14,7 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, and Task 22.1 are complete. The current product area is **Phase 22: Performance, Migration, and Visual Hardening**.
+Phase 20, Phase 21, Task 22.1, and Task 22.2 are complete. The current product area is **Phase 22: Performance, Migration, and Visual Hardening**.
 
 Task 21.5 is complete as a disabled-by-default Preferences surface. Runtime permission policy, prompts, MCP/plugin runtime, and agent bridges remain gated by Phase 23.
 
@@ -34,7 +34,7 @@ For Phase 22 task-card creation or implementation, read:
 ## Phase 22 Context
 
 - Task 22.1 expanded final visual QA to 22 surfaces across compact, desktop, and large widths.
-- Task 22.2 should add library scale benchmarks without marketing them as universal performance guarantees.
+- Task 22.2 added local 1k, 10k, and 50k catalog benchmark evidence without marketing it as universal performance guarantees.
 - Task 22.3 should focus migration, backup, missing-file, conflict, and partial-failure recovery tests.
 - Task 22.4 remains profiling evidence only and depends on RAW/Metal work.
 - Task 22.5 should become a manual photographer QA checklist using licensed or user-provided local assets.
