@@ -131,6 +131,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [22.1: Expanded Visual QA Surface Set](22.1-expanded-visual-qa-surface-set.md)
 - [22.2: Library Scale Benchmarks](22.2-library-scale-benchmarks.md)
 - [22.3: Migration and Backup Failure Tests](22.3-migration-backup-failure-tests.md)
+- [22.4: RAW and Metal Performance Profiling](22.4-raw-metal-performance-profiling.md)
 
 ## Notes for LLM Agents
 

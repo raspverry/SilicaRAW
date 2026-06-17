@@ -1006,6 +1006,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Performance regressions are actionable.
 - **Validation:** Profiling report and viewer performance checklist.
 
+**Status:** Completed on 2026-06-17. Added a local RAW/Metal profile runner, JSON/Markdown report, report checker, and viewer performance checklist. The report separates decode, render, UI-latency, and export categories, records median/p95 timings plus child-process max RSS, and explicitly marks fixture-backed RAW decode/export timing, full Metal pixel throughput, and installed-app interactive drag profiling as gated future evidence.
+
 ### Task 22.5: Manual Photographer QA Checklist
 
 - **Location:** `checklists/`
