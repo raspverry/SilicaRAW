@@ -936,6 +936,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Export dialog reflects current defaults.
 - **Validation:** Export UI smoke.
 
+**Status:** Completed on 2026-06-17. Preferences Color and Export panes now edit the existing catalog-owned export defaults through `get_export_settings` and `save_export_settings`. JPEG sRGB 90 remains the conservative seeded default, Display P3 remains an explicit JPEG-only choice, PNG/TIFF defaults are constrained to sRGB, and the Export dialog reflects Preferences changes without a second preferences store.
+
 ### Task 21.5: Advanced Agent Access Preferences
 
 - **Location:** `apps/desktop/static/`, `crates/silica-core`, `docs/wiki/topics/plugins-and-mcp.md`

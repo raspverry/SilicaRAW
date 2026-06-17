@@ -775,6 +775,18 @@ def main():
     ]:
         require(marker in source, f"preferences library/cache marker missing: {marker}", failures)
     for marker in [
+        "preferencesColorDefaultSpace",
+        "preferencesExportDefaultFormat",
+        "preferencesExportDefaultQuality",
+        "applyPreferencesExportSettings",
+        "currentPreferencesExportSettings",
+        "savePreferencesExportDefaults",
+        "save_export_settings",
+        "get_export_settings",
+        "Display P3 is JPEG-only",
+    ]:
+        require(marker in source, f"preferences color/export marker missing: {marker}", failures)
+    for marker in [
         "recentEmptyState",
         "recentLibraryList",
         "renderRecentLibraries",

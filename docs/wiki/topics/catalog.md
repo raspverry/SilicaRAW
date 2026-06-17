@@ -37,6 +37,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 18.5.2 adds atomic batch edit sync for typed clipboard payloads: Core plans target readiness first, storage commits ready changed graphs in one transaction with one `edit_history` row per affected photo, unchanged targets are skipped, blocked targets stop all writes, and existing clean sidecars are only marked `catalog_newer`.
 - Task 20.1 adds catalog schema version 9 for export-owned defaults and named presets: `export_settings` and `export_presets`.
 - Task 21.3 keeps Library default path preferences in app-session JSON and exposes read-only disposable cache status plus the existing disposable cache clear command to Preferences.
+- Task 21.4 lets Preferences edit the existing catalog-owned export defaults. It does not add a second app-session export preference store or a new migration.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
