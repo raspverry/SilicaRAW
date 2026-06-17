@@ -118,6 +118,10 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [20.4: Batch Export Progress and Recent Exports](20.4-batch-export-progress-recent-exports.md)
 - [20.5: Display P3 Export Enablement](20.5-display-p3-export-enablement.md)
 
+## Phase 21
+
+- [21.1: Preferences Information Architecture](21.1-preferences-information-architecture.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.

@@ -36,7 +36,7 @@
           </button>
           <button class="sr-fit-action" type="button" data-status-action="Fit zoom controls">Fit</button>
           <button class="primary sr-export-action" id="openExportDialog" type="button">Export</button>
-          <button class="sr-icon-button" type="button" aria-label="Settings" data-status-action="Preferences">
+          <button class="sr-icon-button" id="openPreferences" type="button" aria-label="Preferences" data-open-preferences-dialog>
             <span class="sr-glyph sr-glyph-settings" aria-hidden="true"></span>
           </button>
         </div>
@@ -108,7 +108,7 @@
             <nav class="sr-welcome-footer" aria-label="Welcome links">
               <button type="button" data-welcome-action="Documentation">Documentation</button>
               <button type="button" data-welcome-action="Keyboard Shortcuts">Keyboard Shortcuts</button>
-              <button type="button" data-welcome-action="Preferences">Preferences</button>
+              <button type="button" data-open-preferences-dialog>Preferences</button>
             </nav>
           </section>
 
@@ -958,6 +958,156 @@
         </div>
       </footer>
 
+      <section class="sr-preferences-dialog" id="preferencesDialog" role="dialog" aria-modal="true" aria-labelledby="preferencesDialogTitle" hidden>
+        <div class="sr-preferences-dialog-panel">
+          <header class="sr-preferences-dialog-header">
+            <div>
+              <h2 id="preferencesDialogTitle">Preferences</h2>
+              <p>Local alpha settings map</p>
+            </div>
+            <button class="sr-icon-button" id="closePreferencesDialog" type="button" aria-label="Close preferences dialog">x</button>
+          </header>
+          <div class="sr-preferences-dialog-body">
+            <nav class="sr-preferences-section-list" id="preferencesSectionList" role="tablist" aria-label="Preferences sections">
+              <button class="sr-preferences-section-button is-selected" id="preferencesSectionAppearance" type="button" role="tab" data-preferences-section="appearance" aria-selected="true" aria-controls="preferencesPanelAppearance">
+                <span>Appearance</span>
+                <small>Theme, density, scale</small>
+              </button>
+              <button class="sr-preferences-section-button" id="preferencesSectionLibrary" type="button" role="tab" data-preferences-section="library" aria-selected="false" aria-controls="preferencesPanelLibrary">
+                <span>Library</span>
+                <small>Startup, default paths</small>
+              </button>
+              <button class="sr-preferences-section-button" id="preferencesSectionCache" type="button" role="tab" data-preferences-section="cache" aria-selected="false" aria-controls="preferencesPanelCache">
+                <span>Cache</span>
+                <small>Disposable local cache</small>
+              </button>
+              <button class="sr-preferences-section-button" id="preferencesSectionColor" type="button" role="tab" data-preferences-section="color" aria-selected="false" aria-controls="preferencesPanelColor">
+                <span>Color</span>
+                <small>Display and profile policy</small>
+              </button>
+              <button class="sr-preferences-section-button" id="preferencesSectionExport" type="button" role="tab" data-preferences-section="export" aria-selected="false" aria-controls="preferencesPanelExport">
+                <span>Export</span>
+                <small>Default raster settings</small>
+              </button>
+              <button class="sr-preferences-section-button" id="preferencesSectionAdvanced" type="button" role="tab" data-preferences-section="advanced" aria-selected="false" aria-controls="preferencesPanelAdvanced">
+                <span>Advanced</span>
+                <small>Agent access off</small>
+              </button>
+            </nav>
+            <div class="sr-preferences-pane">
+              <section class="sr-preferences-panel" id="preferencesPanelAppearance" role="tabpanel" data-preferences-panel="appearance" aria-labelledby="preferencesPanelAppearanceTitle">
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelAppearanceTitle">Appearance</h3>
+                  <p>Planned display preferences. Current build keeps the shipped dark compact frame.</p>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesAppearanceTheme">Theme</label>
+                  <select id="preferencesAppearanceTheme" disabled>
+                    <option>Dark</option>
+                  </select>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesAppearanceDensity">Density</label>
+                  <select id="preferencesAppearanceDensity" disabled>
+                    <option>Compact</option>
+                  </select>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesAppearanceUiScale">UI Scale</label>
+                  <input id="preferencesAppearanceUiScale" type="range" min="90" max="120" value="100" disabled>
+                </div>
+              </section>
+              <section class="sr-preferences-panel" id="preferencesPanelLibrary" role="tabpanel" data-preferences-panel="library" aria-labelledby="preferencesPanelLibraryTitle" hidden>
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelLibraryTitle">Library</h3>
+                  <p>Library preferences will stay reference-based and never rewrite original photos.</p>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesLibraryDefaultPath">Default Library</label>
+                  <input id="preferencesLibraryDefaultPath" type="text" value="Ask on launch" disabled>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesLibraryStartupAction">Startup Action</label>
+                  <select id="preferencesLibraryStartupAction" disabled>
+                    <option>Open welcome screen</option>
+                  </select>
+                </div>
+              </section>
+              <section class="sr-preferences-panel" id="preferencesPanelCache" role="tabpanel" data-preferences-panel="cache" aria-labelledby="preferencesPanelCacheTitle" hidden>
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelCacheTitle">Cache</h3>
+                  <p>Cache controls remain scoped to disposable thumbnails, previews, render cache, and AI cache.</p>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesCacheClear">Disposable Cache</label>
+                  <button id="preferencesCacheClear" type="button" disabled>Clear Cache...</button>
+                </div>
+                <div class="sr-preferences-note">
+                  <strong>Status</strong>
+                  <output id="preferencesCacheStatus">Cache size and clear action move here in Task 21.3.</output>
+                </div>
+              </section>
+              <section class="sr-preferences-panel" id="preferencesPanelColor" role="tabpanel" data-preferences-panel="color" aria-labelledby="preferencesPanelColorTitle" hidden>
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelColorTitle">Color</h3>
+                  <p>sRGB stays the default. Display P3 remains an explicit export choice.</p>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesColorDefaultSpace">Default Space</label>
+                  <select id="preferencesColorDefaultSpace" disabled>
+                    <option>sRGB</option>
+                  </select>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesColorProfilePolicy">Profile Policy</label>
+                  <select id="preferencesColorProfilePolicy" disabled>
+                    <option>Embed when supported</option>
+                  </select>
+                </div>
+              </section>
+              <section class="sr-preferences-panel" id="preferencesPanelExport" role="tabpanel" data-preferences-panel="export" aria-labelledby="preferencesPanelExportTitle" hidden>
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelExportTitle">Export</h3>
+                  <p>Export dialog presets are live. Global defaults are scheduled for Task 21.4.</p>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesExportDefaultFormat">Default Format</label>
+                  <select id="preferencesExportDefaultFormat" disabled>
+                    <option>JPEG</option>
+                  </select>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesExportDefaultQuality">Default Quality</label>
+                  <input id="preferencesExportDefaultQuality" type="number" min="1" max="100" value="90" disabled>
+                </div>
+              </section>
+              <section class="sr-preferences-panel" id="preferencesPanelAdvanced" role="tabpanel" data-preferences-panel="advanced" aria-labelledby="preferencesPanelAdvancedTitle" hidden>
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelAdvancedTitle">Advanced</h3>
+                  <p>Agent and extension access stays off until the permission model is implemented.</p>
+                </div>
+                <label class="sr-preferences-toggle" for="preferencesAdvancedAgentAccess">
+                  <input id="preferencesAdvancedAgentAccess" type="checkbox" disabled>
+                  <span><strong>Agent Access</strong><small>Off by default. No agent bridge starts from preferences in this task.</small></span>
+                </label>
+                <label class="sr-preferences-toggle" for="preferencesAdvancedMcpAccess">
+                  <input id="preferencesAdvancedMcpAccess" type="checkbox" disabled>
+                  <span><strong>MCP Tools</strong><small>Disabled until Phase 23 permission policy.</small></span>
+                </label>
+                <label class="sr-preferences-toggle" for="preferencesAdvancedPluginRuntime">
+                  <input id="preferencesAdvancedPluginRuntime" type="checkbox" disabled>
+                  <span><strong>Plugin Runtime</strong><small>Disabled in the local alpha.</small></span>
+                </label>
+              </section>
+            </div>
+          </div>
+          <footer class="sr-preferences-dialog-footer">
+            <output id="preferencesStatus" aria-live="polite">Preferences map is ready. Settings are disabled until scoped implementation tasks.</output>
+            <button id="closePreferencesDialogFooter" type="button">Close</button>
+          </footer>
+        </div>
+      </section>
+
       <section class="sr-export-dialog" id="exportDialog" role="dialog" aria-modal="true" aria-labelledby="exportDialogTitle" hidden>
         <div class="sr-export-dialog-panel">
           <header class="sr-export-dialog-header">
@@ -1349,6 +1499,13 @@
       const developHistoryList = document.querySelector("#developHistoryList");
       const developUndoHistory = document.querySelector("#developUndoHistory");
       const developRedoHistory = document.querySelector("#developRedoHistory");
+      const preferencesDialog = document.querySelector("#preferencesDialog");
+      const preferencesOpenButtons = Array.from(document.querySelectorAll("[data-open-preferences-dialog]"));
+      const closePreferencesDialogButton = document.querySelector("#closePreferencesDialog");
+      const closePreferencesDialogFooterButton = document.querySelector("#closePreferencesDialogFooter");
+      const preferencesStatus = document.querySelector("#preferencesStatus");
+      const preferencesSectionButtons = Array.from(document.querySelectorAll("[data-preferences-section]"));
+      const preferencesPanels = Array.from(document.querySelectorAll("[data-preferences-panel]"));
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -4628,6 +4785,38 @@
         }
       }
 
+      function setPreferencesSection(section) {
+        const selectedSection = preferencesPanels.some((panel) => panel.dataset.preferencesPanel === section)
+          ? section
+          : "appearance";
+        preferencesSectionButtons.forEach((button) => {
+          const isSelected = button.dataset.preferencesSection === selectedSection;
+          button.classList.toggle("is-selected", isSelected);
+          button.setAttribute("aria-selected", String(isSelected));
+        });
+        preferencesPanels.forEach((panel) => {
+          panel.hidden = panel.dataset.preferencesPanel !== selectedSection;
+        });
+        const selectedButton = preferencesSectionButtons.find((button) => button.dataset.preferencesSection === selectedSection);
+        if (preferencesStatus && selectedButton) {
+          preferencesStatus.value = `${selectedButton.querySelector("span")?.textContent ?? "Preferences"} settings are mapped; controls remain disabled until their scoped task.`;
+        }
+      }
+
+      function openPreferencesDialog() {
+        const selectedButton = preferencesSectionButtons.find((button) => button.getAttribute("aria-selected") === "true")
+          || preferencesSectionButtons[0];
+        setPreferencesSection(selectedButton?.dataset.preferencesSection ?? "appearance");
+        preferencesDialog.hidden = false;
+        selectedButton?.focus();
+        setStatus("Preferences opened.");
+      }
+
+      function closePreferencesDialog() {
+        preferencesDialog.hidden = true;
+        setStatus("Preferences closed.");
+      }
+
       function openExportDialog() {
         syncExportDialog();
         void loadRecentExports();
@@ -6613,6 +6802,14 @@
       basicPresetButtons.forEach((button) => {
         button.addEventListener("click", () => applyBasicPreset(button.dataset.basicPreset));
       });
+      preferencesOpenButtons.forEach((button) => {
+        button.addEventListener("click", openPreferencesDialog);
+      });
+      preferencesSectionButtons.forEach((button) => {
+        button.addEventListener("click", () => setPreferencesSection(button.dataset.preferencesSection));
+      });
+      closePreferencesDialogButton.addEventListener("click", closePreferencesDialog);
+      closePreferencesDialogFooterButton.addEventListener("click", closePreferencesDialog);
       openExportDialogButton.addEventListener("click", openExportDialog);
       exportDialogButtons.forEach((button) => {
         button.addEventListener("click", openExportDialog);

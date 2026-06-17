@@ -2,7 +2,7 @@
 title: UI Mockups
 status: active
 audience: all
-updated: 2026-06-09
+updated: 2026-06-17
 source_of_truth: MockupUI/MANIFEST.md
 ---
 
@@ -17,6 +17,7 @@ source_of_truth: MockupUI/MANIFEST.md
 - M004 Library Loupe and M005 Develop are the primary preview-related target screens.
 - M003 Library Grid is the primary catalog browsing target screen.
 - M007 Export Dialog is the primary export workflow target screen.
+- M008 Preferences Appearance is the Phase 21 preferences information-architecture target.
 - Compact and large variants define responsive expectations for later UI work.
 
 ## Phase 5.1 Relationship
@@ -52,6 +53,10 @@ Task 5.5.1 establishes the token and source hierarchy baseline before screen imp
 ## Phase 5.6 Relationship
 
 Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders with product runtime behavior. M001, M002, M003, M004, M005, M007, M008-minimal, and M009 remain the relevant visual references for the local alpha. M006 mask active and M010 AI Review remain out of scope until mask and AI/MLX work are explicitly scheduled.
+
+## Phase 21 Relationship
+
+Phase 21 replaces the minimal maintenance surface with a complete Preferences surface. Task 21.1 uses `M008_Preferences_Appearance.png` for the compact section-list and pane structure only; setting persistence, cache actions, export defaults, and advanced agent access are owned by later Phase 21 tasks.
 
 ## Links
 

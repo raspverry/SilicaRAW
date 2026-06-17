@@ -315,6 +315,37 @@ def main():
         "developRedoHistory",
         "developFilmstrip",
         "developEditState",
+        "openPreferences",
+        "preferencesDialog",
+        "preferencesDialogTitle",
+        "closePreferencesDialog",
+        "preferencesSectionList",
+        "preferencesSectionAppearance",
+        "preferencesSectionLibrary",
+        "preferencesSectionCache",
+        "preferencesSectionColor",
+        "preferencesSectionExport",
+        "preferencesSectionAdvanced",
+        "preferencesPanelAppearance",
+        "preferencesPanelLibrary",
+        "preferencesPanelCache",
+        "preferencesPanelColor",
+        "preferencesPanelExport",
+        "preferencesPanelAdvanced",
+        "preferencesAppearanceTheme",
+        "preferencesAppearanceDensity",
+        "preferencesAppearanceUiScale",
+        "preferencesLibraryDefaultPath",
+        "preferencesLibraryStartupAction",
+        "preferencesCacheClear",
+        "preferencesColorDefaultSpace",
+        "preferencesColorProfilePolicy",
+        "preferencesExportDefaultFormat",
+        "preferencesExportDefaultQuality",
+        "preferencesAdvancedAgentAccess",
+        "preferencesAdvancedMcpAccess",
+        "preferencesAdvancedPluginRuntime",
+        "preferencesStatus",
         "openExportDialog",
         "exportDialog",
         "closeExportDialog",
@@ -419,6 +450,10 @@ def main():
             ".sr-detail-panel",
             ".sr-geometry-panel",
             ".sr-edit-clipboard-panel",
+            ".sr-preferences-dialog",
+            ".sr-preferences-dialog-panel",
+            ".sr-preferences-section-list",
+            ".sr-preferences-pane",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
         ]:
@@ -427,6 +462,54 @@ def main():
         require(
             re.search(r"#[0-9a-fA-F]{3,8}|rgba?\(", css) is None,
             "app-frame.css must consume color tokens instead of raw color literals",
+            failures,
+        )
+
+    preferences_dialog = parser.ids.get("preferencesDialog", {})
+    require(
+        preferences_dialog.get("role") == "dialog"
+        and preferences_dialog.get("aria-modal") == "true"
+        and "hidden" in preferences_dialog,
+        "#preferencesDialog must be a hidden modal dialog by default",
+        failures,
+    )
+    for section in ["Appearance", "Library", "Cache", "Color", "Export", "Advanced"]:
+        require(section in source, f"preferences IA must expose {section}", failures)
+    for marker in [
+        "function openPreferencesDialog",
+        "function closePreferencesDialog",
+        "function setPreferencesSection",
+    ]:
+        require(marker in source, f"preferences IA marker missing: {marker}", failures)
+    for control_id in [
+        "preferencesAppearanceTheme",
+        "preferencesAppearanceDensity",
+        "preferencesAppearanceUiScale",
+        "preferencesLibraryDefaultPath",
+        "preferencesLibraryStartupAction",
+        "preferencesCacheClear",
+        "preferencesColorDefaultSpace",
+        "preferencesColorProfilePolicy",
+        "preferencesExportDefaultFormat",
+        "preferencesExportDefaultQuality",
+        "preferencesAdvancedAgentAccess",
+        "preferencesAdvancedMcpAccess",
+        "preferencesAdvancedPluginRuntime",
+    ]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must stay disabled until its scoped implementation task",
+            failures,
+        )
+    for control_id in [
+        "preferencesAdvancedAgentAccess",
+        "preferencesAdvancedMcpAccess",
+        "preferencesAdvancedPluginRuntime",
+    ]:
+        attrs = parser.ids.get(control_id, {})
+        require(
+            attrs.get("type") == "checkbox" and "checked" not in attrs,
+            f"#{control_id} must default off",
             failures,
         )
 
