@@ -42,6 +42,9 @@ python3 scripts/harness/check-library-scale-benchmark.py
 echo "==> Checking RAW/Metal performance profile"
 python3 scripts/harness/check-raw-metal-profile.py
 
+echo "==> Checking photographer workflow QA checklist"
+python3 scripts/harness/check-photographer-qa-checklist.py
+
 echo "==> Checking public trust package"
 python3 scripts/harness/check-public-trust-package.py
 

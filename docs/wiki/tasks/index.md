@@ -132,6 +132,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [22.2: Library Scale Benchmarks](22.2-library-scale-benchmarks.md)
 - [22.3: Migration and Backup Failure Tests](22.3-migration-backup-failure-tests.md)
 - [22.4: RAW and Metal Performance Profiling](22.4-raw-metal-performance-profiling.md)
+- [22.5: Manual Photographer QA Checklist](22.5-manual-photographer-qa-checklist.md)
 
 ## Notes for LLM Agents
 
