@@ -2,7 +2,7 @@
 title: Backup and Restore
 status: active
 audience: all
-updated: 2026-06-11
+updated: 2026-06-17
 source_of_truth: docs/superpowers/specs/2026-06-11-phase-10-evidence-recovery-design.md
 ---
 
@@ -148,6 +148,11 @@ Task 10.5 implementation tests must prove:
 - Restore preserves edit states, flags, sidecar status, export records, and migration metadata. Covered by Task 10.5.3.
 - Restore does not write into original photo folders. Covered by Task 10.5.3.
 - Migration failure leaves a recoverable target state. Covered by Task 10.5.3 through newer-schema rejection before target mutation.
+
+Task 22.3 adds post-alpha hardening coverage:
+
+- Corrupt backup catalog restore fails during staging validation, reports both backup and target paths, removes staging state, preserves the existing target library, and creates no rollback before staging validation succeeds.
+- Restore success coverage verifies stale disposable cache records can be cleared, cache directories are recreated, and new thumbnail/preview cache records can be written after restore.
 
 ## Links
 

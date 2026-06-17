@@ -993,6 +993,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Disposable caches can always be regenerated.
 - **Validation:** Storage integration tests.
 
+**Status:** Completed on 2026-06-17. Storage tests now cover corrupt backup catalog restore failure after staging copy, verify the existing target remains recoverable with no premature rollback, preserve backup/target context in the error, and prove restored stale cache records can be cleared while new thumbnail/preview cache records can be written after restore. Existing storage regressions cover migration survival, missing-target preflight failure without history writes, and sidecar conflict preservation; see [Task 22.3](../tasks/22.3-migration-backup-failure-tests.md).
+
 ### Task 22.4: RAW and Metal Performance Profiling
 
 - **Location:** `crates/silica-render`, `apps/desktop/src-tauri`, `scripts/harness/`
