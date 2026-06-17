@@ -86,7 +86,7 @@ model_id -> model manifest id
 output -> local review/suggestion object
 ```
 
-AI result rows are unapproved by default. Output payloads that directly carry edit graph or photo flag mutation keys are rejected. Approval and conversion into edit graph data remain later explicit tasks.
+AI result rows are unapproved by default. Output payloads that directly carry edit graph or photo flag mutation keys are rejected.
 
 Task 24.4 reads the first review feature from stored blur review output:
 
@@ -98,6 +98,29 @@ output.review.confidence -> optional 0.0 through 1.0 score normalized for displa
 ```
 
 This is display information only. Reading it into the AI Review panel does not approve a suggestion, write edit graph data, write edit history, or change photo flags.
+
+Task 24.5 approves only scoped suggestion payloads after explicit user action. The first supported approval payload is not an edit graph; it is normalized input for the existing edit mutator:
+
+```txt
+output.approval_suggestion.kind -> basic_exposure_contrast
+output.approval_suggestion.exposure -> edit graph basic exposure value
+output.approval_suggestion.contrast -> edit graph basic contrast value
+output.approval_suggestion.summary -> optional human-readable provenance summary
+```
+
+Approval records provenance under:
+
+```txt
+edit_graph.extensions["silica.ai_provenance"].schema -> silica.ai_provenance
+edit_graph.extensions["silica.ai_provenance"].version -> 1
+edit_graph.extensions["silica.ai_provenance"].decision -> approved
+edit_graph.extensions["silica.ai_provenance"].result_id -> ai_results.id
+edit_graph.extensions["silica.ai_provenance"].model_id -> model manifest id
+edit_graph.extensions["silica.ai_provenance"].task_type -> model task type string
+edit_graph.extensions["silica.ai_provenance"].suggestion_kind -> basic_exposure_contrast
+```
+
+Approval commits through edit graph validation and undoable history. Rejection appends action-log evidence only and leaves edit state/history unchanged.
 
 ## Edit Graph v0.1 Required Sections
 

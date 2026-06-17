@@ -298,9 +298,14 @@
                   <div class="sr-ai-review-summary-row"><span>Task</span><strong id="aiReviewSummaryTask">Blur score</strong></div>
                   <div class="sr-ai-review-action-preview" id="aiReviewActionPreview">
                     <strong>Action Preview</strong>
-                    <span>Review information only. Approval is deferred; this does not write edits, flags, or originals.</span>
+                    <span>Explicit approval creates one undoable checkpoint. Rejection leaves edit state unchanged and does not write flags or originals.</span>
                   </div>
-                  <button class="primary" id="aiReviewApprovalDeferred" type="button" disabled>Approval Deferred</button>
+                  <div class="sr-ai-review-approval-actions" aria-label="AI suggestion approval controls">
+                    <button class="primary" id="aiReviewApproveSuggestion" type="button" disabled>Approve Suggestion</button>
+                    <button id="aiReviewRejectSuggestion" type="button" disabled>Reject Suggestion</button>
+                  </div>
+                  <output class="sr-ai-review-approval-note" id="aiReviewApprovalNotice" aria-live="polite">Select an approvable stored result to approve an AI suggestion through explicit approval.</output>
+                  <button class="primary" id="aiReviewApprovalDeferred" type="button" disabled>Approval Waiting</button>
                 </aside>
               </div>
             </section>
@@ -1676,6 +1681,9 @@
       const aiReviewSummaryTask = document.querySelector("#aiReviewSummaryTask");
       const aiReviewSidebarCount = document.querySelector("#aiReviewSidebarCount");
       const aiReviewApprovalDeferred = document.querySelector("#aiReviewApprovalDeferred");
+      const aiReviewApproveSuggestion = document.querySelector("#aiReviewApproveSuggestion");
+      const aiReviewRejectSuggestion = document.querySelector("#aiReviewRejectSuggestion");
+      const aiReviewApprovalNotice = document.querySelector("#aiReviewApprovalNotice");
 
       const invoke = window.__TAURI__?.core?.invoke;
       const dialogApi = window.__TAURI__?.dialog;
@@ -1723,6 +1731,8 @@
       let metadataRequestSequence = 0;
       let historyRequestSequence = 0;
       let lastImportIssues = [];
+      let aiReviewCurrentPanel = null;
+      let aiReviewSelectedResultId = "";
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const pageThumbnailObjectUrls = new Map();
@@ -6729,7 +6739,25 @@
         const confidence = Number.isFinite(item.confidencePercent) ? item.confidencePercent : 0;
         const card = document.createElement("article");
         card.className = "sr-ai-review-card";
+        if (item.resultId === aiReviewSelectedResultId) {
+          card.classList.add("is-selected");
+        }
+        if (item.approvable && !item.approved) {
+          card.classList.add("is-approvable");
+        }
         card.setAttribute("role", "listitem");
+        card.tabIndex = 0;
+        card.dataset.resultId = item.resultId || "";
+        card.addEventListener("click", () => {
+          aiReviewSelectedResultId = item.resultId || "";
+          renderAiReviewPanel(aiReviewCurrentPanel);
+        });
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            card.click();
+          }
+        });
 
         const title = document.createElement("strong");
         title.textContent = item.label || "Review available";
@@ -6742,18 +6770,25 @@
         meter.append(meterFill);
         const meta = document.createElement("small");
         const approvalState = item.approved ? "approved" : "unapproved";
-        meta.textContent = `${confidence}% confidence · ${item.modelId || "local model"} · ${approvalState}`;
+        const approvalMode = item.approvable ? "approvable" : "review only";
+        meta.textContent = `${confidence}% confidence · ${item.modelId || "local model"} · ${approvalState} · ${approvalMode}`;
 
         card.append(title, recommendation, meter, meta);
         return card;
       }
 
       function renderAiReviewPanel(panel = null) {
+        aiReviewCurrentPanel = panel;
         const selected = selectedPhoto();
         const items = Array.isArray(panel?.items) ? panel.items : [];
         const status = panel?.status || "modelUnavailable";
         const baseMessage = panel?.message || "No local blur review model or stored result is available.";
-        const reviewOnlyMessage = `${baseMessage} Review information only; this does not write edits, flags, or originals.`;
+        if (!items.some((item) => item.resultId === aiReviewSelectedResultId)) {
+          aiReviewSelectedResultId = items.find((item) => item.approvable && !item.approved)?.resultId || items[0]?.resultId || "";
+        }
+        const selectedResult = items.find((item) => item.resultId === aiReviewSelectedResultId) || null;
+        const canApprove = Boolean(selected && selectedResult?.approvable && !selectedResult.approved && activeLibraryPath && invoke);
+        const reviewOnlyMessage = `${baseMessage} Explicit approval is required before an AI suggestion writes edit state; this does not write flags or originals.`;
 
         aiReviewSurface.dataset.aiReviewState = status === "reviewAvailable" ? "review-available" : "model-unavailable";
         aiReviewSelectedPhoto.textContent = `Selected photo: ${selected?.fileName ?? "None"}`;
@@ -6764,10 +6799,78 @@
         aiReviewSummaryTask.textContent = "Blur score";
         aiReviewSidebarCount.textContent = String(items.length);
         aiReviewApprovalDeferred.disabled = true;
+        aiReviewApproveSuggestion.disabled = !canApprove;
+        aiReviewRejectSuggestion.disabled = !canApprove;
+        aiReviewApprovalNotice.value = selectedResult
+          ? (canApprove
+            ? "Approval creates one undoable checkpoint; rejection leaves edit state unchanged."
+            : "Selected result is review-only, already approved, or unavailable.")
+          : "No approvable stored result is selected.";
+        aiReviewApprovalNotice.textContent = aiReviewApprovalNotice.value;
 
         aiReviewList.replaceChildren(...items.map(renderAiReviewCard));
         aiReviewList.hidden = items.length === 0;
         aiReviewEmptyState.hidden = items.length > 0;
+      }
+
+      async function finishAiSuggestionDecision(response, fallbackMessage) {
+        if (commandFailed(response)) {
+          setStatus(responseErrorMessage(response, fallbackMessage));
+          return;
+        }
+        const photo = selectedPhoto();
+        if (photo) {
+          const state = developAdjustmentState(photo.photoId);
+          state.readbackLoaded = false;
+          await readPersistedDevelopState(photo, { force: true });
+          await loadDevelopHistory();
+        }
+        setStatus(responseMessage(response, fallbackMessage));
+        await loadAiReviewPanel();
+      }
+
+      async function approveSelectedAiSuggestion() {
+        const selected = selectedPhoto();
+        if (!selected || !aiReviewSelectedResultId || !activeLibraryPath || !invoke) {
+          setStatus("Select an approvable AI result before approval.");
+          return;
+        }
+        setBusy(true);
+        setStatus("Approving AI suggestion...");
+        try {
+          const response = await invoke("approve_ai_suggestion", {
+            libraryPath: activeLibraryPath,
+            photoId: selected.photoId,
+            resultId: aiReviewSelectedResultId,
+          });
+          await finishAiSuggestionDecision(response, "AI suggestion approval failed.");
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "AI suggestion approval failed."));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function rejectSelectedAiSuggestion() {
+        const selected = selectedPhoto();
+        if (!selected || !aiReviewSelectedResultId || !activeLibraryPath || !invoke) {
+          setStatus("Select an approvable AI result before rejection.");
+          return;
+        }
+        setBusy(true);
+        setStatus("Rejecting AI suggestion...");
+        try {
+          const response = await invoke("reject_ai_suggestion", {
+            libraryPath: activeLibraryPath,
+            photoId: selected.photoId,
+            resultId: aiReviewSelectedResultId,
+          });
+          await finishAiSuggestionDecision(response, "AI suggestion rejection failed.");
+        } catch (error) {
+          setStatus(responseErrorMessage(error, "AI suggestion rejection failed."));
+        } finally {
+          setBusy(false);
+        }
       }
 
       async function loadAiReviewPanel() {
@@ -7579,6 +7682,8 @@
       openRecentButton.addEventListener("click", () => openRecentLibrary());
       openAiReviewButton.addEventListener("click", () => void openAiReviewView());
       aiReviewBackToGridButton.addEventListener("click", closeAiReviewView);
+      aiReviewApproveSuggestion.addEventListener("click", () => void approveSelectedAiSuggestion());
+      aiReviewRejectSuggestion.addEventListener("click", () => void rejectSelectedAiSuggestion());
       welcomeActionButtons.forEach((button) => {
         button.addEventListener("click", () => {
           setStatus(`${button.dataset.welcomeAction} will be wired after the local alpha runtime loop is complete.`);

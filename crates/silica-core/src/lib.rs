@@ -1914,9 +1914,42 @@ pub struct AiReviewItem {
     pub model_id: String,
     pub label: String,
     pub recommendation: String,
+    pub approvable: bool,
     pub confidence_percent: Option<u8>,
     pub approved: bool,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AiSuggestionApproval {
+    pub photo_id: String,
+    pub result_id: String,
+    pub model_id: String,
+    pub task_type: String,
+    pub suggestion_kind: String,
+    pub action_log_id: String,
+    pub commit: PhotoEditCommit,
+    pub writes_edit_graph: bool,
+    pub writes_photo_flags: bool,
+    pub writes_original: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiSuggestionRejection {
+    pub photo_id: String,
+    pub result_id: String,
+    pub model_id: String,
+    pub task_type: String,
+    pub action_log_id: String,
+    pub edit_state_unchanged: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct AiApprovalSuggestion {
+    kind: String,
+    exposure: f64,
+    contrast: f64,
+    summary: String,
 }
 
 /// Build the first non-mutating AI review panel from stored local AI result rows only.
@@ -1983,15 +2016,217 @@ fn ai_review_item_from_result(result: AiResult) -> Result<AiReviewItem, CoreErro
         .get("confidence")
         .and_then(serde_json::Value::as_f64)
         .map(|confidence| (confidence.clamp(0.0, 1.0) * 100.0).round() as u8);
+    let approvable = output.get("approval_suggestion").is_some();
 
     Ok(AiReviewItem {
         result_id: result.id,
         model_id: result.model_id,
         label,
         recommendation,
+        approvable,
         confidence_percent,
         approved: result.approved,
         created_at: result.created_at,
+    })
+}
+
+pub fn approve_ai_suggestion(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+    result_id: impl AsRef<str>,
+) -> Result<Option<AiSuggestionApproval>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let photo_id = photo_id.as_ref();
+    let result_id = result_id.as_ref();
+    let result = silica_storage::get_ai_result(library_root_path, result_id)?;
+    ensure_ai_result_targets_photo(&result, photo_id)?;
+    if result.approved {
+        return Err(CoreError::AiReview(
+            "AI result is already approved.".to_string(),
+        ));
+    }
+
+    let suggestion = ai_approval_suggestion_from_result(&result)?;
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let mut edited = match suggestion.kind.as_str() {
+        "basic_exposure_contrast" => silica_edit::apply_exposure_contrast(
+            &graph,
+            suggestion.exposure,
+            suggestion.contrast,
+            current_timestamp_string(),
+        )?,
+        other => {
+            return Err(CoreError::AiReview(format!(
+                "unsupported AI approval suggestion kind: {other}"
+            )));
+        }
+    };
+    let provenance = ai_suggestion_provenance(&result, &suggestion, "approved");
+    edited
+        .extensions
+        .insert("silica.ai_provenance".to_string(), provenance.clone());
+
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+    let approved_result = silica_storage::approve_ai_result(library_root_path, result_id)?;
+    let action_log = append_permissioned_action_log(
+        library_root_path,
+        "ai",
+        Some(&approved_result.model_id),
+        "ai_approval",
+        Some("photo"),
+        Some(photo_id),
+        "ai_result",
+        Some(format!(
+            "ai:{}:approval:{result_id}",
+            approved_result.model_id
+        )),
+        serde_json::json!({
+            "model_id": approved_result.model_id,
+            "result_id": approved_result.id,
+            "task_type": approved_result.task_type,
+            "permission_id": ExtensionPermission::EditSuggestionApply.stable_id(),
+            "suggestion_kind": suggestion.kind,
+            "writes_edit_graph": true,
+            "writes_photo_flags": false,
+            "writes_original": false,
+            "provenance": provenance,
+        }),
+    )?;
+
+    Ok(Some(AiSuggestionApproval {
+        photo_id: persisted.source.photo_id.clone(),
+        result_id: approved_result.id,
+        model_id: approved_result.model_id,
+        task_type: approved_result.task_type,
+        suggestion_kind: suggestion.kind,
+        action_log_id: action_log.id,
+        commit: photo_edit_commit_from_graph(&persisted, "AI suggestion approved."),
+        writes_edit_graph: true,
+        writes_photo_flags: false,
+        writes_original: false,
+    }))
+}
+
+pub fn reject_ai_suggestion(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+    result_id: impl AsRef<str>,
+) -> Result<Option<AiSuggestionRejection>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let photo_id = photo_id.as_ref();
+    let result_id = result_id.as_ref();
+    let result = silica_storage::get_ai_result(library_root_path, result_id)?;
+    ensure_ai_result_targets_photo(&result, photo_id)?;
+    if result.approved {
+        return Err(CoreError::AiReview(
+            "AI result is already approved.".to_string(),
+        ));
+    }
+    let suggestion = ai_approval_suggestion_from_result(&result)?;
+    let action_log = append_permissioned_action_log(
+        library_root_path,
+        "ai",
+        Some(&result.model_id),
+        "ai_rejection",
+        Some("photo"),
+        Some(photo_id),
+        "ai_result",
+        Some(format!("ai:{}:rejection:{result_id}", result.model_id)),
+        serde_json::json!({
+            "model_id": result.model_id,
+            "result_id": result.id,
+            "task_type": result.task_type,
+            "permission_id": ExtensionPermission::EditSuggestionApply.stable_id(),
+            "suggestion_kind": suggestion.kind,
+            "writes_edit_graph": false,
+            "writes_photo_flags": false,
+            "writes_original": false,
+        }),
+    )?;
+
+    Ok(Some(AiSuggestionRejection {
+        photo_id: photo_id.to_string(),
+        result_id: result.id,
+        model_id: result.model_id,
+        task_type: result.task_type,
+        action_log_id: action_log.id,
+        edit_state_unchanged: true,
+    }))
+}
+
+fn ensure_ai_result_targets_photo(result: &AiResult, photo_id: &str) -> Result<(), CoreError> {
+    if result.photo_id != photo_id {
+        return Err(CoreError::AiReview(
+            "AI result does not belong to selected photo.".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn ai_approval_suggestion_from_result(
+    result: &AiResult,
+) -> Result<AiApprovalSuggestion, CoreError> {
+    let payload: serde_json::Value = serde_json::from_str(&result.result_json)
+        .map_err(|error| CoreError::AiReview(format!("invalid result JSON: {error}")))?;
+    let output = payload
+        .get("output")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| CoreError::AiReview("stored result missing output object".to_string()))?;
+    let suggestion = output
+        .get("approval_suggestion")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            CoreError::AiReview("stored result missing approval suggestion".to_string())
+        })?;
+    let kind = suggestion
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| CoreError::AiReview("approval suggestion missing kind".to_string()))?;
+    if kind != "basic_exposure_contrast" {
+        return Err(CoreError::AiReview(format!(
+            "unsupported AI approval suggestion kind: {kind}"
+        )));
+    }
+    let exposure = suggestion
+        .get("exposure")
+        .and_then(serde_json::Value::as_f64)
+        .ok_or_else(|| CoreError::AiReview("approval suggestion missing exposure".to_string()))?;
+    let contrast = suggestion
+        .get("contrast")
+        .and_then(serde_json::Value::as_f64)
+        .ok_or_else(|| CoreError::AiReview("approval suggestion missing contrast".to_string()))?;
+    let summary = suggestion
+        .get("summary")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("AI exposure and contrast suggestion")
+        .to_string();
+
+    Ok(AiApprovalSuggestion {
+        kind: kind.to_string(),
+        exposure,
+        contrast,
+        summary,
+    })
+}
+
+fn ai_suggestion_provenance(
+    result: &AiResult,
+    suggestion: &AiApprovalSuggestion,
+    decision: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "schema": "silica.ai_provenance",
+        "version": 1,
+        "decision": decision,
+        "result_id": result.id,
+        "model_id": result.model_id,
+        "task_type": result.task_type,
+        "suggestion_kind": suggestion.kind,
+        "summary": suggestion.summary,
     })
 }
 
@@ -11012,6 +11247,159 @@ mod tests {
         assert!(!panel.writes_photo_flags);
         assert_eq!(durable_catalog_counts(&created.catalog_path), before);
         assert_original_hash(&jpeg_file, &original_hash, "missing AI review model");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_suggestion_approval_commits_exposure_contrast_with_provenance() {
+        let workspace = unique_library_root("core-ai-suggestion-approval");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let before = durable_catalog_counts(&created.catalog_path);
+        let result = store_ai_result(
+            &created.root_path,
+            &photo_id,
+            "blur_score",
+            "silicaraw.blur-review.test",
+            r#"{"review":{"label":"Usable detail","recommendation":"keep","confidence":0.74},"approval_suggestion":{"kind":"basic_exposure_contrast","exposure":0.35,"contrast":9.0,"summary":"Apply conservative clarity compensation."}}"#,
+        )
+        .expect("store approvable ai result");
+
+        let approval = approve_ai_suggestion(&created.root_path, &photo_id, &result.id)
+            .expect("approve ai suggestion")
+            .expect("approval outcome");
+
+        assert_eq!(approval.photo_id, photo_id);
+        assert_eq!(approval.result_id, result.id);
+        assert_eq!(approval.model_id, "silicaraw.blur-review.test");
+        assert!(approval.commit.persisted);
+        assert_eq!(approval.commit.exposure, 0.35);
+        assert_eq!(approval.commit.contrast, 9.0);
+
+        let after = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after.edit_states, before.edit_states + 1);
+        assert_eq!(after.edit_history, before.edit_history + 1);
+        assert_eq!(after.action_log, before.action_log + 1);
+        assert_eq!(after.ai_results, before.ai_results + 1);
+
+        let listed =
+            list_ai_results_for_photo(&created.root_path, &photo_id, 10).expect("list ai results");
+        assert!(listed[0].approved);
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let action_json: String = connection
+            .query_row(
+                "SELECT action_json FROM edit_history WHERE photo_id = ?1 ORDER BY sequence DESC LIMIT 1",
+                [&photo_id],
+                |row| row.get(0),
+            )
+            .expect("read history action");
+        let action: serde_json::Value =
+            serde_json::from_str(&action_json).expect("parse history action");
+        assert_eq!(
+            action["after"]["edit_graph"]["extensions"]["silica.ai_provenance"]["result_id"],
+            result.id
+        );
+        assert_eq!(
+            action["after"]["edit_graph"]["extensions"]["silica.ai_provenance"]["task_type"],
+            "blur_score"
+        );
+        drop(connection);
+
+        let entries = list_action_log_entries(&created.root_path, 10).expect("list action log");
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "ai_approval"
+                && entry.subject_id.as_deref() == Some(photo_id.as_str())
+                && entry.payload_json.contains(&result.id)
+                && entry.payload_json.contains("edit_suggestion:apply")));
+
+        undo_last_history_action(&created.root_path, &photo_id).expect("undo ai approval");
+        let undone_graph =
+            silica_storage::load_active_edit_graph_or_default(&created.root_path, &photo_id)
+                .expect("load undone graph")
+                .expect("active graph");
+        assert_eq!(undone_graph.basic.exposure.as_f64().unwrap_or(0.0), 0.0);
+        assert_eq!(undone_graph.basic.contrast.as_f64().unwrap_or(0.0), 0.0);
+        assert_original_hash(&jpeg_file, &original_hash, "AI suggestion approval");
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_suggestion_rejection_leaves_edit_state_unchanged() {
+        let workspace = unique_library_root("core-ai-suggestion-rejection");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_hash = file_hash(&jpeg_file);
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let result = store_ai_result(
+            &created.root_path,
+            &photo_id,
+            "blur_score",
+            "silicaraw.blur-review.test",
+            r#"{"review":{"label":"Motion blur likely","recommendation":"review","confidence":0.91},"approval_suggestion":{"kind":"basic_exposure_contrast","exposure":0.2,"contrast":6.0}}"#,
+        )
+        .expect("store rejectable ai result");
+        let before = durable_catalog_counts(&created.catalog_path);
+
+        let rejection = reject_ai_suggestion(&created.root_path, &photo_id, &result.id)
+            .expect("reject ai suggestion")
+            .expect("rejection outcome");
+
+        assert_eq!(rejection.photo_id, photo_id);
+        assert_eq!(rejection.result_id, result.id);
+        let after = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after.edit_states, before.edit_states);
+        assert_eq!(after.edit_history, before.edit_history);
+        assert_eq!(after.ai_results, before.ai_results);
+        assert_eq!(after.action_log, before.action_log + 1);
+
+        let listed =
+            list_ai_results_for_photo(&created.root_path, &photo_id, 10).expect("list ai results");
+        assert!(!listed[0].approved);
+        let graph =
+            silica_storage::load_active_edit_graph_or_default(&created.root_path, &photo_id)
+                .expect("load graph")
+                .expect("default graph");
+        assert_eq!(graph.basic.exposure.as_f64().unwrap_or(0.0), 0.0);
+        assert_eq!(graph.basic.contrast.as_f64().unwrap_or(0.0), 0.0);
+        assert_original_hash(&jpeg_file, &original_hash, "AI suggestion rejection");
 
         remove_library_root(&workspace);
     }

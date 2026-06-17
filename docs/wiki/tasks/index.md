@@ -140,6 +140,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [24.2: Model Manifest Validation](24.2-model-manifest-validation.md)
 - [24.3: AI Result Store and Read Path](24.3-ai-result-store-read-path.md)
 - [24.4: First Non-Mutating AI Review Feature](24.4-first-non-mutating-ai-review.md)
+- [24.5: Explicit AI Suggestion Approval](24.5-explicit-ai-suggestion-approval.md)
 
 ## Notes for LLM Agents
 

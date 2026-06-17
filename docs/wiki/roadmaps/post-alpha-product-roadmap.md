@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-17
+updated: 2026-06-18
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -1129,6 +1129,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Rejection leaves edit state unchanged.
   - Suggestion provenance is recorded.
 - **Validation:** Core/edit/history tests.
+
+**Status:** Completed on 2026-06-18. Added explicit approval and rejection for stored local AI suggestions. Approval supports the scoped `basic_exposure_contrast` suggestion payload, converts it through the existing edit graph validator and undoable history checkpoint path, marks the AI result approved, records provenance under edit graph extensions, and appends `ai_approval` action-log evidence. Rejection appends `ai_rejection` evidence and leaves edit state/history unchanged. The desktop command layer and AI Review UI expose approve/reject controls only for approvable unapproved stored results. Visual QA now includes `M024-ai-approval`.
 
 ## Phase 25: Plugin Foundation
 

@@ -2,7 +2,7 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-17
+updated: 2026-06-18
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md#task-221-expanded-visual-qa-surface-set
 ---
 
@@ -24,7 +24,7 @@ The earlier Phase 5.5 notes remain historical context. The current final runner 
 
 ## Phase 22 Expanded Surface Set
 
-Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. The runner now checks 23 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 69 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
+Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. Task 24.5 adds the AI approval state. The runner now checks 24 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 72 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
 
 Expanded Task 22.1 surfaces:
 
@@ -39,6 +39,7 @@ Expanded Task 22.1 surfaces:
 | `M021-preferences-advanced` | Disabled advanced access gates |
 | `M022-export-workflow` | Export color, metadata, batch progress, failures, and recent exports |
 | `M023-ai-review` | Read-only blur review, disabled approval, and non-mutating action preview |
+| `M024-ai-approval` | Approvable AI suggestion, enabled approve/reject controls, and undo/rejection trust copy |
 
 Current QA command:
 
