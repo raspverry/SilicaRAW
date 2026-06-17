@@ -64,6 +64,7 @@ ALLOWED_COMMANDS = {
     "get_library_cache_status",
     "record_app_session_library_preferences",
     "reset_app_session_library_preferences",
+    "get_ai_review_panel",
 }
 
 WORKFLOW_STEPS = [
@@ -507,6 +508,37 @@ WORKFLOW_STEPS = [
             "Cache",
             "Disposable Cache",
             "Original files are never touched",
+        ],
+    },
+    {
+        "name": "ai-review-read-only",
+        "ids": [
+            "openAiReview",
+            "aiReviewSidebarCount",
+            "aiReviewSurface",
+            "aiReviewBackToGrid",
+            "aiReviewTitle",
+            "aiReviewSelectedPhoto",
+            "aiReviewStatus",
+            "aiReviewBlurTab",
+            "aiReviewQualityTab",
+            "aiReviewDuplicateTab",
+            "aiReviewList",
+            "aiReviewEmptyState",
+            "aiReviewSummary",
+            "aiReviewSummaryStatus",
+            "aiReviewSummaryCount",
+            "aiReviewSummaryTask",
+            "aiReviewActionPreview",
+            "aiReviewApprovalDeferred",
+        ],
+        "commands": ["get_ai_review_panel"],
+        "text": [
+            "AI Review",
+            "Blur",
+            "Review information only",
+            "Approval Deferred",
+            "does not write edits, flags, or originals",
         ],
     },
 ]

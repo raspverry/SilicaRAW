@@ -23,3 +23,10 @@ Task 24.3 records the AI result policy:
 
 - AI results are local-only and unapproved by default.
 - AI result storage does not load a model or mutate edit graph state.
+
+Task 24.4 records the first AI review policy:
+
+- Blur review is the first review task type.
+- Missing model behavior remains editor-usable and AI-review-unavailable.
+- Review output is information only.
+- No model loading, inference, edit graph mutation, or original-file mutation is enabled.

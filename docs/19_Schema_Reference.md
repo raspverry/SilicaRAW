@@ -88,6 +88,17 @@ output -> local review/suggestion object
 
 AI result rows are unapproved by default. Output payloads that directly carry edit graph or photo flag mutation keys are rejected. Approval and conversion into edit graph data remain later explicit tasks.
 
+Task 24.4 reads the first review feature from stored blur review output:
+
+```txt
+task_type -> blur_score
+output.review.label -> user-facing review label
+output.review.recommendation -> review | keep or another non-mutating review decision string
+output.review.confidence -> optional 0.0 through 1.0 score normalized for display
+```
+
+This is display information only. Reading it into the AI Review panel does not approve a suggestion, write edit graph data, write edit history, or change photo flags.
+
 ## Edit Graph v0.1 Required Sections
 
 ```txt

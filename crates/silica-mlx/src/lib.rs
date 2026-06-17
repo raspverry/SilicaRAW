@@ -128,6 +128,18 @@ pub struct MlxAiResultPolicy {
     pub mutates_edit_graph: bool,
 }
 
+/// Task 24.4 first AI review policy without enabling inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MlxAiReviewPolicy {
+    pub task_type: MlxModelTaskType,
+    pub model_optional: bool,
+    pub editor_usable_without_model: bool,
+    pub review_information_only: bool,
+    pub loads_model: bool,
+    pub mutates_edit_graph: bool,
+    pub mutates_originals: bool,
+}
+
 /// Parsed and validated model manifest metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MlxModelManifest {
@@ -200,6 +212,17 @@ pub const TASK_24_3_AI_RESULT_POLICY: MlxAiResultPolicy = MlxAiResultPolicy {
     unapproved_by_default: true,
     loads_model: false,
     mutates_edit_graph: false,
+};
+
+/// Task 24.4 first review policy for downstream crates and tests.
+pub const TASK_24_4_AI_REVIEW_POLICY: MlxAiReviewPolicy = MlxAiReviewPolicy {
+    task_type: MlxModelTaskType::BlurScore,
+    model_optional: true,
+    editor_usable_without_model: true,
+    review_information_only: true,
+    loads_model: false,
+    mutates_edit_graph: false,
+    mutates_originals: false,
 };
 
 impl MlxRuntimeSpike {
@@ -536,5 +559,18 @@ mod tests {
         assert!(policy.unapproved_by_default);
         assert!(!policy.loads_model);
         assert!(!policy.mutates_edit_graph);
+    }
+
+    #[test]
+    fn records_task_24_4_first_review_feature_as_non_mutating_and_optional() {
+        let policy = super::TASK_24_4_AI_REVIEW_POLICY;
+
+        assert_eq!(policy.task_type, super::MlxModelTaskType::BlurScore);
+        assert!(policy.model_optional);
+        assert!(policy.editor_usable_without_model);
+        assert!(policy.review_information_only);
+        assert!(!policy.loads_model);
+        assert!(!policy.mutates_edit_graph);
+        assert!(!policy.mutates_originals);
     }
 }

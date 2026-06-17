@@ -129,6 +129,20 @@ def main():
         "importIssueList",
         "closeImportIssues",
         "viewImportErrors",
+        "openAiReview",
+        "aiReviewSurface",
+        "aiReviewTitle",
+        "aiReviewStatus",
+        "aiReviewSelectedPhoto",
+        "aiReviewBlurTab",
+        "aiReviewQualityTab",
+        "aiReviewDuplicateTab",
+        "aiReviewList",
+        "aiReviewEmptyState",
+        "aiReviewSummary",
+        "aiReviewActionPreview",
+        "aiReviewApprovalDeferred",
+        "aiReviewBackToGrid",
         "libraryGrid",
         "gridEmptyState",
         "gridLoadingState",
@@ -402,8 +416,19 @@ def main():
         "get_photo_history",
         "undo_last_history_action",
         "redo_last_history_action",
+        "get_ai_review_panel",
     ]:
         require(command in source, f"index.html must wire {command}", failures)
+    require(
+        "disabled" in parser.ids.get("aiReviewApprovalDeferred", {}),
+        "#aiReviewApprovalDeferred must stay disabled until explicit AI approval task",
+        failures,
+    )
+    require(
+        "Review information only" in source and "does not write edits, flags, or originals" in source,
+        "AI review surface must state review-only non-mutating behavior",
+        failures,
+    )
 
     require(
         "disabled" in parser.ids.get("openRecent", {}),
@@ -470,6 +495,10 @@ def main():
             ".sr-preferences-pane",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
+            ".sr-ai-review-surface",
+            ".sr-ai-review-layout",
+            ".sr-ai-review-card",
+            ".sr-ai-review-summary",
         ]:
             require(selector in css, f"app-frame.css missing {selector}", failures)
         require("@media" in css, "app-frame.css must define responsive behavior", failures)
@@ -491,6 +520,7 @@ def main():
             "M020-preferences-appearance",
             "M021-preferences-advanced",
             "M022-export-workflow",
+            "M023-ai-review",
         ]:
             require(
                 surface_name in visual_qa_source,

@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-16
+updated: 2026-06-17
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -1116,6 +1116,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Output is presented as review information, not an edit.
   - Original files remain unchanged.
 - **Validation:** Model manifest tests, original hash tests, and visual QA.
+
+**Status:** Completed on 2026-06-17. Added blur review as the first non-mutating AI review feature. `silica-core` builds a read-only AI review panel from stored local `ai_results`, returns a model-unavailable/editor-usable state when no model or stored result exists, and keeps review output out of edit graph, edit history, catalog flags, and original files. The desktop command and static AI Review surface present review information only; approval is disabled and deferred to Task 24.5. Visual QA now includes `M023-ai-review`.
 
 ### Task 24.5: Explicit AI Suggestion Approval
 

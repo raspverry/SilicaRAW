@@ -24,7 +24,7 @@ The earlier Phase 5.5 notes remain historical context. The current final runner 
 
 ## Phase 22 Expanded Surface Set
 
-Task 22.1 expands final visual QA beyond the original MVP path. The runner now checks 22 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 66 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
+Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. The runner now checks 23 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 69 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
 
 Expanded Task 22.1 surfaces:
 
@@ -38,6 +38,7 @@ Expanded Task 22.1 surfaces:
 | `M020-preferences-appearance` | Preferences dialog Appearance pane |
 | `M021-preferences-advanced` | Disabled advanced access gates |
 | `M022-export-workflow` | Export color, metadata, batch progress, failures, and recent exports |
+| `M023-ai-review` | Read-only blur review, disabled approval, and non-mutating action preview |
 
 Current QA command:
 

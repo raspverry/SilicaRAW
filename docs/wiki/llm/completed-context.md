@@ -2,7 +2,7 @@
 title: Completed LLM Context
 status: active
 audience: agents
-updated: 2026-06-13
+updated: 2026-06-17
 source_of_truth: docs/wiki/llm/index.md
 ---
 
@@ -23,6 +23,8 @@ Use this page when a task needs historical context. It keeps [Current LLM Route]
 - Phase 16 is complete. Read [Phase 16 Undo History Action Trust Brief](../phases/phase-16-undo-history-action-trust.md) and [Action Trust](../topics/action-trust.md) instead of replaying Phase 16 task cards.
 - Phase 17 is complete. Read [Phase 17 Develop P0 Expansion Brief](../phases/phase-17-develop-p0-expansion.md) and [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) instead of replaying Phase 17 task cards.
 - Phase 18 is complete. Read [Phase 18 Summary](../phases/phase-18-summary.md), [Phase 18 Professional Editing Baseline Brief](../phases/phase-18-professional-editing-baseline.md), and [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) instead of replaying Phase 18 task cards.
+- Phase 23 is complete. Read [Plugins and MCP](../topics/plugins-and-mcp.md) and [Action Trust](../topics/action-trust.md) only when changing permission or extension action-log behavior.
+- Task 24.1 through Task 24.4 are complete. Read [MLX](../topics/mlx.md), [24.3 AI Result Store and Read Path](../tasks/24.3-ai-result-store-read-path.md), and [24.4 First Non-Mutating AI Review Feature](../tasks/24.4-first-non-mutating-ai-review.md) instead of replaying the full Phase 24 history.
 
 ## Read Avoidance Rules
 
