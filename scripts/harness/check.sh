@@ -39,6 +39,9 @@ python3 scripts/harness/check-recovery-policy.py
 echo "==> Checking library scale benchmark report"
 python3 scripts/harness/check-library-scale-benchmark.py
 
+echo "==> Checking RAW/Metal performance profile"
+python3 scripts/harness/check-raw-metal-profile.py
+
 echo "==> Checking public trust package"
 python3 scripts/harness/check-public-trust-package.py
 

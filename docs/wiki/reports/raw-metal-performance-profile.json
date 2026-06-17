@@ -1,0 +1,113 @@
+{
+  "schema": "silica.raw_metal_profile.v1",
+  "generated_at": "2026-06-17T11:48:06.341327+00:00",
+  "updated_date": "2026-06-17",
+  "git_commit": "e4bd0bb",
+  "app_version": "0.1.0",
+  "machine": {
+    "os": "macOS-26.4-arm64-arm-64bit-Mach-O",
+    "macos_version": "26.4",
+    "arch": "arm64",
+    "machine_model": "Mac17,7",
+    "chip": "Apple M5 Max",
+    "memory_bytes": 137438953472,
+    "python": "3.14.5",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "scope_note": "Local RAW/Metal profiling evidence for this machine only; results are not universal performance guarantees. This report does not implement RAW decoding or Metal viewer behavior.",
+  "run_count": 3,
+  "warmup_count": 1,
+  "fixture_manifest": null,
+  "operations": [
+    {
+      "category": "decode_time",
+      "label": "RAW decode contract boundary",
+      "operation": "cargo test -p silica-decode product_raw_decode_plan_supports_successful_fixture_probe",
+      "status": "measured_contract",
+      "raw_fixture_class": "synthetic supported fixture probe contract",
+      "median_ms": 54.799,
+      "p95_ms": 55.065,
+      "runs_ms": [
+        54.799,
+        54.193,
+        55.065
+      ],
+      "max_rss_kb": 75744.0,
+      "max_rss_runs_kb": [
+        75744.0,
+        75376.0,
+        75232.0
+      ],
+      "notes": "Measures the fixture-backed decode planning contract. It does not run Core Image RAW decode bytes unless a legal fixture manifest is provided to the separate ignored tests."
+    },
+    {
+      "category": "render_time",
+      "label": "Viewer render scheduler boundary",
+      "operation": "cargo test -p silica-render viewer_render_scheduler_records_latest_request_wins",
+      "status": "measured_contract",
+      "raw_fixture_class": "decoded artifact identity contract",
+      "median_ms": 54.414,
+      "p95_ms": 54.716,
+      "runs_ms": [
+        54.159,
+        54.414,
+        54.716
+      ],
+      "max_rss_kb": 75568.0,
+      "max_rss_runs_kb": [
+        75568.0,
+        75296.0,
+        75536.0
+      ],
+      "notes": "Measures the render request scheduler boundary only. It does not allocate Metal textures or render pixels."
+    },
+    {
+      "category": "ui_latency",
+      "label": "Feature-gated native viewer request smoke",
+      "operation": "cargo test -p silica-desktop --features native-metal-viewer render_request_smoke_evidence_is_reviewable",
+      "status": "measured_feature_gate",
+      "raw_fixture_class": "feature-gated decoded artifact identity",
+      "median_ms": 144.78,
+      "p95_ms": 196.556,
+      "runs_ms": [
+        136.9,
+        144.78,
+        196.556
+      ],
+      "max_rss_kb": 109440.0,
+      "max_rss_runs_kb": [
+        109376.0,
+        109264.0,
+        109440.0
+      ],
+      "notes": "Measures the feature-gated native viewer request smoke path as a UI-latency proxy. The default app path still keeps native Metal viewer behavior disabled."
+    },
+    {
+      "category": "export_time",
+      "label": "RAW-derived export safety boundary",
+      "operation": "cargo test -p silica-core raw_derived_jpeg_srgb_export_rejects_original_overwrite_before_decode",
+      "status": "measured_preflight",
+      "raw_fixture_class": "synthetic RAW catalog guard",
+      "median_ms": 91.298,
+      "p95_ms": 98.622,
+      "runs_ms": [
+        90.931,
+        98.622,
+        91.298
+      ],
+      "max_rss_kb": 79936.0,
+      "max_rss_runs_kb": [
+        79760.0,
+        79936.0,
+        79744.0
+      ],
+      "notes": "Measures the RAW-derived export safety preflight. Full fixture-backed RAW export timing remains gated on SILICARAW_RAW_FIXTURE_MANIFEST."
+    }
+  ],
+  "unsupported_or_gated_paths": [
+    "Full fixture-backed Core Image RAW decode timing requires SILICARAW_RAW_FIXTURE_MANIFEST and legal local RAW files.",
+    "Full fixture-backed RAW-derived JPEG export timing requires SILICARAW_RAW_FIXTURE_MANIFEST and remains outside default harness runs.",
+    "Native Metal viewer pixel rendering remains feature-gated; this profile records request-boundary smoke timing, not GPU pixel throughput.",
+    "UI latency is represented by the native viewer request smoke boundary; full interactive drag latency still requires an installed-app profiling pass."
+  ]
+}
