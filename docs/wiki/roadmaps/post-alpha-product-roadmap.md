@@ -910,6 +910,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Design tokens remain the styling source.
 - **Validation:** Visual QA.
 
+**Status:** Completed on 2026-06-17. App-level desktop session state now stores supported Appearance preferences: dark/light theme, compact/comfortable density, and bounded UI scale. The Preferences Appearance pane enables those controls, applies them through tokenized CSS variables, and exposes an Appearance reset action. Non-Appearance Preferences sections remain disabled until their scoped tasks.
+
 ### Task 21.3: Library and Cache Preferences
 
 - **Location:** `crates/silica-core`, `apps/desktop/static/`

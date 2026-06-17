@@ -8,6 +8,19 @@ body {
 .app-frame {
   --sr-sidebar-width: 64px;
   --sr-inspector-width: 280px;
+  --sr-ui-scale: 1;
+  --sr-type-display: calc(28px * var(--sr-ui-scale));
+  --sr-type-title: calc(22px * var(--sr-ui-scale));
+  --sr-type-heading: calc(17px * var(--sr-ui-scale));
+  --sr-type-body: calc(15px * var(--sr-ui-scale));
+  --sr-type-control: calc(13px * var(--sr-ui-scale));
+  --sr-type-caption: calc(11px * var(--sr-ui-scale));
+  --sr-line-display: calc(34px * var(--sr-ui-scale));
+  --sr-line-title: calc(28px * var(--sr-ui-scale));
+  --sr-line-heading: calc(24px * var(--sr-ui-scale));
+  --sr-line-body: calc(22px * var(--sr-ui-scale));
+  --sr-line-control: calc(18px * var(--sr-ui-scale));
+  --sr-line-caption: calc(14px * var(--sr-ui-scale));
   width: 100vw;
   height: 100vh;
   display: grid;
@@ -17,6 +30,14 @@ body {
     "status status status" 52px
     / var(--sr-sidebar-width) minmax(0, 1fr) var(--sr-inspector-width);
   background: var(--sr-bg-primary);
+}
+
+.app-frame[data-density="comfortable"] {
+  --sr-space-xs: 6px;
+  --sr-space-sm: 10px;
+  --sr-space-md: 14px;
+  --sr-space-lg: 18px;
+  --sr-space-xl: 26px;
 }
 
 .app-frame[data-sidebar-collapsed="true"] {
@@ -1797,6 +1818,30 @@ progress::-webkit-progress-value {
   min-height: 36px;
 }
 
+.sr-preferences-scale-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: var(--sr-space-md);
+}
+
+.sr-preferences-scale-control output {
+  min-height: 0;
+  margin: 0;
+  color: var(--sr-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sr-preferences-action-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .sr-preferences-row :disabled,
 .sr-preferences-toggle input:disabled {
   cursor: not-allowed;
@@ -3379,6 +3424,14 @@ progress::-webkit-progress-value {
 
   .sr-preferences-section-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sr-preferences-scale-control {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-preferences-scale-control output {
+    text-align: left;
   }
 
   .sr-export-color-choices {
