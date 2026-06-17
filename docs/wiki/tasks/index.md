@@ -142,6 +142,10 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [24.4: First Non-Mutating AI Review Feature](24.4-first-non-mutating-ai-review.md)
 - [24.5: Explicit AI Suggestion Approval](24.5-explicit-ai-suggestion-approval.md)
 
+## Phase 25
+
+- [25.1: Plugin Manifest Validation](25.1-plugin-manifest-validation.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.

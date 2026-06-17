@@ -14,13 +14,13 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, and Task 24.5 are complete. The next roadmap task is **Task 25.1: Plugin Manifest Validation**.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, and Task 25.1 are complete. The next roadmap task is **Task 25.2: Declarative Preset Plugin**.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. MCP/plugin runtime and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. MCP/plugin runtime and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For Task 25.1, read:
+For Task 25.2, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 25](../roadmaps/post-alpha-product-roadmap.md#phase-25-plugin-foundation)
@@ -30,13 +30,15 @@ For Task 25.1, read:
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Schema Reference](../../19_Schema_Reference.md)
 - [Plugin Manifest Schema](../../../schemas/plugin_manifest.schema.json)
+- [Edit Graph Schema](../../../schemas/edit_graph.schema.json)
+- [Task 25.1: Plugin Manifest Validation](../tasks/25.1-plugin-manifest-validation.md)
 - [Task 24.5: Explicit AI Suggestion Approval](../tasks/24.5-explicit-ai-suggestion-approval.md)
 - [Dependencies Policy](../../DEPENDENCIES.md) if adding or changing a dependency
 
 ## Phase 23 Context
 
 - Task 23.1 defines `ExtensionPermission`, `ExtensionPermissionCategory`, default-deny `ExtensionPermissionPolicy`, and `McpMode` in `silica-core`.
-- `silica-plugin` and `silica-mcp` record matching core permission IDs for boundary checks only and still have no runtime dependencies.
+- `silica-plugin` and `silica-mcp` record matching core permission IDs for boundary checks only and still start no runtime.
 - Task 23.2 defines the static prompt contract in Preferences Advanced: actor, requested permission, side effects, confirmation, undo availability, deny behavior, and dangerous-permission unavailability.
 - Task 23.3 records permission grants, denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts through Core action-log wrappers. Storage rejects extension raw-SQL/direct-database bypass claims.
 - There is no raw SQL permission, no original-mutation permission, no permission persistence, and no runtime server or plugin execution.
@@ -61,8 +63,9 @@ For Task 25.1, read:
 
 - Plugin work starts with manifest validation only.
 - Plugins remain disabled by default.
-- Do not add executable plugin runtime in Task 25.1.
-- Plugin manifests cannot request raw SQL or original-file mutation permission.
+- Task 25.1 validates `silica.plugin` v1 manifests, rejects missing trust fields and unsafe permissions, and returns `enabled_by_default = false`.
+- Task 25.2 may add data-only preset plugin structures, but must not run arbitrary executable plugin code.
+- Plugin manifests cannot request raw SQL, filesystem write, direct database access, or original-file mutation permission.
 
 ## Stop Rules
 
