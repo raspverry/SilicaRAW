@@ -1049,6 +1049,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Dangerous permissions remain unavailable unless a future ADR approves them.
 - **Validation:** UI smoke and visual QA.
 
+**Status:** Completed on 2026-06-17. Added a static Preferences Advanced permission prompt contract covering actor identity, requested permission, side effects, explicit confirmation, undo availability, denial behavior, and dangerous-permission unavailability. Static UI and final visual QA guard the contract text and non-promotional posture. No permission persistence, runtime grant path, MCP server, plugin runtime, or agent bridge was added.
+
 ### Task 23.3: Permissioned Action Log Integration
 
 - **Location:** `crates/silica-core`, `crates/silica-storage`

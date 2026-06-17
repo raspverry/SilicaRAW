@@ -79,7 +79,7 @@ The current implementation order starts with:
 - Task 15.6, RAW export manual color QA, is complete.
 - Phase 15 is complete.
 - Phase 16 is complete: action trust, semantics, edit history, undo/redo, Develop history panel data, append-only action log, and sidecar status after history commits are implemented.
-- Phase 21 Task 21.4 is complete. Task 21.5 is listed next but remains gated by Phase 23 permission policy.
+- Phase 23 Tasks 23.1 and 23.2 are complete. Task 23.3 is next to connect permission decisions and sensitive actions to the action log without starting plugin or MCP runtime.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links

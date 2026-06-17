@@ -389,8 +389,8 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Current Next Tasks
 
-1. Continue to Phase 22 hardening tasks.
-2. Do not start runtime permission, MCP, plugin, or agent bridge work until Phase 23 permission policy exists.
+1. Continue Phase 23 permission foundation tasks.
+2. Do not start runtime permission, MCP, plugin, or agent bridge work until Phase 23 prompt and action-log work is complete.
 
 ## Links
 

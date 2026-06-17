@@ -1116,6 +1116,42 @@
                   <input id="preferencesAdvancedPluginRuntime" type="checkbox" disabled>
                   <span><strong>Plugin Runtime</strong><small>Disabled in the local alpha. Permission prompts, Core API boundaries, and action-log evidence are required before future access.</small></span>
                 </label>
+                <section class="sr-permission-contract" id="permissionPromptContract" aria-labelledby="permissionPromptContractTitle">
+                  <div class="sr-permission-contract-header">
+                    <div>
+                      <span>Prompt template</span>
+                      <h4 id="permissionPromptContractTitle">Permission Prompt Contract</h4>
+                    </div>
+                    <strong id="permissionPromptDangerousUnavailable">Not available</strong>
+                  </div>
+                  <dl class="sr-permission-contract-grid">
+                    <div id="permissionPromptActor">
+                      <dt>Actor</dt>
+                      <dd>Extension name, type, version, and source before any decision.</dd>
+                    </div>
+                    <div id="permissionPromptPermission">
+                      <dt>Requested permission</dt>
+                      <dd>Stable core permission ID plus plain language scope.</dd>
+                    </div>
+                    <div id="permissionPromptSideEffects">
+                      <dt>Side effects</dt>
+                      <dd>Catalog, sidecar, export, AI result, filesystem, or action-log effects.</dd>
+                    </div>
+                    <div id="permissionPromptConfirmation">
+                      <dt>Confirmation</dt>
+                      <dd>Explicit user action. No prechecked controls, no promotional copy.</dd>
+                    </div>
+                    <div id="permissionPromptUndo">
+                      <dt>Undo availability</dt>
+                      <dd>State whether undo exists, or why it does not.</dd>
+                    </div>
+                    <div id="permissionPromptDenyAction">
+                      <dt>Deny</dt>
+                      <dd>Deny keeps the requested extension disabled and records no grant.</dd>
+                    </div>
+                  </dl>
+                  <p>Dangerous permissions are unavailable unless a future ADR approves them.</p>
+                </section>
               </section>
             </div>
           </div>
@@ -5238,7 +5274,7 @@
               ? "Export defaults save to the active library and update the export dialog."
               : "Open a library to edit export defaults.";
           } else if (selectedSection === "advanced") {
-            preferencesStatus.value = "Advanced access remains off until Phase 23 permission policy exists.";
+            preferencesStatus.value = "Advanced access remains off until permission prompts and action-log integration exist.";
           } else {
             preferencesStatus.value = `${label} settings are mapped; controls remain disabled until their scoped task.`;
           }

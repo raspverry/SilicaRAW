@@ -351,6 +351,14 @@ def main():
         "preferencesAdvancedAgentAccess",
         "preferencesAdvancedMcpAccess",
         "preferencesAdvancedPluginRuntime",
+        "permissionPromptContract",
+        "permissionPromptActor",
+        "permissionPromptPermission",
+        "permissionPromptSideEffects",
+        "permissionPromptConfirmation",
+        "permissionPromptUndo",
+        "permissionPromptDenyAction",
+        "permissionPromptDangerousUnavailable",
         "preferencesStatus",
         "openExportDialog",
         "exportDialog",
@@ -639,6 +647,29 @@ def main():
         "Local library, catalog, sidecar, edit, and export actions require explicit permission.",
     ]:
         require(marker in source, f"advanced access preference explanation missing: {marker}", failures)
+    for marker in [
+        "Permission Prompt Contract",
+        "Actor",
+        "Requested permission",
+        "Side effects",
+        "Confirmation",
+        "Undo availability",
+        "Deny keeps the requested extension disabled and records no grant.",
+        "Dangerous permissions are unavailable unless a future ADR approves them.",
+        "Not available",
+    ]:
+        require(marker in source, f"permission prompt contract marker missing: {marker}", failures)
+    for promotional_marker in [
+        "unlock",
+        "supercharge",
+        "magic",
+        "boost",
+    ]:
+        require(
+            promotional_marker not in source.lower(),
+            f"permission prompt copy must stay non-promotional: {promotional_marker}",
+            failures,
+        )
     for forbidden_marker in [
         'invoke("start_mcp',
         'invoke("start_plugin',
