@@ -863,6 +863,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 - **Location:** `crates/silica-core`, `apps/desktop/src-tauri`, `apps/desktop/static/`
 - **Description:** Add multi-photo export progress, failures, and recent export records.
 - **Dependencies:** Task 20.1
+- **Status:** Completed on 2026-06-17. Batch export progress now uses the real current selection in the existing Export dialog, records per-photo failures for review, and loads recent exports from catalog records with output-file existence evidence so missing files are shown honestly.
 - **Acceptance Criteria:**
   - Progress reflects real selected photos.
   - Failures are reviewable.

@@ -248,6 +248,15 @@ export_presets.metadata_policy -> minimal | preserve | remove_gps | remove_all
 export_settings.metadata_policy -> minimal | preserve | remove_gps | remove_all
 ```
 
+Task 20.4 recent export status:
+
+```txt
+exports.created_at -> catalog export ordering evidence
+recent export read model -> export_record_id, photo_id, output_path, export_settings_json, created_at, output_exists
+```
+
+`output_exists` is runtime file evidence only. It must not be stored as catalog truth, and the UI must show missing output files as missing instead of implying a recent export path is still available.
+
 Task 16.6 sidecar status runtime:
 
 ```txt

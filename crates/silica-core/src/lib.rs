@@ -834,6 +834,17 @@ pub struct PhotoExportSession {
     pub message: String,
 }
 
+/// Recent export record returned through the core boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoRecentExport {
+    pub export_record_id: String,
+    pub photo_id: String,
+    pub output_path: String,
+    pub export_settings_json: String,
+    pub created_at: String,
+    pub output_exists: bool,
+}
+
 /// JPEG output color profile accepted by the core export boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PhotoExportColorProfile {
@@ -3566,6 +3577,28 @@ pub fn export_photo_jpeg_with_metadata_policy(
         color_profile,
         metadata_policy,
     )
+}
+
+/// List recent export records with current output file evidence.
+pub fn list_recent_exports(
+    library_root_path: impl AsRef<Path>,
+    limit: usize,
+) -> Result<Vec<PhotoRecentExport>, CoreError> {
+    let records = silica_storage::list_recent_export_records(library_root_path, limit)?;
+    Ok(records
+        .into_iter()
+        .map(|record| {
+            let output_exists = Path::new(&record.output_path).is_file();
+            PhotoRecentExport {
+                export_record_id: record.id,
+                photo_id: record.photo_id,
+                output_path: record.output_path,
+                export_settings_json: record.export_settings_json,
+                created_at: record.created_at,
+                output_exists,
+            }
+        })
+        .collect())
 }
 
 /// Export one edited catalog photo as a PNG sRGB file and record the export.
@@ -10168,6 +10201,60 @@ mod tests {
         assert_eq!(settings["output_metadata_segments"], 1);
         assert_eq!(settings["source_metadata_copied"], true);
         assert_eq!(settings["gps_metadata_removed"], true);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn recent_exports_report_missing_output_evidence() {
+        let workspace = unique_library_root("core-recent-exports");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let existing_output = export_root.join("sample-export.jpg");
+        let missing_output = export_root.join("missing-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        std::fs::write(&existing_output, b"export bytes").expect("write export output");
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        silica_storage::record_export(
+            &created.root_path,
+            &photo_id,
+            &existing_output,
+            r#"{"format":"jpeg"}"#,
+        )
+        .expect("record existing export");
+        silica_storage::record_export(
+            &created.root_path,
+            &photo_id,
+            &missing_output,
+            r#"{"format":"png"}"#,
+        )
+        .expect("record missing export");
+
+        let recent = list_recent_exports(&created.root_path, 2).expect("list recent exports");
+
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].output_path, missing_output.display().to_string());
+        assert!(!recent[0].output_exists);
+        assert_eq!(recent[1].output_path, existing_output.display().to_string());
+        assert!(recent[1].output_exists);
+        assert!(!recent[0].created_at.is_empty());
 
         remove_library_root(&workspace);
     }

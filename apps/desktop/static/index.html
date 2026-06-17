@@ -61,7 +61,7 @@
         <section class="sr-sidebar-section" data-mode-panel="export" hidden>
           <div class="sr-panel-heading">Export</div>
           <button class="sr-sidebar-item is-active" type="button"><span>JPEG sRGB</span><span>Ready</span></button>
-          <button class="sr-sidebar-item" type="button" disabled title="Recent exports are deferred until session persistence is implemented."><span>Recent Exports</span><span>0</span></button>
+          <button class="sr-sidebar-item" type="button" disabled title="Recent exports are read from catalog records."><span>Recent Exports</span><span id="recentExportCount">0</span></button>
         </section>
       </aside>
 
@@ -1028,6 +1028,14 @@
               <div class="sr-export-safety" id="exportSafetyNote">
                 Original files will not be modified. SilicaRAW writes a separate JPEG sRGB file to the output path.
               </div>
+              <section class="sr-export-batch-panel" aria-label="Batch progress">
+                <div class="sr-export-batch-header">
+                  <strong>Batch progress</strong>
+                  <span id="exportBatchProgressLabel">0 / 0</span>
+                </div>
+                <progress id="exportBatchProgress" max="100" value="0"></progress>
+                <ul class="sr-export-failure-list" id="exportBatchFailureList" aria-live="polite"></ul>
+              </section>
               <output id="exportStatus" aria-live="polite">Enter an output path, then export the selected photo.</output>
             </section>
             <aside class="sr-export-summary" aria-label="Export summary">
@@ -1040,7 +1048,13 @@
               <div class="sr-export-row"><span>Color Space</span><strong id="exportSummaryColor">sRGB</strong></div>
               <div class="sr-export-row"><span>Quality</span><strong id="exportSummaryQuality">90</strong></div>
               <div class="sr-export-row"><span>Metadata</span><strong id="exportSummaryMetadata">Minimal</strong></div>
+              <div class="sr-export-row"><span>Batch</span><strong id="exportSummaryBatch">1 photo</strong></div>
               <div class="sr-export-row"><span>File</span><strong id="exportSummaryFile">None</strong></div>
+              <section class="sr-recent-export-panel" aria-label="Recent Exports">
+                <h3>Recent Exports</h3>
+                <p class="sr-recent-export-empty" id="recentExportsEmpty">No recent exports yet.</p>
+                <ul class="sr-recent-export-list" id="recentExportsList" aria-live="polite"></ul>
+              </section>
             </aside>
           </div>
           <footer class="sr-export-dialog-footer">
@@ -1356,12 +1370,19 @@
       const chooseExportOutputPathButton = document.querySelector("#chooseExportOutputPath");
       const exportStatus = document.querySelector("#exportStatus");
       const exportSafetyNote = document.querySelector("#exportSafetyNote");
+      const exportBatchProgress = document.querySelector("#exportBatchProgress");
+      const exportBatchProgressLabel = document.querySelector("#exportBatchProgressLabel");
+      const exportBatchFailureList = document.querySelector("#exportBatchFailureList");
+      const recentExportsList = document.querySelector("#recentExportsList");
+      const recentExportsEmpty = document.querySelector("#recentExportsEmpty");
+      const recentExportCount = document.querySelector("#recentExportCount");
       const exportSummaryFormat = document.querySelector("#exportSummaryFormat");
       const exportSummaryFile = document.querySelector("#exportSummaryFile");
       const exportSummaryPreset = document.querySelector("#exportSummaryPreset");
       const exportSummaryColor = document.querySelector("#exportSummaryColor");
       const exportSummaryQuality = document.querySelector("#exportSummaryQuality");
       const exportSummaryMetadata = document.querySelector("#exportSummaryMetadata");
+      const exportSummaryBatch = document.querySelector("#exportSummaryBatch");
       const exportPreviewArt = document.querySelector("#exportPreviewArt");
       const exportPreviewCard = document.querySelector(".sr-export-preview-card");
       const thumbnailSizeInput = document.querySelector("#thumbnailSize");
@@ -1394,6 +1415,8 @@
       let selectedExportColorProfile = "srgb";
       let selectedExportMetadataPolicy = "minimal";
       let selectedExportPresetId = "jpeg-srgb-90";
+      let exportBatchFailures = [];
+      let recentExports = [];
       let exportSettingsCatalog = defaultExportSettingsCatalog();
       let libraryGridPage = {
         offset: 0,
@@ -4430,15 +4453,151 @@
           : `${exportFormatLabel(selectedExportFormat)} exports do not copy source metadata in this alpha.`;
       }
 
+      function selectedExportPhotos() {
+        const ids = new Set(selectedPhotoIds);
+        const photos = libraryPhotos.filter((photo) => ids.has(photo.photoId));
+        if (photos.length) {
+          return photos;
+        }
+        const photo = selectedPhoto();
+        return photo ? [photo] : [];
+      }
+
+      function exportBatchCountLabel(count) {
+        return `${count} ${count === 1 ? "photo" : "photos"}`;
+      }
+
+      function updateExportBatchProgress(completed, total) {
+        exportBatchProgress.value = total ? Math.round((completed / total) * 100) : 0;
+        exportBatchProgressLabel.textContent = `${completed} / ${total}`;
+      }
+
+      function renderExportBatchFailures() {
+        exportBatchFailureList.replaceChildren(...exportBatchFailures.map((failure) => {
+          const item = document.createElement("li");
+          item.textContent = `${failure.fileName}: ${failure.message}`;
+          return item;
+        }));
+      }
+
+      function splitOutputPath(path) {
+        const separatorIndex = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+        const directory = separatorIndex >= 0 ? path.slice(0, separatorIndex + 1) : "";
+        const fileName = separatorIndex >= 0 ? path.slice(separatorIndex + 1) : path;
+        const dotIndex = fileName.lastIndexOf(".");
+        if (dotIndex > 0) {
+          return {
+            directory,
+            stem: fileName.slice(0, dotIndex),
+            extension: fileName.slice(dotIndex),
+          };
+        }
+        return { directory, stem: fileName || "SilicaRAW-export", extension: "" };
+      }
+
+      function safeOutputStem(value) {
+        return String(value || "photo")
+          .replace(/\.[^.]+$/, "")
+          .replace(/[^a-zA-Z0-9._-]+/g, "-")
+          .replace(/^-|-$/g, "") || "photo";
+      }
+
+      function batchExportPathForPhoto(basePath, photo, index, total) {
+        if (total <= 1) {
+          return basePath;
+        }
+        const parts = splitOutputPath(basePath);
+        const extension = parts.extension || `.${exportFormatExtension(selectedExportFormat)}`;
+        const suffix = safeOutputStem(photo?.fileName || photo?.photoId || `photo-${index + 1}`);
+        return `${parts.directory}${parts.stem}-${suffix}${extension}`;
+      }
+
+      function exportTargetBlockReason(photo, outputPath) {
+        if (!photo) {
+          return "No photo selected.";
+        }
+        if (exportOutputLooksUnsafe(photo, outputPath)) {
+          return "Output path must differ from the original source path.";
+        }
+        const state = developAdjustmentState(photo.photoId);
+        if (hasUnsupportedCommittedDetail(state)) {
+          return "Detail adjustments are unsupported until renderer support exists.";
+        }
+        if (photo.missing) {
+          return "Referenced original is missing.";
+        }
+        if (photo.unsupported) {
+          return "File type is unsupported.";
+        }
+        if (!isRasterExportCandidate(photo)) {
+          return "RAW decode is required before export.";
+        }
+        return "";
+      }
+
+      function renderRecentExports() {
+        recentExportCount.textContent = String(recentExports.length);
+        recentExportsEmpty.hidden = recentExports.length > 0;
+        recentExportsList.replaceChildren(...recentExports.map((entry) => {
+          const item = document.createElement("li");
+          item.className = `sr-recent-export-row${entry.outputExists ? "" : " is-missing"}`;
+          const detail = document.createElement("span");
+          const title = document.createElement("strong");
+          title.textContent = entry.outputPath || "Untitled export";
+          const timestamp = document.createElement("small");
+          timestamp.textContent = entry.createdAt || "Unknown time";
+          detail.append(title, timestamp);
+          const state = document.createElement("span");
+          state.className = "sr-recent-export-state";
+          state.textContent = entry.outputExists ? "Available" : "Output missing";
+          item.append(detail, state);
+          return item;
+        }));
+      }
+
+      async function loadRecentExports() {
+        if (!activeLibraryPath || !invoke) {
+          recentExports = [];
+          renderRecentExports();
+          return;
+        }
+        try {
+          const response = await invoke("get_recent_exports", {
+            libraryPath: activeLibraryPath,
+            limit: 10,
+          });
+          if (commandFailed(response)) {
+            recentExports = [];
+            renderRecentExports();
+            return;
+          }
+          recentExports = Array.isArray(response.data?.exports) ? response.data.exports : [];
+          renderRecentExports();
+        } catch (_error) {
+          recentExports = [];
+          renderRecentExports();
+        }
+      }
+
       function syncExportDialog() {
         const photo = selectedPhoto();
+        const exportPhotos = selectedExportPhotos();
+        const exportCount = exportPhotos.length;
         const hasPhoto = Boolean(photo);
         const state = photo ? developAdjustmentState(photo.photoId) : null;
         const detailUnsupported = hasUnsupportedCommittedDetail(state);
         setExportFormat(selectedExportFormat);
-        exportSelectedPhotoName.textContent = photo?.fileName ?? "No photo selected";
-        exportSelectedInline.textContent = photo?.fileName ?? "None";
-        exportSummaryFile.textContent = photo ? `${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedExportFormat)}` : "None";
+        const selectionText = exportCount > 1 && photo
+          ? `${exportBatchCountLabel(exportCount)}, primary ${photo.fileName}`
+          : photo?.fileName ?? "No photo selected";
+        exportSelectedPhotoName.textContent = selectionText;
+        exportSelectedInline.textContent = selectionText === "No photo selected" ? "None" : selectionText;
+        exportSummaryBatch.textContent = exportCount ? exportBatchCountLabel(exportCount) : "0 photos";
+        exportSummaryFile.textContent = photo
+          ? (exportCount > 1
+            ? `${exportBatchCountLabel(exportCount)} from ${selectedPhotoBaseName(photo)}`
+            : `${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedExportFormat)}`)
+          : "None";
         exportPreviewArt.className = `sr-thumb-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
         renderExportPreviewImage(photo);
         if (photo && (!exportOutputPath.value || exportOutputPath.dataset.autofilled === "true")) {
@@ -4449,6 +4608,9 @@
         const disabled = !hasPhoto || !isRasterExportCandidate(photo) || unsafeOutput || detailUnsupported;
         runJpegExportButton.disabled = disabled;
         chooseExportOutputPathButton.disabled = !hasPhoto || !isRasterExportCandidate(photo) || detailUnsupported;
+        if (exportBatchProgress.dataset.running !== "true") {
+          updateExportBatchProgress(0, exportCount);
+        }
         if (!hasPhoto) {
           exportStatus.value = "Select a photo before exporting.";
         } else if (unsafeOutput) {
@@ -4468,6 +4630,7 @@
 
       function openExportDialog() {
         syncExportDialog();
+        void loadRecentExports();
         exportDialog.hidden = false;
         exportOutputPath.focus();
       }
@@ -4477,20 +4640,14 @@
         setStatus("Export dialog closed.");
       }
 
-      async function runJpegExport() {
-        const photo = selectedPhoto();
+      async function runBatchExport() {
+        const photos = selectedExportPhotos();
         const outputPath = exportOutputPath.value.trim();
         const selectedFormat = selectedExportFormat;
         const exportFormatText = exportFormatLabel(selectedFormat);
         const exportColorProfile = selectedExportColorProfile;
         const exportColorLabel = exportColorProfileLabel(exportColorProfile);
-        const state = photo ? developAdjustmentState(photo.photoId) : null;
-        if (!isRasterExportCandidate(photo)) {
-          syncExportDialog();
-          setStatus(exportStatus.value);
-          return;
-        }
-        if (hasUnsupportedCommittedDetail(state)) {
+        if (!photos.length) {
           syncExportDialog();
           setStatus(exportStatus.value);
           return;
@@ -4500,52 +4657,86 @@
           setStatus(exportStatus.value);
           return;
         }
-        if (exportOutputLooksUnsafe(photo, outputPath)) {
-          exportStatus.value = "Output path must differ from the original source path.";
-          setStatus(exportStatus.value);
-          return;
-        }
 
         if (!activeLibraryPath || !invoke) {
+          exportBatchFailures = [];
+          renderExportBatchFailures();
+          updateExportBatchProgress(photos.length, photos.length);
           exportStatus.value = `Static export smoke passed; desktop runtime writes the ${exportFormatText} and catalog record.`;
           setStatus(exportStatus.value);
           return;
         }
 
         setBusy(true);
-        exportStatus.value = `Exporting ${exportFormatText} ${exportColorLabel}...`;
+        exportBatchProgress.dataset.running = "true";
+        exportBatchFailures = [];
+        renderExportBatchFailures();
+        updateExportBatchProgress(0, photos.length);
+        exportStatus.value = `Exporting ${exportBatchCountLabel(photos.length)} as ${exportFormatText} ${exportColorLabel}...`;
         setStatus(exportStatus.value);
+        let completed = 0;
+        let succeeded = 0;
         try {
-          const payload = {
-            libraryPath: activeLibraryPath,
-            photoId: photo.photoId,
-            outputPath,
-          };
-          if (selectedFormat === "jpeg") {
-            payload.colorProfile = exportColorProfile === "srgb" ? null : exportColorProfile;
-            payload.metadataPolicy = selectedExportMetadataPolicy;
+          for (let index = 0; index < photos.length; index += 1) {
+            const photo = photos[index];
+            const targetPath = batchExportPathForPhoto(outputPath, photo, index, photos.length);
+            const blockedReason = exportTargetBlockReason(photo, targetPath);
+            if (blockedReason) {
+              exportBatchFailures.push({ fileName: photo?.fileName || `Photo ${index + 1}`, message: blockedReason });
+              completed += 1;
+              updateExportBatchProgress(completed, photos.length);
+              renderExportBatchFailures();
+              continue;
+            }
+            const payload = {
+              libraryPath: activeLibraryPath,
+              photoId: photo.photoId,
+              outputPath: targetPath,
+            };
+            if (selectedFormat === "jpeg") {
+              payload.colorProfile = exportColorProfile === "srgb" ? null : exportColorProfile;
+              payload.metadataPolicy = selectedExportMetadataPolicy;
+            }
+            try {
+              const response = await invoke(exportCommandName(selectedFormat), payload);
+              if (commandFailed(response)) {
+                exportBatchFailures.push({
+                  fileName: photo.fileName,
+                  message: responseErrorMessage(response, `${exportFormatText} ${exportColorLabel} export failed.`),
+                });
+              } else if (!response.data) {
+                exportBatchFailures.push({ fileName: photo.fileName, message: "Catalog photo was not found." });
+              } else {
+                succeeded += 1;
+                exportSummaryFile.textContent = response.data.outputPath || targetPath;
+              }
+            } catch (error) {
+              exportBatchFailures.push({
+                fileName: photo.fileName,
+                message: responseErrorMessage(error, `${exportFormatText} ${exportColorLabel} export failed.`),
+              });
+            } finally {
+              completed += 1;
+              updateExportBatchProgress(completed, photos.length);
+              renderExportBatchFailures();
+            }
           }
-          const response = await invoke(exportCommandName(selectedFormat), payload);
-          if (commandFailed(response)) {
-            exportStatus.value = responseErrorMessage(response, `${exportFormatText} ${exportColorLabel} export failed.`);
-            setStatus(exportStatus.value);
-            return;
-          }
-          if (!response.data) {
-            exportStatus.value = "Catalog photo was not found.";
-            setStatus(exportStatus.value);
-            return;
-          }
-          const exportedPath = response.data.outputPath;
-          exportSummaryFile.textContent = exportedPath || `${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedFormat)}`;
-          exportStatus.value = response.data.message || responseMessage(response, `${exportFormatText} ${exportColorLabel} export completed.`);
-          setStatus(responseMessage(response));
+          await loadRecentExports();
+          exportStatus.value = exportBatchFailures.length
+            ? `${succeeded} of ${photos.length} exports completed. Review failures above.`
+            : `${photos.length} of ${photos.length} exports completed.`;
+          setStatus(exportStatus.value);
         } catch (error) {
           exportStatus.value = responseErrorMessage(error, `${exportFormatText} ${exportColorLabel} export failed.`);
           setStatus(exportStatus.value);
         } finally {
+          exportBatchProgress.dataset.running = "false";
           setBusy(false);
         }
+      }
+
+      async function runJpegExport() {
+        await runBatchExport();
       }
 
       function localDevelopPreviewPlan(photo, state) {
@@ -6081,7 +6272,9 @@
         );
         const exportPhoto = selectedPhoto();
         const exportState = exportPhoto ? developAdjustmentState(exportPhoto.photoId) : null;
-        const exportDisabled = !isRasterExportCandidate(exportPhoto) || hasUnsupportedCommittedDetail(exportState);
+        const exportDisabled = !isRasterExportCandidate(exportPhoto)
+          || hasUnsupportedCommittedDetail(exportState)
+          || exportOutputLooksUnsafe(exportPhoto, exportOutputPath.value.trim());
         runJpegExportButton.disabled = isBusy || exportDisabled;
         chooseExportOutputPathButton.disabled = isBusy || exportDisabled;
         exportColorOptionButtons.forEach((button) => {
