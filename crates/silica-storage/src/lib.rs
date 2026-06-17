@@ -339,6 +339,26 @@ pub struct CacheClearSummary {
     pub message: String,
 }
 
+/// Read-only status for one disposable cache directory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CacheDirectoryStatus {
+    pub name: String,
+    pub path: PathBuf,
+    pub exists: bool,
+    pub byte_size: u64,
+    pub file_count: u64,
+}
+
+/// Read-only status for all disposable cache directories in one library.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CacheStatusSummary {
+    pub library_root_path: PathBuf,
+    pub directories: Vec<CacheDirectoryStatus>,
+    pub total_bytes: u64,
+    pub cache_record_count: usize,
+    pub message: String,
+}
+
 /// Result of creating a checkpointed local library backup artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibraryBackupResult {
@@ -1534,6 +1554,42 @@ pub fn get_photo_cache_record(
         .map_err(LibraryStorageError::from)
 }
 
+/// Read disposable cache directory status without clearing or repairing cache directories.
+pub fn get_disposable_cache_status(
+    library_root_path: impl AsRef<Path>,
+) -> Result<CacheStatusSummary, LibraryStorageError> {
+    let library = inspect_local_library_for_restore(library_root_path)?;
+    let connection =
+        Connection::open_with_flags(&library.catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let cache_record_count =
+        connection.query_row("SELECT COUNT(*) FROM cache_records", [], |row| {
+            row.get::<_, i64>(0)
+        })?;
+
+    let mut total_bytes = 0_u64;
+    let mut directories = Vec::with_capacity(DISPOSABLE_CACHE_DIRECTORIES.len());
+    for directory in DISPOSABLE_CACHE_DIRECTORIES {
+        let path = library.root_path.join(directory);
+        let (byte_size, file_count) = cache_directory_size(&path)?;
+        total_bytes = total_bytes.saturating_add(byte_size);
+        directories.push(CacheDirectoryStatus {
+            name: (*directory).to_string(),
+            path,
+            exists: library.root_path.join(directory).is_dir(),
+            byte_size,
+            file_count,
+        });
+    }
+
+    Ok(CacheStatusSummary {
+        library_root_path: library.root_path,
+        directories,
+        total_bytes,
+        cache_record_count: usize::try_from(cache_record_count).unwrap_or(usize::MAX),
+        message: "Cache status covers disposable library caches only.".to_string(),
+    })
+}
+
 /// Clear only disposable cache directories and cache record metadata.
 pub fn clear_disposable_cache(
     library_root_path: impl AsRef<Path>,
@@ -1615,6 +1671,31 @@ fn record_photo_cache(
         path,
         byte_size,
     })
+}
+
+fn cache_directory_size(path: &Path) -> Result<(u64, u64), LibraryStorageError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok((0, 0)),
+        Err(error) => return Err(error.into()),
+    };
+    if metadata.file_type().is_file() {
+        return Ok((metadata.len(), 1));
+    }
+    if !metadata.file_type().is_dir() {
+        return Ok((0, 0));
+    }
+
+    let mut total_bytes = 0_u64;
+    let mut file_count = 0_u64;
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let (entry_bytes, entry_files) = cache_directory_size(&entry.path())?;
+        total_bytes = total_bytes.saturating_add(entry_bytes);
+        file_count = file_count.saturating_add(entry_files);
+    }
+
+    Ok((total_bytes, file_count))
 }
 
 fn validate_cache_path(
@@ -8238,6 +8319,101 @@ mod tests {
             std::fs::read(&supported_file).expect("read original after"),
             original_bytes
         );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn disposable_cache_status_reports_real_paths_and_sizes() {
+        let workspace = unique_library_root("cache-status");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+
+        let thumbnail_path = library
+            .root_path
+            .join("thumbnails")
+            .join("sample-thumb.jpg");
+        let preview_path = library
+            .root_path
+            .join("previews")
+            .join("sample-preview.jpg");
+        let histogram_path = library
+            .root_path
+            .join("render-cache")
+            .join("histogram.json");
+        std::fs::write(&thumbnail_path, b"thumb").expect("write thumbnail");
+        std::fs::write(&preview_path, b"preview").expect("write preview");
+        std::fs::write(&histogram_path, b"histogram").expect("write histogram");
+        std::fs::create_dir_all(library.root_path.join("exports")).expect("create exports");
+        std::fs::write(
+            library.root_path.join("exports").join("keep.jpg"),
+            b"not cache",
+        )
+        .expect("write export");
+        record_thumbnail_cache(
+            &library.root_path,
+            &photo_id,
+            "thumbnail-key",
+            &thumbnail_path,
+            5,
+        )
+        .expect("record thumbnail cache");
+        record_preview_cache(
+            &library.root_path,
+            &photo_id,
+            "preview-key",
+            &preview_path,
+            7,
+        )
+        .expect("record preview cache");
+
+        let status = get_disposable_cache_status(&library.root_path).expect("cache status");
+
+        assert_eq!(
+            status
+                .directories
+                .iter()
+                .map(|directory| directory.name.as_str())
+                .collect::<Vec<_>>(),
+            DISPOSABLE_CACHE_DIRECTORIES
+        );
+        assert_eq!(status.total_bytes, 21);
+        assert_eq!(status.cache_record_count, 2);
+        assert_eq!(
+            status
+                .directories
+                .iter()
+                .find(|directory| directory.name == "thumbnails")
+                .expect("thumbnail status")
+                .byte_size,
+            5
+        );
+        assert_eq!(
+            status
+                .directories
+                .iter()
+                .find(|directory| directory.name == "previews")
+                .expect("preview status")
+                .byte_size,
+            7
+        );
+        assert_eq!(
+            status
+                .directories
+                .iter()
+                .find(|directory| directory.name == "render-cache")
+                .expect("render status")
+                .byte_size,
+            9
+        );
+        assert!(library.root_path.join("exports").join("keep.jpg").is_file());
 
         remove_library_root(&workspace);
     }

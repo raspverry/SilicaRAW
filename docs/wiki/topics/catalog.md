@@ -36,6 +36,7 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 16.6 adds catalog-side sidecar status updates after history commits without a new migration: clean sidecars become `catalog_newer`, while conflict/newer states remain preserved.
 - Task 18.5.2 adds atomic batch edit sync for typed clipboard payloads: Core plans target readiness first, storage commits ready changed graphs in one transaction with one `edit_history` row per affected photo, unchanged targets are skipped, blocked targets stop all writes, and existing clean sidecars are only marked `catalog_newer`.
 - Task 20.1 adds catalog schema version 9 for export-owned defaults and named presets: `export_settings` and `export_presets`.
+- Task 21.3 keeps Library default path preferences in app-session JSON and exposes read-only disposable cache status plus the existing disposable cache clear command to Preferences.
 - The catalog remains local-first and referenced-folder by default.
 - Original photo files must not be modified by catalog work.
 
@@ -166,6 +167,7 @@ Task 11.9 requires reviewable import errors before recursive import exists:
 - Full paged grid UI states and pagination controls.
 - Broad catalog UI screens beyond the local alpha workflow.
 - Plugin or MCP catalog access.
+- Cache quota eviction or background cache pruning.
 
 ## Links
 

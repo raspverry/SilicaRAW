@@ -491,6 +491,13 @@ enum DesktopCommandData {
         removed_cache_records: usize,
         message: String,
     },
+    CacheStatus {
+        library_root_path: String,
+        directories: Vec<DesktopCacheDirectoryStatus>,
+        total_bytes: u64,
+        cache_record_count: usize,
+        message: String,
+    },
 }
 
 impl DesktopCommandData {
@@ -521,6 +528,7 @@ impl DesktopCommandData {
             Self::RecentExports { .. } => "recentExports",
             Self::Export { .. } => "export",
             Self::CacheClear { .. } => "cacheClear",
+            Self::CacheStatus { .. } => "cacheStatus",
         }
     }
 
@@ -543,6 +551,28 @@ impl DesktopCommandData {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct DesktopCacheDirectoryStatus {
+    name: String,
+    path: String,
+    exists: bool,
+    byte_size: u64,
+    file_count: u64,
+}
+
+impl From<silica_core::LibraryCacheDirectoryStatus> for DesktopCacheDirectoryStatus {
+    fn from(directory: silica_core::LibraryCacheDirectoryStatus) -> Self {
+        Self {
+            name: directory.name,
+            path: directory.path.display().to_string(),
+            exists: directory.exists,
+            byte_size: directory.byte_size,
+            file_count: directory.file_count,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DesktopAppSession {
     schema: String,
     version: i64,
@@ -551,6 +581,8 @@ struct DesktopAppSession {
     recents: Vec<DesktopRecentLibrary>,
     #[serde(default)]
     appearance: DesktopAppearancePreferences,
+    #[serde(default)]
+    library: DesktopLibraryPreferences,
     layout: DesktopLayoutPreferences,
     per_library: BTreeMap<String, DesktopPerLibrarySession>,
 }
@@ -576,6 +608,7 @@ impl DesktopAppSession {
                 .map(DesktopRecentLibrary::from_core)
                 .collect(),
             appearance: DesktopAppearancePreferences::from_core(session.appearance),
+            library: DesktopLibraryPreferences::from_core(session.library),
             layout: DesktopLayoutPreferences::from_core(session.layout),
             per_library: session
                 .per_library
@@ -610,6 +643,7 @@ impl DesktopAppSession {
                 .map(DesktopRecentLibrary::into_core)
                 .collect(),
             appearance: self.appearance.into_core()?,
+            library: self.library.into_core(),
             layout: self.layout.into_core()?,
             per_library: self
                 .per_library
@@ -714,6 +748,34 @@ impl DesktopAppearancePreferences {
             density: parse_desktop_app_appearance_density(&self.density)?,
             ui_scale: self.ui_scale,
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopLibraryPreferences {
+    default_library_root_path: Option<String>,
+}
+
+impl Default for DesktopLibraryPreferences {
+    fn default() -> Self {
+        Self::from_core(silica_core::AppLibraryPreferences::default())
+    }
+}
+
+impl DesktopLibraryPreferences {
+    fn from_core(library: silica_core::AppLibraryPreferences) -> Self {
+        Self {
+            default_library_root_path: library
+                .default_library_root_path
+                .map(|path| path.display().to_string()),
+        }
+    }
+
+    fn into_core(self) -> silica_core::AppLibraryPreferences {
+        silica_core::AppLibraryPreferences {
+            default_library_root_path: self.default_library_root_path.map(PathBuf::from),
+        }
     }
 }
 
@@ -1063,6 +1125,33 @@ fn reset_app_session_appearance(app: tauri::AppHandle) -> DesktopCommandResponse
         Ok(session_path) => reset_app_session_appearance_at_path(session_path),
         Err(error) => DesktopCommandResponse::error(
             "reset_app_session_appearance",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn record_app_session_library_preferences(
+    app: tauri::AppHandle,
+    library: DesktopLibraryPreferences,
+) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => record_app_session_library_preferences_at_path(session_path, library),
+        Err(error) => DesktopCommandResponse::error(
+            "record_app_session_library_preferences",
+            error,
+            DesktopCommandContext::default(),
+        ),
+    }
+}
+
+#[tauri::command]
+fn reset_app_session_library_preferences(app: tauri::AppHandle) -> DesktopCommandResponse {
+    match resolve_app_session_path(&app) {
+        Ok(session_path) => reset_app_session_library_preferences_at_path(session_path),
+        Err(error) => DesktopCommandResponse::error(
+            "reset_app_session_library_preferences",
             error,
             DesktopCommandContext::default(),
         ),
@@ -3676,6 +3765,36 @@ fn desktop_photo_export_response(
 }
 
 #[tauri::command]
+fn get_library_cache_status(library_path: String) -> DesktopCommandResponse {
+    let command = "get_library_cache_status";
+    match silica_core::get_library_cache_status(PathBuf::from(&library_path)) {
+        Ok(status) => DesktopCommandResponse::ok(
+            command,
+            status.message.clone(),
+            DesktopCommandData::CacheStatus {
+                library_root_path: status.library_root_path.display().to_string(),
+                directories: status
+                    .directories
+                    .into_iter()
+                    .map(DesktopCacheDirectoryStatus::from)
+                    .collect(),
+                total_bytes: status.total_bytes,
+                cache_record_count: status.cache_record_count,
+                message: status.message,
+            },
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
 fn clear_library_cache(library_path: String) -> DesktopCommandResponse {
     let command = "clear_library_cache";
     match silica_core::clear_library_cache(PathBuf::from(&library_path)) {
@@ -3844,6 +3963,37 @@ fn reset_app_session_appearance_at_path(session_path: PathBuf) -> DesktopCommand
         Ok(loaded) => DesktopCommandResponse::ok(
             command,
             "App session appearance reset.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn record_app_session_library_preferences_at_path(
+    session_path: PathBuf,
+    library: DesktopLibraryPreferences,
+) -> DesktopCommandResponse {
+    let command = "record_app_session_library_preferences";
+    match silica_core::record_app_session_library_preferences(&session_path, library.into_core()) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session library preferences recorded.",
+            app_session_data(session_path, loaded),
+        ),
+        Err(error) => {
+            DesktopCommandResponse::error(command, error, DesktopCommandContext::default())
+        }
+    }
+}
+
+fn reset_app_session_library_preferences_at_path(session_path: PathBuf) -> DesktopCommandResponse {
+    let command = "reset_app_session_library_preferences";
+    match silica_core::reset_app_session_library_preferences(&session_path) {
+        Ok(loaded) => DesktopCommandResponse::ok(
+            command,
+            "App session library preferences reset.",
             app_session_data(session_path, loaded),
         ),
         Err(error) => {
@@ -4432,6 +4582,8 @@ fn main() {
             reset_app_session_layout,
             record_app_session_appearance,
             reset_app_session_appearance,
+            record_app_session_library_preferences,
+            reset_app_session_library_preferences,
             inspect_app_session,
             resolve_launch_restore,
             record_app_session_selection,
@@ -4484,6 +4636,7 @@ fn main() {
             get_recent_exports,
             save_export_settings,
             save_export_preset,
+            get_library_cache_status,
             clear_library_cache
         ])
         .run(tauri::generate_context!())
@@ -4746,6 +4899,85 @@ mod tests {
                 assert_eq!(session.appearance.theme, "dark");
                 assert_eq!(session.appearance.density, "compact");
                 assert_eq!(session.appearance.ui_scale, 100);
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_library_cache_preferences_round_trip() {
+        let workspace = unique_library_root("desktop-library-cache-preferences");
+        let session_path = workspace.join("AppConfig").join("app-session.json");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+        silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        std::fs::write(
+            library_root.join("thumbnails").join("status.cache"),
+            b"cache",
+        )
+        .expect("write cache");
+        std::fs::create_dir_all(library_root.join("exports")).expect("create exports");
+        std::fs::write(library_root.join("exports").join("keep.jpg"), b"not cache")
+            .expect("write export");
+
+        let status = super::get_library_cache_status(library_root.display().to_string());
+
+        assert!(status.ok);
+        assert_eq!(status.command, "get_library_cache_status");
+        match response_data(&status) {
+            super::DesktopCommandData::CacheStatus {
+                directories,
+                total_bytes,
+                cache_record_count,
+                ..
+            } => {
+                assert_eq!(*total_bytes, 5);
+                assert_eq!(*cache_record_count, 0);
+                assert_eq!(directories.len(), 4);
+                assert!(directories.iter().any(|directory| {
+                    directory.name == "thumbnails"
+                        && directory.byte_size == 5
+                        && directory.path.contains("thumbnails")
+                }));
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+        assert!(library_root.join("exports").join("keep.jpg").is_file());
+
+        let preferences = super::DesktopLibraryPreferences {
+            default_library_root_path: Some(library_root.display().to_string()),
+        };
+        let recorded = super::record_app_session_library_preferences_at_path(
+            session_path.clone(),
+            preferences,
+        );
+
+        assert!(recorded.ok);
+        assert_eq!(recorded.command, "record_app_session_library_preferences");
+        match response_data(&recorded) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(
+                    session.library.default_library_root_path.as_deref(),
+                    Some(library_root.to_string_lossy().as_ref())
+                );
+            }
+            other => panic!("unexpected response data: {other:?}"),
+        }
+
+        let reset = super::reset_app_session_library_preferences_at_path(session_path);
+
+        assert!(reset.ok);
+        assert_eq!(reset.command, "reset_app_session_library_preferences");
+        match response_data(&reset) {
+            super::DesktopCommandData::AppSession { session, .. } => {
+                assert_eq!(session.library.default_library_root_path, None);
             }
             other => panic!("unexpected response data: {other:?}"),
         }

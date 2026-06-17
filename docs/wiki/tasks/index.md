@@ -122,6 +122,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 
 - [21.1: Preferences Information Architecture](21.1-preferences-information-architecture.md)
 - [21.2: Appearance Preferences](21.2-appearance-preferences.md)
+- [21.3: Library and Cache Preferences](21.3-library-cache-preferences.md)
 
 ## Notes for LLM Agents
 

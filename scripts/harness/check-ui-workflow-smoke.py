@@ -61,6 +61,9 @@ ALLOWED_COMMANDS = {
     "save_export_settings",
     "save_export_preset",
     "clear_library_cache",
+    "get_library_cache_status",
+    "record_app_session_library_preferences",
+    "reset_app_session_library_preferences",
 }
 
 WORKFLOW_STEPS = [
@@ -481,6 +484,31 @@ WORKFLOW_STEPS = [
             "Catalog, edits, exports, originals, sidecars, backups, and logs stay intact",
         ],
     },
+    {
+        "name": "preferences-library-cache",
+        "ids": [
+            "preferencesPanelLibrary",
+            "preferencesLibraryDefaultPath",
+            "preferencesLibraryUseCurrent",
+            "preferencesLibraryReset",
+            "preferencesPanelCache",
+            "preferencesCacheClear",
+            "preferencesCacheRefresh",
+            "preferencesCacheStatus",
+        ],
+        "commands": [
+            "get_library_cache_status",
+            "clear_library_cache",
+            "record_app_session_library_preferences",
+            "reset_app_session_library_preferences",
+        ],
+        "text": [
+            "Default Library",
+            "Cache",
+            "Disposable Cache",
+            "Original files are never touched",
+        ],
+    },
 ]
 
 
@@ -734,6 +762,18 @@ def main():
         "Cache clear removed only disposable library caches.",
     ]:
         require(marker in source, f"cache clear marker missing: {marker}", failures)
+    for marker in [
+        "refreshPreferencesCacheStatus",
+        "runPreferencesCacheClearCommand",
+        "recordLibraryPreferences",
+        "resetLibraryPreferences",
+        "get_library_cache_status",
+        "record_app_session_library_preferences",
+        "reset_app_session_library_preferences",
+        "response.data.totalBytes",
+        "response.data.cacheRecordCount",
+    ]:
+        require(marker in source, f"preferences library/cache marker missing: {marker}", failures)
     for marker in [
         "recentEmptyState",
         "recentLibraryList",
