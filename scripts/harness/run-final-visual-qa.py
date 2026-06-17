@@ -51,6 +51,7 @@ SURFACES = [
     ("M021-preferences-advanced", "preferences-advanced"),
     ("M022-export-workflow", "export-workflow"),
     ("M023-ai-review", "ai-review"),
+    ("M024-ai-approval", "ai-approval"),
 ]
 
 
@@ -612,9 +613,11 @@ def state_script(state):
     }}));
   }}
 
-  function aiReviewCard(label, recommendation, confidence, modelId) {{
+  function aiReviewCard(label, recommendation, confidence, modelId, approvable = false, selected = false) {{
     const card = document.createElement("article");
     card.className = "sr-ai-review-card";
+    card.classList.toggle("is-approvable", approvable);
+    card.classList.toggle("is-selected", selected);
     card.setAttribute("role", "listitem");
     const title = document.createElement("strong");
     title.textContent = label;
@@ -626,12 +629,12 @@ def state_script(state):
     const fill = document.createElement("span");
     meter.append(fill);
     const meta = document.createElement("small");
-    meta.textContent = `${{confidence}}% confidence · ${{modelId}} · unapproved`;
+    meta.textContent = `${{confidence}}% confidence · ${{modelId}} · unapproved · ${{approvable ? "approvable" : "review only"}}`;
     card.append(title, rec, meter, meta);
     return card;
   }}
 
-  function setAiReviewState() {{
+  function setAiReviewState(approvalEnabled = false) {{
     openLibraryBase(true);
     gridShell.hidden = true;
     libraryHeader.hidden = true;
@@ -640,7 +643,9 @@ def state_script(state):
     aiReviewSurface.hidden = false;
     aiReviewSurface.dataset.aiReviewState = "review-available";
     document.querySelector("#aiReviewSelectedPhoto").textContent = "Selected photo: synthetic-gradient.jpg";
-    const status = "Blur review suggestions are information only until explicit approval is implemented. Review information only; this does not write edits, flags, or originals.";
+    const status = approvalEnabled
+      ? "Stored AI suggestion is ready for explicit approval. Approval writes one undoable edit checkpoint and does not write flags or originals."
+      : "Blur review suggestions are information only until explicit approval is implemented. Review information only; this does not write edits, flags, or originals.";
     document.querySelector("#aiReviewStatus").value = status;
     document.querySelector("#aiReviewStatus").textContent = status;
     document.querySelector("#aiReviewSummaryStatus").textContent = "Review available";
@@ -652,8 +657,14 @@ def state_script(state):
     document.querySelector("#aiReviewEmptyState").hidden = true;
     document.querySelector("#aiReviewList").hidden = false;
     document.querySelector("#aiReviewApprovalDeferred").disabled = true;
+    document.querySelector("#aiReviewApproveSuggestion").disabled = !approvalEnabled;
+    document.querySelector("#aiReviewRejectSuggestion").disabled = !approvalEnabled;
+    document.querySelector("#aiReviewApprovalNotice").value = approvalEnabled
+      ? "Approval creates one undoable checkpoint; rejection leaves edit state unchanged."
+      : "Selected result is review-only, already approved, or unavailable.";
+    document.querySelector("#aiReviewApprovalNotice").textContent = document.querySelector("#aiReviewApprovalNotice").value;
     document.querySelector("#aiReviewList").replaceChildren(
-      aiReviewCard("Motion blur likely", "review", 91, "silicaraw.blur-review.test"),
+      aiReviewCard("Motion blur likely", "review", 91, "silicaraw.blur-review.test", approvalEnabled, approvalEnabled),
       aiReviewCard("Focus missed", "review", 86, "silicaraw.blur-review.test"),
       aiReviewCard("Usable detail", "keep", 74, "silicaraw.blur-review.test"),
     );
@@ -710,6 +721,8 @@ def state_script(state):
     }}
   }} else if (state === "ai-review") {{
     setAiReviewState();
+  }} else if (state === "ai-approval") {{
+    setAiReviewState(true);
   }} else if (state === "import") {{
     openLibraryBase(true);
     importPanel.hidden = false;
@@ -1361,6 +1374,9 @@ def metric_script(surface):
       summaryStatus: text("#aiReviewSummaryStatus"),
       summaryCount: text("#aiReviewSummaryCount"),
       approvalDisabled: disabled("#aiReviewApprovalDeferred"),
+      approveDisabled: disabled("#aiReviewApproveSuggestion"),
+      rejectDisabled: disabled("#aiReviewRejectSuggestion"),
+      approvalNotice: text("#aiReviewApprovalNotice"),
       actionPreview: text("#aiReviewActionPreview"),
     }},
     preferencesState: {{
@@ -1518,7 +1534,7 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: history commands disabled")
                     if history_state["status"] != "3 committed history entries.":
                         failures.append(f"{viewport_name} {surface_name}: history status wrong")
-                if state == "ai-review":
+                if state in {"ai-review", "ai-approval"}:
                     ai_review = metrics["aiReviewState"]
                     if not ai_review["visible"] or ai_review["panelState"] != "review-available":
                         failures.append(f"{viewport_name} {surface_name}: AI review panel state not visible")
@@ -1530,8 +1546,16 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: AI review summary status wrong")
                     if not ai_review["approvalDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: AI review approval must stay disabled")
-                    if "Review information only" not in ai_review["status"] or "does not write edits" not in ai_review["actionPreview"]:
-                        failures.append(f"{viewport_name} {surface_name}: AI review non-mutating copy missing")
+                    if state == "ai-review":
+                        if not ai_review["approveDisabled"] or not ai_review["rejectDisabled"]:
+                            failures.append(f"{viewport_name} {surface_name}: AI review-only actions must stay disabled")
+                        if "Review information only" not in ai_review["status"] or "does not write flags or originals" not in ai_review["actionPreview"]:
+                            failures.append(f"{viewport_name} {surface_name}: AI review non-mutating copy missing")
+                    if state == "ai-approval":
+                        if ai_review["approveDisabled"] or ai_review["rejectDisabled"]:
+                            failures.append(f"{viewport_name} {surface_name}: AI approval controls disabled")
+                        if "undoable edit checkpoint" not in ai_review["status"] or "rejection leaves edit state unchanged" not in ai_review["approvalNotice"]:
+                            failures.append(f"{viewport_name} {surface_name}: AI approval trust copy missing")
                 if state in {"mask-active", "mask-editor"}:
                     mask_state = metrics["maskState"]
                     if not mask_state["visible"] or mask_state["panelState"] != "active":

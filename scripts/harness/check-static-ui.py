@@ -142,6 +142,9 @@ def main():
         "aiReviewSummary",
         "aiReviewActionPreview",
         "aiReviewApprovalDeferred",
+        "aiReviewApproveSuggestion",
+        "aiReviewRejectSuggestion",
+        "aiReviewApprovalNotice",
         "aiReviewBackToGrid",
         "libraryGrid",
         "gridEmptyState",
@@ -417,16 +420,26 @@ def main():
         "undo_last_history_action",
         "redo_last_history_action",
         "get_ai_review_panel",
+        "approve_ai_suggestion",
+        "reject_ai_suggestion",
     ]:
         require(command in source, f"index.html must wire {command}", failures)
     require(
         "disabled" in parser.ids.get("aiReviewApprovalDeferred", {}),
-        "#aiReviewApprovalDeferred must stay disabled until explicit AI approval task",
+        "#aiReviewApprovalDeferred must default disabled until an approvable payload exists",
         failures,
     )
+    for control_id in ["aiReviewApproveSuggestion", "aiReviewRejectSuggestion"]:
+        require(
+            "disabled" in parser.ids.get(control_id, {}),
+            f"#{control_id} must default disabled until an approvable AI result is selected",
+            failures,
+        )
     require(
-        "Review information only" in source and "does not write edits, flags, or originals" in source,
-        "AI review surface must state review-only non-mutating behavior",
+        "explicit approval" in source
+        and "undoable checkpoint" in source
+        and "does not write flags or originals" in source,
+        "AI approval surface must state explicit approval, undo, and non-original mutation behavior",
         failures,
     )
 
@@ -521,6 +534,7 @@ def main():
             "M021-preferences-advanced",
             "M022-export-workflow",
             "M023-ai-review",
+            "M024-ai-approval",
         ]:
             require(
                 surface_name in visual_qa_source,

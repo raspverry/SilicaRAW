@@ -58,6 +58,26 @@ impl DesktopCommandResponse {
             }),
         }
     }
+
+    fn error_message(
+        command: &'static str,
+        message: impl Into<String>,
+        kind: impl Into<String>,
+        context: DesktopCommandContext,
+    ) -> Self {
+        let message = message.into();
+        Self {
+            ok: false,
+            command,
+            message: message.clone(),
+            data: None,
+            error: Some(DesktopCommandError {
+                kind: kind.into(),
+                message,
+                context,
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -456,6 +476,28 @@ enum DesktopCommandData {
         writes_photo_flags: bool,
         items: Vec<DesktopAiReviewItem>,
     },
+    AiSuggestionApproval {
+        photo_id: String,
+        result_id: String,
+        model_id: String,
+        task_type: String,
+        suggestion_kind: String,
+        action_log_id: String,
+        commit: DesktopAiSuggestionCommit,
+        writes_edit_graph: bool,
+        writes_photo_flags: bool,
+        writes_original: bool,
+        message: String,
+    },
+    AiSuggestionRejection {
+        photo_id: String,
+        result_id: String,
+        model_id: String,
+        task_type: String,
+        action_log_id: String,
+        edit_state_unchanged: bool,
+        message: String,
+    },
     Histogram {
         photo_id: String,
         source_path: String,
@@ -535,6 +577,8 @@ impl DesktopCommandData {
             Self::HistoryCommand { .. } => "historyCommand",
             Self::HistoryPanel { .. } => "historyPanel",
             Self::AiReviewPanel { .. } => "aiReviewPanel",
+            Self::AiSuggestionApproval { .. } => "aiSuggestionApproval",
+            Self::AiSuggestionRejection { .. } => "aiSuggestionRejection",
             Self::Histogram { .. } => "histogram",
             Self::ExportSettings { .. } => "exportSettings",
             Self::RecentExports { .. } => "recentExports",
@@ -998,9 +1042,20 @@ struct DesktopAiReviewItem {
     model_id: String,
     label: String,
     recommendation: String,
+    approvable: bool,
     confidence_percent: Option<u8>,
     approved: bool,
     created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopAiSuggestionCommit {
+    photo_id: String,
+    exposure: f64,
+    contrast: f64,
+    persisted: bool,
+    message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -1055,9 +1110,22 @@ impl From<silica_core::AiReviewItem> for DesktopAiReviewItem {
             model_id: item.model_id,
             label: item.label,
             recommendation: item.recommendation,
+            approvable: item.approvable,
             confidence_percent: item.confidence_percent,
             approved: item.approved,
             created_at: item.created_at,
+        }
+    }
+}
+
+impl From<silica_core::PhotoEditCommit> for DesktopAiSuggestionCommit {
+    fn from(commit: silica_core::PhotoEditCommit) -> Self {
+        Self {
+            photo_id: commit.photo_id,
+            exposure: commit.exposure,
+            contrast: commit.contrast,
+            persisted: commit.persisted,
+            message: commit.message,
         }
     }
 }
@@ -1539,6 +1607,76 @@ fn get_ai_review_panel(library_path: String, photo_id: String) -> DesktopCommand
         Ok(panel) => {
             DesktopCommandResponse::ok(command, panel.message.clone(), ai_review_panel_data(panel))
         }
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn approve_ai_suggestion(
+    library_path: String,
+    photo_id: String,
+    result_id: String,
+) -> DesktopCommandResponse {
+    let command = "approve_ai_suggestion";
+    match silica_core::approve_ai_suggestion(PathBuf::from(&library_path), &photo_id, &result_id) {
+        Ok(Some(approval)) => DesktopCommandResponse::ok(
+            command,
+            "AI suggestion approved as an undoable edit checkpoint.",
+            ai_suggestion_approval_data(approval),
+        ),
+        Ok(None) => DesktopCommandResponse::error_message(
+            command,
+            "AI suggestion approval skipped because the selected photo is unavailable.",
+            "aiReview",
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+        Err(error) => DesktopCommandResponse::error(
+            command,
+            error,
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
+    }
+}
+
+#[tauri::command]
+fn reject_ai_suggestion(
+    library_path: String,
+    photo_id: String,
+    result_id: String,
+) -> DesktopCommandResponse {
+    let command = "reject_ai_suggestion";
+    match silica_core::reject_ai_suggestion(PathBuf::from(&library_path), &photo_id, &result_id) {
+        Ok(Some(rejection)) => DesktopCommandResponse::ok(
+            command,
+            "AI suggestion rejected; edit state is unchanged.",
+            ai_suggestion_rejection_data(rejection),
+        ),
+        Ok(None) => DesktopCommandResponse::error_message(
+            command,
+            "AI suggestion rejection skipped because the selected photo is unavailable.",
+            "aiReview",
+            DesktopCommandContext {
+                library_path: Some(library_path),
+                photo_id: Some(photo_id),
+                ..DesktopCommandContext::default()
+            },
+        ),
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
@@ -4319,6 +4457,36 @@ fn ai_review_panel_data(panel: silica_core::AiReviewPanel) -> DesktopCommandData
     }
 }
 
+fn ai_suggestion_approval_data(approval: silica_core::AiSuggestionApproval) -> DesktopCommandData {
+    DesktopCommandData::AiSuggestionApproval {
+        photo_id: approval.photo_id,
+        result_id: approval.result_id,
+        model_id: approval.model_id,
+        task_type: approval.task_type,
+        suggestion_kind: approval.suggestion_kind,
+        action_log_id: approval.action_log_id,
+        commit: approval.commit.into(),
+        writes_edit_graph: approval.writes_edit_graph,
+        writes_photo_flags: approval.writes_photo_flags,
+        writes_original: approval.writes_original,
+        message: "AI suggestion approved as an undoable edit checkpoint.".to_string(),
+    }
+}
+
+fn ai_suggestion_rejection_data(
+    rejection: silica_core::AiSuggestionRejection,
+) -> DesktopCommandData {
+    DesktopCommandData::AiSuggestionRejection {
+        photo_id: rejection.photo_id,
+        result_id: rejection.result_id,
+        model_id: rejection.model_id,
+        task_type: rejection.task_type,
+        action_log_id: rejection.action_log_id,
+        edit_state_unchanged: rejection.edit_state_unchanged,
+        message: "AI suggestion rejected; edit state is unchanged.".to_string(),
+    }
+}
+
 fn ai_review_status_text(status: silica_core::AiReviewPanelStatus) -> &'static str {
     match status {
         silica_core::AiReviewPanelStatus::ModelUnavailable => "modelUnavailable",
@@ -4679,6 +4847,8 @@ fn main() {
             get_photo_flags,
             get_photo_metadata,
             get_ai_review_panel,
+            approve_ai_suggestion,
+            reject_ai_suggestion,
             open_photo_preview,
             preview_exposure_contrast_edit,
             preview_white_balance_edit,
@@ -6800,6 +6970,61 @@ mod tests {
                 assert!(*requires_explicit_approval);
             }
             other => panic!("unexpected AI review response data: {other:?}"),
+        }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn desktop_command_approves_ai_suggestion_with_undoable_edit() {
+        let workspace = unique_library_root("desktop-ai-approval");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&supported_file);
+
+        let created = silica_core::create_library(&library_root).expect("create library");
+        silica_core::import_folder(&library_root, &import_root).expect("import folder");
+        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let result = silica_core::store_ai_result(
+            &created.root_path,
+            &photo_id,
+            "blur_score",
+            "silicaraw.blur-review.test",
+            r#"{"review":{"label":"Usable detail","recommendation":"keep","confidence":0.74},"approval_suggestion":{"kind":"basic_exposure_contrast","exposure":0.3,"contrast":7.0}}"#,
+        )
+        .expect("store ai suggestion");
+
+        let response = super::approve_ai_suggestion(
+            library_root.display().to_string(),
+            photo_id.clone(),
+            result.id.clone(),
+        );
+
+        assert!(response.ok, "AI approval command failed: {response:?}");
+        assert_eq!(response.command, "approve_ai_suggestion");
+        match response_data(&response) {
+            super::DesktopCommandData::AiSuggestionApproval {
+                photo_id: returned_photo_id,
+                result_id,
+                model_id,
+                commit,
+                writes_edit_graph,
+                writes_photo_flags,
+                ..
+            } => {
+                assert_eq!(returned_photo_id, &photo_id);
+                assert_eq!(result_id, &result.id);
+                assert_eq!(model_id, "silicaraw.blur-review.test");
+                assert!(commit.persisted);
+                assert_eq!(commit.exposure, 0.3);
+                assert_eq!(commit.contrast, 7.0);
+                assert!(*writes_edit_graph);
+                assert!(!*writes_photo_flags);
+            }
+            other => panic!("unexpected AI approval response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

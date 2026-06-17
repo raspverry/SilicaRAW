@@ -3618,6 +3618,28 @@ pub fn append_ai_result(
     ai_result_by_id(&connection, &id)
 }
 
+pub fn get_ai_result(
+    library_root_path: impl AsRef<Path>,
+    result_id: impl AsRef<str>,
+) -> Result<AiResult, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    ai_result_by_id(&connection, result_id.as_ref())
+}
+
+pub fn approve_ai_result(
+    library_root_path: impl AsRef<Path>,
+    result_id: impl AsRef<str>,
+) -> Result<AiResult, LibraryStorageError> {
+    let library = open_existing_library_for_read(library_root_path)?;
+    let connection = open_catalog(&library.catalog_path)?;
+    connection.execute(
+        "UPDATE ai_results SET approved = 1 WHERE id = ?1",
+        params![result_id.as_ref()],
+    )?;
+    ai_result_by_id(&connection, result_id.as_ref())
+}
+
 pub fn list_ai_results_for_photo(
     library_root_path: impl AsRef<Path>,
     photo_id: &str,
@@ -9919,6 +9941,56 @@ mod tests {
             .expect_err("direct mutation payload rejected");
             assert!(error.to_string().contains("direct edit mutation"));
         }
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn ai_result_approval_marks_existing_result_without_edit_history() {
+        let workspace = unique_library_root("ai-result-approve");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
+
+        let library = create_local_library(&library_root).expect("create library");
+        import_folder(&library.root_path, &import_root).expect("import folder");
+
+        let connection = open_catalog(&library.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        let before_history = count_edit_history(&connection);
+        drop(connection);
+
+        let result = append_ai_result(
+            &library.root_path,
+            NewAiResult {
+                photo_id: photo_id.clone(),
+                task_type: "blur_score".to_string(),
+                model_id: "silicaraw.blur-review.test".to_string(),
+                permission_id: "ai_result:propose".to_string(),
+                output_json: r#"{"review":{"label":"Usable detail"},"approval_suggestion":{"kind":"basic_exposure_contrast","exposure":0.25,"contrast":8.0}}"#.to_string(),
+            },
+        )
+        .expect("append ai result");
+        assert!(!result.approved);
+
+        let approved = approve_ai_result(&library.root_path, &result.id).expect("approve result");
+
+        assert_eq!(approved.id, result.id);
+        assert!(approved.approved);
+        let listed = list_ai_results_for_photo(&library.root_path, &photo_id, 10)
+            .expect("list approved result");
+        assert!(listed[0].approved);
+        let connection = open_catalog(&library.catalog_path).expect("reopen catalog");
+        assert_eq!(count_edit_history(&connection), before_history);
 
         remove_library_root(&workspace);
     }

@@ -65,6 +65,8 @@ ALLOWED_COMMANDS = {
     "record_app_session_library_preferences",
     "reset_app_session_library_preferences",
     "get_ai_review_panel",
+    "approve_ai_suggestion",
+    "reject_ai_suggestion",
 }
 
 WORKFLOW_STEPS = [
@@ -531,14 +533,19 @@ WORKFLOW_STEPS = [
             "aiReviewSummaryTask",
             "aiReviewActionPreview",
             "aiReviewApprovalDeferred",
+            "aiReviewApproveSuggestion",
+            "aiReviewRejectSuggestion",
+            "aiReviewApprovalNotice",
         ],
-        "commands": ["get_ai_review_panel"],
+        "commands": ["get_ai_review_panel", "approve_ai_suggestion", "reject_ai_suggestion"],
         "text": [
             "AI Review",
             "Blur",
-            "Review information only",
-            "Approval Deferred",
-            "does not write edits, flags, or originals",
+            "explicit approval",
+            "undoable checkpoint",
+            "does not write flags or originals",
+            "Approve Suggestion",
+            "Reject Suggestion",
         ],
     },
 ]

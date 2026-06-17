@@ -57,7 +57,9 @@ Phase 5.6 keeps the Phase 5.5 screen hierarchy but replaces static placeholders 
 
 ## Phase 24 Relationship
 
-Task 24.4 implements the first M010-inspired AI Review surface as read-only blur review. The visible structure follows the mockup's AI Tools navigation, review list, summary, and action-preview areas, but approval controls stay disabled because explicit AI suggestion approval belongs to Task 24.5.
+Task 24.4 implements the first M010-inspired AI Review surface as read-only blur review. The visible structure follows the mockup's AI Tools navigation, review list, summary, and action-preview areas.
+
+Task 24.5 adds explicit approval/rejection controls to the same surface. Controls stay disabled for review-only rows and become active only for stored, unapproved, approvable suggestion payloads.
 
 ## Phase 21 Relationship
 

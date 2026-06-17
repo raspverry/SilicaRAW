@@ -1206,6 +1206,21 @@ progress::-webkit-progress-value {
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background: var(--sr-surface-card);
+  cursor: pointer;
+}
+
+.sr-ai-review-card:hover,
+.sr-ai-review-card:focus-visible {
+  border-color: var(--sr-border-strong);
+}
+
+.sr-ai-review-card.is-selected {
+  border-color: var(--sr-accent-system);
+  box-shadow: 0 0 0 1px var(--sr-accent-system);
+}
+
+.sr-ai-review-card.is-approvable {
+  background: var(--sr-surface-raised);
 }
 
 .sr-ai-review-card strong,
@@ -1290,6 +1305,20 @@ progress::-webkit-progress-value {
 
 .sr-ai-review-action-preview span {
   color: var(--sr-text-secondary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+}
+
+.sr-ai-review-approval-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sr-space-sm);
+}
+
+.sr-ai-review-approval-note {
+  min-height: 44px;
+  display: block;
+  color: var(--sr-text-tertiary);
   font-size: var(--sr-type-control);
   line-height: var(--sr-line-control);
 }

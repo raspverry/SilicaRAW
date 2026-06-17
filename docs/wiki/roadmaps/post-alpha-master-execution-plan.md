@@ -2,7 +2,7 @@
 title: Post-Alpha Master Execution Plan
 status: active
 audience: all
-updated: 2026-06-17
+updated: 2026-06-18
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -60,7 +60,7 @@ As of 2026-06-17:
 - Phase 21 is complete as a Preferences surface.
 - Task 21.5 completed disabled Advanced controls and explanatory permission text only; runtime permission implementation remains Phase 23.
 - Phase 23 is complete.
-- Task 24.1 through Task 24.4 are complete; Task 24.4 is read-only blur review with approval deferred.
+- Phase 24 is complete through Task 24.5; explicit AI suggestion approval now routes through undoable edit checkpoints and action-log provenance.
 
 ## Wave Map
 
