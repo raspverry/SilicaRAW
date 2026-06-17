@@ -12,3 +12,9 @@ Task 24.1 records the first post-alpha runtime spike decision:
 - No-model behavior: AI surfaces remain unavailable while the editor continues to work.
 - Packaging rule: no model weight can be bundled or enabled without a valid model manifest.
 - Runtime status: still boundary-only; no MLX dependency is linked by default.
+
+Task 24.2 adds model manifest validation only:
+
+- Validates `silica.model` v1 identity, provenance, preprocessing, output metadata, and `sha256:` file hash fields.
+- Compares the manifest hash to candidate model bytes deterministically.
+- Does not load a model, run inference, start a worker, or make models required.

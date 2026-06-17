@@ -12,6 +12,7 @@ fail() {
 
 check_deferred_crate_boundary() {
   local crate="$1"
+  local allowed_deps="${2:-}"
   local cargo="crates/$crate/Cargo.toml"
   local src_dir="crates/$crate/src"
 
@@ -24,17 +25,28 @@ check_deferred_crate_boundary() {
     fail "$crate must remain boundary-only for local alpha; unexpected source files found"
   fi
 
-  if awk '
+  local dependency_names
+  dependency_names=$(awk '
     /^\[dependencies\]/ { in_deps = 1; next }
     /^\[/ { in_deps = 0 }
-    in_deps && $0 !~ /^[[:space:]]*($|#)/ { found = 1 }
-    END { exit found ? 0 : 1 }
-  ' "$cargo"; then
-    fail "$crate must not add runtime dependencies during local alpha"
+    in_deps && $0 !~ /^[[:space:]]*($|#)/ {
+      name = $0
+      sub(/=.*/, "", name)
+      gsub(/[[:space:]]/, "", name)
+      print name
+    }
+  ' "$cargo")
+
+  if [ -n "$dependency_names" ]; then
+    if [ -z "$allowed_deps" ]; then
+      fail "$crate must not add runtime dependencies during local alpha"
+    elif printf '%s\n' "$dependency_names" | grep -Ev "^($allowed_deps)$"; then
+      fail "$crate has dependency outside the approved manifest-validation allowlist"
+    fi
   fi
 }
 
-check_deferred_crate_boundary "silica-mlx"
+check_deferred_crate_boundary "silica-mlx" "serde_json|sha2"
 check_deferred_crate_boundary "silica-mcp"
 check_deferred_crate_boundary "silica-plugin"
 

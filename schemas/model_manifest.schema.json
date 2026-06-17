@@ -51,13 +51,32 @@
       "type": "string"
     },
     "file_hash": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
     },
     "input": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "preprocessing"
+      ],
+      "properties": {
+        "preprocessing": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
     },
     "output": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "metadata"
+      ],
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
     },
     "minimum_silica_version": {
       "type": "string"

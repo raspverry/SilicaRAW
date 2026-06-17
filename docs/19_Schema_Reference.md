@@ -51,6 +51,24 @@ Required fixture guardrails:
 - Fixture paths must be relative POSIX paths without absolute prefixes, dot segments, backslashes, or double slashes.
 ```
 
+## Model Manifest v1
+
+`schemas/model_manifest.schema.json` is the authoritative contract for optional MLX model manifests.
+
+Task 24.2 status:
+
+```txt
+schema -> silica.model
+version -> 1
+required identity -> model_id, model_version, task_type, minimum_silica_version
+required provenance -> license, source
+required integrity -> file_hash as sha256:<64 lowercase hex chars>
+required input metadata -> input.preprocessing object
+required output metadata -> output.metadata object
+```
+
+Model manifests validate before any model can be enabled. Hash checks are deterministic SHA-256 comparisons against the candidate model bytes. Passing validation does not load a model, run inference, or make AI features required.
+
 ## Edit Graph v0.1 Required Sections
 
 ```txt

@@ -137,6 +137,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 ## Phase 24
 
 - [24.1: MLX Runtime Spike](24.1-mlx-runtime-spike.md)
+- [24.2: Model Manifest Validation](24.2-model-manifest-validation.md)
 
 ## Notes for LLM Agents
 

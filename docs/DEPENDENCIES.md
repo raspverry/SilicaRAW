@@ -364,7 +364,7 @@ Version: 1.0.150
 Purpose: JSON value, number, map, parsing, and serialization support.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/serde-rs/json
-Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, crates/silica-core in Phase 5.4, and crates/silica-decode behind `core-image-raw-probe` in Phase 12.2; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
+Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, crates/silica-core in Phase 5.4, crates/silica-decode behind `core-image-raw-probe` in Phase 12.2, and crates/silica-mlx in Task 24.2 for model manifest validation; expected later for silica-plugin and silica-mcp when their schema-backed JSON tasks are reached.
 Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, active edit graph JSON persistence in SQLite, export settings JSON validation, export settings JSON construction at the Core orchestration boundary, and RAW fixture manifest parsing for probe evidence.
 Alternatives considered: simd-json, manual JSON parsing, schemars-only workflows
 Risk notes: JSON Schema validation rules still need explicit validation or a schema validator; serde_json only parses and serializes JSON.
@@ -413,8 +413,8 @@ Version: 0.10.9
 Purpose: Compute SHA-256 source/output/profile hashes for feature-gated RAW, color fixture probe, and ICC export evidence.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/RustCrypto/hashes
-Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature; crates/silica-export for Task 13.6 ICC export proof.
-Why needed: Task 12.2 RAW evidence, Task 13.3 color profile evidence, and Task 13.6 ICC export proof must verify source/output/profile hashes and original-file preservation.
+Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature; crates/silica-export for Task 13.6 ICC export proof; crates/silica-mlx in Task 24.2 for deterministic model file hash checks.
+Why needed: Task 12.2 RAW evidence, Task 13.3 color profile evidence, Task 13.6 ICC export proof, and Task 24.2 model manifest validation must verify source/output/profile/model hashes and original-file preservation.
 Alternatives considered: Python-only hash verification, existing partial FNV-style test hash, platform-specific hashing APIs.
 Risk notes: Do not use partial hashes for fixture or export evidence.
 Binary size impact: Pure Rust hashing code is linked into the local alpha export crate and feature-gated proof builds.

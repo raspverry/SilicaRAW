@@ -22,6 +22,8 @@ MLX is planned as a local Apple Silicon enhancement layer, not the core editor. 
 - If no model manifest or model is available, AI features stay unavailable and the core editor continues.
 - Model licenses, sources, hashes, preprocessing, and output metadata must be recorded.
 - No model weight can be bundled or enabled without a valid model manifest.
+- Task 24.2 validates model manifests before enablement and checks deterministic `sha256:` file hashes against candidate model bytes.
+- Models remain optional; manifest validation does not load a model or run inference.
 - Treat MLX unified memory as app-global memory pressure; future runtime work should use a bounded worker lane.
 - Cancellation is cooperative at queue/task boundaries until a runtime probe proves stronger behavior.
 - MLX should not own final image state.
@@ -49,4 +51,4 @@ MLX is planned as a local Apple Silicon enhancement layer, not the core editor. 
 
 ## Notes for LLM Agents
 
-Do not add MLX dependencies, model downloads, model loaders, inference code, model assets, or MLX UI unless the selected task explicitly requires that scoped work. Task 24.1 records the runtime direction only; Task 24.2 must validate manifests before any model can be enabled.
+Do not add MLX runtime dependencies, model downloads, model loaders, inference code, model assets, or MLX UI unless the selected task explicitly requires that scoped work. Task 24.2 validates manifests only; passing validation is not permission to load or run a model.
