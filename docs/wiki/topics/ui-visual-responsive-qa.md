@@ -2,27 +2,48 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-16
-source_of_truth: docs/wiki/topics/ui-mvp-baseline.md
+updated: 2026-06-17
+source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md#task-221-expanded-visual-qa-surface-set
 ---
 
 # UI Visual and Responsive QA
 
 ## Summary
 
-Task 5.5.10 verifies the connected UI MVP against the M003, M005, and M007 mockup families at compact, standard desktop, and large desktop widths.
+Final visual QA verifies the connected desktop UI against the current product surface set at compact, standard desktop, and large desktop widths.
 
-The checked surfaces are:
+The checked route now covers:
 
 ```txt
-Library grid -> Develop exposure/contrast -> Export JPEG sRGB dialog
+Welcome -> Library -> Loupe -> Develop -> Masks -> History -> Preferences -> Export
 ```
 
-This is a visual and responsive QA pass only. It does not add real image pixels, thumbnail cache generation, RAW decoding, Metal rendering, native folder picking, or export formats beyond JPEG sRGB.
+This is a visual and responsive QA pass only. It does not add product functionality, RAW decoding, Metal rendering, native folder picking, MLX, MCP, plugin runtime, or broad fallback behavior.
 
-This page remains the record for the static Phase 5.5 pass. It is not the final Phase 6 readiness gate. Phase 5.6.12 reruns visual/responsive QA after real JPEG/JPG thumbnails, loupe preview, Develop preview, path UX, cache UI, and demo-state cleanup are implemented.
+The earlier Phase 5.5 notes remain historical context. The current final runner is `scripts/harness/run-final-visual-qa.py`.
 
-Task 5.6.12 is now the Phase 6 readiness visual gate. The Phase 5.5 notes below remain historical context only.
+## Phase 22 Expanded Surface Set
+
+Task 22.1 expands final visual QA beyond the original MVP path. The runner now checks 22 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 66 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
+
+Expanded Task 22.1 surfaces:
+
+| Surface | State |
+|---|---|
+| `M015-library-filters` | Library search, file type, metadata, rating, culling, and sort filters seeded |
+| `M016-library-metadata` | Catalog-backed selected-photo metadata readback |
+| `M017-develop-history` | Develop history entries plus undo/redo command state |
+| `M018-develop-expanded` | Expanded Develop panels including tone, HSL, Detail boundary, and Lens/Geometry |
+| `M019-mask-editor` | Manual Mask Editor readback and unavailable AI/MLX controls |
+| `M020-preferences-appearance` | Preferences dialog Appearance pane |
+| `M021-preferences-advanced` | Disabled advanced access gates |
+| `M022-export-workflow` | Export color, metadata, batch progress, failures, and recent exports |
+
+Current QA command:
+
+```bash
+python3 scripts/harness/run-final-visual-qa.py
+```
 
 ## Phase 17 Histogram Note
 

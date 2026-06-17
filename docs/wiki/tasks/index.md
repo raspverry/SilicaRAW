@@ -126,6 +126,10 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [21.4: Color and Export Defaults](21.4-color-export-defaults.md)
 - [21.5: Advanced Agent Access Preferences](21.5-advanced-agent-access-preferences.md)
 
+## Phase 22
+
+- [22.1: Expanded Visual QA Surface Set](22.1-expanded-visual-qa-surface-set.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.

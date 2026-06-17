@@ -693,6 +693,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Controls use consistent typography, spacing, and tokenized styling.
   - No text or controls overlap.
 - **Validation:** `python3 scripts/harness/run-final-visual-qa.py`
+
 - **Status:** Completed on 2026-06-13. Final visual QA now captures 36 screenshots across 12 surfaces and three desktop widths, with Develop-specific checks for selected-photo state, histogram state, Before/After availability, and active basic presets.
 
 ## Phase 18: Professional Editing Baseline
@@ -965,6 +966,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Typography, spacing, and controls remain consistent.
   - No overlapping or clipped text.
 - **Validation:** `python3 scripts/harness/run-final-visual-qa.py`
+
+**Status:** Completed on 2026-06-17. The final visual QA runner now captures and validates 22 surfaces across compact, desktop, and large widths, including Library filters, metadata, Develop history, expanded Develop panels, Mask Editor, Preferences appearance/advanced panes, and expanded Export workflow state.
 
 ### Task 22.2: Library Scale Benchmarks
 
