@@ -1205,6 +1205,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Tool manifests validate against schema.
 - **Validation:** `cargo test -p silica-mcp`
 
+**Status:** Completed on 2026-06-18. `silica.mcp_tool` v1 manifests now validate for read-only MCP tools only. Valid manifests use stable `mcp:read_only` permission IDs, no confirmation, empty side effects, no undo behavior, and object-shaped input/output schemas. Validation rejects mutating tool IDs, non-read-only permissions, side effects, unknown fields, and direct SQLite claims. No MCP server, adapter runtime, storage access, or mutating tool was added.
+
 ### Task 26.3: Read-Only MCP Adapter Through Core APIs
 
 - **Location:** `crates/silica-mcp`, `crates/silica-core`

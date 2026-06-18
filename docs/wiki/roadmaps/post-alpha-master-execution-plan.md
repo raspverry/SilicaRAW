@@ -31,7 +31,7 @@ Allowed reasons to create a new phase-specific plan:
 
 ## Current Position
 
-As of 2026-06-17:
+As of 2026-06-18:
 
 - Phase 12 RAW proof is complete for fixture-backed Core Image support mapping.
 - Phase 13 color proof is complete for ICC/profile evidence, but visual color correctness remains blocked pending tolerance and manual review.
@@ -61,6 +61,8 @@ As of 2026-06-17:
 - Task 21.5 completed disabled Advanced controls and explanatory permission text only; runtime permission implementation remains Phase 23.
 - Phase 23 is complete.
 - Phase 24 is complete through Task 24.5; explicit AI suggestion approval now routes through undoable edit checkpoints and action-log provenance.
+- Phase 25 is complete through Task 25.3; plugins remain disabled and runtime-free.
+- Phase 26 is complete through Task 26.2; MCP remains disabled, stdio-first, and manifest-only so far.
 
 ## Wave Map
 
@@ -281,7 +283,7 @@ Phase 25:
 Phase 26:
 
 - Task 26.1 complete: stdio-first MCP transport/session ADR first.
-- Read-only tool manifests before adapters.
+- Task 26.2 complete: read-only tool manifests before adapters.
 - Read-only adapter calls go through Core APIs.
 - No mutating MCP tools in the first MCP phase.
 
