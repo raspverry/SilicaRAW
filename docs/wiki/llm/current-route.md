@@ -14,13 +14,13 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, Task 25.1, and Task 25.2 are complete. The next roadmap task is **Task 25.3: Plugin Permission Review and Action Log**.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, Task 25.1, Task 25.2, and Task 25.3 are complete. The next roadmap task is **Task 25.4: Plugin Execution Model ADR**.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. MCP/plugin runtime and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. Task 25.3 adds plugin permission review evidence without runtime or grant persistence. MCP/plugin runtime and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For Task 25.3, read:
+For Task 25.4, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 25](../roadmaps/post-alpha-product-roadmap.md#phase-25-plugin-foundation)
@@ -32,6 +32,7 @@ For Task 25.3, read:
 - [Plugin Manifest Schema](../../../schemas/plugin_manifest.schema.json)
 - [Plugin Preset Pack Schema](../../../schemas/plugin_preset_pack.schema.json)
 - [Edit Graph Schema](../../../schemas/edit_graph.schema.json)
+- [Task 25.3: Plugin Permission Review and Action Log](../tasks/25.3-plugin-permission-review-action-log.md)
 - [Task 25.2: Declarative Preset Plugin](../tasks/25.2-declarative-preset-plugin.md)
 - [Task 25.1: Plugin Manifest Validation](../tasks/25.1-plugin-manifest-validation.md)
 - [Task 24.5: Explicit AI Suggestion Approval](../tasks/24.5-explicit-ai-suggestion-approval.md)
@@ -67,7 +68,8 @@ For Task 25.3, read:
 - Plugins remain disabled by default.
 - Task 25.1 validates `silica.plugin` v1 manifests, rejects missing trust fields and unsafe permissions, and returns `enabled_by_default = false`.
 - Task 25.2 validates `silica.plugin_preset_pack` v1, supports P0 Basic data-only presets, and applies them only through explicit Core approval, edit graph validation, one undoable history checkpoint, and `plugin_apply` action-log evidence.
-- Task 25.3 may add permission review UI/logging around plugin enable/apply decisions, but must not add executable plugin runtime or direct SQLite access.
+- Task 25.3 validates plugin manifests for permission review, logs enable/apply decisions, handles denials without state mutation, and keeps runtime/grant persistence unavailable.
+- Task 25.4 is an ADR only unless the roadmap explicitly changes scope.
 - Plugin manifests cannot request raw SQL, filesystem write, direct database access, or original-file mutation permission.
 
 ## Stop Rules

@@ -26,6 +26,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Task 23.3 adds Core action-log wrappers for permission grants, denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts. Storage rejects extension raw-SQL/direct-database bypass claims. This is evidence only; it does not enable plugin, MCP, AI, or agent runtime.
 - Task 25.1 validates `silica.plugin` v1 manifests before any plugin can be enabled. Valid manifests stay `enabled_by_default = false`; validation rejects missing trust fields, empty permissions, unknown permissions, raw SQL, direct database access, and write-like permissions.
 - Task 25.2 validates data-only `silica.plugin_preset_pack` v1 payloads and applies P0 Basic preset data only through explicit Core approval, edit graph validation, undoable history, and `plugin_apply` action-log evidence. It still starts no plugin runtime.
+- Task 25.3 logs plugin enable grants/denials and plugin apply denials through Core after manifest and permission checks. It stores no grants, starts no runtime, and writes no catalog edit state for denied requests.
 
 ## Task 23.1 Permission Vocabulary
 

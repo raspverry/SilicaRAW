@@ -1967,6 +1967,18 @@ pub struct PluginPresetApproval {
     pub writes_original: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PluginPermissionReview {
+    pub plugin_id: String,
+    pub permission_id: String,
+    pub granted: bool,
+    pub action_log_id: String,
+    pub runtime_started: bool,
+    pub permission_persisted: bool,
+    pub writes_edit_graph: bool,
+    pub writes_original: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct AiApprovalSuggestion {
     kind: String,
@@ -2394,6 +2406,102 @@ pub fn record_plugin_apply_attempt(
     )
 }
 
+pub fn review_plugin_enable_permission(
+    library_root_path: impl AsRef<Path>,
+    manifest_json: impl AsRef<str>,
+    permission: ExtensionPermission,
+    granted: bool,
+    reason: impl AsRef<str>,
+) -> Result<PluginPermissionReview, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let manifest = silica_plugin::validate_plugin_manifest_json(manifest_json.as_ref())?;
+    let permission_id = permission.stable_id();
+    ensure_plugin_manifest_requests_permission(&manifest, permission_id)?;
+    let action_type = if granted {
+        "permission_grant"
+    } else {
+        "permission_denial"
+    };
+    let action_log = append_permissioned_action_log(
+        library_root_path,
+        "plugin",
+        Some(&manifest.plugin_id),
+        action_type,
+        Some("permission"),
+        Some(permission_id),
+        "permission_decision",
+        Some(format!(
+            "plugin:{}:enable:{permission_id}",
+            manifest.plugin_id
+        )),
+        serde_json::json!({
+            "review_kind": "plugin_enable",
+            "plugin_id": manifest.plugin_id,
+            "permission_id": permission_id,
+            "granted": granted,
+            "reason": reason.as_ref(),
+            "permission_persisted": false,
+            "runtime_started": false,
+        }),
+    )?;
+
+    Ok(PluginPermissionReview {
+        plugin_id: manifest.plugin_id,
+        permission_id: permission_id.to_string(),
+        granted,
+        action_log_id: action_log.id,
+        runtime_started: false,
+        permission_persisted: false,
+        writes_edit_graph: false,
+        writes_original: false,
+    })
+}
+
+pub fn review_plugin_apply_permission(
+    library_root_path: impl AsRef<Path>,
+    manifest_json: impl AsRef<str>,
+    photo_id: Option<&str>,
+    preset_id: Option<&str>,
+    granted: bool,
+    reason: impl AsRef<str>,
+) -> Result<PluginPermissionReview, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let manifest = silica_plugin::validate_plugin_manifest_json(manifest_json.as_ref())?;
+    let permission_id = ExtensionPermission::EditSuggestionApply.stable_id();
+    ensure_plugin_manifest_requests_permission(&manifest, permission_id)?;
+    let action_log = append_permissioned_action_log(
+        library_root_path,
+        "plugin",
+        Some(&manifest.plugin_id),
+        "plugin_apply",
+        Some("photo"),
+        photo_id,
+        "extension_review",
+        Some(format!("plugin:{}:apply-review", manifest.plugin_id)),
+        serde_json::json!({
+            "review_kind": "plugin_apply",
+            "plugin_id": manifest.plugin_id,
+            "preset_id": preset_id,
+            "permission_id": permission_id,
+            "granted": granted,
+            "reason": reason.as_ref(),
+            "writes_edit_graph": false,
+            "writes_original": false,
+        }),
+    )?;
+
+    Ok(PluginPermissionReview {
+        plugin_id: manifest.plugin_id,
+        permission_id: permission_id.to_string(),
+        granted,
+        action_log_id: action_log.id,
+        runtime_started: false,
+        permission_persisted: false,
+        writes_edit_graph: false,
+        writes_original: false,
+    })
+}
+
 /// Apply one data-only plugin preset after explicit approval.
 pub fn approve_plugin_preset(
     library_root_path: impl AsRef<Path>,
@@ -2474,6 +2582,22 @@ pub fn approve_plugin_preset(
         writes_photo_flags: false,
         writes_original: false,
     }))
+}
+
+fn ensure_plugin_manifest_requests_permission(
+    manifest: &silica_plugin::PluginManifest,
+    permission_id: &str,
+) -> Result<(), CoreError> {
+    if manifest
+        .permissions
+        .iter()
+        .any(|permission| permission == permission_id)
+    {
+        return Ok(());
+    }
+    Err(CoreError::Plugin(format!(
+        "plugin manifest does not request {permission_id}"
+    )))
 }
 
 /// Record an approved AI result boundary without running MLX or mutating edits.
@@ -11328,6 +11452,76 @@ mod tests {
             std::fs::read(&jpeg_file).expect("read original after"),
             original_before
         );
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn plugin_permission_review_logs_grants_and_denials_without_state_mutation() {
+        let workspace = unique_library_root("core-plugin-permission-review");
+        let library_root = workspace.join("SilicaRAW Library");
+        let created = create_library(&library_root).expect("create library");
+        let before = durable_catalog_counts(&created.catalog_path);
+        let manifest_json = r#"{
+          "schema":"silica.plugin",
+          "version":1,
+          "plugin_id":"silicaraw.test.preset_pack",
+          "name":"Silica Test Presets",
+          "description":"Data-only preset pack manifest.",
+          "author":"SilicaRAW",
+          "license":"MIT",
+          "plugin_version":"0.1.0",
+          "minimum_silica_version":"0.1.0",
+          "type":"preset_pack",
+          "permissions":["edit_suggestion:apply"]
+        }"#;
+
+        let enable_review = review_plugin_enable_permission(
+            &created.root_path,
+            manifest_json,
+            ExtensionPermission::EditSuggestionApply,
+            true,
+            "user-approved-enable-review",
+        )
+        .expect("review plugin enable permission");
+        let apply_denial = review_plugin_apply_permission(
+            &created.root_path,
+            manifest_json,
+            Some("photo-1"),
+            Some("warm_skin"),
+            false,
+            "user-denied-apply-review",
+        )
+        .expect("review plugin apply denial");
+
+        assert_eq!(enable_review.plugin_id, "silicaraw.test.preset_pack");
+        assert!(enable_review.granted);
+        assert!(!enable_review.runtime_started);
+        assert!(!enable_review.permission_persisted);
+        assert!(!apply_denial.granted);
+        assert!(!apply_denial.writes_edit_graph);
+        assert!(!apply_denial.writes_original);
+
+        let after = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after.edit_states, before.edit_states);
+        assert_eq!(after.edit_history, before.edit_history);
+        assert_eq!(after.exports, before.exports);
+        assert_eq!(after.cache_records, before.cache_records);
+        assert_eq!(after.action_log, before.action_log + 2);
+
+        let entries = list_action_log_entries(&created.root_path, 20).expect("list action log");
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "permission_grant"
+                && entry.actor_type == "plugin"
+                && entry.payload_json.contains("plugin_enable")
+                && entry.payload_json.contains("user-approved-enable-review")));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.action_type == "plugin_apply"
+                && entry.actor_type == "plugin"
+                && entry.payload_json.contains("\"granted\":false")
+                && entry.payload_json.contains("user-denied-apply-review")));
 
         remove_library_root(&workspace);
     }
