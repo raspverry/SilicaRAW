@@ -62,7 +62,7 @@ As of 2026-06-18:
 - Phase 23 is complete.
 - Phase 24 is complete through Task 24.5; explicit AI suggestion approval now routes through undoable edit checkpoints and action-log provenance.
 - Phase 25 is complete through Task 25.3; plugins remain disabled and runtime-free.
-- Phase 26 is complete through Task 26.2; MCP remains disabled, stdio-first, and manifest-only so far.
+- Phase 26 is complete through Task 26.3; MCP remains disabled and stdio-first, with read-only manifest validation and a runtime-free Core API adapter only.
 
 ## Wave Map
 
@@ -284,7 +284,7 @@ Phase 26:
 
 - Task 26.1 complete: stdio-first MCP transport/session ADR first.
 - Task 26.2 complete: read-only tool manifests before adapters.
-- Read-only adapter calls go through Core APIs.
+- Task 26.3 complete: read-only adapter calls go through Core APIs and log `mcp_read` evidence.
 - No mutating MCP tools in the first MCP phase.
 
 ### Phase 27: Public Beta Gate

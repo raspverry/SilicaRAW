@@ -30,6 +30,7 @@ Use this page when a task needs historical context. It keeps [Current LLM Route]
 - Task 25.3 is complete. Read [25.3 Plugin Permission Review and Action Log](../tasks/25.3-plugin-permission-review-action-log.md) when changing plugin permission review evidence.
 - Task 26.1 is complete. Read [ADR 0010](../decisions/adr-0010-mcp-transport-session.md) when changing MCP transport or session posture.
 - Task 26.2 is complete. Read [26.2 Read-Only MCP Tool Manifests](../tasks/26.2-read-only-mcp-tool-manifests.md) when changing MCP tool manifest validation.
+- Task 26.3 is complete. Read [26.3 Read-Only MCP Adapter Through Core APIs](../tasks/26.3-read-only-mcp-adapter-core-apis.md) when changing the MCP adapter/Core API boundary.
 
 ## Read Avoidance Rules
 

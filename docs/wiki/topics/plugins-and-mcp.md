@@ -29,6 +29,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Task 25.3 logs plugin enable grants/denials and plugin apply denials through Core after manifest and permission checks. It stores no grants, starts no runtime, and writes no catalog edit state for denied requests.
 - Task 26.1 records ADR 0010: MCP is disabled by default, stdio-first, process-lifetime scoped, and read-only first. No listener, persisted grant, HTTP transport, mutating tool, permission self-escalation, or direct SQLite access is added.
 - Task 26.2 validates `silica.mcp_tool` v1 manifests for read-only MCP tools only. Valid tool manifests use `mcp:read_only`, have no side effects, require no confirmation, are not undoable, and reject unknown fields, mutating tool IDs, non-read-only permissions, and direct SQLite claims.
+- Task 26.3 adds a runtime-free read-only MCP adapter function. It validates manifests, calls only `silica-core` APIs for product data, records `mcp_read` evidence, and keeps `silica-mcp` free of direct storage, rusqlite, and catalog handles.
 
 ## Task 23.1 Permission Vocabulary
 

@@ -114,3 +114,5 @@ GO WITH CONDITIONS.
 Task 26.1 records MCP transport/session design in ADR 0010. Remaining scoped work needs exact MCP schemas, read-only tool manifests, and adapter implementation through Core APIs.
 
 Task 26.2 defines and validates read-only MCP tool manifests. Adapter calls, server startup, mutating tools, direct SQLite access, and permission self-escalation remain unimplemented.
+
+Task 26.3 adds a runtime-free read-only MCP adapter function that validates the manifest, calls Core APIs only, returns JSON payloads, and records `mcp_read` evidence. MCP server startup, direct SQLite access, mutating tools, export execution tools, and permission self-escalation remain unimplemented.

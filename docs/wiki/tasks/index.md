@@ -152,6 +152,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 
 - [26.1: MCP Transport and Session ADR](26.1-mcp-transport-session-adr.md)
 - [26.2: Read-Only MCP Tool Manifests](26.2-read-only-mcp-tool-manifests.md)
+- [26.3: Read-Only MCP Adapter Through Core APIs](26.3-read-only-mcp-adapter-core-apis.md)
 
 ## Notes for LLM Agents
 
