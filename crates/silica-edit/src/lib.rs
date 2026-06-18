@@ -219,6 +219,22 @@ pub enum BasicPreset {
     SoftMatte,
 }
 
+/// Data-only plugin preset values for P0 Basic controls.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PluginBasicPresetAdjustments {
+    pub white_balance: WhiteBalance,
+    pub temperature: f64,
+    pub tint: f64,
+    pub exposure: f64,
+    pub contrast: f64,
+    pub highlights: f64,
+    pub shadows: f64,
+    pub whites: f64,
+    pub blacks: f64,
+    pub vibrance: f64,
+    pub saturation: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToneAdjustments {
@@ -1180,6 +1196,29 @@ pub fn apply_basic_preset(
             edited.basic.saturation = Number::from(-6);
         }
     }
+    edited.updated_at = updated_at.into();
+    validate_edit_graph(&edited)?;
+    Ok(edited)
+}
+
+/// Apply one data-only plugin preset through the edit graph validator.
+pub fn apply_plugin_basic_preset(
+    graph: &EditGraph,
+    preset: &PluginBasicPresetAdjustments,
+    updated_at: impl Into<String>,
+) -> Result<EditGraph, EditGraphValidationError> {
+    let mut edited = graph.clone();
+    edited.basic.white_balance = preset.white_balance;
+    edited.basic.temperature = number_from_f64("basic.temperature", preset.temperature)?;
+    edited.basic.tint = number_from_f64("basic.tint", preset.tint)?;
+    edited.basic.exposure = number_from_f64("basic.exposure", preset.exposure)?;
+    edited.basic.contrast = number_from_f64("basic.contrast", preset.contrast)?;
+    edited.basic.highlights = number_from_f64("basic.highlights", preset.highlights)?;
+    edited.basic.shadows = number_from_f64("basic.shadows", preset.shadows)?;
+    edited.basic.whites = number_from_f64("basic.whites", preset.whites)?;
+    edited.basic.blacks = number_from_f64("basic.blacks", preset.blacks)?;
+    edited.basic.vibrance = number_from_f64("basic.vibrance", preset.vibrance)?;
+    edited.basic.saturation = number_from_f64("basic.saturation", preset.saturation)?;
     edited.updated_at = updated_at.into();
     validate_edit_graph(&edited)?;
     Ok(edited)
@@ -3488,6 +3527,50 @@ mod tests {
         assert_eq!(soft.basic.blacks.as_f64(), Some(18.0));
         assert_eq!(round_tripped.basic.contrast.as_f64(), Some(18.0));
         super::validate_edit_graph_json(&serialized).expect("preset graph validates");
+    }
+
+    #[test]
+    fn applies_plugin_basic_preset_through_edit_graph_validation() {
+        let graph = super::default_edit_graph(
+            super::EditGraphSource {
+                photo_id: "photo-1".to_string(),
+                path: "/tmp/sample.jpg".to_string(),
+                file_size: 16,
+                modified_at: None,
+                partial_hash: None,
+                full_hash: None,
+            },
+            "unix:2",
+        );
+        let preset = super::PluginBasicPresetAdjustments {
+            white_balance: super::WhiteBalance::Custom,
+            temperature: 6100.0,
+            tint: 4.0,
+            exposure: 0.35,
+            contrast: 12.0,
+            highlights: -18.0,
+            shadows: 14.0,
+            whites: 8.0,
+            blacks: -6.0,
+            vibrance: 10.0,
+            saturation: 3.0,
+        };
+
+        let edited = super::apply_plugin_basic_preset(&graph, &preset, "unix:3")
+            .expect("apply plugin preset");
+        assert_eq!(edited.basic.white_balance, super::WhiteBalance::Custom);
+        assert_eq!(edited.basic.temperature.as_f64(), Some(6100.0));
+        assert_eq!(edited.basic.exposure.as_f64(), Some(0.35));
+        assert_eq!(edited.basic.contrast.as_f64(), Some(12.0));
+        super::validate_edit_graph(&edited).expect("plugin preset graph validates");
+
+        let invalid = super::PluginBasicPresetAdjustments {
+            exposure: 12.0,
+            ..preset
+        };
+        let error = super::apply_plugin_basic_preset(&graph, &invalid, "unix:4")
+            .expect_err("out-of-range plugin preset must fail edit graph validation");
+        assert!(error.to_string().contains("basic.exposure"));
     }
 
     #[test]

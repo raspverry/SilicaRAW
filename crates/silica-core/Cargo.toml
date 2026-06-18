@@ -17,6 +17,7 @@ core-image-raw-probe = ["silica-decode/core-image-raw-probe"]
 silica-decode = { path = "../silica-decode" }
 silica-edit = { path = "../silica-edit" }
 silica-export = { path = "../silica-export" }
+silica-plugin = { path = "../silica-plugin" }
 silica-render = { path = "../silica-render" }
 silica-storage = { path = "../silica-storage" }
 serde_json = "1.0.150"

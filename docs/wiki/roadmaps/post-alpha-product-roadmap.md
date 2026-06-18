@@ -1160,6 +1160,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Applying a preset requires explicit approval and creates history.
 - **Validation:** `cargo test -p silica-plugin -p silica-core -p silica-edit`
 
+**Status:** Completed on 2026-06-18. Added data-only `silica.plugin_preset_pack` v1 validation, P0 Basic preset application through `silica-edit` edit graph validation, and a Core explicit approval path that commits one undoable edit history checkpoint and appends `plugin_apply` action-log evidence. No arbitrary executable plugin code, plugin runtime, plugin storage, permission persistence, UI, MCP behavior, sidecar writes, export writes, or original-file mutation was added.
+
 ### Task 25.3: Plugin Permission Review and Action Log
 
 - **Location:** `crates/silica-plugin`, `crates/silica-core`, `apps/desktop/static/`

@@ -160,7 +160,9 @@ pub use silica_edit::CurveMode;
 pub use silica_edit::EditClipboardPayload;
 pub use silica_edit::EditClipboardSelection;
 pub use silica_edit::HslColorChannel;
+pub use silica_edit::PluginBasicPresetAdjustments;
 pub use silica_edit::WhiteBalance;
+pub use silica_plugin::{PluginBasicPreset, PluginManifest, PluginPreset, PluginPresetPack};
 pub use silica_storage::ActionLogEntry;
 pub use silica_storage::AiResult;
 pub use silica_storage::CatalogRebuildDryRunAction;
@@ -1181,6 +1183,7 @@ pub enum CoreError {
     UnsupportedEdit(String),
     AppSession(String),
     AiReview(String),
+    Plugin(String),
 }
 
 impl fmt::Display for CoreError {
@@ -1196,6 +1199,7 @@ impl fmt::Display for CoreError {
             Self::UnsupportedEdit(message) => write!(formatter, "unsupported edit: {message}"),
             Self::AppSession(message) => write!(formatter, "app session error: {message}"),
             Self::AiReview(message) => write!(formatter, "AI review error: {message}"),
+            Self::Plugin(message) => write!(formatter, "plugin error: {message}"),
         }
     }
 }
@@ -1213,6 +1217,7 @@ impl Error for CoreError {
             Self::UnsupportedEdit(_) => None,
             Self::AppSession(_) => None,
             Self::AiReview(_) => None,
+            Self::Plugin(_) => None,
         }
     }
 }
@@ -1250,6 +1255,12 @@ impl From<silica_edit::EditClipboardError> for CoreError {
 impl From<silica_export::ExportError> for CoreError {
     fn from(error: silica_export::ExportError) -> Self {
         Self::Export(error)
+    }
+}
+
+impl From<silica_plugin::PluginManifestError> for CoreError {
+    fn from(error: silica_plugin::PluginManifestError) -> Self {
+        Self::Plugin(error.to_string())
     }
 }
 
@@ -1945,6 +1956,18 @@ pub struct AiSuggestionRejection {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct PluginPresetApproval {
+    pub plugin_id: String,
+    pub preset_id: String,
+    pub preset_name: String,
+    pub action_log_id: String,
+    pub commit: PhotoEditCommit,
+    pub writes_edit_graph: bool,
+    pub writes_photo_flags: bool,
+    pub writes_original: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 struct AiApprovalSuggestion {
     kind: String,
     exposure: f64,
@@ -2371,6 +2394,88 @@ pub fn record_plugin_apply_attempt(
     )
 }
 
+/// Apply one data-only plugin preset after explicit approval.
+pub fn approve_plugin_preset(
+    library_root_path: impl AsRef<Path>,
+    photo_id: impl AsRef<str>,
+    manifest_json: impl AsRef<str>,
+    preset_pack_json: impl AsRef<str>,
+    preset_id: impl AsRef<str>,
+) -> Result<Option<PluginPresetApproval>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let photo_id = photo_id.as_ref();
+    let preset_id = preset_id.as_ref();
+    let manifest = silica_plugin::validate_plugin_manifest_json(manifest_json.as_ref())?;
+    if !manifest
+        .permissions
+        .iter()
+        .any(|permission| permission == ExtensionPermission::EditSuggestionApply.stable_id())
+    {
+        return Err(CoreError::Plugin(
+            "plugin preset apply requires edit_suggestion:apply".to_string(),
+        ));
+    }
+    let preset_pack =
+        silica_plugin::validate_preset_pack_json(&manifest, preset_pack_json.as_ref())?;
+    let preset = preset_pack
+        .presets
+        .iter()
+        .find(|preset| preset.preset_id == preset_id)
+        .ok_or_else(|| CoreError::Plugin(format!("preset_id {preset_id} not found")))?;
+    let graph =
+        match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
+            Some(graph) => graph,
+            None => return Ok(None),
+        };
+    let adjustments = plugin_basic_preset_adjustments(&preset.basic)?;
+    let mut edited =
+        silica_edit::apply_plugin_basic_preset(&graph, &adjustments, current_timestamp_string())?;
+    edited.extensions.insert(
+        "silica.plugin_provenance".to_string(),
+        serde_json::json!({
+            "schema": "silica.plugin_provenance",
+            "version": 1,
+            "plugin_id": manifest.plugin_id,
+            "plugin_version": manifest.plugin_version,
+            "preset_id": preset.preset_id,
+            "preset_name": preset.name,
+            "permission_id": ExtensionPermission::EditSuggestionApply.stable_id(),
+        }),
+    );
+    let persisted = silica_storage::commit_edit_graph(library_root_path, edited)?;
+    let action_log = append_permissioned_action_log(
+        library_root_path,
+        "plugin",
+        Some(&manifest.plugin_id),
+        "plugin_apply",
+        Some("photo"),
+        Some(photo_id),
+        "edit_graph",
+        Some(format!("plugin:{}:preset:{preset_id}", manifest.plugin_id)),
+        serde_json::json!({
+            "plugin_id": manifest.plugin_id,
+            "preset_id": preset.preset_id,
+            "preset_name": preset.name,
+            "permission_id": ExtensionPermission::EditSuggestionApply.stable_id(),
+            "granted": true,
+            "writes_edit_graph": true,
+            "writes_photo_flags": false,
+            "writes_original": false,
+        }),
+    )?;
+
+    Ok(Some(PluginPresetApproval {
+        plugin_id: preset_pack.plugin_id,
+        preset_id: preset.preset_id.clone(),
+        preset_name: preset.name.clone(),
+        action_log_id: action_log.id,
+        commit: photo_edit_commit_from_graph(&persisted, "Plugin preset applied."),
+        writes_edit_graph: true,
+        writes_photo_flags: false,
+        writes_original: false,
+    }))
+}
+
 /// Record an approved AI result boundary without running MLX or mutating edits.
 pub fn record_ai_approval(
     library_root_path: impl AsRef<Path>,
@@ -2393,6 +2498,41 @@ pub fn record_ai_approval(
             "permission_id": permission.stable_id(),
         }),
     )
+}
+
+fn plugin_basic_preset_adjustments(
+    preset: &silica_plugin::PluginBasicPreset,
+) -> Result<silica_edit::PluginBasicPresetAdjustments, CoreError> {
+    Ok(silica_edit::PluginBasicPresetAdjustments {
+        white_balance: plugin_white_balance(&preset.white_balance)?,
+        temperature: preset.temperature,
+        tint: preset.tint,
+        exposure: preset.exposure,
+        contrast: preset.contrast,
+        highlights: preset.highlights,
+        shadows: preset.shadows,
+        whites: preset.whites,
+        blacks: preset.blacks,
+        vibrance: preset.vibrance,
+        saturation: preset.saturation,
+    })
+}
+
+fn plugin_white_balance(value: &str) -> Result<silica_edit::WhiteBalance, CoreError> {
+    match value {
+        "as_shot" => Ok(silica_edit::WhiteBalance::AsShot),
+        "auto" => Ok(silica_edit::WhiteBalance::Auto),
+        "daylight" => Ok(silica_edit::WhiteBalance::Daylight),
+        "cloudy" => Ok(silica_edit::WhiteBalance::Cloudy),
+        "shade" => Ok(silica_edit::WhiteBalance::Shade),
+        "tungsten" => Ok(silica_edit::WhiteBalance::Tungsten),
+        "fluorescent" => Ok(silica_edit::WhiteBalance::Fluorescent),
+        "flash" => Ok(silica_edit::WhiteBalance::Flash),
+        "custom" => Ok(silica_edit::WhiteBalance::Custom),
+        other => Err(CoreError::Plugin(format!(
+            "unsupported plugin white_balance {other}"
+        ))),
+    }
 }
 
 /// Record a future MCP read through Core policy without starting an MCP server.
@@ -11086,6 +11226,108 @@ mod tests {
         assert!(entries.iter().any(|entry| entry.action_type == "mcp_read"
             && entry.actor_type == "mcp"
             && entry.side_effect_category == "catalog_read"));
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn plugin_preset_approval_commits_history_and_logs_apply_without_original_mutation() {
+        let workspace = unique_library_root("core-plugin-preset-approval");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let jpeg_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        write_source_jpeg(&jpeg_file);
+        let original_before = std::fs::read(&jpeg_file).expect("read original before");
+
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let approval = approve_plugin_preset(
+            &created.root_path,
+            &photo_id,
+            r#"{
+              "schema":"silica.plugin",
+              "version":1,
+              "plugin_id":"silicaraw.test.preset_pack",
+              "name":"Silica Test Presets",
+              "description":"Data-only preset pack manifest.",
+              "author":"SilicaRAW",
+              "license":"MIT",
+              "plugin_version":"0.1.0",
+              "minimum_silica_version":"0.1.0",
+              "type":"preset_pack",
+              "permissions":["edit_suggestion:apply"]
+            }"#,
+            r#"{
+              "schema":"silica.plugin_preset_pack",
+              "version":1,
+              "plugin_id":"silicaraw.test.preset_pack",
+              "presets":[
+                {
+                  "preset_id":"warm_skin",
+                  "name":"Warm Skin",
+                  "description":"Warm basic adjustments.",
+                  "basic":{
+                    "white_balance":"custom",
+                    "temperature":6100,
+                    "tint":4,
+                    "exposure":0.35,
+                    "contrast":12,
+                    "highlights":-18,
+                    "shadows":14,
+                    "whites":8,
+                    "blacks":-6,
+                    "vibrance":10,
+                    "saturation":3
+                  }
+                }
+              ]
+            }"#,
+            "warm_skin",
+        )
+        .expect("approve plugin preset")
+        .expect("plugin preset approval result");
+
+        assert_eq!(approval.plugin_id, "silicaraw.test.preset_pack");
+        assert_eq!(approval.preset_id, "warm_skin");
+        assert_eq!(approval.commit.photo_id, photo_id);
+        assert_eq!(approval.commit.exposure, 0.35);
+        assert_eq!(approval.commit.contrast, 12.0);
+        assert!(approval.writes_edit_graph);
+        assert!(!approval.writes_photo_flags);
+        assert!(!approval.writes_original);
+
+        let history = list_photo_history(&created.root_path, &photo_id).expect("history panel");
+        assert_eq!(history.items.len(), 1);
+        assert!(history.can_undo);
+
+        let entries = list_action_log_entries(&created.root_path, 20).expect("list action log");
+        let entry = entries
+            .iter()
+            .find(|entry| entry.action_type == "plugin_apply")
+            .expect("plugin apply action log entry");
+        assert_eq!(entry.actor_type, "plugin");
+        assert_eq!(
+            entry.actor_id.as_deref(),
+            Some("silicaraw.test.preset_pack")
+        );
+        assert!(entry.payload_json.contains("\"granted\":true"));
+        assert!(entry.payload_json.contains("edit_suggestion:apply"));
+        assert_eq!(
+            std::fs::read(&jpeg_file).expect("read original after"),
+            original_before
+        );
 
         remove_library_root(&workspace);
     }
