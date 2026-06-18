@@ -68,6 +68,7 @@ External file effects are not inside undo/redo transactions. Export files, sidec
 | AI result proposal | Logged/local result state, unapproved by default | Store local review/suggestion output in `ai_results` only. Do not write edit graph, edit history, or photo flags. Approval remains a later explicit user action. |
 | AI blur review panel | View-only | Read stored local blur review rows and model-unavailable state only. Do not approve suggestions, write edit graph, write edit history, change photo flags, or touch originals. |
 | Data-only plugin preset approval | Undoable and logged | Apply validated P0 Basic preset data only after explicit Core approval. Commit one edit graph history checkpoint and append `plugin_apply` action-log evidence. Do not run plugin code or touch originals. |
+| Plugin permission review denial | Logged-only | Record enable/apply denial evidence through Core action log. Do not persist grants, start runtime, write edit history, or change catalog state. |
 | Original photo mutation | Blocked | No undo class may touch, rewrite, move, or delete original referenced files. |
 | Extension, plugin, or MCP mutation | Blocked until permission/action-log phases | Future mutations must enter through Core APIs and append-only action logging, never direct DB or file writes. |
 

@@ -27,6 +27,7 @@ Use this page when a task needs historical context. It keeps [Current LLM Route]
 - Phase 24 is complete. Read [MLX](../topics/mlx.md), [24.3 AI Result Store and Read Path](../tasks/24.3-ai-result-store-read-path.md), [24.4 First Non-Mutating AI Review Feature](../tasks/24.4-first-non-mutating-ai-review.md), and [24.5 Explicit AI Suggestion Approval](../tasks/24.5-explicit-ai-suggestion-approval.md) instead of replaying the full Phase 24 history.
 - Task 25.1 is complete. Read [Plugins and MCP](../topics/plugins-and-mcp.md), [Schema Reference](../../19_Schema_Reference.md), and [25.1 Plugin Manifest Validation](../tasks/25.1-plugin-manifest-validation.md) when changing plugin manifest validation.
 - Task 25.2 is complete. Read [25.2 Declarative Preset Plugin](../tasks/25.2-declarative-preset-plugin.md) when changing data-only preset plugin application.
+- Task 25.3 is complete. Read [25.3 Plugin Permission Review and Action Log](../tasks/25.3-plugin-permission-review-action-log.md) when changing plugin permission review evidence.
 
 ## Read Avoidance Rules
 

@@ -1195,6 +1195,34 @@
                   </dl>
                   <p>Dangerous permissions are unavailable unless a future ADR approves them.</p>
                 </section>
+                <section class="sr-permission-contract sr-plugin-review-contract" id="pluginPermissionReview" aria-labelledby="pluginPermissionReviewTitle">
+                  <div class="sr-permission-contract-header">
+                    <div>
+                      <span>Plugin review</span>
+                      <h4 id="pluginPermissionReviewTitle">Plugin Permission Review</h4>
+                    </div>
+                    <strong id="pluginPermissionNoSql">No direct SQLite</strong>
+                  </div>
+                  <dl class="sr-permission-contract-grid">
+                    <div id="pluginPermissionActor">
+                      <dt>Actor</dt>
+                      <dd>Validated plugin manifest, version, license, and source.</dd>
+                    </div>
+                    <div id="pluginPermissionEnableDecision">
+                      <dt>Enable review</dt>
+                      <dd>Grant or deny is logged; runtime stays stopped and no grant is persisted.</dd>
+                    </div>
+                    <div id="pluginPermissionApplyDecision">
+                      <dt>Apply review</dt>
+                      <dd>Preset data requires explicit approval before an undoable edit checkpoint.</dd>
+                    </div>
+                    <div id="pluginPermissionDenyEvidence">
+                      <dt>Denial</dt>
+                      <dd>Denied requests append evidence and leave catalog edit state unchanged.</dd>
+                    </div>
+                  </dl>
+                  <p>Plugin data must enter Core APIs; direct database access and original-file mutation stay unavailable.</p>
+                </section>
               </section>
             </div>
           </div>

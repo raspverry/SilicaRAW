@@ -1175,6 +1175,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Permission bypass tests.
   - `scripts/harness/check-scope-guardrails.sh`
 
+**Status:** Completed on 2026-06-18. Added Core plugin permission review helpers for enable decisions and apply denials. Reviews validate plugin manifests, check requested permissions, append action-log evidence, and keep grants, runtime, direct SQLite access, edit state, history, exports, sidecars, and originals untouched. Preferences Advanced now shows the static plugin permission review contract.
+
 ## Phase 26: MCP Read-Only First
 
 **Goal:** Add MCP only as a disabled-by-default, read-only, permissioned interface first.
