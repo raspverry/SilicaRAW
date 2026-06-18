@@ -77,16 +77,16 @@ Verification source: local workspace Cargo metadata and Phase 4.2 core/storage t
 ```txt
 Name: silica-core
 Version: workspace
-Purpose: Desktop command boundary for local library, edit, and export workflows.
+Purpose: Core command boundary for local library, edit, export, and read-only extension workflows.
 License: project internal
 Repository/Homepage: this repository
-Used by: apps/desktop/src-tauri
-Why needed: Phase 4.2 exposes minimal Tauri commands through Core instead of letting the desktop shell call storage directly; Phase 5.4 reuses the same boundary for command-level JPEG sRGB export.
+Used by: apps/desktop/src-tauri; crates/silica-mcp in Task 26.3
+Why needed: Phase 4.2 exposes minimal Tauri commands through Core instead of letting the desktop shell call storage directly; Phase 5.4 reuses the same boundary for command-level JPEG sRGB export; Task 26.3 routes read-only MCP adapter calls through Core APIs instead of granting storage access.
 Alternatives considered: desktop shell calling `silica-storage` directly.
-Risk notes: Keep app shell thin. Do not add RAW, Metal viewer, import scanner, plugin, MCP, or MLX behavior through this dependency.
+Risk notes: Keep app shell thin and MCP read-only. Do not expose raw SQLite, storage handles, original mutation, plugin runtime, MCP server startup, or MLX behavior through this dependency.
 Binary size impact: Internal workspace code only.
-Security notes: Desktop commands accept local paths and must not mutate original photo folders.
-Verification source: local workspace Cargo metadata, Phase 4.2 desktop command test, and Phase 5.4 export command test.
+Security notes: Desktop commands accept local paths and must not mutate original photo folders. MCP adapter calls must use Core APIs only and log read evidence where required.
+Verification source: local workspace Cargo metadata, Phase 4.2 desktop command test, Phase 5.4 export command test, and Task 26.3 MCP adapter tests.
 ```
 
 ```txt

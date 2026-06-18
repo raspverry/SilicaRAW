@@ -1220,6 +1220,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - `cargo test -p silica-mcp -p silica-core`
   - Scope guardrails.
 
+**Status:** Completed on 2026-06-18. Added `run_read_only_mcp_tool` as a runtime-free adapter function in `silica-mcp`. It validates `silica.mcp_tool` manifests, dispatches the read-only tool set through `silica-core`, returns JSON payloads, and records `mcp_read` action-log evidence through Core. `silica-mcp` depends on `silica-core` only for product data and scope guardrails reject direct `silica-storage`, `rusqlite`, or catalog handle access. No MCP server, stdio process launch, HTTP transport, mutation tool, export execution tool, direct SQLite access, or permission self-escalation was added.
+
 ## Phase 27: Public Beta Gate
 
 **Goal:** Decide whether SilicaRAW is ready for public beta users.

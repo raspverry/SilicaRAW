@@ -1979,6 +1979,19 @@ pub struct PluginPermissionReview {
     pub writes_original: bool,
 }
 
+/// Photo row subset exposed to read-only MCP adapters through Core only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpPhotoReadRecord {
+    pub photo_id: String,
+    pub file_name: String,
+    pub path: String,
+    pub unsupported: bool,
+    pub rating: u8,
+    pub picked: bool,
+    pub rejected: bool,
+    pub color_label: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct AiApprovalSuggestion {
     kind: String,
@@ -2864,6 +2877,30 @@ pub fn get_photo_flags(
     photo_id: &str,
 ) -> Result<Option<silica_storage::PhotoFlags>, CoreError> {
     silica_storage::get_photo_flags(library_root_path, photo_id).map_err(CoreError::from)
+}
+
+/// Read one photo row for MCP through Core APIs without hydrating caches.
+pub fn get_mcp_photo_read_record(
+    library_root_path: impl AsRef<Path>,
+    photo_id: &str,
+) -> Result<Option<McpPhotoReadRecord>, CoreError> {
+    let library_root_path = library_root_path.as_ref();
+    let Some(candidate) = silica_storage::get_photo_preview_candidate(library_root_path, photo_id)?
+    else {
+        return Ok(None);
+    };
+    let flags = silica_storage::get_photo_flags(library_root_path, photo_id)?;
+
+    Ok(Some(McpPhotoReadRecord {
+        photo_id: candidate.photo_id,
+        file_name: candidate.file_name,
+        path: candidate.path,
+        unsupported: candidate.unsupported,
+        rating: flags.as_ref().map(|value| value.rating).unwrap_or(0),
+        picked: flags.as_ref().map(|value| value.picked).unwrap_or(false),
+        rejected: flags.as_ref().map(|value| value.rejected).unwrap_or(false),
+        color_label: flags.and_then(|value| value.color_label),
+    }))
 }
 
 /// Undo the latest undoable history action for one photo through the core boundary.

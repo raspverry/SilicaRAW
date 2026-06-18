@@ -10,4 +10,5 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies]
+silica-core = { path = "../silica-core" }
 serde_json = "1.0.150"

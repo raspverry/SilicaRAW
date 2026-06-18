@@ -47,8 +47,12 @@ check_deferred_crate_boundary() {
 }
 
 check_deferred_crate_boundary "silica-mlx" "serde_json|sha2"
-check_deferred_crate_boundary "silica-mcp" "serde_json"
+check_deferred_crate_boundary "silica-mcp" "serde_json|silica-core"
 check_deferred_crate_boundary "silica-plugin" "serde_json"
+
+if rg -n "silica_storage|rusqlite|open_catalog" crates/silica-mcp -g '*.rs' -g '*.toml'; then
+  fail "silica-mcp must not access storage, rusqlite, or catalog handles directly"
+fi
 
 if rg -n \
   "posthog|sentry|telemetry|analytics|firebase|amplitude|segment\.io|segmentio|@segment|Segment Analytics|segment analytics|cloud sync|cloud-sync|upload_original|uploadPhoto|delete_original|overwrite_original" \

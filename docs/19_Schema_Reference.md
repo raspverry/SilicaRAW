@@ -147,6 +147,8 @@ silica.exports.list
 
 Unknown fields, mutating tool IDs, non-read-only permissions, side effects, confirmation requirements, undoable behavior, and direct SQLite claims are rejected. Validation does not start an MCP server, launch a stdio process, call Core APIs, access storage, or add mutating tools.
 
+Task 26.3 adds a read-only adapter function for these manifests. The adapter returns JSON payloads through `silica-mcp`, calls `silica-core` APIs only, and records `mcp_read` action-log evidence through Core. The adapter does not extend this schema, does not grant direct SQLite access, and does not add mutation or export execution tools.
+
 ## AI Result Payload v1
 
 Task 24.3 stores AI outputs in the existing `ai_results` catalog table, separate from edit graph, edit history, and photo flags.

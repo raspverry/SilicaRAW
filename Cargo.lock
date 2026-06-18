@@ -2926,6 +2926,7 @@ name = "silica-mcp"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "silica-core",
 ]
 
 [[package]]
