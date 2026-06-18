@@ -27,6 +27,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Task 25.1 validates `silica.plugin` v1 manifests before any plugin can be enabled. Valid manifests stay `enabled_by_default = false`; validation rejects missing trust fields, empty permissions, unknown permissions, raw SQL, direct database access, and write-like permissions.
 - Task 25.2 validates data-only `silica.plugin_preset_pack` v1 payloads and applies P0 Basic preset data only through explicit Core approval, edit graph validation, undoable history, and `plugin_apply` action-log evidence. It still starts no plugin runtime.
 - Task 25.3 logs plugin enable grants/denials and plugin apply denials through Core after manifest and permission checks. It stores no grants, starts no runtime, and writes no catalog edit state for denied requests.
+- Task 26.1 records ADR 0010: MCP is disabled by default, stdio-first, process-lifetime scoped, and read-only first. No listener, persisted grant, HTTP transport, mutating tool, permission self-escalation, or direct SQLite access is added.
 
 ## Task 23.1 Permission Vocabulary
 
@@ -90,6 +91,7 @@ Extension actors cannot log raw SQL or direct database access claims. Direct SQL
 - [Plugin Manifest Schema](../../../schemas/plugin_manifest.schema.json)
 - [Plugin Preset Pack Schema](../../../schemas/plugin_preset_pack.schema.json)
 - [MCP Tool Manifest Schema](../../../schemas/mcp_tool_manifest.schema.json)
+- [ADR 0010: MCP Transport and Session](../decisions/adr-0010-mcp-transport-session.md)
 - [Agent Rules](../../../codex/AGENT_RULES.md)
 
 ## Notes for LLM Agents

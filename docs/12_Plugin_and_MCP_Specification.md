@@ -109,4 +109,4 @@ All mutation/export/permission/plugin actions are logged in action_log.
 
 GO WITH CONDITIONS.
 
-Need exact MCP schemas, permission enum, action log implementation, transport/session design, plugin manifest validation.
+Task 26.1 records MCP transport/session design in ADR 0010. Remaining scoped work needs exact MCP schemas, read-only tool manifests, and adapter implementation through Core APIs.

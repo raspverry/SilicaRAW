@@ -1192,6 +1192,8 @@ The combined conclusion is that product breadth should not start with flashy AI 
   - Mutating tools are explicitly out of scope.
 - **Validation:** `python3 scripts/harness/check-md-links.py`
 
+**Status:** Completed on 2026-06-18. Added ADR 0010, selecting disabled-by-default stdio-first MCP with one local process lifetime per session. No background listener, persisted grant, persisted token, app-start server, HTTP transport, mutating tools, permission self-escalation, direct SQLite access, plugin install, or plugin enable behavior was added. Streamable HTTP requires a future ADR.
+
 ### Task 26.2: Read-Only MCP Tool Manifests
 
 - **Location:** `crates/silica-mcp`, `schemas/mcp_tool_manifest.schema.json`

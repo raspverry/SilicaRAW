@@ -14,23 +14,25 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, Task 25.1, Task 25.2, and Task 25.3 are complete. The next roadmap task is **Task 25.4: Plugin Execution Model ADR**.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, Task 25.1, Task 25.2, Task 25.3, and Task 26.1 are complete. The next roadmap task is **Task 26.2: Read-Only MCP Tool Manifests**.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. Task 25.3 adds plugin permission review evidence without runtime or grant persistence. MCP/plugin runtime and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. Task 25.3 adds plugin permission review evidence without runtime or grant persistence. Task 26.1 selects disabled-by-default stdio-first MCP without starting a server. MCP/plugin runtime and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For Task 25.4, read:
+For Task 26.2, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
-- [Post-Alpha Product Roadmap: Phase 25](../roadmaps/post-alpha-product-roadmap.md#phase-25-plugin-foundation)
+- [Post-Alpha Product Roadmap: Phase 26](../roadmaps/post-alpha-product-roadmap.md#phase-26-mcp-read-only-first)
 - [Plugins and MCP](../topics/plugins-and-mcp.md)
 - [Action Trust](../topics/action-trust.md)
 - [Data Safety](../topics/data-safety.md)
 - [Architecture Patch](../../20_v1_1_Architecture_Patch.md)
 - [Schema Reference](../../19_Schema_Reference.md)
+- [ADR 0010: MCP Transport and Session](../decisions/adr-0010-mcp-transport-session.md)
 - [Plugin Manifest Schema](../../../schemas/plugin_manifest.schema.json)
 - [Plugin Preset Pack Schema](../../../schemas/plugin_preset_pack.schema.json)
+- [MCP Tool Manifest Schema](../../../schemas/mcp_tool_manifest.schema.json)
 - [Edit Graph Schema](../../../schemas/edit_graph.schema.json)
 - [Task 25.3: Plugin Permission Review and Action Log](../tasks/25.3-plugin-permission-review-action-log.md)
 - [Task 25.2: Declarative Preset Plugin](../tasks/25.2-declarative-preset-plugin.md)
@@ -69,8 +71,14 @@ For Task 25.4, read:
 - Task 25.1 validates `silica.plugin` v1 manifests, rejects missing trust fields and unsafe permissions, and returns `enabled_by_default = false`.
 - Task 25.2 validates `silica.plugin_preset_pack` v1, supports P0 Basic data-only presets, and applies them only through explicit Core approval, edit graph validation, one undoable history checkpoint, and `plugin_apply` action-log evidence.
 - Task 25.3 validates plugin manifests for permission review, logs enable/apply decisions, handles denials without state mutation, and keeps runtime/grant persistence unavailable.
-- Task 25.4 is an ADR only unless the roadmap explicitly changes scope.
 - Plugin manifests cannot request raw SQL, filesystem write, direct database access, or original-file mutation permission.
+
+## Phase 26 Context
+
+- Task 26.1 records ADR 0010: disabled-by-default stdio-first MCP with one process lifetime per session.
+- MCP remains off by default. There is no background listener, persisted token, persisted grant, app-start server, or HTTP transport.
+- Phase 26 starts read-only. Mutating MCP tools, permission self-escalation, direct SQLite, unrestricted filesystem, original mutation, plugin install, and plugin enable are out of scope.
+- Future Streamable HTTP MCP transport requires a separate ADR before implementation.
 
 ## Stop Rules
 
