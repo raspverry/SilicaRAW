@@ -289,13 +289,13 @@ Phase 26:
 
 ### Phase 27: Public Beta Gate
 
-Add Task 27.0 before the existing audit:
+Task 27.0 is complete and created the public beta scope freeze/evidence index:
 
 - Freeze beta scope.
 - List included and excluded features.
 - Confirm whether MLX, plugins, or MCP are disabled, hidden, or absent.
 
-Task 27.1 must produce a public beta readiness evidence index, not only an audit note.
+Task 27.1 must audit the public beta evidence index, not only write a generic audit note.
 
 Evidence index must cover:
 

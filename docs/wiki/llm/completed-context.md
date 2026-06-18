@@ -31,6 +31,7 @@ Use this page when a task needs historical context. It keeps [Current LLM Route]
 - Task 26.1 is complete. Read [ADR 0010](../decisions/adr-0010-mcp-transport-session.md) when changing MCP transport or session posture.
 - Task 26.2 is complete. Read [26.2 Read-Only MCP Tool Manifests](../tasks/26.2-read-only-mcp-tool-manifests.md) when changing MCP tool manifest validation.
 - Task 26.3 is complete. Read [26.3 Read-Only MCP Adapter Through Core APIs](../tasks/26.3-read-only-mcp-adapter-core-apis.md) when changing the MCP adapter/Core API boundary.
+- Task 27.0 is complete. Read [Public Beta Evidence Index](../roadmaps/public-beta-evidence-index.md) and [Public Beta Scope Freeze Checklist](../../../checklists/PUBLIC_BETA_SCOPE_FREEZE.md) when changing beta readiness scope.
 
 ## Read Avoidance Rules
 

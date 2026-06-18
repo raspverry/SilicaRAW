@@ -16,6 +16,8 @@ The user-ready target is a signed and notarized GitHub Release DMG containing `S
 
 While that gate is blocked, maintainers may use the unsigned developer-preview artifact path for internal testing only.
 
+Public beta readiness is tracked in the [Public Beta Evidence Index](public-beta-evidence-index.md). Unsigned developer-preview artifacts must not be described as public beta releases.
+
 ## Release Types
 
 ### User-Ready Local Alpha

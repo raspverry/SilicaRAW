@@ -154,6 +154,10 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [26.2: Read-Only MCP Tool Manifests](26.2-read-only-mcp-tool-manifests.md)
 - [26.3: Read-Only MCP Adapter Through Core APIs](26.3-read-only-mcp-adapter-core-apis.md)
 
+## Phase 27
+
+- [27.0: Public Beta Scope Freeze and Evidence Index](27.0-public-beta-scope-freeze.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.
