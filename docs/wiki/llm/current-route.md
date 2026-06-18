@@ -14,18 +14,20 @@ This is the shortest read path for agents. Read this page after [Agent Rules](..
 
 ## Current Work Area
 
-Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, Task 25.1, Task 25.2, Task 25.3, Task 26.1, Task 26.2, Task 26.3, and Task 27.0 are complete. The next task is **Task 27.1: Public Beta Readiness Audit**.
+Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 23.1, Task 23.2, Task 23.3, Task 24.1, Task 24.2, Task 24.3, Task 24.4, Task 24.5, Task 25.1, Task 25.2, Task 25.3, Task 26.1, Task 26.2, Task 26.3, Task 27.0, and Task 27.1 are complete. **Task 27.2: Public Beta Release Candidate is blocked** until signing/notarization prerequisites and clean-Mac downloaded-artifact QA are available.
 
-Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. Task 25.3 adds plugin permission review evidence without runtime or grant persistence. Task 26.1 selects disabled-by-default stdio-first MCP without starting a server. Task 26.2 defines read-only MCP tool manifests. Task 26.3 adds a runtime-free read-only MCP adapter function through Core APIs only. Task 27.0 freezes public beta scope and adds the public beta evidence index. MCP server startup, plugin runtime, and agent bridges remain unavailable.
+Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. Task 25.3 adds plugin permission review evidence without runtime or grant persistence. Task 26.1 selects disabled-by-default stdio-first MCP without starting a server. Task 26.2 defines read-only MCP tool manifests. Task 26.3 adds a runtime-free read-only MCP adapter function through Core APIs only. Task 27.0 freezes public beta scope and adds the public beta evidence index. Task 27.1 completes the readiness audit with a blocked verdict. MCP server startup, plugin runtime, and agent bridges remain unavailable.
 
 ## Minimal Read Set
 
-For Task 27.1, read:
+For Task 27.2 or any beta release-candidate work, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 27](../roadmaps/post-alpha-product-roadmap.md#phase-27-public-beta-gate)
 - [Public Beta Evidence Index](../roadmaps/public-beta-evidence-index.md)
+- [Public Beta Readiness Audit](../roadmaps/public-beta-readiness-audit.md)
 - [Public Beta Scope Freeze Checklist](../../../checklists/PUBLIC_BETA_SCOPE_FREEZE.md)
+- [Public Beta Readiness Audit Checklist](../../../checklists/PUBLIC_BETA_READINESS_AUDIT.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)
 - [Completed LLM Context](completed-context.md)
 - [Plugins and MCP](../topics/plugins-and-mcp.md)
@@ -79,6 +81,7 @@ For Task 27.1, read:
 ## Phase 27 Context
 
 - Task 27.0 freezes public beta scope and creates the evidence index.
+- Task 27.1 audits readiness and blocks public beta release-candidate work.
 - Public beta is blocked until a signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist.
 - Unsigned developer-preview DMGs are internal testing artifacts only and must not be called public beta.
 - MLX runtime, plugin runtime, MCP server/runtime, broad RAW claims, broad visual color-correctness claims, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are excluded from public beta scope.

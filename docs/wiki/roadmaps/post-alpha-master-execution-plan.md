@@ -310,6 +310,8 @@ Evidence index must cover:
 
 Public beta cannot use an unsigned developer-preview DMG.
 
+Task 27.1 is complete and keeps Task 27.2 blocked until Apple Developer Program funding, Developer ID certificate, notarization credentials, a signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist.
+
 ### Phase 28: v1.0 Gate
 
 Phase 28 starts after beta feedback and a v1.0 scope freeze.

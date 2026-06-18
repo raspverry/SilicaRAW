@@ -157,6 +157,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 ## Phase 27
 
 - [27.0: Public Beta Scope Freeze and Evidence Index](27.0-public-beta-scope-freeze.md)
+- [27.1: Public Beta Readiness Audit](27.1-public-beta-readiness-audit.md)
 
 ## Notes for LLM Agents
 
