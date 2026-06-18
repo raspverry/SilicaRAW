@@ -51,7 +51,7 @@ Excluded from public beta scope:
 
 | Gate | Current state | Evidence source | Beta action |
 | --- | --- | --- | --- |
-| Data trust matrix | Present for action trust, edit history, sidecars, extension evidence, and original-file safety. | [Action Trust](../topics/action-trust.md), [Data Safety](../topics/data-safety.md) | Re-audit in Task 27.1. |
+| Data trust matrix | Present for action trust, edit history, sidecars, extension evidence, and original-file safety. | [Action Trust](../topics/action-trust.md), [Data Safety](../topics/data-safety.md), [Public Beta Readiness Audit](public-beta-readiness-audit.md) | Task 27.1 audit complete; release-candidate work remains blocked. |
 | Original-hash safety | Local workflow and export tests preserve originals; manual QA checklist exists. | [QA Checklist](../../../checklists/QA_CHECKLIST.md), [Photographer Workflow QA](../../../checklists/PHOTOGRAPHER_WORKFLOW_QA.md) | Re-run before beta RC. |
 | Dependency/license inventory | Current dependency inventory exists and harness checks it. | [Dependencies Policy](../../DEPENDENCIES.md), `scripts/harness/check.sh` | Re-check before beta RC. |
 | Fixture/sample asset licenses | Fixture manifest contract exists; committed sample asset policy remains conservative. | [Fixture Manifest Schema](../../../schemas/fixture_manifest.schema.json), [Installed App Preflight](../../../checklists/INSTALLED_APP_PREFLIGHT.md) | Confirm no unlicensed public sample media ships. |
@@ -81,4 +81,4 @@ Signed public beta available
 
 ## Next Step
 
-Task 27.1 should audit this index, fill any missing evidence rows, and decide whether the release path is still blocked or ready for a signed/notarized beta RC.
+Task 27.1 completed the audit and kept public beta blocked. Task 27.2 can start only after signing/notarization prerequisites, checksums, and clean-Mac downloaded-artifact QA are available.
