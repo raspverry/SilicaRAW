@@ -25,6 +25,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Task 23.2 adds the static permission prompt UI contract in Preferences Advanced. It shows actor identity, requested permission, side effects, confirmation requirement, undo availability, deny behavior, and dangerous-permission unavailability without granting permissions or starting runtime behavior.
 - Task 23.3 adds Core action-log wrappers for permission grants, denials, plugin apply reviews, AI approvals, MCP reads, and permissioned export attempts. Storage rejects extension raw-SQL/direct-database bypass claims. This is evidence only; it does not enable plugin, MCP, AI, or agent runtime.
 - Task 25.1 validates `silica.plugin` v1 manifests before any plugin can be enabled. Valid manifests stay `enabled_by_default = false`; validation rejects missing trust fields, empty permissions, unknown permissions, raw SQL, direct database access, and write-like permissions.
+- Task 25.2 validates data-only `silica.plugin_preset_pack` v1 payloads and applies P0 Basic preset data only through explicit Core approval, edit graph validation, undoable history, and `plugin_apply` action-log evidence. It still starts no plugin runtime.
 
 ## Task 23.1 Permission Vocabulary
 
@@ -78,6 +79,7 @@ Extension actors cannot log raw SQL or direct database access claims. Direct SQL
 ## Required Manifest Areas
 
 - Plugin manifests must include schema, version, plugin identity, license, plugin version, minimum SilicaRAW version, type, and non-empty safe allowlisted permissions.
+- Plugin preset packs must include schema, version, matching plugin ID, and data-only P0 Basic preset entries. Executable fields are rejected.
 - Model manifests must include license, source, and hash.
 - MCP tool manifests must declare permission, side effects, confirmation behavior, and undo behavior.
 
@@ -85,6 +87,7 @@ Extension actors cannot log raw SQL or direct database access claims. Direct SQL
 
 - [Plugin and MCP Specification](../../12_Plugin_and_MCP_Specification.md)
 - [Plugin Manifest Schema](../../../schemas/plugin_manifest.schema.json)
+- [Plugin Preset Pack Schema](../../../schemas/plugin_preset_pack.schema.json)
 - [MCP Tool Manifest Schema](../../../schemas/mcp_tool_manifest.schema.json)
 - [Agent Rules](../../../codex/AGENT_RULES.md)
 

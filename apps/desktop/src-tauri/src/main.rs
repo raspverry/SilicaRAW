@@ -4786,6 +4786,7 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
         silica_core::CoreError::ExportBlocked(_) => "exportBlocked",
         silica_core::CoreError::AppSession(_) => "appSession",
         silica_core::CoreError::AiReview(_) => "aiReview",
+        silica_core::CoreError::Plugin(_) => "plugin",
     }
 }
 
@@ -4910,6 +4911,12 @@ mod tests {
             ));
 
         assert_eq!(super::core_error_kind(&error), "decode");
+        assert_eq!(
+            super::core_error_kind(&silica_core::CoreError::Plugin(
+                "invalid plugin".to_string()
+            )),
+            "plugin"
+        );
     }
 
     #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]

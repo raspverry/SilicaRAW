@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://silicaraw.local/schemas/plugin_preset_pack.schema.json",
+  "title": "SilicaRAW Plugin Preset Pack v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "plugin_id",
+    "presets"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "silica.plugin_preset_pack"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "plugin_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "presets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "preset_id",
+          "name",
+          "description",
+          "basic"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "preset_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basic": {
+            "type": "object",
+            "required": [
+              "white_balance",
+              "temperature",
+              "tint",
+              "exposure",
+              "contrast",
+              "highlights",
+              "shadows",
+              "whites",
+              "blacks",
+              "vibrance",
+              "saturation"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "white_balance": {
+                "type": "string",
+                "enum": [
+                  "as_shot",
+                  "auto",
+                  "daylight",
+                  "cloudy",
+                  "shade",
+                  "tungsten",
+                  "fluorescent",
+                  "flash",
+                  "custom"
+                ]
+              },
+              "temperature": {
+                "type": "number"
+              },
+              "tint": {
+                "type": "number"
+              },
+              "exposure": {
+                "type": "number"
+              },
+              "contrast": {
+                "type": "number"
+              },
+              "highlights": {
+                "type": "number"
+              },
+              "shadows": {
+                "type": "number"
+              },
+              "whites": {
+                "type": "number"
+              },
+              "blacks": {
+                "type": "number"
+              },
+              "vibrance": {
+                "type": "number"
+              },
+              "saturation": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "uniqueItems": true
+    }
+  }
+}

@@ -145,6 +145,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 ## Phase 25
 
 - [25.1: Plugin Manifest Validation](25.1-plugin-manifest-validation.md)
+- [25.2: Declarative Preset Plugin](25.2-declarative-preset-plugin.md)
 
 ## Notes for LLM Agents
 

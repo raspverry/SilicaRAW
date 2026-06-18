@@ -2867,6 +2867,7 @@ dependencies = [
  "silica-decode",
  "silica-edit",
  "silica-export",
+ "silica-plugin",
  "silica-render",
  "silica-storage",
 ]

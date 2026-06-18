@@ -4,7 +4,7 @@ Status: AUTHORITATIVE FOR v0.1 IMPLEMENTATION
 
 ## Purpose
 
-This document defines schema sources that Codex / Claude Code must use when implementing storage, sidecars, plugin manifests, MLX model manifests, and MCP tool declarations.
+This document defines schema sources that Codex / Claude Code must use when implementing storage, sidecars, plugin manifests and preset packs, MLX model manifests, and MCP tool declarations.
 
 ## Authoritative Schema Files
 
@@ -16,6 +16,7 @@ schemas/sidecar.example.json
 schemas/fixture_manifest.schema.json
 schemas/fixture_manifest.example.json
 schemas/plugin_manifest.schema.json
+schemas/plugin_preset_pack.schema.json
 schemas/model_manifest.schema.json
 schemas/mcp_tool_manifest.schema.json
 ```
@@ -79,6 +80,23 @@ ai_result:read
 ```
 
 Raw SQL, direct database access, filesystem write, and original-file mutation permissions are not valid plugin manifest permissions. Validation does not load plugins, execute code, persist grants, or enable a plugin runtime.
+
+## Plugin Preset Pack v1
+
+`schemas/plugin_preset_pack.schema.json` is the authoritative contract for data-only declarative preset packs.
+
+Task 25.2 status:
+
+```txt
+schema -> silica.plugin_preset_pack
+version -> 1
+plugin_id -> must match a validated silica.plugin manifest with type preset_pack
+presets -> non-empty array of data-only presets
+supported preset data -> P0 Basic adjustments only
+approval path -> Core explicit approval, edit graph validation, edit history checkpoint
+```
+
+Preset packs cannot include executable fields such as `entry`, `command`, `script`, `runtime`, or plugin code. Unknown fields are rejected. Numeric edit ranges are enforced by `silica-edit` edit graph validation during approved apply, not by a plugin runtime.
 
 ## Model Manifest v1
 
@@ -384,6 +402,7 @@ Unknown fields must not be silently discarded.
 [x] edit graph serialization validates in crates/silica-edit for Phase 5.2
 [ ] sidecar serialization validates
 [x] plugin manifest rejects missing license, missing minimum app version, empty/missing permissions, raw SQL, and unknown permissions
+[x] plugin preset pack rejects executable fields and applies approved basic presets through edit graph validation
 [ ] model manifest rejects missing hash/license
 [ ] MCP tool schema rejects missing permission/side-effect declarations
 ```
