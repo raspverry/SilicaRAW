@@ -280,7 +280,7 @@ Phase 25:
 
 Phase 26:
 
-- MCP transport/session ADR first.
+- Task 26.1 complete: stdio-first MCP transport/session ADR first.
 - Read-only tool manifests before adapters.
 - Read-only adapter calls go through Core APIs.
 - No mutating MCP tools in the first MCP phase.

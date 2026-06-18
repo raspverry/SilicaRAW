@@ -148,6 +148,10 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [25.2: Declarative Preset Plugin](25.2-declarative-preset-plugin.md)
 - [25.3: Plugin Permission Review and Action Log](25.3-plugin-permission-review-action-log.md)
 
+## Phase 26
+
+- [26.1: MCP Transport and Session ADR](26.1-mcp-transport-session-adr.md)
+
 ## Notes for LLM Agents
 
 Read one task card at a time. If a task card conflicts with an authoritative schema, dependency policy, ADR, or agent rule, the authoritative source wins.
