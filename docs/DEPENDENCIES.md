@@ -364,8 +364,8 @@ Version: 1.0.150
 Purpose: JSON value, number, map, parsing, and serialization support.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/serde-rs/json
-Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, crates/silica-core in Phase 5.4, crates/silica-decode behind `core-image-raw-probe` in Phase 12.2, crates/silica-mlx in Task 24.2 for model manifest validation, and crates/silica-plugin in Task 25.1 for plugin manifest validation; expected later for silica-mcp when its schema-backed JSON tasks are reached.
-Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, active edit graph JSON persistence in SQLite, export settings JSON validation, export settings JSON construction at the Core orchestration boundary, RAW fixture manifest parsing for probe evidence, model manifest validation, and plugin manifest validation.
+Used by: crates/silica-edit in Phase 5.2, crates/silica-storage in Phases 5.3/5.4, crates/silica-core in Phase 5.4, crates/silica-decode behind `core-image-raw-probe` in Phase 12.2, crates/silica-mlx in Task 24.2 for model manifest validation, crates/silica-plugin in Task 25.1 for plugin manifest validation, and crates/silica-mcp in Task 26.2 for read-only MCP tool manifest validation.
+Why needed: edit graph example round-tripping, `extensions` storage, schema-owned JSON values, numeric representation preservation, active edit graph JSON persistence in SQLite, export settings JSON validation, export settings JSON construction at the Core orchestration boundary, RAW fixture manifest parsing for probe evidence, model manifest validation, plugin manifest validation, and MCP tool manifest validation.
 Alternatives considered: simd-json, manual JSON parsing, schemars-only workflows
 Risk notes: JSON Schema validation rules still need explicit validation or a schema validator; serde_json only parses and serializes JSON.
 Binary size impact: Low/typical Rust ecosystem dependency.

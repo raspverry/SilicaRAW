@@ -28,6 +28,7 @@ Plugins and MCP are optional extension layers. They must be permissioned, audita
 - Task 25.2 validates data-only `silica.plugin_preset_pack` v1 payloads and applies P0 Basic preset data only through explicit Core approval, edit graph validation, undoable history, and `plugin_apply` action-log evidence. It still starts no plugin runtime.
 - Task 25.3 logs plugin enable grants/denials and plugin apply denials through Core after manifest and permission checks. It stores no grants, starts no runtime, and writes no catalog edit state for denied requests.
 - Task 26.1 records ADR 0010: MCP is disabled by default, stdio-first, process-lifetime scoped, and read-only first. No listener, persisted grant, HTTP transport, mutating tool, permission self-escalation, or direct SQLite access is added.
+- Task 26.2 validates `silica.mcp_tool` v1 manifests for read-only MCP tools only. Valid tool manifests use `mcp:read_only`, have no side effects, require no confirmation, are not undoable, and reject unknown fields, mutating tool IDs, non-read-only permissions, and direct SQLite claims.
 
 ## Task 23.1 Permission Vocabulary
 
@@ -83,7 +84,7 @@ Extension actors cannot log raw SQL or direct database access claims. Direct SQL
 - Plugin manifests must include schema, version, plugin identity, license, plugin version, minimum SilicaRAW version, type, and non-empty safe allowlisted permissions.
 - Plugin preset packs must include schema, version, matching plugin ID, and data-only P0 Basic preset entries. Executable fields are rejected.
 - Model manifests must include license, source, and hash.
-- MCP tool manifests must declare permission, side effects, confirmation behavior, and undo behavior.
+- MCP tool manifests must declare stable tool ID, permission, side effects, confirmation behavior, undo behavior, and input/output schema objects. Phase 26 permits read-only IDs only.
 
 ## Links
 

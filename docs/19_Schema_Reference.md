@@ -116,6 +116,37 @@ required output metadata -> output.metadata object
 
 Model manifests validate before any model can be enabled. Hash checks are deterministic SHA-256 comparisons against the candidate model bytes. Passing validation does not load a model, run inference, or make AI features required.
 
+## MCP Tool Manifest v1
+
+`schemas/mcp_tool_manifest.schema.json` is the authoritative contract for Phase 26 MCP tool manifests.
+
+Task 26.2 status:
+
+```txt
+schema -> silica.mcp_tool
+version -> 1
+permission -> mcp:read_only
+requires_confirmation -> false
+side_effects -> []
+undoable -> false
+input_schema -> object
+output_schema -> object
+```
+
+Allowed Phase 26 read-only tool IDs are:
+
+```txt
+silica.photos.list
+silica.photos.get
+silica.photos.get_metadata
+silica.collections.list
+silica.selection.get
+silica.presets.list
+silica.exports.list
+```
+
+Unknown fields, mutating tool IDs, non-read-only permissions, side effects, confirmation requirements, undoable behavior, and direct SQLite claims are rejected. Validation does not start an MCP server, launch a stdio process, call Core APIs, access storage, or add mutating tools.
+
 ## AI Result Payload v1
 
 Task 24.3 stores AI outputs in the existing `ai_results` catalog table, separate from edit graph, edit history, and photo flags.

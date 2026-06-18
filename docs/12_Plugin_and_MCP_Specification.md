@@ -68,6 +68,8 @@ Read-only:
 - silica.presets.list
 - silica.exports.list
 
+Task 26.2 validates only these read-only `silica.mcp_tool` v1 manifests. Valid manifests use `permission: "mcp:read_only"`, `requires_confirmation: false`, `side_effects: []`, and `undoable: false`.
+
 Edit:
 
 - set_rating
@@ -110,3 +112,5 @@ All mutation/export/permission/plugin actions are logged in action_log.
 GO WITH CONDITIONS.
 
 Task 26.1 records MCP transport/session design in ADR 0010. Remaining scoped work needs exact MCP schemas, read-only tool manifests, and adapter implementation through Core APIs.
+
+Task 26.2 defines and validates read-only MCP tool manifests. Adapter calls, server startup, mutating tools, direct SQLite access, and permission self-escalation remain unimplemented.

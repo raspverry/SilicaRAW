@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://silicaraw.local/schemas/mcp_tool_manifest.schema.json",
-  "title": "SilicaRAW MCP Tool Manifest v0.1",
+  "title": "SilicaRAW MCP Tool Manifest v1",
   "type": "object",
   "required": [
     "schema",
     "version",
+    "tool_id",
     "name",
     "description",
     "permission",
@@ -24,32 +25,44 @@
       "type": "integer",
       "const": 1
     },
+    "tool_id": {
+      "type": "string",
+      "enum": [
+        "silica.photos.list",
+        "silica.photos.get",
+        "silica.photos.get_metadata",
+        "silica.collections.list",
+        "silica.selection.get",
+        "silica.presets.list",
+        "silica.exports.list"
+      ]
+    },
     "name": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "description": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "permission": {
       "type": "string",
-      "enum": [
-        "read_only",
-        "review",
-        "edit",
-        "export"
-      ]
+      "const": "mcp:read_only"
     },
     "requires_confirmation": {
-      "type": "boolean"
+      "type": "boolean",
+      "const": false
     },
     "side_effects": {
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "maxItems": 0
     },
     "undoable": {
-      "type": "boolean"
+      "type": "boolean",
+      "const": false
     },
     "input_schema": {
       "type": "object"

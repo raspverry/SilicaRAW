@@ -47,7 +47,7 @@ check_deferred_crate_boundary() {
 }
 
 check_deferred_crate_boundary "silica-mlx" "serde_json|sha2"
-check_deferred_crate_boundary "silica-mcp"
+check_deferred_crate_boundary "silica-mcp" "serde_json"
 check_deferred_crate_boundary "silica-plugin" "serde_json"
 
 if rg -n \
