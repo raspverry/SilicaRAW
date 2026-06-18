@@ -1226,6 +1226,20 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Decide whether SilicaRAW is ready for public beta users.
 
+### Task 27.0: Public Beta Scope Freeze and Evidence Index
+
+- **Location:** `docs/wiki/roadmaps/`, `checklists/`
+- **Description:** Freeze public beta scope, list included/excluded features, confirm MLX/plugin/MCP state, and create the evidence index used by the readiness audit.
+- **Dependencies:** Task 26.3
+- **Acceptance Criteria:**
+  - Included and excluded beta features are explicit.
+  - MLX, plugins, and MCP are marked disabled, hidden, absent, or blocked.
+  - Evidence index covers data trust, original safety, dependency/license inventory, fixture/sample licensing, model licensing if models ship, color/export evidence, clean-Mac install QA, and signing/notarization status.
+  - Public beta is blocked if only unsigned developer-preview artifacts are available.
+- **Validation:** `python3 scripts/harness/check-md-links.py`
+
+**Status:** Completed on 2026-06-18. Added the Public Beta Evidence Index and Public Beta Scope Freeze checklist. Public beta remains blocked until a signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist. MLX runtime, plugin runtime, MCP server/runtime, cloud sync, telemetry, auto-update, Homebrew, Mac App Store distribution, broad RAW claims, and broad visual color-correctness claims are excluded from beta scope.
+
 ### Task 27.1: Public Beta Readiness Audit
 
 - **Location:** `docs/wiki/roadmaps/`, `checklists/`

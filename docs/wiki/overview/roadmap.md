@@ -90,6 +90,7 @@ The current implementation order starts with:
 - Task 25.3 is complete: plugin enable/apply permission review logs grants or denials, denial leaves catalog state unchanged, and Preferences Advanced shows the review contract while runtime/grant persistence stays unavailable.
 - Task 26.1 is complete: ADR 0010 selects disabled-by-default stdio-first MCP with process-lifetime sessions and read-only-first posture.
 - Phase 26 is complete through Task 26.3: read-only MCP manifests validate, the adapter calls Core APIs only, and no MCP server/runtime, mutating tools, or direct storage access is enabled.
+- Task 27.0 is complete: public beta scope is frozen, the evidence index exists, and public beta is blocked until signed/notarized DMG and clean-Mac downloaded-artifact QA exist.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
 
 ## Links
