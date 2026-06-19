@@ -31,6 +31,7 @@ SURFACES = [
     ("M001-welcome", "welcome"),
     ("M002-library-empty", "empty"),
     ("M003-library-populated", "grid"),
+    ("M025-library-unsupported-grid", "unsupported-grid"),
     ("M004-loupe", "loupe"),
     ("M005-develop", "develop"),
     ("M006-mask-active", "mask-active"),
@@ -429,7 +430,6 @@ def state_script(state):
       thumbnail.value = String(thumbnailSize);
     }}
     grid.style.setProperty("--sr-thumb-min", `${{thumbnailSize}}px`);
-    grid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${{thumbnailSize}}px, 1fr))`;
   }}
 
   function setMode(mode) {{
@@ -501,6 +501,47 @@ def state_script(state):
     {{ fileName: "export-candidate.jpg", fileType: "JPG", rating: "*****", src: secondaryPath }},
   ];
 
+  const unsupportedPhotos = Array.from({{ length: 60 }}, (_, index) => {{
+    const number = String(index + 1).padStart(2, "0");
+    const names = [
+      "yoroshiku_onegaishimasu",
+      "pekorii",
+      "arigatou_gozaimasu",
+      "iine",
+      "waai",
+      "otsukaresama_desu",
+      "gomennasai",
+      "chiratt",
+      "oyasuminasai",
+      "ohayou",
+      "ganbatte",
+      "matane",
+      "sugoi",
+      "ureshii",
+      "daijoubu",
+      "hai",
+      "iie",
+      "sumimasen",
+      "konnichiwa",
+    ];
+    const baseName = names[index % names.length];
+    return {{
+      photoId: `unsupported-${{number}}`,
+      path: `/fixture/unsupported/${{number}}_${{baseName}}.png`,
+      fileName: `${{number}}_${{baseName}}.png`,
+      fileType: "PNG",
+      rating: 0,
+      picked: false,
+      rejected: false,
+      missing: false,
+      colorLabel: null,
+      thumbnailPath: null,
+      thumbnailBytes: [],
+      artClass: `sr-thumb-art-${{String.fromCharCode(97 + (index % 8))}}`,
+      unsupported: true,
+    }};
+  }});
+
   function populateGrid(withPhotos) {{
     grid.replaceChildren(...(withPhotos ? photos.map(photoCard) : []));
     grid.hidden = !withPhotos;
@@ -525,6 +566,19 @@ def state_script(state):
     }});
     document.querySelector("#pickSelectedPhoto").setAttribute("aria-pressed", String(withPhotos));
     document.querySelector("#rejectSelectedPhoto").setAttribute("aria-pressed", "false");
+  }}
+
+  function populateUnsupportedGrid() {{
+    renderLibraryGrid(unsupportedPhotos, {{
+      page: {{
+        offset: 0,
+        limit: unsupportedPhotos.length,
+        totalCount: unsupportedPhotos.length,
+        hasNextPage: false,
+      }},
+      preferredPhotoId: unsupportedPhotos[1].photoId,
+      persistSelection: false,
+    }});
   }}
 
   function setLibraryFilters() {{
@@ -709,6 +763,10 @@ def state_script(state):
     document.querySelector("#welcomeStatus").value = "Enter a local library folder path to begin.";
   }} else if (state === "empty") {{
     openLibraryBase(false);
+  }} else if (state === "unsupported-grid") {{
+    openLibraryBase(false);
+    populateUnsupportedGrid();
+    setHistogramState(true);
   }} else if (state === "grid" || state === "maintenance" || state === "library-filters" || state === "library-metadata") {{
     openLibraryBase(true);
     if (state === "maintenance") {{
@@ -1197,13 +1255,18 @@ def metric_script(surface):
     const rect = element.getBoundingClientRect();
     return {{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }};
   }};
+  const elementBox = (element) => {{
+    if (!visible(element)) return null;
+    const rect = element.getBoundingClientRect();
+    return {{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }};
+  }};
   const text = (selector) => (document.querySelector(selector)?.textContent || "").trim();
   const value = (selector) => document.querySelector(selector)?.value || "";
   const disabled = (selector) => Boolean(document.querySelector(selector)?.disabled);
   const mode = box("#modeNavigation");
   const actions = box(".sr-toolbar-actions");
   const toolbarOverlap = Boolean(mode && actions && mode.right > actions.left && mode.left < actions.right);
-  const controlClipping = Array.from(document.querySelectorAll("button, output, label"))
+  const controlClipping = Array.from(document.querySelectorAll("button, output, label, select"))
     .filter(visible)
     .filter((element) => element.scrollWidth > element.clientWidth + 2)
     .map((element) => {{
@@ -1221,7 +1284,26 @@ def metric_script(surface):
     horizontalOverflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > innerWidth + 1,
     toolbarOverlap,
     controlClipping,
+    renderedPhotoCards: document.querySelectorAll(".sr-photo-card").length,
     visiblePhotoCards: Array.from(document.querySelectorAll(".sr-photo-card")).filter(visible).length,
+    overlappingPhotoCards: (() => {{
+      const cards = Array.from(document.querySelectorAll(".sr-photo-card")).filter(visible);
+      let overlaps = 0;
+      for (let outer = 0; outer < cards.length; outer += 1) {{
+        const first = elementBox(cards[outer]);
+        if (!first) continue;
+        for (let inner = outer + 1; inner < cards.length; inner += 1) {{
+          const second = elementBox(cards[inner]);
+          if (!second) continue;
+          const xOverlap = first.left < second.right - 1 && second.left < first.right - 1;
+          const yOverlap = first.top < second.bottom - 1 && second.top < first.bottom - 1;
+          if (xOverlap && yOverlap) {{
+            overlaps += 1;
+          }}
+        }}
+      }}
+      return overlaps;
+    }})(),
     visibleFilmstripCards: Array.from(document.querySelectorAll(".sr-filmstrip-card")).filter(visible).length,
     visibleImages: Array.from(document.querySelectorAll(".sr-thumb-image, .sr-loupe-image, .sr-develop-image")).filter(visible).length,
     importIssueReviewVisible: Boolean(box("#importIssueReview")),
@@ -1243,6 +1325,12 @@ def metric_script(surface):
       sort: value("#librarySort"),
       note: text("#gridStateNote"),
     }},
+    gridState: {{
+      subtitle: text("#gridPhotoSubtitle"),
+      libraryPhotoCount: text("#libraryPhotoCount"),
+      selectedPhoto: text("#selectedPhotoName"),
+    }},
+    virtualGridState: window.__silicaUnsupportedScroll || null,
     metadataState: {{
       fileName: text("#selectedPhotoName"),
       fileType: text("#metadataFileType"),
@@ -1423,6 +1511,35 @@ def metric_script(surface):
 """
 
 
+def unsupported_grid_scroll_script():
+    return """
+(async () => {
+  const grid = document.querySelector("#libraryGrid");
+  const before = grid?.dataset.virtualGridWindow || "";
+  const selected = document.querySelector(".sr-photo-card.is-selected");
+  (selected ?? grid)?.focus({ preventScroll: true });
+  const maxScroll = Math.max(0, grid.scrollHeight - grid.clientHeight);
+  const firstCard = grid.querySelector(".sr-photo-card");
+  const rowGap = Number.parseFloat(getComputedStyle(grid).rowGap) || 0;
+  const rowHeight = Math.max(1, (firstCard?.getBoundingClientRect().height || 0) + rowGap);
+  grid.scrollTop = Math.min(maxScroll, Math.round(rowHeight * 8));
+  grid.dispatchEvent(new Event("scroll"));
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const active = document.activeElement;
+  window.__silicaUnsupportedScroll = {
+    before,
+    after: grid.dataset.virtualGridWindow || "",
+    scrollTop: grid.scrollTop,
+    scrollHeight: grid.scrollHeight,
+    clientHeight: grid.clientHeight,
+    focusInsideGrid: active === grid || grid.contains(active),
+    selectedRenderedAfterScroll: Boolean(document.querySelector(".sr-photo-card.is-selected")),
+  };
+  return window.__silicaUnsupportedScroll;
+})()
+""".strip()
+
+
 def capture(url):
     failures = []
     results = []
@@ -1434,6 +1551,9 @@ def capture(url):
             for surface_name, state in SURFACES:
                 browser.evaluate(state_script(state))
                 browser.wait(150)
+                if state == "unsupported-grid":
+                    browser.evaluate(unsupported_grid_scroll_script())
+                    browser.wait(100)
                 metrics = browser.evaluate(metric_script(surface_name))
                 screenshot_path = SCREENSHOTS / f"{viewport_name}-{surface_name}.png"
                 browser.screenshot(screenshot_path)
@@ -1450,6 +1570,10 @@ def capture(url):
                     )
                 if not metrics["exportDialogWithinViewport"]:
                     failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
+                if metrics["overlappingPhotoCards"]:
+                    failures.append(
+                        f"{viewport_name} {surface_name}: {metrics['overlappingPhotoCards']} overlapping photo cards"
+                    )
                 if state.startswith("preferences-") and not metrics["preferencesState"]["dialogWithinViewport"]:
                     failures.append(f"{viewport_name} {surface_name}: preferences dialog leaves viewport")
                 if state == "import-review" and (
@@ -1464,6 +1588,25 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: library rating/culling/sort filters not visible")
                     if "Filtered" not in filters["note"]:
                         failures.append(f"{viewport_name} {surface_name}: library filtered state note missing")
+                if state == "unsupported-grid":
+                    grid_state = metrics["gridState"]
+                    virtual_grid = metrics["virtualGridState"] or {}
+                    if metrics["renderedPhotoCards"] < 6 or metrics["visiblePhotoCards"] < 6:
+                        failures.append(
+                            f"{viewport_name} {surface_name}: expected visible unsupported grid rows, saw {metrics['renderedPhotoCards']} rendered and {metrics['visiblePhotoCards']} visible"
+                        )
+                    if grid_state["subtitle"] != "60 of 60 catalog rows" or grid_state["libraryPhotoCount"] != "60 photos":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported grid count state missing")
+                    if not grid_state["selectedPhoto"].endswith(".png"):
+                        failures.append(f"{viewport_name} {surface_name}: unsupported selected PNG state missing")
+                    if (
+                        virtual_grid.get("scrollTop", 0) <= 0
+                        or virtual_grid.get("scrollHeight", 0) <= virtual_grid.get("clientHeight", 0)
+                        or virtual_grid.get("before") == virtual_grid.get("after")
+                    ):
+                        failures.append(f"{viewport_name} {surface_name}: virtual grid scroll window did not advance")
+                    if not virtual_grid.get("focusInsideGrid"):
+                        failures.append(f"{viewport_name} {surface_name}: virtual grid focus not preserved after scroll")
                 if state == "library-metadata":
                     metadata = metrics["metadataState"]
                     if metadata["fileName"] != "synthetic-gradient.jpg" or metadata["fileType"] != "JPG":

@@ -1056,13 +1056,19 @@ progress::-webkit-progress-value {
 
 .sr-grid-tools {
   display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sr-space-sm);
+  min-width: 0;
 }
 
 .sr-grid-tools select {
+  flex: 1 1 128px;
   min-height: 32px;
-  max-width: 132px;
+  min-width: 120px;
+  max-width: 168px;
   padding: 0 var(--sr-space-md);
   border: 1px solid var(--sr-border-default);
   border-radius: var(--sr-radius-sm);
@@ -1349,8 +1355,10 @@ progress::-webkit-progress-value {
   grid-row: 4;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--sr-thumb-min)), var(--sr-thumb-min)));
+  align-items: start;
   align-content: start;
+  justify-content: start;
   gap: var(--sr-space-md);
   overflow: hidden auto;
 }
@@ -1363,6 +1371,9 @@ progress::-webkit-progress-value {
 
 .sr-photo-card {
   position: relative;
+  display: block;
+  width: 100%;
+  height: calc(var(--sr-thumb-min) * 0.75);
   min-width: 0;
   min-height: 0;
   aspect-ratio: 4 / 3;
@@ -1381,6 +1392,13 @@ progress::-webkit-progress-value {
 .sr-photo-card:focus-visible {
   outline: 2px solid var(--sr-accent-system);
   outline-offset: 2px;
+}
+
+.sr-photo-card::before {
+  content: "";
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
 }
 
 .sr-photo-card.is-selected {
@@ -1470,16 +1488,28 @@ progress::-webkit-progress-value {
     linear-gradient(35deg, var(--sr-bg-primary), var(--sr-surface-raised));
 }
 
-.sr-file-badge,
-.sr-card-state,
+.sr-card-badges,
 .sr-card-footer {
   position: absolute;
   z-index: 1;
 }
 
+.sr-card-badges {
+  top: var(--sr-space-sm);
+  right: var(--sr-space-sm);
+  left: var(--sr-space-sm);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sr-space-xs);
+  pointer-events: none;
+}
+
 .sr-file-badge,
 .sr-card-state {
-  top: var(--sr-space-sm);
+  min-width: 0;
+  max-width: calc(50% - var(--sr-space-xs));
+  overflow: hidden;
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-xs);
   background: var(--sr-bg-secondary);
@@ -1487,14 +1517,11 @@ progress::-webkit-progress-value {
   padding: var(--sr-space-2xs) var(--sr-space-xs);
   font-size: var(--sr-type-caption);
   line-height: var(--sr-line-caption);
-}
-
-.sr-file-badge {
-  left: var(--sr-space-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sr-card-state {
-  right: var(--sr-space-sm);
   color: var(--sr-text-secondary);
 }
 
@@ -3742,9 +3769,9 @@ progress::-webkit-progress-value {
   }
 
   .sr-grid-tools select {
-    width: 104px;
-    min-width: 0;
-    max-width: 104px;
+    flex-basis: 124px;
+    min-width: 120px;
+    max-width: 148px;
   }
 }
 
@@ -3761,10 +3788,6 @@ progress::-webkit-progress-value {
 
   .sr-mode-switcher {
     width: min(276px, 100%);
-  }
-
-  .sr-photo-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .sr-export-dialog-panel {
@@ -3933,10 +3956,6 @@ progress::-webkit-progress-value {
   .app-frame[data-active-mode="develop"],
   .app-frame[data-active-mode="export"] {
     grid-template-columns: 340px minmax(0, 1fr) 420px;
-  }
-
-  .sr-photo-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .sr-mode-switcher {
