@@ -474,13 +474,16 @@ def state_script(state):
     const badge = document.createElement("span");
     badge.className = "sr-file-badge";
     badge.textContent = photo.fileType;
-    card.append(badge);
+    const badgeRow = document.createElement("span");
+    badgeRow.className = "sr-card-badges";
+    badgeRow.append(badge);
     if (photo.state) {{
       const stateBadge = document.createElement("span");
       stateBadge.className = `sr-card-state ${{photo.stateClass || ""}}`.trim();
       stateBadge.textContent = photo.state;
-      card.append(stateBadge);
+      badgeRow.append(stateBadge);
     }}
+    card.append(badgeRow);
     const footer = document.createElement("span");
     footer.className = "sr-card-footer";
     const name = document.createElement("span");
@@ -547,6 +550,8 @@ def state_script(state):
     grid.hidden = !withPhotos;
     empty.hidden = withPhotos;
     loading.hidden = true;
+    const selected = withPhotos ? photos[0] : null;
+    const pageStatus = withPhotos ? `Page 1 of 1 · 1-${{photos.length}} of ${{photos.length}}` : "Page 1 of 1 · 0 rows";
     document.querySelector("#libraryPhotoCount").textContent = withPhotos ? `${{photos.length}} photos` : "0 photos";
     document.querySelector("#allPhotosCount").textContent = withPhotos ? String(photos.length) : "0";
     document.querySelector("#recentImportCount").textContent = withPhotos ? String(photos.length) : "0";
@@ -554,8 +559,22 @@ def state_script(state):
       ? "Imported photos are displayed by catalog reference."
       : "Import a folder by reference to populate the grid.";
     document.querySelector("#gridPhotoSubtitle").textContent = withPhotos ? `${{photos.length}} catalog rows` : "No catalog rows";
-    document.querySelector("#selectedPhotoName").textContent = withPhotos ? "synthetic-gradient.jpg" : "None";
+    document.querySelector("#gridPageState").dataset.gridPageState = withPhotos ? "page" : "empty";
+    document.querySelector("#gridPageStatus").value = pageStatus;
+    document.querySelector("#gridPageStatus").textContent = pageStatus;
+    document.querySelector("#gridPreviousPage").disabled = true;
+    document.querySelector("#gridNextPage").disabled = true;
+    document.querySelector("#selectedPhotoName").textContent = selected?.fileName || "None";
     document.querySelector("#selectedPhotoRating").textContent = withPhotos ? "****-" : "-----";
+    document.querySelector("#primarySelectedPhotoName").textContent = selected?.fileName || "None";
+    document.querySelector("#selectionSummary").dataset.multiSelectionState = withPhotos ? "single" : "empty";
+    document.querySelector("#multiSelectionCount").value = withPhotos ? "1 selected" : "0 selected";
+    document.querySelector("#multiSelectionCount").textContent = document.querySelector("#multiSelectionCount").value;
+    document.querySelector("#metadataFileType").textContent = selected?.fileType || "Unavailable";
+    document.querySelector("#developPhotoName").textContent = selected?.fileName || "No photo selected";
+    document.querySelector("#developMaskSelectedPhoto").value = selected ? `Selected photo: ${{selected.fileName}}` : "Selected photo: None";
+    document.querySelector("#developMaskSelectedPhoto").textContent = document.querySelector("#developMaskSelectedPhoto").value;
+    document.querySelector("#aiReviewSelectedPhoto").textContent = selected ? `Selected photo: ${{selected.fileName}}` : "Selected photo: None";
     document.querySelector("#cullingStatus").value = withPhotos ? "Rating 4. Picked." : "No photo selected.";
     document.querySelectorAll("[data-rating-value]").forEach((button) => {{
       button.disabled = !withPhotos;
@@ -749,6 +768,7 @@ def state_script(state):
     populateFilmstrip("#loupeFilmstrip");
     populateFilmstrip("#developFilmstrip");
     document.querySelector("#appStatus").value = withPhotos ? "Library grid loaded." : "Open library with no imported photos.";
+    document.querySelector("#appStatus").textContent = document.querySelector("#appStatus").value;
     document.querySelector("#cacheClearStatus").value = "Ready to clear disposable caches.";
     document.querySelector("#clearLibraryCache").disabled = false;
   }}
@@ -767,6 +787,8 @@ def state_script(state):
     openLibraryBase(false);
     populateUnsupportedGrid();
     setHistogramState(true);
+    document.querySelector("#appStatus").value = "Library grid loaded.";
+    document.querySelector("#appStatus").textContent = "Library grid loaded.";
   }} else if (state === "grid" || state === "maintenance" || state === "library-filters" || state === "library-metadata") {{
     openLibraryBase(true);
     if (state === "maintenance") {{
@@ -1027,11 +1049,18 @@ def state_script(state):
           ["Base", "Import reference"],
         ].map(([label, summary]) => {{
           const item = document.createElement("li");
-          const strong = document.createElement("strong");
-          strong.textContent = label;
-          const small = document.createElement("small");
-          small.textContent = summary;
-          item.append(strong, small);
+          item.className = "sr-history-item";
+          const button = document.createElement("button");
+          button.className = "sr-history-button";
+          button.type = "button";
+          const title = document.createElement("span");
+          title.className = "sr-history-label";
+          title.textContent = label;
+          const state = document.createElement("span");
+          state.className = "sr-history-state";
+          state.textContent = summary;
+          button.append(title, state);
+          item.append(button);
           return item;
         }})
       );
@@ -1101,6 +1130,10 @@ def state_script(state):
       document.querySelector("#developMaskPanel").scrollIntoView({{ block: "start" }});
     }} else if (state === "develop-expanded") {{
       document.querySelector("#developHslPanel").scrollIntoView({{ block: "center" }});
+    }} else if (state === "develop-history") {{
+      document.querySelector("#developHistoryPanel").scrollIntoView({{ block: "center" }});
+    }} else if (state === "develop") {{
+      document.querySelector("#rightInspector").scrollTop = 0;
     }} else {{
       document.querySelector("#developLensGeometryPanel").scrollIntoView({{ block: "center" }});
     }}
@@ -1184,6 +1217,14 @@ def state_script(state):
       document.querySelector("#multiSelectionCount").textContent = "2 selected";
       document.querySelector("#exportSelectedPhotoName").textContent = "2 photos, primary synthetic-gradient.jpg";
       document.querySelector("#exportSelectedInline").textContent = "2 photos";
+      const exportPreset = document.querySelector("#exportPreset");
+      if (!Array.from(exportPreset.options).some((option) => option.value === "")) {{
+        const customOption = document.createElement("option");
+        customOption.value = "";
+        customOption.textContent = "Custom";
+        exportPreset.prepend(customOption);
+      }}
+      exportPreset.value = "";
       document.querySelector("#exportPresetName").value = "JPEG Display P3 Preserve";
       document.querySelector("#exportColorSrgb").classList.remove("is-selected");
       document.querySelector("#exportColorSrgb").setAttribute("aria-pressed", "false");
@@ -1194,9 +1235,11 @@ def state_script(state):
       document.querySelector("#exportBatchProgress").value = 50;
       document.querySelector("#exportBatchProgressLabel").textContent = "1 / 2";
       document.querySelector("#exportStatus").value = "1 of 2 exports completed. Review failures above.";
+      document.querySelector("#exportSummaryPreset").textContent = "Custom JPEG Display P3 Preserve";
       document.querySelector("#exportSummaryColor").textContent = "Display P3";
       document.querySelector("#exportSummaryMetadata").textContent = "Preserve";
       document.querySelector("#exportSummaryBatch").textContent = "2 photos";
+      document.querySelector("#exportSafetyNote").textContent = "Original files will not be modified. SilicaRAW writes separate JPEG Display P3 files to the output path.";
       const failures = document.querySelector("#exportBatchFailureList");
       failures.replaceChildren(...[
         ["blocked-raw.DNG", "RAW decode is required before export."],
