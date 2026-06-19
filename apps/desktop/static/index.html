@@ -6957,6 +6957,7 @@
         importPanel.hidden = true;
         libraryGridShell.hidden = true;
         aiReviewSurface.hidden = true;
+        appFrame.dataset.aiReviewActive = "false";
         loupeSurface.hidden = false;
         renderLoupeFilmstrip();
         await previewSelectedPhoto();
@@ -7157,6 +7158,7 @@
         setLibraryWorkbenchChromeVisible(false);
         libraryAllPhotosNav.classList.remove("is-active");
         openAiReviewButton.classList.add("is-active");
+        appFrame.dataset.aiReviewActive = "true";
         aiReviewSurface.hidden = false;
         renderAiReviewPanel();
         await loadAiReviewPanel();
@@ -7165,6 +7167,7 @@
       function closeAiReviewView() {
         aiReviewSurface.hidden = true;
         loupeSurface.hidden = true;
+        appFrame.dataset.aiReviewActive = "false";
         setLibraryWorkbenchChromeVisible(true);
         openAiReviewButton.classList.remove("is-active");
         libraryAllPhotosNav.classList.add("is-active");
@@ -7322,6 +7325,9 @@
 
       function setMode(mode, options = {}) {
         appFrame.dataset.activeMode = mode;
+        if (mode !== "library") {
+          appFrame.dataset.aiReviewActive = "false";
+        }
         modeButtons.forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
         });
