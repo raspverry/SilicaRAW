@@ -4961,9 +4961,20 @@
         };
       }
 
+      function exportSettingsEqual(a, b) {
+        return Boolean(a && b)
+          && normalizeExportFormat(a.format) === normalizeExportFormat(b.format)
+          && normalizeExportMetadataPolicy(a.metadataPolicy) === normalizeExportMetadataPolicy(b.metadataPolicy)
+          && clampExportQuality(a.quality) === clampExportQuality(b.quality)
+          && normalizeExportSettings(a).colorProfile === normalizeExportSettings(b).colorProfile;
+      }
+
       function syncExportPresetSummary() {
         const preset = selectedExportPreset();
-        exportSummaryPreset.textContent = preset?.name || "Custom";
+        const matchesPreset = preset && exportSettingsEqual(currentExportSettings(), preset.settings);
+        exportSummaryPreset.textContent = matchesPreset
+          ? preset.name
+          : `Custom ${exportFormatLabel(selectedExportFormat)} ${exportColorProfileLabel(selectedExportColorProfile)} ${exportMetadataPolicyLabel(selectedExportMetadataPolicy)}`;
       }
 
       function syncPreferencesExportControlState() {
