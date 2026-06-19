@@ -483,6 +483,21 @@ def main():
         "#appFrame must default to data-library-state=\"welcome\"",
         failures,
     )
+    require(
+        "aria-live" not in parser.ids.get("libraryGrid", {}),
+        "#libraryGrid must not be an aria-live region because virtualized scroll replaces children",
+        failures,
+    )
+    require(
+        "function gridSpacerHeight" in source,
+        "virtualized grid must compensate spacer heights for grid row gaps",
+        failures,
+    )
+    require(
+        "libraryGrid.style.gridTemplateColumns" not in source,
+        "library grid columns must be defined by CSS and --sr-thumb-min, not inline JS",
+        failures,
+    )
 
     expected_modes = {"library": "Library", "develop": "Develop", "export": "Export"}
     for mode, label in expected_modes.items():
@@ -546,6 +561,32 @@ def main():
             "icon rail sidebar must be limited to the true compact breakpoint",
             failures,
         )
+        require(
+            "grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--sr-thumb-min)), var(--sr-thumb-min)));" in css,
+            "library grid must use CSS auto-fill columns controlled by --sr-thumb-min",
+            failures,
+        )
+        require(
+            ".sr-photo-card::before" in css
+            and "aspect-ratio: 4 / 3;" in css
+            and "height: calc(var(--sr-thumb-min) * 0.75);" in css,
+            "photo cards must expose a static ratio box so CSS grid rows cannot collapse",
+            failures,
+        )
+        require(
+            ".sr-card-badges" in css
+            and "justify-content: space-between;" in css
+            and "text-overflow: ellipsis;" in css,
+            "photo card badges must share a constrained header row",
+            failures,
+        )
+        require(
+            ".sr-grid-tools" in css
+            and "flex-wrap: wrap;" in css
+            and "flex: 1 1 128px;" in css,
+            "library filter toolbar must wrap at constrained widths",
+            failures,
+        )
         compact_toolbar_media = ""
         if "@media (max-width: 1279px)" in css and "@media (max-width: 1023px)" in css:
             compact_toolbar_media = css.split("@media (max-width: 1279px)", 1)[1].split(
@@ -572,12 +613,22 @@ def main():
             "M022-export-workflow",
             "M023-ai-review",
             "M024-ai-approval",
+            "M025-library-unsupported-grid",
         ]:
             require(
                 surface_name in visual_qa_source,
                 f"final visual QA must include expanded Phase 22 surface {surface_name}",
                 failures,
             )
+        require(
+            "grid.style.gridTemplateColumns" not in visual_qa_source
+            and "renderLibraryGrid(unsupportedPhotos" in visual_qa_source
+            and "unsupported_grid_scroll_script" in visual_qa_source
+            and "focusInsideGrid" in visual_qa_source
+            and "overlappingPhotoCards" in visual_qa_source,
+            "final visual QA must exercise runtime library grid layout without inline column overrides",
+            failures,
+        )
 
     preferences_dialog = parser.ids.get("preferencesDialog", {})
     require(

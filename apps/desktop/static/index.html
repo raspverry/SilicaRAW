@@ -267,7 +267,7 @@
                 <strong>Grid page unavailable</strong>
                 <span id="gridErrorMessage">Library grid failed to load.</span>
               </div>
-              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" aria-live="polite" tabindex="0" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0" data-grid-keyboard-navigation="roving-focus"></div>
+              <div class="sr-photo-grid" id="libraryGrid" aria-label="Imported photo grid" tabindex="0" data-page-scoped-thumbnail-request="query_library_photos" data-virtual-grid-window="0-0" data-grid-keyboard-navigation="roving-focus"></div>
             </div>
             <section class="sr-ai-review-surface" id="aiReviewSurface" hidden aria-labelledby="aiReviewTitle" data-ai-review-state="model-unavailable">
               <div class="sr-ai-review-header">
@@ -2432,7 +2432,6 @@
         toggleFilmstripButton.setAttribute("aria-pressed", String(normalized.filmstripVisible));
         thumbnailSizeInput.value = String(normalized.thumbnailSize);
         libraryGrid.style.setProperty("--sr-thumb-min", `${normalized.thumbnailSize}px`);
-        libraryGrid.style.gridTemplateColumns = `repeat(auto-fill, minmax(${normalized.thumbnailSize}px, 1fr))`;
         renderVirtualGridWindow({ force: true });
         librarySortInput.value = normalized.sort;
         fileTypeFilterInput.value = normalized.filters.fileType ?? "";
@@ -4396,14 +4395,16 @@
 
       function virtualGridMetrics() {
         const styles = window.getComputedStyle(libraryGrid);
-        const columns = styles.gridTemplateColumns
+        const trackWidths = styles.gridTemplateColumns
           .split(" ")
-          .filter((column) => column && column !== "none")
-          .length || 1;
+          .map((column) => Number.parseFloat(column))
+          .filter((width) => Number.isFinite(width) && width > 0);
+        const columns = trackWidths.length || 1;
         const columnGap = Number.parseFloat(styles.columnGap) || 0;
         const rowGap = Number.parseFloat(styles.rowGap) || 0;
         const gridWidth = Math.max(1, libraryGrid.clientWidth);
-        const cardWidth = Math.max(1, (gridWidth - columnGap * (columns - 1)) / columns);
+        const computedCardWidth = trackWidths[0] ?? (gridWidth - columnGap * (columns - 1)) / columns;
+        const cardWidth = Math.max(1, computedCardWidth);
         const cardHeight = cardWidth * 0.75;
         const rowHeight = Math.max(1, cardHeight + rowGap);
         const totalRows = Math.ceil(libraryPhotos.length / columns);
@@ -4418,12 +4419,20 @@
         return {
           columns,
           rowHeight,
+          rowGap,
           viewportRows,
           start,
           end,
-          topSpacerHeight: firstRenderedRow * rowHeight,
-          bottomSpacerHeight: Math.max(0, (totalRows - renderedEndRow) * rowHeight),
+          topSpacerHeight: gridSpacerHeight(firstRenderedRow, rowHeight, rowGap),
+          bottomSpacerHeight: gridSpacerHeight(totalRows - renderedEndRow, rowHeight, rowGap),
         };
+      }
+
+      function gridSpacerHeight(rows, rowHeight, rowGap) {
+        if (rows <= 0) {
+          return 0;
+        }
+        return Math.max(0, rows * rowHeight - rowGap);
       }
 
       function createGridSpacer(className, height) {
@@ -4452,6 +4461,7 @@
           return;
         }
 
+        const shouldRestoreGridFocus = libraryGrid.contains(document.activeElement);
         const visiblePhotos = libraryPhotos.slice(metrics.start, metrics.end);
         const retainedKeys = new Set(visiblePhotos.map(thumbnailObjectUrlKey).filter(Boolean));
         const nodes = [];
@@ -4469,6 +4479,10 @@
         releaseGridThumbnailObjectUrls(retainedKeys);
         gridVirtualWindow = { start: metrics.start, end: metrics.end };
         libraryGrid.dataset.virtualGridWindow = `${metrics.start}-${metrics.end}`;
+        if (shouldRestoreGridFocus) {
+          const selectedCard = selectedGridCard();
+          (selectedCard ?? libraryGrid).focus({ preventScroll: true });
+        }
       }
 
       function scheduleVirtualGridWindowRender() {
@@ -4643,17 +4657,21 @@
 
         card.append(renderThumbnailArt(photo, index));
 
+        const badgeRow = document.createElement("span");
+        badgeRow.className = "sr-card-badges";
+
         const badge = document.createElement("span");
         badge.className = "sr-file-badge";
         badge.textContent = photo.fileType || "FILE";
-        card.append(badge);
+        badgeRow.append(badge);
 
         if (state) {
           const stateBadge = document.createElement("span");
           stateBadge.className = `sr-card-state ${state.className}`.trim();
           stateBadge.textContent = state.label;
-          card.append(stateBadge);
+          badgeRow.append(stateBadge);
         }
+        card.append(badgeRow);
 
         const footer = document.createElement("span");
         footer.className = "sr-card-footer";
