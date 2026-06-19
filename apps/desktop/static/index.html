@@ -51,8 +51,8 @@
           <button class="sr-sidebar-item" type="button" disabled title="Rejected filter is deferred until culling filters are implemented."><span>Rejected</span><span>0</span></button>
           <div class="sr-panel-heading sr-panel-heading-spaced">Folders</div>
           <button class="sr-sidebar-item" type="button" disabled title="Folder browsing is deferred for the local alpha."><span>Local Library</span><span>0</span></button>
-          <div class="sr-panel-heading sr-panel-heading-spaced">AI Tools</div>
-          <button class="sr-sidebar-item" id="openAiReview" type="button"><span>AI Review</span><span id="aiReviewSidebarCount">0</span></button>
+          <div class="sr-panel-heading sr-panel-heading-spaced sr-secondary-heading">Review Assist</div>
+          <button class="sr-sidebar-item sr-secondary-sidebar-item" id="openAiReview" type="button" title="Secondary AI review surface; suggestions never apply without explicit approval."><span>AI Review</span><span id="aiReviewSidebarCount">0</span></button>
           <button class="sr-sidebar-item" type="button" disabled title="AI suggestions require explicit approval in a later task."><span>AI Suggestions</span><span>Later</span></button>
         </section>
         <section class="sr-sidebar-section" data-mode-panel="develop" hidden>
@@ -110,7 +110,7 @@
             </div>
             <nav class="sr-welcome-footer" aria-label="Welcome links">
               <button type="button" data-welcome-action="Documentation">Documentation</button>
-              <button type="button" data-welcome-action="Keyboard Shortcuts">Keyboard Shortcuts</button>
+              <button type="button" data-open-shortcuts-dialog>Keyboard Shortcuts</button>
               <button type="button" data-open-preferences-dialog>Preferences</button>
             </nav>
           </section>
@@ -1032,6 +1032,10 @@
                 <span>Export</span>
                 <small>Default raster settings</small>
               </button>
+              <button class="sr-preferences-section-button" id="preferencesSectionShortcuts" type="button" role="tab" data-preferences-section="shortcuts" aria-selected="false" aria-controls="preferencesPanelShortcuts">
+                <span>Shortcuts</span>
+                <small>Keys and access</small>
+              </button>
               <button class="sr-preferences-section-button" id="preferencesSectionAdvanced" type="button" role="tab" data-preferences-section="advanced" aria-selected="false" aria-controls="preferencesPanelAdvanced">
                 <span>Advanced</span>
                 <small>Agent access off</small>
@@ -1142,6 +1146,22 @@
                   <input id="preferencesExportDefaultQuality" type="number" min="1" max="100" value="90">
                 </div>
               </section>
+              <section class="sr-preferences-panel" id="preferencesPanelShortcuts" role="tabpanel" data-preferences-panel="shortcuts" aria-labelledby="preferencesPanelShortcutsTitle" hidden>
+                <div class="sr-preferences-panel-header">
+                  <h3 id="preferencesPanelShortcutsTitle">Shortcuts</h3>
+                  <p>Keyboard shortcuts are listed here. Custom remapping is deferred to a later scoped task.</p>
+                </div>
+                <div class="sr-preferences-row">
+                  <label>Open Shortcuts</label>
+                  <button id="preferencesOpenShortcuts" type="button" data-open-shortcuts-dialog>Keyboard Shortcuts...</button>
+                </div>
+                <div class="sr-preferences-row">
+                  <label for="preferencesShortcutRemapping">Custom Remapping</label>
+                  <select id="preferencesShortcutRemapping" disabled>
+                    <option>Unavailable in local alpha</option>
+                  </select>
+                </div>
+              </section>
               <section class="sr-preferences-panel" id="preferencesPanelAdvanced" role="tabpanel" data-preferences-panel="advanced" aria-labelledby="preferencesPanelAdvancedTitle" hidden>
                 <div class="sr-preferences-panel-header">
                   <h3 id="preferencesPanelAdvancedTitle">Advanced</h3>
@@ -1230,6 +1250,41 @@
             <output id="preferencesStatus" aria-live="polite">Appearance settings save automatically. Other sections stay disabled until scoped tasks.</output>
             <button id="closePreferencesDialogFooter" type="button">Close</button>
           </footer>
+        </div>
+      </section>
+
+      <section class="sr-shortcuts-dialog" id="shortcutsDialog" role="dialog" aria-modal="true" aria-labelledby="shortcutsDialogTitle" hidden>
+        <div class="sr-shortcuts-dialog-panel">
+          <header class="sr-shortcuts-dialog-header">
+            <div>
+              <h2 id="shortcutsDialogTitle">Keyboard Shortcuts</h2>
+              <p>Local alpha shortcuts and access paths</p>
+            </div>
+            <button class="sr-icon-button" id="closeShortcutsDialog" type="button" aria-label="Close keyboard shortcuts dialog">x</button>
+          </header>
+          <div class="sr-shortcuts-dialog-body">
+            <section>
+              <h3>Global</h3>
+              <dl class="sr-shortcut-list">
+                <div><dt>Esc</dt><dd>Close the top dialog or panel. If none is open, clear grid multi-select.</dd></div>
+                <div><dt>?</dt><dd>Open this shortcuts window.</dd></div>
+                <div><dt>Command + ,</dt><dd>Open Preferences.</dd></div>
+              </dl>
+            </section>
+            <section>
+              <h3>Library Grid</h3>
+              <dl class="sr-shortcut-list">
+                <div><dt>Arrow keys</dt><dd>Move selection in the current grid page.</dd></div>
+                <div><dt>Space</dt><dd>Toggle the selected photo in the multi-select set.</dd></div>
+                <div><dt>Enter</dt><dd>Open the selected photo in Loupe.</dd></div>
+                <div><dt>Home / End</dt><dd>Move to the first or last visible grid item.</dd></div>
+              </dl>
+            </section>
+            <section class="sr-shortcuts-disabled">
+              <h3>Custom Remapping</h3>
+              <p>Shortcut remapping is disabled in the local alpha. A later app-session preference task must define persistence before custom key bindings are editable.</p>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -1362,6 +1417,7 @@
       const importIssueReview = document.querySelector("#importIssueReview");
       const importIssueReviewSummary = document.querySelector("#importIssueReviewSummary");
       const importIssueList = document.querySelector("#importIssueList");
+      const importPanel = document.querySelector("#importPanel");
       const libraryGrid = document.querySelector("#libraryGrid");
       const librarySurfaceHeader = document.querySelector("#librarySurfaceHeader");
       const libraryAllPhotosNav = document.querySelector("#libraryAllPhotosNav");
@@ -1628,6 +1684,7 @@
       const developUndoHistory = document.querySelector("#developUndoHistory");
       const developRedoHistory = document.querySelector("#developRedoHistory");
       const preferencesDialog = document.querySelector("#preferencesDialog");
+      const openPreferencesButton = document.querySelector("#openPreferences");
       const preferencesOpenButtons = Array.from(document.querySelectorAll("[data-open-preferences-dialog]"));
       const closePreferencesDialogButton = document.querySelector("#closePreferencesDialog");
       const closePreferencesDialogFooterButton = document.querySelector("#closePreferencesDialogFooter");
@@ -1650,6 +1707,9 @@
       const preferencesColorProfilePolicy = document.querySelector("#preferencesColorProfilePolicy");
       const preferencesExportDefaultFormat = document.querySelector("#preferencesExportDefaultFormat");
       const preferencesExportDefaultQuality = document.querySelector("#preferencesExportDefaultQuality");
+      const shortcutsDialog = document.querySelector("#shortcutsDialog");
+      const shortcutsOpenButtons = Array.from(document.querySelectorAll("[data-open-shortcuts-dialog]"));
+      const closeShortcutsDialogButton = document.querySelector("#closeShortcutsDialog");
       const exportDialog = document.querySelector("#exportDialog");
       const openExportDialogButton = document.querySelector("#openExportDialog");
       const exportDialogButtons = Array.from(document.querySelectorAll("[data-open-export-dialog]"));
@@ -1761,6 +1821,9 @@
       let lastImportIssues = [];
       let aiReviewCurrentPanel = null;
       let aiReviewSelectedResultId = "";
+      let preferencesDialogReturnFocus = null;
+      let shortcutsDialogReturnFocus = null;
+      let exportDialogReturnFocus = null;
       const developAdjustmentsByPhoto = new Map();
       const thumbnailObjectUrls = new Map();
       const pageThumbnailObjectUrls = new Map();
@@ -1976,6 +2039,16 @@
       function closeImportIssueReview() {
         importIssueReview.hidden = true;
         viewImportErrorsButton.setAttribute("aria-expanded", "false");
+      }
+
+      function openImportPanel() {
+        importPanel.hidden = false;
+        setStatus("Import panel ready.");
+      }
+
+      function closeImportPanel() {
+        importPanel.hidden = true;
+        setStatus("Import panel minimized.");
       }
 
       function clampThumbnailSize(value) {
@@ -5367,6 +5440,8 @@
             preferencesStatus.value = activeLibraryPath
               ? "Export defaults save to the active library and update the export dialog."
               : "Open a library to edit export defaults.";
+          } else if (selectedSection === "shortcuts") {
+            preferencesStatus.value = "Keyboard shortcuts are listed here; custom remapping is not enabled in the local alpha.";
           } else if (selectedSection === "advanced") {
             preferencesStatus.value = "Advanced access remains off until permission prompts and action-log integration exist.";
           } else {
@@ -5375,7 +5450,29 @@
         }
       }
 
+      function isHiddenFromFocus(target) {
+        let element = target;
+        while (element && element !== document.body) {
+          if (element.hidden || element.getAttribute("aria-hidden") === "true") {
+            return true;
+          }
+          element = element.parentElement;
+        }
+        return false;
+      }
+
+      function restoreFocus(target, fallback = null) {
+        const focusTarget = target && document.contains(target) && !isHiddenFromFocus(target) ? target : fallback;
+        if (focusTarget && typeof focusTarget.focus === "function") {
+          focusTarget.focus({ preventScroll: true });
+        }
+      }
+
       function openPreferencesDialog() {
+        if (!preferencesDialog.hidden || !shortcutsDialog.hidden || !exportDialog.hidden || !importIssueReview.hidden) {
+          return;
+        }
+        preferencesDialogReturnFocus = document.activeElement;
         const selectedButton = preferencesSectionButtons.find((button) => button.getAttribute("aria-selected") === "true")
           || preferencesSectionButtons[0];
         setPreferencesSection(selectedButton?.dataset.preferencesSection ?? "appearance");
@@ -5386,10 +5483,33 @@
 
       function closePreferencesDialog() {
         preferencesDialog.hidden = true;
+        restoreFocus(preferencesDialogReturnFocus, openPreferencesButton);
+        preferencesDialogReturnFocus = null;
         setStatus("Preferences closed.");
       }
 
+      function openShortcutsDialog() {
+        if (!shortcutsDialog.hidden) {
+          return;
+        }
+        shortcutsDialogReturnFocus = document.activeElement;
+        shortcutsDialog.hidden = false;
+        closeShortcutsDialogButton.focus();
+        setStatus("Keyboard shortcuts opened.");
+      }
+
+      function closeShortcutsDialog() {
+        shortcutsDialog.hidden = true;
+        restoreFocus(shortcutsDialogReturnFocus, openPreferencesButton);
+        shortcutsDialogReturnFocus = null;
+        setStatus("Keyboard shortcuts closed.");
+      }
+
       function openExportDialog() {
+        if (!exportDialog.hidden || !shortcutsDialog.hidden || !preferencesDialog.hidden || !importIssueReview.hidden) {
+          return;
+        }
+        exportDialogReturnFocus = document.activeElement;
         syncExportDialog();
         void loadRecentExports();
         exportDialog.hidden = false;
@@ -5398,7 +5518,70 @@
 
       function closeExportDialog() {
         exportDialog.hidden = true;
+        restoreFocus(exportDialogReturnFocus, openExportDialogButton);
+        exportDialogReturnFocus = null;
         setStatus("Export dialog closed.");
+      }
+
+      function isTextEntryTarget(target) {
+        const tagName = target?.tagName?.toLowerCase();
+        return tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable;
+      }
+
+      function dismissTopSurface() {
+        if (!shortcutsDialog.hidden) {
+          closeShortcutsDialog();
+          return true;
+        }
+        if (!preferencesDialog.hidden) {
+          closePreferencesDialog();
+          return true;
+        }
+        if (!exportDialog.hidden) {
+          closeExportDialog();
+          return true;
+        }
+        if (!importIssueReview.hidden) {
+          closeImportIssueReview();
+          restoreFocus(viewImportErrorsButton);
+          setStatus("Import issue review closed.");
+          return true;
+        }
+        if (!importPanel.hidden) {
+          closeImportPanel();
+          restoreFocus(showImportPanelButton);
+          return true;
+        }
+        if (!loupeSurface.hidden) {
+          closeLoupeView();
+          restoreFocus(openLoupeButton, libraryGrid);
+          return true;
+        }
+        if (!aiReviewSurface.hidden) {
+          closeAiReviewView();
+          restoreFocus(openAiReviewButton, libraryGrid);
+          return true;
+        }
+        return false;
+      }
+
+      function handleGlobalKeydown(event) {
+        if (event.key === "Escape") {
+          if (dismissTopSurface()) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return;
+        }
+        if (event.metaKey && event.key === ",") {
+          event.preventDefault();
+          openPreferencesDialog();
+          return;
+        }
+        if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey && !isTextEntryTarget(event.target)) {
+          event.preventDefault();
+          openShortcutsDialog();
+        }
       }
 
       async function runBatchExport() {
@@ -6742,7 +6925,7 @@
           setStatus("No photo selected.");
           return;
         }
-        document.querySelector("#importPanel").hidden = true;
+        importPanel.hidden = true;
         libraryGridShell.hidden = true;
         aiReviewSurface.hidden = true;
         loupeSurface.hidden = false;
@@ -6939,7 +7122,7 @@
       }
 
       async function openAiReviewView() {
-        document.querySelector("#importPanel").hidden = true;
+        importPanel.hidden = true;
         loupeSurface.hidden = true;
         libraryGridShell.hidden = true;
         setLibraryWorkbenchChromeVisible(false);
@@ -7589,6 +7772,9 @@
       preferencesOpenButtons.forEach((button) => {
         button.addEventListener("click", openPreferencesDialog);
       });
+      shortcutsOpenButtons.forEach((button) => {
+        button.addEventListener("click", openShortcutsDialog);
+      });
       preferencesSectionButtons.forEach((button) => {
         button.addEventListener("click", () => setPreferencesSection(button.dataset.preferencesSection));
       });
@@ -7616,6 +7802,7 @@
       });
       closePreferencesDialogButton.addEventListener("click", closePreferencesDialog);
       closePreferencesDialogFooterButton.addEventListener("click", closePreferencesDialog);
+      closeShortcutsDialogButton.addEventListener("click", closeShortcutsDialog);
       openExportDialogButton.addEventListener("click", openExportDialog);
       exportDialogButtons.forEach((button) => {
         button.addEventListener("click", openExportDialog);
@@ -7699,14 +7886,8 @@
           void loadLibraryGrid({ offset: 0 });
         });
       });
-      showImportPanelButton.addEventListener("click", () => {
-        document.querySelector("#importPanel").hidden = false;
-        setStatus("Import panel ready.");
-      });
-      minimizeImportButton.addEventListener("click", () => {
-        document.querySelector("#importPanel").hidden = true;
-        setStatus("Import panel minimized.");
-      });
+      showImportPanelButton.addEventListener("click", openImportPanel);
+      minimizeImportButton.addEventListener("click", closeImportPanel);
       openRecentButton.addEventListener("click", () => openRecentLibrary());
       openAiReviewButton.addEventListener("click", () => void openAiReviewView());
       aiReviewBackToGridButton.addEventListener("click", closeAiReviewView);
@@ -7717,6 +7898,7 @@
           setStatus(`${button.dataset.welcomeAction} will be wired after the local alpha runtime loop is complete.`);
         });
       });
+      document.addEventListener("keydown", handleGlobalKeydown, true);
       statusActionButtons.forEach((button) => {
         button.addEventListener("click", () => {
           setStatus(`${button.dataset.statusAction} are deferred for this local alpha.`);

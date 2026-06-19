@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-16
+updated: 2026-06-19
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-19] blocked-beta | UI hardening route added
+
+- Added the blocked public beta UI hardening plan for sidebar hierarchy, responsive breakpoints, Escape dismissal, and shortcuts discoverability.
+- Routed current LLM context to this blocked-gate hardening path while Task 27.2 remains externally blocked by signing/notarization prerequisites.
+- Kept this work separate from public beta release-candidate claims.
 
 ## [2026-06-16] phase-19 | Mask editor visual QA completed
 
