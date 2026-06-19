@@ -343,12 +343,14 @@ def main():
         "preferencesSectionCache",
         "preferencesSectionColor",
         "preferencesSectionExport",
+        "preferencesSectionShortcuts",
         "preferencesSectionAdvanced",
         "preferencesPanelAppearance",
         "preferencesPanelLibrary",
         "preferencesPanelCache",
         "preferencesPanelColor",
         "preferencesPanelExport",
+        "preferencesPanelShortcuts",
         "preferencesPanelAdvanced",
         "preferencesAppearanceTheme",
         "preferencesAppearanceDensity",
@@ -365,6 +367,8 @@ def main():
         "preferencesColorProfilePolicy",
         "preferencesExportDefaultFormat",
         "preferencesExportDefaultQuality",
+        "preferencesOpenShortcuts",
+        "preferencesShortcutRemapping",
         "preferencesAdvancedAgentAccess",
         "preferencesAdvancedMcpAccess",
         "preferencesAdvancedPluginRuntime",
@@ -383,6 +387,9 @@ def main():
         "pluginPermissionDenyEvidence",
         "pluginPermissionNoSql",
         "preferencesStatus",
+        "shortcutsDialog",
+        "shortcutsDialogTitle",
+        "closeShortcutsDialog",
         "openExportDialog",
         "exportDialog",
         "closeExportDialog",
@@ -512,6 +519,9 @@ def main():
             ".sr-preferences-dialog-panel",
             ".sr-preferences-section-list",
             ".sr-preferences-pane",
+            ".sr-shortcuts-dialog",
+            ".sr-shortcuts-dialog-panel",
+            ".sr-shortcut-list",
             ".sr-export-dialog",
             ".sr-export-dialog-panel",
             ".sr-ai-review-surface",
@@ -524,6 +534,27 @@ def main():
         require(
             re.search(r"#[0-9a-fA-F]{3,8}|rgba?\(", css) is None,
             "app-frame.css must consume color tokens instead of raw color literals",
+            failures,
+        )
+        require(
+            "--sr-sidebar-width: 240px;" in css,
+            "desktop sidebar must default to readable text width",
+            failures,
+        )
+        require(
+            "@media (max-width: 1023px)" in css and "--sr-sidebar-width: 64px;" in css,
+            "icon rail sidebar must be limited to the true compact breakpoint",
+            failures,
+        )
+        compact_toolbar_media = ""
+        if "@media (max-width: 1279px)" in css and "@media (max-width: 1023px)" in css:
+            compact_toolbar_media = css.split("@media (max-width: 1279px)", 1)[1].split(
+                "@media (max-width: 1023px)", 1
+            )[0]
+        require(
+            ".sr-sidebar-item span" not in compact_toolbar_media
+            and ".sr-preset-row span:last-child" not in compact_toolbar_media,
+            "1279px toolbar compaction must not hide desktop sidebar text",
             failures,
         )
 
@@ -558,9 +589,15 @@ def main():
     )
     for section in ["Appearance", "Library", "Cache", "Color", "Export", "Advanced"]:
         require(section in source, f"preferences IA must expose {section}", failures)
+    require("Shortcuts" in source, "preferences IA must expose Shortcuts", failures)
     for marker in [
         "function openPreferencesDialog",
         "function closePreferencesDialog",
+        "function openShortcutsDialog",
+        "function closeShortcutsDialog",
+        "function handleGlobalKeydown",
+        "function dismissTopSurface",
+        "function isHiddenFromFocus",
         "function setPreferencesSection",
         "function normalizeAppearancePreferences",
         "function applyAppearancePreferences",
@@ -668,6 +705,41 @@ def main():
         "Display P3 is JPEG-only",
     ]:
         require(marker in source, f"color/export preference marker missing: {marker}", failures)
+    shortcuts_dialog = parser.ids.get("shortcutsDialog", {})
+    require(
+        shortcuts_dialog.get("role") == "dialog"
+        and shortcuts_dialog.get("aria-modal") == "true"
+        and "hidden" in shortcuts_dialog,
+        "#shortcutsDialog must be a hidden modal dialog by default",
+        failures,
+    )
+    require(
+        "data-open-shortcuts-dialog" in source
+        and "Keyboard Shortcuts..." in source
+        and "Command + ," in source
+        and "Shortcut remapping is disabled in the local alpha" in source,
+        "shortcuts surface must be discoverable, document active keys, and keep remapping disabled",
+        failures,
+    )
+    require(
+        "event.key === \"Escape\"" in source
+        and "event.key === \"?\"" in source
+        and "event.metaKey && event.key === \",\"" in source,
+        "global keyboard handler must cover Escape, ?, and Command-comma",
+        failures,
+    )
+    require(
+        "function openPreferencesDialog() {\n        if (!preferencesDialog.hidden" in source
+        and "function openShortcutsDialog() {\n        if (!shortcutsDialog.hidden" in source
+        and "function openExportDialog() {\n        if (!exportDialog.hidden" in source,
+        "dialog open helpers must no-op when their surface is already open",
+        failures,
+    )
+    require(
+        "target && document.contains(target) && !isHiddenFromFocus(target)" in source,
+        "focus restore must reject hidden modal descendants before falling back",
+        failures,
+    )
     for control_id in [
         "preferencesColorProfilePolicy",
         "preferencesAdvancedAgentAccess",
