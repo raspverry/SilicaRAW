@@ -48,8 +48,13 @@ body {
   --sr-inspector-width: 0px;
 }
 
+.app-frame[data-ai-review-active="true"] {
+  --sr-inspector-width: 0px;
+}
+
 .app-frame[data-sidebar-collapsed="true"] .sr-sidebar,
-.app-frame[data-inspector-collapsed="true"] .sr-inspector {
+.app-frame[data-inspector-collapsed="true"] .sr-inspector,
+.app-frame[data-ai-review-active="true"] .sr-inspector {
   display: none;
 }
 
@@ -3196,7 +3201,7 @@ progress::-webkit-progress-value {
   min-height: 42px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: var(--sr-space-sm);
   padding: var(--sr-space-xs) var(--sr-space-sm);
   text-align: left;
@@ -3211,9 +3216,10 @@ progress::-webkit-progress-value {
 .sr-mask-row-main span,
 .sr-mask-row-main small {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .sr-mask-row-main small {

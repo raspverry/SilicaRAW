@@ -709,6 +709,7 @@ def state_script(state):
 
   function setAiReviewState(approvalEnabled = false) {{
     openLibraryBase(true);
+    app.dataset.aiReviewActive = "true";
     gridShell.hidden = true;
     libraryHeader.hidden = true;
     cacheMaintenance.hidden = true;
@@ -752,6 +753,7 @@ def state_script(state):
 
   function openLibraryBase(withPhotos = true) {{
     setMode("library");
+    app.dataset.aiReviewActive = "false";
     setLibraryState("open");
     importPanel.hidden = true;
     loupeSurface.hidden = true;
@@ -1354,6 +1356,7 @@ def metric_script(surface):
     exportDialogWithinViewport: !dialog || (dialog.left >= 0 && dialog.right <= innerWidth && dialog.top >= 0 && dialog.bottom <= innerHeight),
     activeMode: app.dataset.activeMode,
     libraryState: app.dataset.libraryState,
+    aiReviewActive: app.dataset.aiReviewActive,
     sidebarCollapsed: app.dataset.sidebarCollapsed,
     inspectorCollapsed: app.dataset.inspectorCollapsed,
     filmstripVisible: app.dataset.filmstripVisible,
@@ -1722,6 +1725,8 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: history status wrong")
                 if state in {"ai-review", "ai-approval"}:
                     ai_review = metrics["aiReviewState"]
+                    if metrics["aiReviewActive"] != "true" or metrics["inspectorVisible"]:
+                        failures.append(f"{viewport_name} {surface_name}: AI review should replace the generic inspector rail")
                     if not ai_review["visible"] or ai_review["panelState"] != "review-available":
                         failures.append(f"{viewport_name} {surface_name}: AI review panel state not visible")
                     if ai_review["selectedPhoto"] != "Selected photo: synthetic-gradient.jpg":
