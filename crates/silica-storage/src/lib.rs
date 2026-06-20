@@ -1408,6 +1408,7 @@ pub fn list_library_photos(
           photos.path,
           photos.missing,
           photos.unsupported,
+          photos.file_type,
           photo_flags.rating,
           photo_flags.picked,
           photo_flags.rejected,
@@ -1885,17 +1886,18 @@ pub fn get_photo_preview_candidate(
     connection
         .query_row(
             r#"
-            SELECT id, file_name, path, unsupported
+            SELECT id, file_name, path, unsupported, file_type
             FROM photos
             WHERE id = ?1
             "#,
             params![photo_id],
             |row| {
+                let file_type: String = row.get(4)?;
                 Ok(PhotoPreviewCandidate {
                     photo_id: row.get(0)?,
                     file_name: row.get(1)?,
                     path: row.get(2)?,
-                    unsupported: sql_to_bool(row.get::<_, i64>(3)?),
+                    unsupported: sql_to_bool(row.get::<_, i64>(3)?) || file_type != "jpeg",
                 })
             },
         )
@@ -4608,35 +4610,38 @@ fn library_photo_grid_item_from_row(
         .and_then(|value| value.to_str())
         .unwrap_or("")
         .to_ascii_uppercase();
-    let rating = u8::try_from(row.get::<_, Option<i64>>(5)?.unwrap_or(0))
+    let catalog_file_type: String = row.get(5)?;
+    let rating = u8::try_from(row.get::<_, Option<i64>>(6)?.unwrap_or(0))
         .unwrap_or(0)
         .min(ALPHA_MAX_RATING);
+    let unsupported = sql_to_bool(row.get::<_, i64>(4)?) || catalog_file_type != "jpeg";
 
     Ok(LibraryPhotoGridItem {
         photo_id,
         file_name,
         path,
         file_type,
-        thumbnail_path: row.get(9)?,
-        thumbnail_cache_key: row.get(10)?,
+        thumbnail_path: row.get(10)?,
+        thumbnail_cache_key: row.get(11)?,
         missing: sql_to_bool(row.get::<_, i64>(3)?),
-        unsupported: sql_to_bool(row.get::<_, i64>(4)?),
+        unsupported,
         rating,
-        picked: sql_to_bool(row.get::<_, Option<i64>>(6)?.unwrap_or(0)),
-        rejected: sql_to_bool(row.get::<_, Option<i64>>(7)?.unwrap_or(0)),
-        color_label: row.get(8)?,
+        picked: sql_to_bool(row.get::<_, Option<i64>>(7)?.unwrap_or(0)),
+        rejected: sql_to_bool(row.get::<_, Option<i64>>(8)?.unwrap_or(0)),
+        color_label: row.get(9)?,
     })
 }
 
 fn photo_metadata_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoMetadata> {
-    let unsupported = sql_to_bool(row.get::<_, i64>(4)?);
+    let file_type: String = row.get(3)?;
+    let unsupported = sql_to_bool(row.get::<_, i64>(4)?) || file_type != "jpeg";
     let metadata_present = row.get::<_, i64>(7)? != 0;
 
     Ok(PhotoMetadata {
         photo_id: row.get(0)?,
         file_name: row.get(1)?,
         source_path: row.get(2)?,
-        file_type: row.get(3)?,
+        file_type,
         unsupported,
         file_size: PhotoMetadataField::known(row.get(5)?),
         modified_at: match row.get(6)? {
@@ -5497,37 +5502,12 @@ SET file_type = CASE
     OR lower(path) GLOB '*.jpg'
     OR lower(path) GLOB '*.jpeg'
     THEN 'jpeg'
-  WHEN lower(file_name) GLOB '*.dng'
-    OR lower(file_name) GLOB '*.cr2'
-    OR lower(file_name) GLOB '*.cr3'
-    OR lower(file_name) GLOB '*.nef'
-    OR lower(file_name) GLOB '*.arw'
-    OR lower(file_name) GLOB '*.raf'
-    OR lower(file_name) GLOB '*.orf'
-    OR lower(file_name) GLOB '*.rw2'
-    OR lower(file_name) GLOB '*.pef'
-    OR lower(file_name) GLOB '*.srw'
-    OR lower(file_name) GLOB '*.raw'
-    OR lower(file_name) GLOB '*.tif'
-    OR lower(file_name) GLOB '*.tiff'
-    OR lower(file_name) GLOB '*.heic'
-    OR lower(path) GLOB '*.dng'
-    OR lower(path) GLOB '*.cr2'
-    OR lower(path) GLOB '*.cr3'
-    OR lower(path) GLOB '*.nef'
-    OR lower(path) GLOB '*.arw'
-    OR lower(path) GLOB '*.raf'
-    OR lower(path) GLOB '*.orf'
-    OR lower(path) GLOB '*.rw2'
-    OR lower(path) GLOB '*.pef'
-    OR lower(path) GLOB '*.srw'
-    OR lower(path) GLOB '*.raw'
-    OR lower(path) GLOB '*.tif'
-    OR lower(path) GLOB '*.tiff'
-    OR lower(path) GLOB '*.heic'
-    THEN 'raw'
   ELSE 'unsupported'
 END;
+
+UPDATE photos
+SET unsupported = 1
+WHERE file_type = 'unsupported';
 
 CREATE INDEX IF NOT EXISTS idx_photos_library_imported_id
   ON photos(library_id, imported_at DESC, id ASC);
@@ -5799,7 +5779,12 @@ WHERE photos.library_id = :library_id
   AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
   AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
   AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
-  AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :file_type IS NULL
+    OR (:file_type = 'jpeg' AND photos.file_type = 'jpeg' AND photos.unsupported = 0)
+    OR (:file_type = 'raw' AND photos.file_type = 'raw')
+    OR (:file_type = 'unsupported' AND (photos.unsupported = 1 OR photos.file_type <> 'jpeg'))
+  )
   AND (
     :metadata_filter IS NULL
     OR (
@@ -5822,6 +5807,7 @@ SELECT
   photos.path,
   photos.missing,
   photos.unsupported,
+  photos.file_type,
   photo_flags.rating,
   photo_flags.picked,
   photo_flags.rejected,
@@ -5838,7 +5824,12 @@ WHERE photos.library_id = :library_id
   AND (:min_rating IS NULL OR COALESCE(photo_flags.rating, 0) >= :min_rating)
   AND (:picked IS NULL OR COALESCE(photo_flags.picked, 0) = :picked)
   AND (:rejected IS NULL OR COALESCE(photo_flags.rejected, 0) = :rejected)
-  AND (:file_type IS NULL OR photos.file_type = :file_type)
+  AND (
+    :file_type IS NULL
+    OR (:file_type = 'jpeg' AND photos.file_type = 'jpeg' AND photos.unsupported = 0)
+    OR (:file_type = 'raw' AND photos.file_type = 'raw')
+    OR (:file_type = 'unsupported' AND (photos.unsupported = 1 OR photos.file_type <> 'jpeg'))
+  )
   AND (
     :metadata_filter IS NULL
     OR (
@@ -6392,19 +6383,20 @@ mod tests {
 
         run_migrations(&mut connection).expect("upgrade to current");
 
-        for (id, expected) in [
-            ("photo-jpeg", "jpeg"),
-            ("photo-raw", "raw"),
-            ("photo-unsupported", "unsupported"),
+        for (id, expected_type, expected_unsupported) in [
+            ("photo-jpeg", "jpeg", 0_i64),
+            ("photo-raw", "unsupported", 1_i64),
+            ("photo-unsupported", "unsupported", 1_i64),
         ] {
-            let actual: String = connection
+            let (actual_type, actual_unsupported): (String, i64) = connection
                 .query_row(
-                    "SELECT file_type FROM photos WHERE id = ?1",
+                    "SELECT file_type, unsupported FROM photos WHERE id = ?1",
                     params![id],
-                    |row| row.get(0),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .expect("file type");
-            assert_eq!(actual, expected);
+            assert_eq!(actual_type, expected_type);
+            assert_eq!(actual_unsupported, expected_unsupported);
         }
     }
 
@@ -6414,19 +6406,36 @@ mod tests {
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
         let jpeg_file = import_root.join("portrait.jpg");
-        let raw_file = import_root.join("sample.DNG");
+        let unsupported_source_file = import_root.join("sample.DNG");
         let unsupported_file = import_root.join("notes.txt");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
         std::fs::write(&jpeg_file, b"jpeg candidate").expect("write jpeg");
-        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+        std::fs::write(&unsupported_source_file, b"raw candidate").expect("write raw");
         std::fs::write(&unsupported_file, b"unsupported").expect("write unsupported");
 
         let library = create_local_library(&library_root).expect("create library");
         import_folder(&library.root_path, &import_root).expect("import folder");
-        let raw_id = stable_catalog_id("photo", &raw_file.display().to_string());
-        set_photo_flags(&library.root_path, raw_id.clone(), 4, true, false, None)
-            .expect("set raw flags");
+        let unsupported_source_id =
+            stable_catalog_id("photo", &unsupported_source_file.display().to_string());
+        {
+            let connection = open_catalog(&library.catalog_path).expect("open catalog");
+            connection
+                .execute(
+                    "UPDATE photos SET file_type = 'raw', unsupported = 0 WHERE id = ?1",
+                    params![unsupported_source_id],
+                )
+                .expect("simulate legacy raw-supported row");
+        }
+        set_photo_flags(
+            &library.root_path,
+            unsupported_source_id.clone(),
+            4,
+            true,
+            false,
+            None,
+        )
+        .expect("set unsupported source flags");
 
         let first_page = query_library_photos(
             &library.root_path,
@@ -6451,7 +6460,7 @@ mod tests {
         assert_eq!(first_page.items[0].file_name, "notes.txt");
         assert_eq!(first_page.items[1].file_name, "portrait.jpg");
 
-        let raw_page = query_library_photos(
+        let unsupported_source_page = query_library_photos(
             &library.root_path,
             LibraryQueryRequest::new(
                 0,
@@ -6461,19 +6470,23 @@ mod tests {
                     min_rating: Some(4),
                     picked: Some(true),
                     rejected: Some(false),
-                    file_type: Some(LibraryQueryFileType::Raw),
+                    file_type: Some(LibraryQueryFileType::Unsupported),
                     search: "sample".to_string(),
                     ..LibraryQueryFilters::default()
                 },
             ),
         )
         .expect("query filtered page");
-        assert_eq!(raw_page.total_count, 1);
-        assert_eq!(raw_page.items.len(), 1);
-        assert_eq!(raw_page.items[0].photo_id, raw_id);
-        assert_eq!(raw_page.items[0].rating, 4);
-        assert!(raw_page.items[0].picked);
-        assert!(!raw_page.has_next_page);
+        assert_eq!(unsupported_source_page.total_count, 1);
+        assert_eq!(unsupported_source_page.items.len(), 1);
+        assert_eq!(
+            unsupported_source_page.items[0].photo_id,
+            unsupported_source_id
+        );
+        assert_eq!(unsupported_source_page.items[0].rating, 4);
+        assert!(unsupported_source_page.items[0].picked);
+        assert!(unsupported_source_page.items[0].unsupported);
+        assert!(!unsupported_source_page.has_next_page);
 
         let empty_page = query_library_photos(
             &library.root_path,
@@ -7985,26 +7998,35 @@ mod tests {
         let workspace = unique_library_root("import");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
-        let supported_file = import_root.join("sample.DNG");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_raw_file = import_root.join("sample.DNG");
         let unsupported_file = import_root.join("notes.txt");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        std::fs::write(&supported_file, b"supported jpeg candidate").expect("write supported");
+        std::fs::write(&unsupported_raw_file, b"unsupported raw candidate")
+            .expect("write unsupported raw");
         std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
         let supported_before = std::fs::read(&supported_file).expect("read supported before");
+        let unsupported_raw_before =
+            std::fs::read(&unsupported_raw_file).expect("read unsupported raw before");
         let unsupported_before = std::fs::read(&unsupported_file).expect("read unsupported before");
 
         let library = create_local_library(&library_root).expect("create library");
         let summary = import_folder(&library.root_path, &import_root).expect("import folder");
 
-        assert_eq!(summary.scanned_files, 2);
+        assert_eq!(summary.scanned_files, 3);
         assert_eq!(summary.supported_files, 1);
-        assert_eq!(summary.unsupported_files, 1);
-        assert_eq!(summary.candidates.len(), 2);
+        assert_eq!(summary.unsupported_files, 2);
+        assert_eq!(summary.candidates.len(), 3);
         assert!(summary
             .candidates
             .iter()
-            .any(|candidate| candidate.file_name == "sample.DNG" && !candidate.unsupported));
+            .any(|candidate| candidate.file_name == "sample.jpg" && !candidate.unsupported));
+        assert!(summary
+            .candidates
+            .iter()
+            .any(|candidate| candidate.file_name == "sample.DNG" && candidate.unsupported));
         assert!(summary
             .candidates
             .iter()
@@ -8014,7 +8036,7 @@ mod tests {
         let imported_count: i64 = connection
             .query_row("SELECT COUNT(*) FROM photos", [], |row| row.get(0))
             .expect("count photos");
-        assert_eq!(imported_count, 2);
+        assert_eq!(imported_count, 3);
 
         let (path, file_size, unsupported, file_type, partial_hash): (
             String,
@@ -8024,7 +8046,7 @@ mod tests {
             String,
         ) = connection
             .query_row(
-                "SELECT path, file_size, unsupported, file_type, partial_hash FROM photos WHERE file_name = 'sample.DNG'",
+                "SELECT path, file_size, unsupported, file_type, partial_hash FROM photos WHERE file_name = 'sample.jpg'",
                 [],
                 |row| {
                     Ok((
@@ -8040,8 +8062,18 @@ mod tests {
         assert_eq!(path, supported_file.display().to_string());
         assert_eq!(file_size, supported_before.len() as i64);
         assert_eq!(unsupported, 0);
-        assert_eq!(file_type, "raw");
+        assert_eq!(file_type, "jpeg");
         assert!(!partial_hash.is_empty());
+
+        let (unsupported, file_type): (i64, String) = connection
+            .query_row(
+                "SELECT unsupported, file_type FROM photos WHERE file_name = 'sample.DNG'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("unsupported raw row");
+        assert_eq!(unsupported, 1);
+        assert_eq!(file_type, "unsupported");
 
         let (unsupported, file_type): (i64, String) = connection
             .query_row(
@@ -8058,9 +8090,14 @@ mod tests {
             supported_before
         );
         assert_eq!(
+            std::fs::read(&unsupported_raw_file).expect("read unsupported raw after"),
+            unsupported_raw_before
+        );
+        assert_eq!(
             std::fs::read(&unsupported_file).expect("read unsupported after"),
             unsupported_before
         );
+        assert!(!library_root.join("sample.jpg").exists());
         assert!(!library_root.join("sample.DNG").exists());
         assert!(!library_root.join("notes.txt").exists());
 
@@ -8261,12 +8298,12 @@ mod tests {
         let workspace = unique_library_root("grid-items");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
-        let supported_file = import_root.join("sample.DNG");
-        let unsupported_file = import_root.join("notes.txt");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("sample.DNG");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
-        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        std::fs::write(&supported_file, b"supported jpeg candidate").expect("write supported");
+        std::fs::write(&unsupported_file, b"unsupported raw candidate").expect("write unsupported");
 
         let library = create_local_library(&library_root).expect("create library");
         import_folder(&library.root_path, &import_root).expect("import folder");
@@ -8287,10 +8324,10 @@ mod tests {
         assert_eq!(items.len(), 2);
         let supported = items
             .iter()
-            .find(|item| item.file_name == "sample.DNG")
+            .find(|item| item.file_name == "sample.jpg")
             .expect("supported grid item");
         assert_eq!(supported.photo_id, supported_id);
-        assert_eq!(supported.file_type, "DNG");
+        assert_eq!(supported.file_type, "JPG");
         assert_eq!(supported.rating, 4);
         assert!(supported.picked);
         assert!(!supported.rejected);
@@ -8300,9 +8337,9 @@ mod tests {
 
         let unsupported = items
             .iter()
-            .find(|item| item.file_name == "notes.txt")
+            .find(|item| item.file_name == "sample.DNG")
             .expect("unsupported grid item");
-        assert_eq!(unsupported.file_type, "TXT");
+        assert_eq!(unsupported.file_type, "DNG");
         assert!(unsupported.unsupported);
         assert_eq!(unsupported.rating, 0);
 
@@ -8917,10 +8954,12 @@ mod tests {
         let import_root = workspace.join("Originals");
         let supported_file = import_root.join("sample.jpg");
         let unsupported_file = import_root.join("notes.txt");
+        let legacy_raw_file = import_root.join("legacy.DNG");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
         std::fs::write(&supported_file, b"jpeg placeholder bytes").expect("write supported");
         std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        std::fs::write(&legacy_raw_file, b"legacy raw placeholder").expect("write legacy raw");
 
         let library = create_local_library(&library_root).expect("create library");
         import_folder(&library.root_path, &import_root).expect("import folder");
@@ -8940,6 +8979,19 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("unsupported photo id");
+        let legacy_raw_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'legacy.DNG'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("legacy raw photo id");
+        connection
+            .execute(
+                "UPDATE photos SET file_type = 'raw', unsupported = 0 WHERE id = ?1",
+                params![legacy_raw_id],
+            )
+            .expect("simulate legacy raw-supported preview row");
 
         let supported = get_photo_preview_candidate(&library.root_path, &supported_id)
             .expect("read supported preview candidate")
@@ -8954,6 +9006,12 @@ mod tests {
             .expect("unsupported preview candidate");
         assert_eq!(unsupported.file_name, "notes.txt");
         assert!(unsupported.unsupported);
+
+        let legacy_raw = get_photo_preview_candidate(&library.root_path, &legacy_raw_id)
+            .expect("read legacy raw preview candidate")
+            .expect("legacy raw preview candidate");
+        assert_eq!(legacy_raw.file_name, "legacy.DNG");
+        assert!(legacy_raw.unsupported);
 
         assert!(
             get_photo_preview_candidate(&library.root_path, "missing-photo")

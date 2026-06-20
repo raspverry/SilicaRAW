@@ -368,7 +368,7 @@ cargo tauri build --bundles app,dmg --ci --no-sign
   - Decoder assumptions are documented.
 - **Validation:** Manual preview test with fixture classes.
 
-**Status:** Completed on 2026-06-08 as the minimal preview path contract. Raster candidates such as JPEG return a ready preview status by reference, unsupported catalog entries return a clear unsupported state, and RAW candidates return a Core Image RAW blocked state until fixture-backed probe coverage exists. The product Metal viewer, RAW decoding, color correctness proof, and M004/M005 UI screens remain later explicit tasks.
+**Status:** Completed on 2026-06-08 as the minimal preview path contract. Q1.1 later narrows the installed-alpha product route to JPEG/JPG source rows only: RAW, PNG, TIFF, HEIC, database, sidecar-like, and other unsupported rows return clear unsupported states unless a later task adds end-to-end codec evidence. The product Metal viewer, RAW decoding, color correctness proof, and M004/M005 UI screens remain later explicit tasks.
 
 ### Task 5.2: Implement Edit Graph Types and Validation
 
@@ -491,12 +491,12 @@ cargo tauri build --bundles app,dmg --ci --no-sign
 - **Description:** Add one-photo preview/loupe state backed by the existing preview readiness command.
 - **Dependencies:** Task 5.5.5
 - **Acceptance Criteria:**
-  - JPEG raster candidates show a preview surface.
-  - RAW candidates show the blocked decode state without implying RAW decode is implemented.
+  - JPEG/JPG source rows show a preview surface.
+  - RAW, PNG, TIFF, HEIC, database, and sidecar-like rows show unsupported states without implying decode is implemented.
   - Unsupported files show a clear unsupported state.
 - **Validation:** Preview status smoke test with JPEG, RAW placeholder, and unsupported file.
 
-**Status:** Completed on 2026-06-09. The Library workbench now has an M004-style Loupe view that opens from the selected grid photo, displays file name, rating, fit controls, preview readiness status, and a bottom filmstrip. The Loupe uses the existing `open_photo_preview` command path when running inside Tauri and falls back to the same local alpha readiness rules for static UI smoke checks. JPEG/raster candidates show the ready preview surface, RAW candidates show the blocked decode state, and unsupported entries show an unsupported state. This does not implement RAW decoding, real pixel rendering, Metal viewer output, full metadata, or Develop edits.
+**Status:** Completed on 2026-06-09. The Library workbench now has an M004-style Loupe view that opens from the selected grid photo, displays file name, rating, fit controls, preview readiness status, and a bottom filmstrip. The Loupe uses the existing `open_photo_preview` command path when running inside Tauri and falls back to the same local alpha readiness rules for static UI smoke checks. Q1.1 narrows this readiness rule to JPEG/JPG source rows only; RAW, PNG, TIFF, HEIC, database, sidecar-like, and unsupported entries show unsupported states. This does not implement RAW decoding, real pixel rendering, Metal viewer output, full metadata, or Develop edits.
 
 ### Task 5.5.7: Implement Develop Panel MVP
 
@@ -635,7 +635,7 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
 - **Dependencies:** Task 5.6.4
 - **Acceptance Criteria:**
   - Opening Loupe for JPEG/JPG displays the selected original or generated preview image.
-  - RAW candidates show decode-blocked state without implying RAW decoding.
+  - Non-JPEG/JPG source rows show unsupported or missing states without implying RAW decoding.
   - Missing/unsupported candidates show clear blocked states.
   - Preview cache data is disposable.
 - **Validation:** Preview UI smoke, cache/original safety test, and harness pass.
@@ -651,10 +651,10 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - Exposure/contrast slider changes update the visible Develop preview for JPEG/JPG.
   - Draft preview updates remain non-persistent until commit.
   - Commit persists the active edit graph.
-  - RAW candidates may keep valid edit graph state while preview pixels remain decode-blocked.
+  - Unsupported source rows, including RAW placeholders, do not accept Develop commits in the installed alpha.
 - **Validation:** Draft/no-write test, visual/runtime smoke, edit persistence test, and harness pass.
 
-**Status:** Completed on 2026-06-09. JPEG/JPG Develop preview now writes disposable adjusted JPEG preview bytes from the current exposure/contrast draft without persisting edit state until commit, returns `developPreviewBytes` through the desktop preview command, and renders those bytes as a Blob-backed `.sr-develop-image` inside the existing Develop surface. RAW candidates still keep valid draft edit graph routing while preview pixels remain decode-blocked, commit still persists the active edit graph, and tests verify draft/no-write behavior, original-file safety, desktop response bytes, UI smoke markers, and DOM image containment.
+**Status:** Completed on 2026-06-09. JPEG/JPG Develop preview now writes disposable adjusted JPEG preview bytes from the current exposure/contrast draft without persisting edit state until commit, returns `developPreviewBytes` through the desktop preview command, and renders those bytes as a Blob-backed `.sr-develop-image` inside the existing Develop surface. Q1.1 narrows Develop commits to JPEG/JPG source rows only; unsupported rows remain blocked before edit state is written. Tests verify draft/no-write behavior, original-file safety, desktop response bytes, UI smoke markers, and DOM image containment.
 
 ### Task 5.6.7: Persisted Edit-State Readback in UI
 

@@ -172,8 +172,8 @@ def create_raw_placeholders(output, fixtures):
             "raw-blocked-placeholder",
             "text/plain; raw-placeholder",
             {
-                "import_supported": True,
-                "preview_status": "raw_decode_blocked",
+                "import_supported": False,
+                "preview_status": "unsupported",
                 "visible_alpha_path": False,
             },
         )

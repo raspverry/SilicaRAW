@@ -2088,6 +2088,9 @@ pub fn approve_ai_suggestion(
     let result_id = result_id.as_ref();
     let result = silica_storage::get_ai_result(library_root_path, result_id)?;
     ensure_ai_result_targets_photo(&result, photo_id)?;
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     if result.approved {
         return Err(CoreError::AiReview(
             "AI result is already approved.".to_string(),
@@ -2543,6 +2546,9 @@ pub fn approve_plugin_preset(
         .iter()
         .find(|preset| preset.preset_id == preset_id)
         .ok_or_else(|| CoreError::Plugin(format!("preset_id {preset_id} not found")))?;
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4024,6 +4030,9 @@ pub fn commit_manual_linear_gradient_mask(
     contrast: Option<f64>,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4070,6 +4079,9 @@ pub fn commit_manual_radial_gradient_mask(
     contrast: Option<f64>,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4113,6 +4125,9 @@ pub fn commit_manual_brush_mask(
     contrast: Option<f64>,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4147,6 +4162,9 @@ pub fn commit_detail_sharpening_edit(
     masking: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4176,6 +4194,9 @@ pub fn commit_detail_noise_reduction_edit(
     color_detail: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4207,6 +4228,9 @@ pub fn commit_geometry_crop_edit(
     aspect: Option<&str>,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4237,6 +4261,9 @@ pub fn commit_clear_geometry_crop(
     photo_id: &str,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4261,6 +4288,9 @@ pub fn commit_geometry_orientation_edit(
     flip_vertical: bool,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4290,6 +4320,9 @@ pub fn commit_exposure_contrast_edit(
     contrast: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4335,6 +4368,9 @@ pub fn commit_white_balance_edit(
     tint: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4382,6 +4418,9 @@ pub fn commit_tone_recovery_edit(
     blacks: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4430,6 +4469,9 @@ pub fn commit_tone_curve_edit(
     blue_curve: &[(f64, f64)],
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4479,6 +4521,9 @@ pub fn commit_hsl_color_mixer_edit(
     luminance: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4525,6 +4570,9 @@ pub fn commit_color_presence_edit(
     saturation: f64,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4567,6 +4615,9 @@ pub fn commit_p0_basic_reset(
     photo_id: &str,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -4605,6 +4656,9 @@ pub fn commit_basic_preset_edit(
     preset: silica_edit::BasicPreset,
 ) -> Result<Option<PhotoEditCommit>, CoreError> {
     let library_root_path = library_root_path.as_ref();
+    if !ensure_supported_develop_source(library_root_path, photo_id)? {
+        return Ok(None);
+    }
     let graph =
         match silica_storage::load_active_edit_graph_or_default(library_root_path, photo_id)? {
             Some(graph) => graph,
@@ -7266,6 +7320,33 @@ fn edit_clipboard_catalog_target_block(
     Ok(None)
 }
 
+fn local_alpha_develop_source_block(
+    library_root_path: &Path,
+    photo_id: &str,
+) -> Result<Option<(&'static str, String)>, CoreError> {
+    let Some(metadata) = silica_storage::get_photo_metadata(library_root_path, photo_id)? else {
+        return Ok(Some(("missing_photo", "Photo not found.".to_string())));
+    };
+    if metadata.unsupported || metadata.file_type != "jpeg" {
+        return Ok(Some((
+            "unsupported_source",
+            "Develop edits are limited to JPEG/JPG source photos in this alpha.".to_string(),
+        )));
+    }
+    Ok(None)
+}
+
+fn ensure_supported_develop_source(
+    library_root_path: &Path,
+    photo_id: &str,
+) -> Result<bool, CoreError> {
+    match local_alpha_develop_source_block(library_root_path, photo_id)? {
+        Some(("missing_photo", _)) => Ok(false),
+        Some((_, message)) => Err(CoreError::UnsupportedEdit(message)),
+        None => Ok(true),
+    }
+}
+
 fn has_unsupported_basic_runtime(graph: &silica_edit::EditGraph) -> bool {
     graph.basic.texture.as_f64().unwrap_or(0.0) != 0.0
         || graph.basic.clarity.as_f64().unwrap_or(0.0) != 0.0
@@ -8290,7 +8371,7 @@ mod tests {
     }
 
     #[test]
-    fn edit_clipboard_blocks_raw_copy_and_batch_target_without_writes() {
+    fn edit_clipboard_blocks_unsupported_source_copy_and_batch_target_without_writes() {
         let workspace = unique_library_root("core-edit-clipboard-raw-blocked");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
@@ -8314,7 +8395,7 @@ mod tests {
             .find(|photo| photo.file_name == "target.DNG")
             .expect("raw target photo");
         assert_eq!(raw_photo.file_type, "DNG");
-        assert!(!raw_photo.unsupported);
+        assert!(raw_photo.unsupported);
 
         let raw_copy = copy_photo_edit_clipboard_payload(
             &created.root_path,
@@ -8327,6 +8408,18 @@ mod tests {
         .expect_err("RAW copy must be blocked");
         assert!(matches!(raw_copy, CoreError::UnsupportedEdit(_)));
         assert!(raw_copy.to_string().contains("JPEG/JPG"));
+
+        let unsupported_commit =
+            commit_exposure_contrast_edit(&created.root_path, &raw_photo.photo_id, 0.2, 4.0)
+                .expect_err("unsupported source Develop commit must be blocked");
+        assert!(matches!(unsupported_commit, CoreError::UnsupportedEdit(_)));
+        assert!(unsupported_commit.to_string().contains("JPEG/JPG"));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &raw_photo.photo_id)
+                .expect("load unsupported source active graph")
+                .is_none(),
+            "unsupported source Develop commit must not write active edit graph"
+        );
 
         commit_exposure_contrast_edit(&created.root_path, &source_photo.photo_id, 0.8, 12.0)
             .expect("commit source edit");
@@ -8346,7 +8439,7 @@ mod tests {
             std::slice::from_ref(&raw_photo.photo_id),
             &payload,
         )
-        .expect("plan raw target");
+        .expect("plan unsupported target");
         assert_eq!(plan.status, "blocked");
         assert_eq!(plan.ready_count, 0);
         assert_eq!(plan.blocked_count, 1);
@@ -8358,7 +8451,7 @@ mod tests {
             std::slice::from_ref(&raw_photo.photo_id),
             &payload,
         )
-        .expect("raw target returns blocked result");
+        .expect("unsupported target returns blocked result");
         assert_eq!(result.status, "blocked");
         assert_eq!(result.applied_count, 0);
         assert_eq!(result.blocked_count, 1);
@@ -9134,7 +9227,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("raw metadata count");
-        assert_eq!(raw_metadata_count, 1);
+        assert_eq!(raw_metadata_count, 0);
 
         let unsupported_metadata_count: i64 = connection
             .query_row(
@@ -9328,10 +9421,10 @@ mod tests {
         let workspace = unique_library_root("core-flags");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
-        let supported_file = import_root.join("sample.DNG");
+        let supported_file = import_root.join("sample.jpg");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        write_source_jpeg(&supported_file);
 
         let created = create_library(&library_root).expect("create library through core");
         let summary = import_folder(&created.root_path, &import_root).expect("import through core");
@@ -9340,7 +9433,7 @@ mod tests {
         let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
         let photo_id: String = connection
             .query_row(
-                "SELECT id FROM photos WHERE file_name = 'sample.DNG'",
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
                 [],
                 |row| row.get(0),
             )
@@ -9371,12 +9464,12 @@ mod tests {
         let workspace = unique_library_root("core-grid");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
-        let supported_file = import_root.join("sample.DNG");
-        let unsupported_file = import_root.join("notes.txt");
+        let supported_file = import_root.join("sample.jpg");
+        let unsupported_file = import_root.join("sample.DNG");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
-        std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
+        write_source_jpeg(&supported_file);
+        std::fs::write(&unsupported_file, b"unsupported raw candidate").expect("write unsupported");
 
         let created = create_library(&library_root).expect("create library through core");
         import_folder(&created.root_path, &import_root).expect("import through core");
@@ -9384,7 +9477,7 @@ mod tests {
         let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
         let photo_id: String = connection
             .query_row(
-                "SELECT id FROM photos WHERE file_name = 'sample.DNG'",
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
                 [],
                 |row| row.get(0),
             )
@@ -9405,14 +9498,16 @@ mod tests {
 
         assert_eq!(rows.len(), 2);
         assert!(rows.iter().any(|row| {
-            row["fileName"] == "sample.DNG"
-                && row["fileType"] == "DNG"
+            row["fileName"] == "sample.jpg"
+                && row["fileType"] == "JPG"
                 && row["rating"] == 4
                 && row["picked"] == true
                 && row["colorLabel"] == "green"
         }));
         assert!(rows.iter().any(|row| {
-            row["fileName"] == "notes.txt" && row["fileType"] == "TXT" && row["unsupported"] == true
+            row["fileName"] == "sample.DNG"
+                && row["fileType"] == "DNG"
+                && row["unsupported"] == true
         }));
 
         remove_library_root(&workspace);
@@ -9662,8 +9757,8 @@ mod tests {
         let raw_preview = open_photo_preview(&created.root_path, &raw_id)
             .expect("open raw preview")
             .expect("raw preview session");
-        assert_eq!(raw_preview.status, PhotoPreviewStatus::BlockedByDecode);
-        assert!(raw_preview.message.contains("Core Image RAW preview"));
+        assert_eq!(raw_preview.status, PhotoPreviewStatus::Unsupported);
+        assert!(raw_preview.message.contains("Unsupported file type"));
         assert!(raw_preview.preview_bytes.is_none());
 
         let unsupported_preview = open_photo_preview(&created.root_path, &unsupported_id)
@@ -11944,9 +12039,11 @@ mod tests {
             .expect("photo id");
         drop(connection);
 
-        commit_manual_linear_gradient_mask(
-            &created.root_path,
-            &photo_id,
+        let draft =
+            silica_storage::load_active_edit_graph_or_default(&created.root_path, &photo_id)
+                .expect("load RAW proof draft")
+                .expect("RAW proof draft");
+        let mask = silica_edit::manual_linear_gradient_mask(
             "mask-linear-1",
             "Diagonal lift",
             100.0,
@@ -11956,11 +12053,16 @@ mod tests {
             0.0,
             1.0,
             1.0,
-            Some(1.0),
-            Some(0.0),
+            silica_edit::ManualMaskLocalAdjustments {
+                exposure: Some(1.0),
+                contrast: Some(0.0),
+            },
         )
-        .expect("commit RAW manual mask")
-        .expect("commit result");
+        .expect("build RAW proof mask");
+        let edited = silica_edit::append_manual_mask(&draft, mask, "unix:raw-proof-mask")
+            .expect("append RAW proof mask");
+        silica_storage::commit_edit_graph(&created.root_path, edited)
+            .expect("commit RAW proof mask graph");
         let probe = successful_raw_probe(&raw_file.display().to_string(), Some(5184), Some(3456));
 
         let error = export_raw_photo_jpeg_srgb_from_probe(
