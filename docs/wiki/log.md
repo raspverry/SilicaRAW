@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-19
+updated: 2026-06-20
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-20] local-alpha | Quality closure route added
+
+- Added the Local Alpha Quality Closure Plan for data trust, photo-first UI polish, interaction QA, installed app QA, and DMG readiness.
+- Routed current LLM context from ad hoc blocked-gate UI hardening to the full local alpha closure path while Task 27.2 remains externally blocked.
+- Corrected the final visual QA topic to match the current 25-surface, 75-screenshot runner inventory.
 
 ## [2026-06-19] blocked-beta | UI hardening route added
 

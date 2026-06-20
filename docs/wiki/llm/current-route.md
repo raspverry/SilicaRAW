@@ -2,7 +2,7 @@
 title: Current LLM Route
 status: active
 audience: agents
-updated: 2026-06-19
+updated: 2026-06-20
 source_of_truth: docs/wiki/llm/index.md
 ---
 
@@ -18,14 +18,15 @@ Phase 20, Phase 21, Task 22.1, Task 22.2, Task 22.3, Task 22.4, Task 22.5, Task 
 
 Task 21.5 is complete as a disabled-by-default Preferences surface. Task 23.1 adds the core default-deny permission vocabulary. Task 23.2 adds the static permission prompt UI contract only. Task 23.3 connects permission decisions and future extension-sensitive actions to the append-only action log. Task 24.1 records the MLX runtime spike without enabling a runtime. Task 24.2 validates model manifests without loading models. Task 24.3 stores local AI results without mutating edit state. Task 24.4 adds read-only blur review presentation with model-unavailable behavior. Task 24.5 adds explicit approval/rejection for stored AI suggestions through the undoable edit history boundary. Task 25.1 validates plugin manifests and keeps plugins disabled by default. Task 25.2 adds data-only preset packs and explicit approval apply through edit history. Task 25.3 adds plugin permission review evidence without runtime or grant persistence. Task 26.1 selects disabled-by-default stdio-first MCP without starting a server. Task 26.2 defines read-only MCP tool manifests. Task 26.3 adds a runtime-free read-only MCP adapter function through Core APIs only. Task 27.0 freezes public beta scope and adds the public beta evidence index. Task 27.1 completes the readiness audit with a blocked verdict. MCP server startup, plugin runtime, and agent bridges remain unavailable.
 
-While Task 27.2 is blocked, [Blocked Public Beta UI Hardening Plan](../roadmaps/blocked-public-beta-ui-hardening-plan.md) is the active route for local developer-preview UI shell fixes only.
+While Task 27.2 is blocked, [Local Alpha Quality Closure Plan](../roadmaps/local-alpha-quality-closure-plan.md) is the active route before more product feature growth. It covers data-trust fixes, photo-first UI polish, interaction QA, installed app QA, and unsigned developer-preview DMG proof. [Blocked Public Beta UI Hardening Plan](../roadmaps/blocked-public-beta-ui-hardening-plan.md) remains an input for the UI shell and keyboard subset, not the top-level route.
 
 ## Minimal Read Set
 
-For Task 27.2 or any beta release-candidate work, read:
+For local alpha quality closure, Task 27.2, or any beta release-candidate work, read:
 
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
 - [Post-Alpha Product Roadmap: Phase 27](../roadmaps/post-alpha-product-roadmap.md#phase-27-public-beta-gate)
+- [Local Alpha Quality Closure Plan](../roadmaps/local-alpha-quality-closure-plan.md)
 - [Public Beta Evidence Index](../roadmaps/public-beta-evidence-index.md)
 - [Public Beta Readiness Audit](../roadmaps/public-beta-readiness-audit.md)
 - [Blocked Public Beta UI Hardening Plan](../roadmaps/blocked-public-beta-ui-hardening-plan.md)
@@ -87,11 +88,14 @@ For Task 27.2 or any beta release-candidate work, read:
 - Task 27.1 audits readiness and blocks public beta release-candidate work.
 - Public beta is blocked until a signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist.
 - Blocked-gate UI hardening may fix local developer-preview QA bugs, but must not be treated as public beta release-candidate work.
+- Local alpha quality closure is now the active route while Task 27.2 is blocked.
+- Trust issues in source support, export overwrite protection, and missing-original state come before UI polish.
 - Unsigned developer-preview DMGs are internal testing artifacts only and must not be called public beta.
 - MLX runtime, plugin runtime, MCP server/runtime, broad RAW claims, broad visual color-correctness claims, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are excluded from public beta scope.
 
 ## Stop Rules
 
+- Do not start feature growth before the active local alpha quality closure route is complete or explicitly superseded.
 - Do not treat visual QA screenshots as product feature implementation.
 - Do not add broad fallback systems for performance, migration, or profiling work.
 - Do not start agent, MCP, or plugin runtime.

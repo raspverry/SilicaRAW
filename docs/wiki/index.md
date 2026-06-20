@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-17
+updated: 2026-06-20
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -41,6 +41,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local DMG Distribution Plan](roadmaps/local-dmg-distribution-plan.md): phased plan for GitHub-hosted macOS DMG distribution.
 - [Local DMG Release Runbook](roadmaps/local-dmg-release-runbook.md): maintainer steps for signed local releases and current unsigned preview artifacts.
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
+- [Local Alpha Quality Closure Plan](roadmaps/local-alpha-quality-closure-plan.md): active closure plan for data trust, UI polish, installed app QA, and DMG readiness while Task 27.2 is blocked.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
 - [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through v1.0.
 - [Blocked Public Beta UI Hardening Plan](roadmaps/blocked-public-beta-ui-hardening-plan.md): UI shell and keyboard hardening allowed while Task 27.2 is externally blocked.
