@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Cache clear symlink boundary verified
+
+- Completed Q1.5 of the local alpha quality closure plan.
+- Disposable cache clear now handles cache-root symlinks without following protected targets.
+- Added storage coverage for symlinked cache roots and nested symlinks into originals.
+
 ## [2026-06-20] quality | Schema-invalid sidecar dry-run tightened
 
 - Completed Q1.4 of the local alpha quality closure plan.

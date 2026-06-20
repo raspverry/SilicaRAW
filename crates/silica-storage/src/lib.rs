@@ -1639,10 +1639,7 @@ pub fn clear_disposable_cache(
 
     for directory in DISPOSABLE_CACHE_DIRECTORIES {
         let path = library.root_path.join(directory);
-        if path.exists() {
-            fs::remove_dir_all(&path)?;
-        }
-        fs::create_dir_all(&path)?;
+        clear_disposable_cache_directory(&path)?;
         cleared_directories.push((*directory).to_string());
         recreated_directories.push((*directory).to_string());
     }
@@ -1656,6 +1653,28 @@ pub fn clear_disposable_cache(
         removed_cache_records,
         message: "Cache clear removed only disposable library caches.".to_string(),
     })
+}
+
+fn clear_disposable_cache_directory(path: &Path) -> Result<(), LibraryStorageError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            let file_type = metadata.file_type();
+            if file_type.is_symlink() || file_type.is_file() {
+                fs::remove_file(path)?;
+            } else if file_type.is_dir() {
+                fs::remove_dir_all(path)?;
+            } else {
+                return Err(LibraryStorageError::CacheValidation(format!(
+                    "disposable cache path is not removable cache material: {}",
+                    path.display()
+                )));
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    fs::create_dir_all(path)?;
+    Ok(())
 }
 
 fn record_photo_cache(
@@ -8755,6 +8774,124 @@ mod tests {
         assert_eq!(
             std::fs::read(&supported_file).expect("read original after"),
             original_bytes
+        );
+
+        remove_library_root(&workspace);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn clear_disposable_cache_removes_symlinks_without_following_targets() {
+        let workspace = unique_library_root("clear-cache-symlink-boundary");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"original bytes").expect("write original");
+        let original_bytes = std::fs::read(&supported_file).expect("read original before");
+        let library = create_local_library(&library_root).expect("create library");
+
+        let protected_targets = [
+            ("sidecars", "sidecar keep"),
+            ("exports", "export keep"),
+            ("backups", "backup keep"),
+            ("logs", "log keep"),
+        ];
+        for (directory, file_name) in protected_targets {
+            let path = library.root_path.join(directory);
+            std::fs::create_dir_all(&path).expect("create protected directory");
+            std::fs::write(path.join(file_name), b"protected").expect("write protected file");
+        }
+        let protected_bytes = protected_targets
+            .iter()
+            .map(|(directory, file_name)| {
+                (
+                    (*directory).to_string(),
+                    (*file_name).to_string(),
+                    std::fs::read(library.root_path.join(directory).join(file_name))
+                        .expect("read protected file before"),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let top_level_links = [
+            ("thumbnails", "sidecars"),
+            ("previews", "exports"),
+            ("render-cache", "backups"),
+            ("ai-cache", "logs"),
+        ];
+        for (cache_directory, target_directory) in top_level_links {
+            let cache_path = library.root_path.join(cache_directory);
+            if cache_path.exists() {
+                std::fs::remove_dir_all(&cache_path).expect("remove cache directory");
+            }
+            std::os::unix::fs::symlink(library.root_path.join(target_directory), &cache_path)
+                .expect("create top-level cache symlink");
+            assert!(std::fs::symlink_metadata(&cache_path)
+                .expect("cache symlink metadata")
+                .file_type()
+                .is_symlink());
+        }
+
+        clear_disposable_cache(&library.root_path).expect("clear top-level symlink caches");
+
+        for directory in DISPOSABLE_CACHE_DIRECTORIES {
+            let metadata = std::fs::symlink_metadata(library.root_path.join(directory))
+                .expect("cache directory metadata");
+            assert!(
+                metadata.file_type().is_dir(),
+                "{directory} should be a directory"
+            );
+            assert!(
+                !metadata.file_type().is_symlink(),
+                "{directory} should be recreated as a real directory"
+            );
+        }
+        for (directory, file_name, bytes) in &protected_bytes {
+            assert_eq!(
+                std::fs::read(library.root_path.join(directory).join(file_name))
+                    .expect("read protected file after"),
+                *bytes,
+                "{directory} target bytes should be preserved"
+            );
+        }
+
+        let top_level_original_link = library.root_path.join("thumbnails");
+        std::fs::remove_dir_all(&top_level_original_link)
+            .expect("remove recreated thumbnails directory");
+        std::os::unix::fs::symlink(&import_root, &top_level_original_link)
+            .expect("create top-level original symlink");
+        clear_disposable_cache(&library.root_path).expect("clear top-level original symlink cache");
+        let top_level_original_metadata =
+            std::fs::symlink_metadata(&top_level_original_link).expect("thumbnail metadata");
+        assert!(top_level_original_metadata.file_type().is_dir());
+        assert!(!top_level_original_metadata.file_type().is_symlink());
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after top-level symlink"),
+            original_bytes
+        );
+
+        let nested_original_link = library
+            .root_path
+            .join("thumbnails")
+            .join("linked-originals");
+        std::os::unix::fs::symlink(&import_root, &nested_original_link)
+            .expect("create nested original symlink");
+        assert!(std::fs::symlink_metadata(&nested_original_link)
+            .expect("nested symlink metadata")
+            .file_type()
+            .is_symlink());
+
+        clear_disposable_cache(&library.root_path).expect("clear nested symlink cache");
+
+        assert_eq!(
+            std::fs::read(&supported_file).expect("read original after nested symlink"),
+            original_bytes
+        );
+        assert!(
+            std::fs::symlink_metadata(&nested_original_link).is_err(),
+            "nested symlink should be removed with disposable cache directory"
         );
 
         remove_library_root(&workspace);

@@ -136,6 +136,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Add narrow verification for symlinked or adversarial cache paths without creating a broad fallback cleaner.
 - **Acceptance:** Cache clear only deletes disposable cache material and never follows paths into originals, sidecars, exports, backups, or logs.
 - **Validation:** targeted storage test plus `scripts/harness/check.sh`
+- **Status:** Completed on 2026-06-20. Cache clear now uses symlink-aware metadata handling for disposable cache roots, removes symlink cache entries without following protected targets, and verifies nested symlinks into originals are removed without deleting originals.
 
 ## Phase Q2: Photo-First UI Product Polish
 
