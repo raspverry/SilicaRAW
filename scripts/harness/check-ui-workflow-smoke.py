@@ -869,7 +869,7 @@ def main():
         "toggleSelectedPick",
         "toggleSelectedReject",
         "updateCullingControls",
-        "RAW decode is not enabled in this alpha",
+        "RAW, PNG, TIFF, and HEIC sources remain cataloged as unsupported in this alpha",
     ]:
         require(marker in source, f"demo removal/culling marker missing: {marker}", failures)
     for forbidden in [

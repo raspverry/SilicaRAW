@@ -5609,19 +5609,20 @@ mod tests {
         let workspace = unique_library_root("desktop-grid");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
-        let supported_file = import_root.join("sample.DNG");
+        let unsupported_raw_file = import_root.join("sample.DNG");
         let jpeg_file = import_root.join("sample.jpg");
         let unsupported_file = import_root.join("notes.txt");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
-        std::fs::write(&supported_file, b"supported raw candidate").expect("write supported");
+        std::fs::write(&unsupported_raw_file, b"unsupported raw candidate")
+            .expect("write unsupported raw");
         write_source_jpeg(&jpeg_file);
         std::fs::write(&unsupported_file, b"unsupported side note").expect("write unsupported");
 
         silica_core::create_library(&library_root).expect("create library");
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
 
-        let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
+        let photo_id = stable_catalog_id("photo", &jpeg_file.display().to_string());
         let flags = super::set_photo_flags(
             library_root.display().to_string(),
             photo_id,
@@ -5637,10 +5638,6 @@ mod tests {
         match response_data(&grid) {
             super::DesktopCommandData::PhotoGrid { photos } => {
                 assert_eq!(photos.len(), 3);
-                assert!(photos.iter().any(|photo| photo.file_name == "sample.DNG"
-                    && photo.rating == 4
-                    && photo.picked
-                    && photo.color_label.as_deref() == Some("green")));
                 assert!(photos.iter().any(|photo| {
                     photo.file_name == "sample.jpg"
                         && photo.thumbnail_path.is_some()
@@ -5648,7 +5645,13 @@ mod tests {
                             .thumbnail_bytes
                             .as_ref()
                             .is_some_and(|bytes| !bytes.is_empty())
+                        && photo.rating == 4
+                        && photo.picked
+                        && photo.color_label.as_deref() == Some("green")
                 }));
+                assert!(photos
+                    .iter()
+                    .any(|photo| photo.file_name == "sample.DNG" && photo.unsupported));
                 assert!(photos
                     .iter()
                     .any(|photo| photo.file_name == "notes.txt" && photo.unsupported));
@@ -5665,17 +5668,25 @@ mod tests {
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
         let jpeg_file = import_root.join("portrait.jpg");
-        let raw_file = import_root.join("sample.DNG");
+        let unsupported_source_file = import_root.join("sample.DNG");
 
         std::fs::create_dir_all(&import_root).expect("create import directory");
         write_source_jpeg(&jpeg_file);
-        std::fs::write(&raw_file, b"raw candidate").expect("write raw");
+        std::fs::write(&unsupported_source_file, b"raw candidate").expect("write raw");
 
         silica_core::create_library(&library_root).expect("create library");
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
-        let raw_id = stable_catalog_id("photo", &raw_file.display().to_string());
-        silica_core::set_photo_flags(&library_root, raw_id.clone(), 5, true, false, None)
-            .expect("set raw flags");
+        let unsupported_source_id =
+            stable_catalog_id("photo", &unsupported_source_file.display().to_string());
+        silica_core::set_photo_flags(
+            &library_root,
+            unsupported_source_id.clone(),
+            5,
+            true,
+            false,
+            None,
+        )
+        .expect("set unsupported source flags");
 
         let page = super::query_library_photos(
             library_root.display().to_string(),
@@ -5687,7 +5698,7 @@ mod tests {
                     min_rating: Some(4),
                     picked: Some(true),
                     rejected: None,
-                    file_type: Some("raw".to_string()),
+                    file_type: Some("unsupported".to_string()),
                     metadata: None,
                     search: "sample".to_string(),
                 },
@@ -5711,7 +5722,8 @@ mod tests {
                 assert!(!has_next_page);
                 assert_eq!(order_fields, &["rating_desc", "photo_id_asc"]);
                 assert_eq!(photos.len(), 1);
-                assert_eq!(photos[0].photo_id, raw_id);
+                assert_eq!(photos[0].photo_id, unsupported_source_id);
+                assert!(photos[0].unsupported);
                 assert_eq!(photos[0].thumbnail_bytes, None);
             }
             other => panic!("unexpected response data: {other:?}"),
@@ -7606,8 +7618,8 @@ mod tests {
                 ..
             } => {
                 assert_eq!(*scanned_files, 4);
-                assert_eq!(*supported_files, 3);
-                assert_eq!(*unsupported_files, 1);
+                assert_eq!(*supported_files, 2);
+                assert_eq!(*unsupported_files, 2);
                 assert!(*originals_unchanged);
             }
             other => panic!("unexpected import response data: {other:?}"),
@@ -7633,7 +7645,7 @@ mod tests {
                     .iter()
                     .find(|photo| photo.file_name == "blocked-raw.DNG")
                     .expect("RAW-blocked grid row");
-                assert!(!raw.unsupported);
+                assert!(raw.unsupported);
                 let unsupported = photos
                     .iter()
                     .find(|photo| photo.file_name == "notes.txt")
@@ -7763,9 +7775,9 @@ mod tests {
                 message,
                 ..
             } => {
-                assert_eq!(*status, "BlockedByDecode");
+                assert_eq!(*status, "Unsupported");
                 assert!(preview_bytes.is_none());
-                assert!(message.contains("Core Image RAW preview"));
+                assert!(message.contains("Unsupported file type"));
             }
             other => panic!("unexpected RAW preview response data: {other:?}"),
         }
@@ -7944,8 +7956,8 @@ mod tests {
                 ..
             } => {
                 assert_eq!(*scanned_files, 6);
-                assert_eq!(*supported_files, 4);
-                assert_eq!(*unsupported_files, 2);
+                assert_eq!(*supported_files, 3);
+                assert_eq!(*unsupported_files, 3);
                 assert!(issues.iter().any(|issue| {
                     issue.kind == "unsupported_file"
                         && issue.file_name == Some("recursive-notes.txt".to_string())

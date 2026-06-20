@@ -90,13 +90,13 @@ pub const ALPHA_CATALOG_SCHEMA: CatalogSchemaContract = CatalogSchemaContract {
     required_indexes: ALPHA_CATALOG_REQUIRED_INDEXES,
 };
 
-/// File extensions accepted as supported photo candidates in the alpha scanner.
-pub const ALPHA_SUPPORTED_PHOTO_EXTENSIONS: &[&str] = &[
-    "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2", "pef", "srw", "raw", "jpg", "jpeg",
-    "tif", "tiff", "heic",
-];
+/// File extensions accepted as supported source candidates in the local alpha scanner.
+///
+/// RAW and other raster formats remain catalog-reviewable as unsupported entries until
+/// their source pipelines have end-to-end preview, Develop, and export gates.
+pub const ALPHA_SUPPORTED_PHOTO_EXTENSIONS: &[&str] = &["jpg", "jpeg"];
 
-/// Return whether an extension is a supported local alpha photo candidate.
+/// Return whether an extension is a supported local alpha source candidate.
 pub fn is_supported_photo_extension(extension: &str) -> bool {
     ALPHA_SUPPORTED_PHOTO_EXTENSIONS
         .iter()
@@ -508,9 +508,13 @@ mod tests {
 
     #[test]
     fn classifies_alpha_import_file_extensions() {
-        assert!(is_supported_photo_extension("DNG"));
         assert!(is_supported_photo_extension("jpg"));
-        assert!(is_supported_photo_extension("RAF"));
+        assert!(is_supported_photo_extension("JPEG"));
+        assert!(!is_supported_photo_extension("DNG"));
+        assert!(!is_supported_photo_extension("RAF"));
+        assert!(!is_supported_photo_extension("png"));
+        assert!(!is_supported_photo_extension("tiff"));
+        assert!(!is_supported_photo_extension("heic"));
         assert!(!is_supported_photo_extension("txt"));
         assert!(!is_supported_photo_extension(""));
     }

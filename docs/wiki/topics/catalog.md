@@ -102,7 +102,9 @@ Task 11.5 starts with a contract before storage implementation:
   - file name ascending, then path ascending, then photo id ascending
   - rating descending, then photo id ascending
 - Accepted filters are minimum rating, picked, rejected, file type, `has_dimensions`, and search text.
-- File type is a whitelisted enum: JPEG, RAW, or unsupported. Storage records this as normalized `photos.file_type` values `jpeg`, `raw`, and `unsupported`; in the local alpha, `raw` means supported non-JPEG photo candidates until later metadata extraction expands the taxonomy.
+- File type is a whitelisted enum: JPEG, RAW, or unsupported. Storage records this as normalized `photos.file_type` values `jpeg`, `raw`, and `unsupported`.
+- For the installed local alpha source contract, only JPEG/JPG rows are supported photo sources. RAW, PNG, TIFF, HEIC, database, and sidecar-like files may be cataloged by reference as unsupported rows, but they must not appear preview-ready, develop-ready, or export-ready.
+- The `raw` file type remains reserved for older catalogs and explicit RAW proof work. It is not a supported installed-alpha source state unless a later task adds end-to-end RAW decode, preview, edit, export, and QA evidence.
 - Required query indexes are:
   - `idx_photos_library_imported_id`
   - `idx_photos_library_file_name_path_id`

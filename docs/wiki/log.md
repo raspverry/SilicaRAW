@@ -953,3 +953,9 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 ## Notes for LLM Agents
 
 Use this log to understand recent wiki changes before editing multiple wiki pages.
+
+## [2026-06-20] quality | Source capability contract narrowed
+
+- Completed Q1.1 of the local alpha quality closure plan.
+- Defined the installed-alpha source contract as JPEG/JPG-only for preview, Develop, and export readiness.
+- Recorded that RAW, PNG, TIFF, HEIC, database, and sidecar-like files may be cataloged by reference as unsupported product rows until later codec-specific proof adds end-to-end evidence.

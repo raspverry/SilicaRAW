@@ -774,16 +774,25 @@ pub fn plan_preview_decode(source_path: impl AsRef<str>, unsupported: bool) -> P
         };
     }
 
+    if is_raw_candidate_extension(extension) {
+        return PreviewDecodePlan {
+            source_path,
+            backend: PreviewDecodeBackend::CoreImageRaw,
+            status: PreviewDecodeStatus::BlockedByMissingRawFixtureProbe,
+            message: "Core Image RAW preview is selected but not implemented until fixture-backed probe coverage exists.".to_string(),
+        };
+    }
+
     PreviewDecodePlan {
         source_path,
-        backend: PreviewDecodeBackend::CoreImageRaw,
-        status: PreviewDecodeStatus::BlockedByMissingRawFixtureProbe,
-        message: "Core Image RAW preview is selected but not implemented until fixture-backed probe coverage exists.".to_string(),
+        backend: PreviewDecodeBackend::None,
+        status: PreviewDecodeStatus::Unsupported,
+        message: "Unsupported file type for SilicaRAW preview.".to_string(),
     }
 }
 
 fn is_raster_preview_extension(extension: &str) -> bool {
-    ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
+    ["jpg", "jpeg"]
         .iter()
         .any(|supported| extension.eq_ignore_ascii_case(supported))
 }
@@ -843,6 +852,18 @@ mod tests {
             super::PreviewDecodeStatus::Unsupported
         );
         assert_eq!(unsupported_plan.backend, super::PreviewDecodeBackend::None);
+
+        for source_path in ["/tmp/sample.png", "/tmp/sample.tiff", "/tmp/sample.heic"] {
+            let unsupported_raster_plan = super::plan_preview_decode(source_path, false);
+            assert_eq!(
+                unsupported_raster_plan.status,
+                super::PreviewDecodeStatus::Unsupported
+            );
+            assert_eq!(
+                unsupported_raster_plan.backend,
+                super::PreviewDecodeBackend::None
+            );
+        }
     }
 
     #[test]

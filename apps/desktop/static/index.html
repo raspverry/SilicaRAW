@@ -96,7 +96,7 @@
                 <span>RAW decode blocked</span>
                 <span>Local-first</span>
               </div>
-              <p class="sr-alpha-scope-note">JPEG/JPG previews and JPEG, PNG, and TIFF export are enabled. RAW decode is not enabled in this alpha; Metal viewer output and AI tools are also disabled.</p>
+              <p class="sr-alpha-scope-note">JPEG/JPG source previews and JPEG, PNG, and TIFF export outputs are enabled. RAW, PNG, TIFF, and HEIC sources remain cataloged as unsupported in this alpha; Metal viewer output and AI tools are also disabled.</p>
               <section class="sr-recent-libraries" aria-label="Recent libraries">
                 <div class="sr-recent-header">
                   <h2>Recent Libraries</h2>
@@ -220,7 +220,7 @@
                   <select id="fileTypeFilter" aria-label="File type filter">
                     <option value="">All Files</option>
                     <option value="jpeg">JPEG</option>
-                    <option value="raw">RAW</option>
+                    <option value="raw">RAW legacy</option>
                     <option value="unsupported">Unsupported</option>
                   </select>
                   <select id="metadataFilter" aria-label="Metadata filter">
@@ -3702,7 +3702,7 @@
           photo
           && !photo.missing
           && !photo.unsupported
-          && ["JPG", "JPEG", "PNG", "HEIC", "TIF", "TIFF"].includes((photo.fileType || "").toUpperCase())
+          && isJpegDevelopFileType(photo.fileType)
         );
       }
 
@@ -6868,7 +6868,7 @@
             message: "Unsupported file type for SilicaRAW preview.",
           };
         }
-        if (["JPG", "JPEG", "PNG", "HEIC", "TIF", "TIFF"].includes((photo.fileType || "").toUpperCase())) {
+        if (isJpegDevelopFileType(photo.fileType)) {
           return {
             fileName: photo.fileName,
             status: "Ready",
@@ -6877,8 +6877,8 @@
         }
         return {
           fileName: photo.fileName,
-          status: "BlockedByDecode",
-          message: "Core Image RAW preview is selected but not implemented until fixture-backed probe coverage exists.",
+          status: "Unsupported",
+          message: "Unsupported file type for SilicaRAW preview.",
         };
       }
 

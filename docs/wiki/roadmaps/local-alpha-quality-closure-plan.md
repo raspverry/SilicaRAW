@@ -100,6 +100,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Make the contract explicit: JPEG/JPG are the supported local alpha source formats. Unsupported files may be cataloged by reference, but they must not look preview-ready, develop-ready, or export-ready.
 - **Acceptance:** PNG, TIFF, HEIC, database files, and sidecar-like files are not shown as supported photo sources. Unsupported rows remain understandable and compact.
 - **Validation:** targeted core/storage tests plus `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-20. Catalog, preview, Develop commit, desktop static UI, fixture generator, and docs now use the JPEG/JPG-only installed-alpha source contract.
 
 ### Q1.2: Harden Export Against Same-File and Hard-Link Writes
 

@@ -151,9 +151,9 @@ Task 5.5.6 adds the M004 Loupe MVP inside Library mode:
 
 - Loupe opens from the currently selected Library grid photo.
 - Runtime preview state uses the existing desktop `open_photo_preview` command.
-- JPEG/raster candidates render the ready preview surface.
-- RAW candidates render the blocked decode state and must not imply RAW decoding is implemented.
-- Unsupported catalog entries render a clear unsupported state.
+- JPEG/JPG source rows render the ready preview surface.
+- RAW, PNG, TIFF, HEIC, database, and sidecar-like rows render a clear unsupported state in the installed alpha and must not imply decoding is implemented.
+- Fixture-backed RAW proof paths remain separate from the product preview route.
 - The bottom filmstrip mirrors the current grid selection and keeps M004 navigation visible.
 - Real image pixels, Metal output, RAW decoding, and Develop edits remain future work in this baseline. Phase 11 later shares the catalog-backed metadata inspector with Loupe.
 
@@ -167,7 +167,7 @@ Task 5.5.7 adds the M005 Develop Panel MVP:
 - Draft slider and numeric input changes call only the preview path.
 - `Commit Edit` is the explicit persistence action for final exposure and contrast values.
 - Unsupported and missing files disable Develop edit controls rather than implying an editable preview.
-- RAW candidates may accept a valid edit graph draft while still showing blocked decode preview state.
+- RAW, PNG, TIFF, HEIC, database, and sidecar-like rows must not accept Develop edits in the installed alpha.
 - Real image pixels, Metal output, RAW decoding, masks, full tone/color/detail controls, and sidecar writing remain future work.
 
 ## Task 5.5.8 Export Dialog
