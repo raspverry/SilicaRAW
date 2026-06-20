@@ -458,6 +458,12 @@ def state_script(state):
     return image;
   }}
 
+  function placeholder() {{
+    const art = document.createElement("span");
+    art.className = "sr-thumb-placeholder";
+    return art;
+  }}
+
   function photoCard(photo, index) {{
     const card = document.createElement("button");
     card.className = "sr-photo-card";
@@ -467,9 +473,7 @@ def state_script(state):
     if (photo.src) {{
       card.append(thumb(photo.src));
     }} else {{
-      const art = document.createElement("span");
-      art.className = `sr-thumb-art ${{photo.artClass || "sr-thumb-art-a"}}`;
-      card.append(art);
+      card.append(placeholder());
     }}
     const badge = document.createElement("span");
     badge.className = "sr-file-badge";
@@ -498,8 +502,8 @@ def state_script(state):
   const photos = [
     {{ fileName: "synthetic-gradient.jpg", fileType: "JPG", rating: "****-", state: "Pick", stateClass: "sr-card-state-pick", src: imagePath }},
     {{ fileName: "synthetic-checker.jpeg", fileType: "JPEG", rating: "***--", src: secondaryPath }},
-    {{ fileName: "blocked-raw.DNG", fileType: "DNG", rating: "-----", state: "Blocked", artClass: "sr-thumb-art-c" }},
-    {{ fileName: "notes.txt", fileType: "TXT", rating: "-----", state: "Unsupported", artClass: "sr-thumb-art-d" }},
+    {{ fileName: "blocked-raw.DNG", fileType: "DNG", rating: "-----", state: "Blocked" }},
+    {{ fileName: "notes.txt", fileType: "TXT", rating: "-----", state: "Unsupported" }},
     {{ fileName: "contact-sheet-qa.jpg", fileType: "JPG", rating: "**---", src: imagePath }},
     {{ fileName: "export-candidate.jpg", fileType: "JPG", rating: "*****", src: secondaryPath }},
   ];
@@ -540,7 +544,6 @@ def state_script(state):
       colorLabel: null,
       thumbnailPath: null,
       thumbnailBytes: [],
-      artClass: `sr-thumb-art-${{String.fromCharCode(97 + (index % 8))}}`,
       unsupported: true,
     }};
   }});
@@ -677,8 +680,7 @@ def state_script(state):
       card.className = "sr-filmstrip-card";
       card.type = "button";
       card.classList.toggle("is-selected", index === 0);
-      card.append(photo.src ? thumb(photo.src) : document.createElement("span"));
-      card.lastElementChild.className ||= `sr-thumb-art ${{photo.artClass || "sr-thumb-art-a"}}`;
+      card.append(photo.src ? thumb(photo.src) : placeholder());
       const name = document.createElement("span");
       name.textContent = photo.fileName;
       card.append(name);

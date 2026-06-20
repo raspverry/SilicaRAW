@@ -1421,15 +1421,18 @@ progress::-webkit-progress-value {
 
 .sr-photo-card.is-rejected .sr-thumb-art,
 .sr-photo-card.is-rejected .sr-thumb-image,
+.sr-photo-card.is-rejected .sr-thumb-placeholder,
 .sr-photo-card.is-missing .sr-thumb-art,
 .sr-photo-card.is-missing .sr-thumb-image,
+.sr-photo-card.is-missing .sr-thumb-placeholder,
 .sr-photo-card.is-unsupported .sr-thumb-art,
 .sr-photo-card.is-unsupported .sr-thumb-image {
   opacity: 0.58;
 }
 
 .sr-thumb-art,
-.sr-thumb-image {
+.sr-thumb-image,
+.sr-thumb-placeholder {
   position: absolute;
   inset: 0;
 }
@@ -1446,6 +1449,27 @@ progress::-webkit-progress-value {
     linear-gradient(135deg, var(--sr-overlay-white-subtle), transparent 48%),
     linear-gradient(0deg, var(--sr-bg-primary), transparent 34%),
     var(--sr-surface-card);
+}
+
+.sr-thumb-placeholder {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, var(--sr-bg-primary), var(--sr-surface-card));
+}
+
+.sr-thumb-placeholder::before {
+  content: "";
+  width: 34%;
+  min-width: 48px;
+  max-width: 76px;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--sr-border-default);
+  border-radius: var(--sr-radius-xs);
+  background:
+    linear-gradient(135deg, transparent 49%, var(--sr-border-default) 50%, transparent 51%),
+    var(--sr-bg-secondary);
+  opacity: 0.88;
 }
 
 .sr-thumb-art-a {
@@ -1516,7 +1540,6 @@ progress::-webkit-progress-value {
 .sr-file-badge,
 .sr-card-state {
   min-width: 0;
-  max-width: calc(50% - var(--sr-space-xs));
   overflow: hidden;
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-xs);
@@ -1529,7 +1552,12 @@ progress::-webkit-progress-value {
   white-space: nowrap;
 }
 
+.sr-file-badge {
+  max-width: calc(36% - var(--sr-space-xs));
+}
+
 .sr-card-state {
+  max-width: calc(64% - var(--sr-space-xs));
   color: var(--sr-text-secondary);
 }
 
@@ -1625,8 +1653,7 @@ progress::-webkit-progress-value {
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background:
-    radial-gradient(circle at 38% 28%, var(--sr-overlay-silica-soft), transparent 22%),
-    radial-gradient(circle at 70% 22%, var(--sr-overlay-white-subtle), transparent 18%),
+    linear-gradient(135deg, transparent 49%, var(--sr-border-subtle) 50%, transparent 51%),
     linear-gradient(145deg, var(--sr-surface-card), var(--sr-bg-primary) 68%);
 }
 
@@ -1728,7 +1755,8 @@ progress::-webkit-progress-value {
   padding: 0;
 }
 
-.sr-filmstrip-card .sr-thumb-art {
+.sr-filmstrip-card .sr-thumb-art,
+.sr-filmstrip-card .sr-thumb-placeholder {
   inset: 0;
 }
 
@@ -1810,6 +1838,12 @@ progress::-webkit-progress-value {
   inset: var(--sr-space-lg);
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
+}
+
+.sr-preview-placeholder {
+  background:
+    linear-gradient(135deg, transparent 49%, var(--sr-border-subtle) 50%, transparent 51%),
+    linear-gradient(145deg, var(--sr-surface-card), var(--sr-bg-primary) 68%);
 }
 
 .sr-develop-image {

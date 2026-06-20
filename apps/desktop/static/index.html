@@ -350,7 +350,7 @@
               </div>
             </div>
             <div class="sr-develop-preview" id="developPreviewSurface" data-preview-status="blocked" data-dirty="false" data-before-after-mode="after" data-native-viewer-host="reserved" data-native-viewer-surface="develop" data-native-viewer-state="web-fallback" data-native-viewer-controls="external">
-              <div class="sr-develop-art sr-thumb-art-a" id="developPreviewArt" aria-hidden="true"></div>
+              <div class="sr-develop-art sr-preview-placeholder" id="developPreviewArt" aria-hidden="true"></div>
               <div class="sr-develop-status">
                 <strong id="developPreviewStatus">No Preview</strong>
                 <span id="developPreviewMessage">Select a photo from the Library grid.</span>
@@ -1370,7 +1370,7 @@
             </section>
             <aside class="sr-export-summary" aria-label="Export summary">
               <div class="sr-export-preview-card">
-                <span class="sr-thumb-art sr-thumb-art-a" id="exportPreviewArt" aria-hidden="true"></span>
+                <span class="sr-thumb-placeholder" id="exportPreviewArt" aria-hidden="true"></span>
               </div>
               <h3>Summary</h3>
               <div class="sr-export-row"><span>Format</span><strong id="exportSummaryFormat">JPEG</strong></div>
@@ -2794,7 +2794,7 @@
           colorLabel: card.dataset.colorLabel || null,
           thumbnailPath: card.dataset.thumbnailPath || null,
           thumbnailBytes: null,
-          artClass: Array.from(card.querySelector(".sr-thumb-art")?.classList ?? []).find((className) => className.startsWith("sr-thumb-art-")) ?? "sr-thumb-art-a",
+          artClass: Array.from(card.querySelector(".sr-thumb-art")?.classList ?? []).find((className) => className.startsWith("sr-thumb-art-")) ?? null,
         };
       }
 
@@ -4262,7 +4262,8 @@
         }
 
         const art = document.createElement("span");
-        art.className = `sr-thumb-art ${photo.artClass ?? `sr-thumb-art-${String.fromCharCode(97 + (index % 8))}`}`;
+        art.className = "sr-thumb-placeholder";
+        art.dataset.placeholderState = photo?.unsupported ? "unsupported" : photo?.missing ? "missing" : "pending";
         art.setAttribute("aria-hidden", "true");
         return art;
       }
@@ -5407,7 +5408,7 @@
             ? `${exportBatchCountLabel(exportCount)} from ${selectedPhotoBaseName(photo)}`
             : `${selectedPhotoBaseName(photo)}_SilicaRAW.${exportFormatExtension(selectedExportFormat)}`)
           : "None";
-        exportPreviewArt.className = `sr-thumb-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
+        exportPreviewArt.className = "sr-thumb-placeholder";
         renderExportPreviewImage(photo);
         if (photo && (!exportOutputPath.value || exportOutputPath.dataset.autofilled === "true")) {
           exportOutputPath.value = defaultExportPath(photo);
@@ -5797,7 +5798,7 @@
       function syncDevelopSelection() {
         const photo = selectedPhoto();
         developPhotoName.textContent = photo?.fileName ?? "No photo selected";
-        developPreviewArt.className = `sr-develop-art ${photo?.artClass ?? "sr-thumb-art-a"}`;
+        developPreviewArt.className = "sr-develop-art sr-preview-placeholder";
         const disabled = !isDevelopable(photo);
         [
           developExposureSlider,
