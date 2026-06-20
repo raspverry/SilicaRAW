@@ -2474,6 +2474,7 @@ fn process_rebuild_dry_run_sidecar(
             sidecar_relative_path.clone(),
             error.to_string(),
         );
+        return Ok(());
     }
 
     let sidecar_photo_id = match json["photo"]["photo_id"].as_str() {
@@ -7154,8 +7155,8 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_dry_run_uses_metadata_fallback_and_defaults() {
-        let workspace = unique_library_root("sidecar-rebuild-precedence");
+    fn rebuild_dry_run_reports_schema_invalid_sidecars_without_entries() {
+        let workspace = unique_library_root("sidecar-rebuild-schema-invalid");
         let library_root = workspace.join("SilicaRAW Library");
         let import_root = workspace.join("Originals");
         let metadata_file = import_root.join("metadata.jpg");
@@ -7209,46 +7210,26 @@ mod tests {
             .expect("dry-run sidecar rebuild");
 
         assert_eq!(report.sidecars_scanned, 2);
-        assert_eq!(report.entries.len(), 2);
-        assert!(
+        assert_eq!(
             report
                 .issues
                 .iter()
                 .filter(|issue| issue.kind == CatalogRebuildDryRunIssueKind::SchemaInvalid)
-                .count()
-                >= 2,
+                .count(),
+            2,
             "schema-invalid sidecars must be reported"
         );
-
-        let metadata_entry = report
-            .entries
-            .iter()
-            .find(|entry| entry.photo_id == metadata_photo_id)
-            .expect("metadata entry");
-        assert_eq!(
-            metadata_entry.flag_source,
-            CatalogRebuildFlagSource::EditGraphMetadata
-        );
-        assert_eq!(metadata_entry.resolved_flags.rating, 2);
-        assert!(metadata_entry.resolved_flags.picked);
-        assert_eq!(
-            metadata_entry.resolved_flags.color_label.as_deref(),
-            Some("blue")
-        );
-
-        let defaults_entry = report
-            .entries
-            .iter()
-            .find(|entry| entry.photo_id == defaults_photo_id)
-            .expect("defaults entry");
-        assert_eq!(
-            defaults_entry.flag_source,
-            CatalogRebuildFlagSource::Defaults
-        );
-        assert_eq!(defaults_entry.resolved_flags.rating, 0);
-        assert!(!defaults_entry.resolved_flags.picked);
-        assert!(!defaults_entry.resolved_flags.rejected);
-        assert_eq!(defaults_entry.resolved_flags.color_label, None);
+        assert!(report.entries.is_empty());
+        assert!(report.issues.iter().any(|issue| {
+            issue.photo_id.as_deref() == Some(metadata_photo_id.as_str())
+                && issue.sidecar_relative_path
+                    == format!("{SIDECAR_DIRECTORY}/{metadata_photo_id}{SIDECAR_FILE_SUFFIX}")
+        }));
+        assert!(report.issues.iter().any(|issue| {
+            issue.photo_id.as_deref() == Some(defaults_photo_id.as_str())
+                && issue.sidecar_relative_path
+                    == format!("{SIDECAR_DIRECTORY}/{defaults_photo_id}{SIDECAR_FILE_SUFFIX}")
+        }));
 
         remove_library_root(&workspace);
     }

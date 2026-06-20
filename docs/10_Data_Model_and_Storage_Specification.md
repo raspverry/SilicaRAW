@@ -267,7 +267,7 @@ exported
 
 ## Catalog Rebuild from Sidecars
 
-When rebuilding from sidecars:
+When rebuilding from schema-valid sidecars:
 
 ```txt
 1. Use sidecar.flags when present and valid.
@@ -278,6 +278,8 @@ When rebuilding from sidecars:
    rejected = false
    color_label = null
 ```
+
+Schema-invalid sidecars are reported as dry-run issues only and do not produce rebuild entries.
 
 ## Conflict Rules
 
