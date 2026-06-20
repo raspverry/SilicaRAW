@@ -503,13 +503,15 @@ Conflict detection
 
 ### Rebuild precedence
 
-When rebuilding a catalog from sidecars:
+When rebuilding a catalog from schema-valid sidecars:
 
 ```txt
 1. sidecar.flags wins if present and valid.
 2. edit_graph.metadata is fallback.
 3. missing flags default to rating 0, picked false, rejected false, color_label null.
 ```
+
+Schema-invalid sidecars produce dry-run issues only. They must not produce rebuild entries that imply recoverable flag state.
 
 This prevents Codex from inventing a separate meaning for `flags`.
 

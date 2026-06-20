@@ -127,6 +127,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Schema-invalid sidecars should produce issues only during dry-run rebuild, not rebuild entries that imply recoverability.
 - **Acceptance:** Dry-run output separates recoverable rebuild work from invalid sidecar issues.
 - **Validation:** `python3 scripts/harness/check-sidecar-contract.py`
+- **Status:** Completed on 2026-06-20. Storage dry-run now stops schema-invalid sidecars at issue reporting, produces no rebuild entries for them, and documents that rebuild precedence applies only after sidecar schema validation passes.
 
 ### Q1.5: Verify Disposable Cache Clear Safety
 

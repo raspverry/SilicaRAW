@@ -60,7 +60,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Original hash protection. Phase 6.2 covers the connected local alpha workflow with an automated generated-fixture hash test in `silica-core`.
 - Edit graph serialization.
 - Sidecar read/write safety. Task 10.3 covers library-local paths, schema-aware validation, status update after success, malformed/mismatched read rejection, and original hash preservation.
-- Sidecar rebuild dry-run safety. Task 10.4 covers deterministic output, catalog non-mutation, precedence from `sidecar.flags` to `edit_graph.metadata` to defaults, and conflict/malformed-sidecar reporting.
+- Sidecar rebuild dry-run safety. Task 10.4 covers deterministic output, catalog non-mutation, precedence from `sidecar.flags` to `edit_graph.metadata` to defaults for schema-valid sidecars, and conflict/malformed/schema-invalid sidecar reporting.
 - Recovery policy safety. Task 10.5.1 covers backup boundaries, WAL checkpoint policy, restore target rules, disposable cache exclusion, and migration failure behavior.
 - Backup boundary safety. Task 10.5.2 covers checkpointed backup artifacts, manifest creation, cache/original/export-output exclusion, and latest WAL state preservation in the copied `catalog.db`.
 - Restore boundary safety. Task 10.5.3 covers restore into empty targets, rollback-protected restore into existing targets, restored edit/flag/sidecar/export/migration state, newer-schema rejection before target mutation, and original-file preservation.

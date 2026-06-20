@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Schema-invalid sidecar dry-run tightened
+
+- Completed Q1.4 of the local alpha quality closure plan.
+- Schema-invalid sidecars now produce dry-run issues only, not rebuild entries.
+- Clarified that sidecar rebuild precedence applies only after sidecar schema validation passes.
+
 ## [2026-06-20] quality | Missing originals downgraded
 
 - Completed Q1.3 of the local alpha quality closure plan.
