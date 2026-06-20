@@ -109,6 +109,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Prevent export destinations that resolve to the original file or the same inode through hard links.
 - **Acceptance:** Export cannot overwrite or mutate an original by path, symlink, or hard-link equivalence.
 - **Validation:** `cargo test -p silica-export hard_link`
+- **Status:** Completed on 2026-06-20. JPEG export and RAW proof export guards now compare existing output destinations by canonical path and Unix file identity before any output write.
 
 ### Q1.3: Downgrade Missing Originals from Ready State
 

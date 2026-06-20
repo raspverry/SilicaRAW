@@ -959,3 +959,9 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Completed Q1.1 of the local alpha quality closure plan.
 - Defined the installed-alpha source contract as JPEG/JPG-only for preview, Develop, and export readiness.
 - Recorded that RAW, PNG, TIFF, HEIC, database, and sidecar-like files may be cataloged by reference as unsupported product rows until later codec-specific proof adds end-to-end evidence.
+
+## [2026-06-20] quality | Export hard-link guard added
+
+- Completed Q1.2 of the local alpha quality closure plan.
+- Hardened export overwrite protection so existing output paths that are hard links to the original source are blocked before writes.
+- Covered both JPEG export and fixture-backed RAW proof export guard paths.

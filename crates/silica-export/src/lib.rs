@@ -1310,7 +1310,28 @@ fn paths_match(source_path: &PathBuf, output_path: &PathBuf) -> Result<bool, Exp
         return Ok(false);
     }
 
-    Ok(fs::canonicalize(source_path)? == fs::canonicalize(output_path)?)
+    if fs::canonicalize(source_path)? == fs::canonicalize(output_path)? {
+        return Ok(true);
+    }
+
+    paths_share_file_identity(source_path, output_path)
+}
+
+#[cfg(unix)]
+fn paths_share_file_identity(source_path: &Path, output_path: &Path) -> Result<bool, ExportError> {
+    use std::os::unix::fs::MetadataExt;
+
+    let source = fs::metadata(source_path)?;
+    let output = fs::metadata(output_path)?;
+    Ok(source.dev() == output.dev() && source.ino() == output.ino())
+}
+
+#[cfg(not(unix))]
+fn paths_share_file_identity(
+    _source_path: &Path,
+    _output_path: &Path,
+) -> Result<bool, ExportError> {
+    Ok(false)
 }
 
 fn apply_exposure_contrast(image: &mut image::RgbImage, exposure: f64, contrast: f64) {
@@ -2600,6 +2621,42 @@ mod tests {
         .expect_err("same source/output path should fail");
 
         assert!(error.to_string().contains("output path must differ"));
+        remove_export_root(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_to_export_over_original_hard_link() {
+        let root = unique_export_root("same-hard-link");
+        let source_path = root.join("source.jpg");
+        let output_path = root.join("source-hard-link.jpg");
+        std::fs::create_dir_all(&root).expect("create export root");
+        write_source_jpeg(&source_path);
+        let original_before = std::fs::read(&source_path).expect("read original before");
+        std::fs::hard_link(&source_path, &output_path).expect("create source hard link");
+
+        let error = super::export_jpeg_srgb(super::JpegSrgbExportRequest {
+            source_path: source_path.clone(),
+            output_path: output_path.clone(),
+            exposure: 0.0,
+            contrast: 0.0,
+            white_balance: super::WhiteBalanceAdjustment::neutral(),
+            tone_recovery: super::ToneRecoveryAdjustment::neutral(),
+            color_presence: super::ColorPresenceAdjustment::neutral(),
+            tone_curve: super::ToneCurveAdjustment::neutral(),
+            hsl_color_mixer: super::HslColorMixerAdjustment::neutral(),
+            detail: super::DetailAdjustment::neutral(),
+            geometry: super::GeometryAdjustment::neutral(),
+            masks: Vec::new(),
+            quality: 90,
+        })
+        .expect_err("hard-linked source/output path should fail");
+
+        assert!(error.to_string().contains("output path must differ"));
+        assert_eq!(
+            std::fs::read(&source_path).expect("read original after"),
+            original_before
+        );
         remove_export_root(&root);
     }
 

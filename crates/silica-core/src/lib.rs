@@ -6502,7 +6502,27 @@ fn paths_match(source_path: &PathBuf, output_path: &Path) -> Result<bool, CoreEr
         }
     };
 
-    Ok(source_path == output_path)
+    if source_path == output_path {
+        return Ok(true);
+    }
+
+    paths_share_file_identity(&source_path, &output_path)
+}
+
+#[cfg(unix)]
+fn paths_share_file_identity(source_path: &Path, output_path: &Path) -> Result<bool, CoreError> {
+    use std::os::unix::fs::MetadataExt;
+
+    let source = std::fs::metadata(source_path)
+        .map_err(|error| CoreError::Storage(silica_storage::LibraryStorageError::from(error)))?;
+    let output = std::fs::metadata(output_path)
+        .map_err(|error| CoreError::Storage(silica_storage::LibraryStorageError::from(error)))?;
+    Ok(source.dev() == output.dev() && source.ino() == output.ino())
+}
+
+#[cfg(not(unix))]
+fn paths_share_file_identity(_source_path: &Path, _output_path: &Path) -> Result<bool, CoreError> {
+    Ok(false)
 }
 
 fn preview_status_from_render(status: silica_render::PreviewRenderStatus) -> PhotoPreviewStatus {
@@ -12010,6 +12030,58 @@ mod tests {
             )
         ));
         assert_original_hash(&raw_file, &file_hash(&raw_file), "RAW overwrite rejection");
+
+        remove_library_root(&workspace);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn raw_derived_jpeg_srgb_export_rejects_original_hard_link_before_decode() {
+        let workspace = unique_library_root("core-raw-export-hard-link");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let raw_file = import_root.join("sample.cr2");
+        let output_path = export_root.join("sample-hard-link.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        std::fs::write(&raw_file, b"raw placeholder").expect("write raw placeholder");
+        let original_hash = file_hash(&raw_file);
+        std::fs::hard_link(&raw_file, &output_path).expect("create raw source hard link");
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.cr2'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+        let probe = successful_raw_probe(&raw_file.display().to_string(), Some(5184), Some(3456));
+
+        let error = export_raw_photo_jpeg_srgb_from_probe(
+            &created.root_path,
+            &photo_id,
+            "A",
+            &probe,
+            &output_path,
+        )
+        .expect_err("RAW export cannot overwrite hard-linked original");
+
+        assert!(matches!(
+            error,
+            CoreError::RawExport(
+                silica_decode::RawFullResolutionExportSourceError::OutputMatchesSource(_)
+            )
+        ));
+        assert_original_hash(
+            &raw_file,
+            &original_hash,
+            "RAW hard-link overwrite rejection",
+        );
 
         remove_library_root(&workspace);
     }
