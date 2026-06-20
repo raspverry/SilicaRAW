@@ -6861,6 +6861,13 @@
         if (!photo) {
           return { status: "missing", message: "No preview session." };
         }
+        if (photo.missing) {
+          return {
+            fileName: photo.fileName,
+            status: "BlockedByDecode",
+            message: "Preview unavailable because the referenced source file is missing.",
+          };
+        }
         if (photo.unsupported) {
           return {
             fileName: photo.fileName,

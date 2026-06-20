@@ -118,6 +118,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** If the referenced original is missing, preview, histogram, Develop, and export states must show a missing-original block instead of `Ready`.
 - **Acceptance:** A catalog row with a deleted original cannot be developed or exported and does not show stale thumbnail readiness as proof of source availability.
 - **Validation:** targeted core/desktop tests plus workflow smoke.
+- **Status:** Completed on 2026-06-20. Runtime grid/query mapping, preview, histogram, Develop, export, and desktop command responses now downgrade deleted referenced originals to missing/blocked states and hide stale thumbnail readiness without mutating catalog state.
 
 ### Q1.4: Tighten Sidecar Rebuild Dry-Run Behavior
 

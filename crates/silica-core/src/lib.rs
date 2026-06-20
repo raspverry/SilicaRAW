@@ -2835,7 +2835,11 @@ pub fn list_library_photos(
 ) -> Result<Vec<silica_storage::LibraryPhotoGridItem>, CoreError> {
     let library_root_path = library_root_path.as_ref();
     ensure_jpeg_thumbnail_cache(library_root_path)?;
-    silica_storage::list_library_photos(library_root_path).map_err(CoreError::from)
+    let photos = silica_storage::list_library_photos(library_root_path)?;
+    Ok(photos
+        .into_iter()
+        .map(mark_runtime_missing_source)
+        .collect())
 }
 
 /// Query imported catalog photos by bounded page without cache hydration.
@@ -2843,7 +2847,13 @@ pub fn query_library_photos(
     library_root_path: impl AsRef<Path>,
     request: silica_storage::LibraryQueryRequest,
 ) -> Result<silica_storage::LibraryQueryPage<silica_storage::LibraryPhotoGridItem>, CoreError> {
-    silica_storage::query_library_photos(library_root_path, request).map_err(CoreError::from)
+    let mut page = silica_storage::query_library_photos(library_root_path, request)?;
+    page.items = page
+        .items
+        .into_iter()
+        .map(mark_runtime_missing_source)
+        .collect();
+    Ok(page)
 }
 
 /// Query one catalog page and hydrate JPEG thumbnails only for rows in that page.
@@ -5319,9 +5329,34 @@ fn preview_render_plan(
         Some(candidate) => candidate,
         None => return Ok(None),
     };
+    let source_path = PathBuf::from(&candidate.path);
+    if !source_path.is_file() {
+        return Ok(Some((
+            candidate.photo_id,
+            candidate.file_name,
+            silica_render::PreviewRenderPlan {
+                source_path: candidate.path,
+                status: silica_render::PreviewRenderStatus::BlockedByDecode,
+                color_behavior: silica_render::PreviewColorBehavior::DisplayProfileAware,
+                message: "Preview unavailable because the referenced source file is missing."
+                    .to_string(),
+            },
+        )));
+    }
     let decode_plan = silica_decode::plan_preview_decode(&candidate.path, candidate.unsupported);
     let render_plan = silica_render::plan_preview_render(decode_plan);
     Ok(Some((candidate.photo_id, candidate.file_name, render_plan)))
+}
+
+fn mark_runtime_missing_source(
+    mut photo: silica_storage::LibraryPhotoGridItem,
+) -> silica_storage::LibraryPhotoGridItem {
+    if !Path::new(&photo.path).is_file() {
+        photo.missing = true;
+        photo.thumbnail_path = None;
+        photo.thumbnail_cache_key = None;
+    }
+    photo
 }
 
 fn manual_mask_adjustments(
@@ -7351,6 +7386,12 @@ fn local_alpha_develop_source_block(
         return Ok(Some((
             "unsupported_source",
             "Develop edits are limited to JPEG/JPG source photos in this alpha.".to_string(),
+        )));
+    }
+    if !Path::new(&metadata.source_path).is_file() {
+        return Ok(Some((
+            "missing_source",
+            "Develop edits are blocked because the referenced source file is missing.".to_string(),
         )));
     }
     Ok(None)
@@ -9798,6 +9839,129 @@ mod tests {
             )
             .expect("count preview cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn missing_original_blocks_ready_preview_develop_and_export_without_writes() {
+        let workspace = unique_library_root("core-missing-original-readiness");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let jpeg_file = import_root.join("sample.jpg");
+        let output_path = export_root.join("sample-export.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_jpeg(&jpeg_file);
+        let created = create_library(&library_root).expect("create library");
+        import_folder(&created.root_path, &import_root).expect("import folder");
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        let photo_id: String = connection
+            .query_row(
+                "SELECT id FROM photos WHERE file_name = 'sample.jpg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("photo id");
+        drop(connection);
+
+        let cached_rows = list_library_photos(&created.root_path).expect("hydrate thumbnail");
+        let cached = cached_rows
+            .iter()
+            .find(|row| row.photo_id == photo_id)
+            .expect("cached row");
+        assert!(!cached.missing);
+        assert!(cached.thumbnail_path.is_some());
+
+        std::fs::remove_file(&jpeg_file).expect("remove referenced original");
+        let before_missing_counts = durable_catalog_counts(&created.catalog_path);
+        let before_stored_missing: i64 = {
+            let connection =
+                silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+            connection
+                .query_row(
+                    "SELECT missing FROM photos WHERE id = ?1",
+                    [&photo_id],
+                    |row| row.get(0),
+                )
+                .expect("read stored missing before runtime downgrade")
+        };
+        assert_eq!(before_stored_missing, 0);
+
+        let missing_rows = list_library_photos(&created.root_path).expect("list missing row");
+        let missing = missing_rows
+            .iter()
+            .find(|row| row.photo_id == photo_id)
+            .expect("missing row");
+        assert!(missing.missing);
+        assert!(missing.thumbnail_path.is_none());
+
+        let missing_page = query_library_photos(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                0,
+                10,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query missing row");
+        assert_eq!(missing_page.items.len(), 1);
+        assert!(missing_page.items[0].missing);
+        assert!(missing_page.items[0].thumbnail_path.is_none());
+
+        let preview = open_photo_preview(&created.root_path, &photo_id)
+            .expect("open missing preview")
+            .expect("missing preview session");
+        assert_eq!(preview.status, PhotoPreviewStatus::BlockedByDecode);
+        assert!(preview.message.contains("source file is missing"));
+        assert!(preview.preview_bytes.is_none());
+
+        let histogram = get_photo_histogram(&created.root_path, &photo_id)
+            .expect("get missing histogram")
+            .expect("missing histogram");
+        assert_eq!(histogram.status, PhotoHistogramStatus::Missing);
+        assert_eq!(histogram.pixel_count, 0);
+
+        let develop_preview =
+            preview_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, 4.0)
+                .expect("preview missing develop")
+                .expect("missing develop preview");
+        assert_eq!(develop_preview.status, PhotoPreviewStatus::BlockedByDecode);
+        assert!(develop_preview.develop_preview_bytes.is_none());
+
+        let commit_error = commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.5, 4.0)
+            .expect_err("missing source Develop commit must be blocked");
+        assert!(matches!(commit_error, CoreError::UnsupportedEdit(_)));
+        assert!(commit_error.to_string().contains("source file is missing"));
+        assert!(
+            silica_storage::load_active_edit_graph(&created.root_path, &photo_id)
+                .expect("load missing source active graph")
+                .is_none(),
+            "missing source Develop commit must not write active edit graph"
+        );
+
+        let export_error = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+            .expect_err("missing source export must be blocked");
+        assert!(matches!(export_error, CoreError::ExportBlocked(_)));
+        assert!(export_error.to_string().contains("source file is missing"));
+        assert!(!output_path.exists());
+        let after_missing_counts = durable_catalog_counts(&created.catalog_path);
+        assert_eq!(after_missing_counts, before_missing_counts);
+        let after_stored_missing: i64 = {
+            let connection =
+                silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+            connection
+                .query_row(
+                    "SELECT missing FROM photos WHERE id = ?1",
+                    [&photo_id],
+                    |row| row.get(0),
+                )
+                .expect("read stored missing after runtime downgrade")
+        };
+        assert_eq!(after_stored_missing, 0);
 
         remove_library_root(&workspace);
     }
