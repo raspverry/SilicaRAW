@@ -5836,7 +5836,8 @@ mod tests {
         silica_core::import_folder(&library_root, &import_root).expect("import folder");
 
         let photo_id = stable_catalog_id("photo", &supported_file.display().to_string());
-        let preview = super::open_photo_preview(library_root.display().to_string(), photo_id);
+        let preview =
+            super::open_photo_preview(library_root.display().to_string(), photo_id.clone());
 
         assert!(preview.ok);
         match response_data(&preview) {
@@ -5853,6 +5854,56 @@ mod tests {
                 assert!(preview_bytes.as_ref().is_some_and(|bytes| bytes.len() > 2));
             }
             other => panic!("unexpected response data: {other:?}"),
+        }
+
+        std::fs::remove_file(&supported_file).expect("remove referenced original");
+        let grid = super::list_library_photos(library_root.display().to_string());
+        assert!(grid.ok);
+        match response_data(&grid) {
+            super::DesktopCommandData::PhotoGrid { photos } => {
+                assert_eq!(photos.len(), 1);
+                assert!(photos[0].missing);
+                assert!(photos[0].thumbnail_path.is_none());
+                assert!(photos[0].thumbnail_bytes.is_none());
+            }
+            other => panic!("unexpected missing grid response data: {other:?}"),
+        }
+
+        let paged_grid = super::query_library_photos(
+            library_root.display().to_string(),
+            super::DesktopLibraryQueryRequest {
+                offset: 0,
+                limit: 10,
+                sort: "file_name_asc".to_string(),
+                filters: super::DesktopLibraryQueryFilters::default(),
+            },
+        );
+        assert!(paged_grid.ok);
+        match response_data(&paged_grid) {
+            super::DesktopCommandData::PhotoGridPage { photos, .. } => {
+                assert_eq!(photos.len(), 1);
+                assert!(photos[0].missing);
+                assert!(photos[0].thumbnail_path.is_none());
+                assert!(photos[0].thumbnail_bytes.is_none());
+            }
+            other => panic!("unexpected missing paged grid response data: {other:?}"),
+        }
+
+        let missing_preview =
+            super::open_photo_preview(library_root.display().to_string(), photo_id);
+        assert!(missing_preview.ok);
+        match response_data(&missing_preview) {
+            super::DesktopCommandData::PhotoPreview {
+                status,
+                message,
+                preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "BlockedByDecode");
+                assert!(message.contains("source file is missing"));
+                assert!(preview_bytes.is_none());
+            }
+            other => panic!("unexpected missing preview response data: {other:?}"),
         }
 
         remove_library_root(&workspace);

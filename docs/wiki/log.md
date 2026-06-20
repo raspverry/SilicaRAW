@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Missing originals downgraded
+
+- Completed Q1.3 of the local alpha quality closure plan.
+- Missing referenced originals now block preview, histogram, Develop, and export readiness.
+- Desktop grid mapping hides stale thumbnail readiness for missing source rows without mutating catalog state.
+
 ## [2026-06-20] local-alpha | Quality closure route added
 
 - Added the Local Alpha Quality Closure Plan for data trust, photo-first UI polish, interaction QA, installed app QA, and DMG readiness.
