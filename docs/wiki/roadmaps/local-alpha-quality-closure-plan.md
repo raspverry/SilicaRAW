@@ -183,6 +183,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Align headings, row spacing, labels, button sizes, status copy, and disabled states across panels.
 - **Acceptance:** Inspector content does not shift between unrelated component styles from screen to screen.
 - **Validation:** static UI checks, visual QA, manual review.
+- **Status:** Completed on 2026-06-20. Right inspector sections now use a tighter shared section rhythm, label/value rows share the same control typography, Export summary and recent-export headings no longer overpower inspector headings, disabled controls are demoted in scoped panel contexts, and batch export failures separate file name from block reason. The ready Develop visual QA state now also asserts the mask support copy stays `Manual`, not `Unsupported`.
 
 ### Q2.6: Resolve Known Visual Contradictions
 

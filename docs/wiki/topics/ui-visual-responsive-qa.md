@@ -34,6 +34,8 @@ Task Q2.3 updates thumbnail card density. Unsupported and missing card states ke
 
 Task Q2.4 updates preview-state honesty. Legal JPEG/JPG fixtures now use deterministic photo-like reference scenes instead of gradient/checker mockups, unavailable rows cannot leak stale thumbnail bytes through the desktop command boundary, and the runner captures ready, unsupported, and missing-original preview states separately.
 
+Task Q2.5 updates inspector density and panel rhythm. Right inspector sections, Export summary rows, Preferences two-line selectors, scoped disabled controls, and batch export failure rows now use consistent compact desktop rhythm. The runner also checks that the ready Develop state does not display unsupported mask support copy.
+
 Expanded Task 22.1 surfaces:
 
 | Surface | State |

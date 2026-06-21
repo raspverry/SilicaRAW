@@ -5309,7 +5309,11 @@
       function renderExportBatchFailures() {
         exportBatchFailureList.replaceChildren(...exportBatchFailures.map((failure) => {
           const item = document.createElement("li");
-          item.textContent = `${failure.fileName}: ${failure.message}`;
+          const name = document.createElement("strong");
+          name.textContent = failure.fileName;
+          const message = document.createElement("span");
+          message.textContent = failure.message;
+          item.append(name, message);
           return item;
         }));
       }

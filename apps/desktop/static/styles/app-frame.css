@@ -310,9 +310,14 @@ body {
   margin-top: var(--sr-space-lg);
 }
 
+.sr-inspector-section + .sr-inspector-section {
+  margin-top: 0;
+}
+
 .sr-panel-heading {
   color: var(--sr-text-primary);
   font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
   font-weight: 700;
 }
 
@@ -2293,7 +2298,7 @@ progress::-webkit-progress-value {
 }
 
 .sr-preferences-section-button {
-  min-height: 58px;
+  min-height: 56px;
   display: grid;
   align-content: center;
   justify-items: start;
@@ -2387,11 +2392,11 @@ progress::-webkit-progress-value {
 .sr-preferences-row :disabled,
 .sr-preferences-toggle input:disabled {
   cursor: not-allowed;
-  opacity: 0.62;
+  opacity: 0.72;
 }
 
 .sr-preferences-toggle {
-  min-height: 58px;
+  min-height: 56px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -2644,7 +2649,7 @@ progress::-webkit-progress-value {
 }
 
 .sr-export-color-choice {
-  min-height: 52px;
+  min-height: 56px;
   display: grid;
   align-content: center;
   gap: var(--sr-space-2xs);
@@ -2681,7 +2686,7 @@ progress::-webkit-progress-value {
 
 .sr-export-color-choice:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.72;
 }
 
 .sr-export-color-proof {
@@ -2717,11 +2722,13 @@ progress::-webkit-progress-value {
 }
 
 .sr-export-batch-header strong,
-.sr-recent-export-panel h3 {
+.sr-recent-export-panel h3,
+.sr-export-summary h3 {
+  margin: 0;
   color: var(--sr-text-primary);
   font-size: var(--sr-type-control);
   line-height: var(--sr-line-control);
-  margin: 0;
+  font-weight: 700;
 }
 
 .sr-export-batch-header span {
@@ -2762,7 +2769,26 @@ progress::-webkit-progress-value {
 }
 
 .sr-export-failure-list li {
+  display: grid;
+  gap: var(--sr-space-2xs);
   border-color: color-mix(in srgb, var(--sr-danger) 35%, var(--sr-border-subtle));
+}
+
+.sr-export-failure-list li strong,
+.sr-export-failure-list li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-export-failure-list li strong {
+  color: var(--sr-text-primary);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
+}
+
+.sr-export-failure-list li span {
+  color: var(--sr-text-tertiary);
 }
 
 .sr-recent-export-row strong,
@@ -2820,13 +2846,6 @@ progress::-webkit-progress-value {
   object-fit: cover;
 }
 
-.sr-export-summary h3 {
-  margin: 0;
-  color: var(--sr-text-primary);
-  font-size: var(--sr-type-heading);
-  line-height: var(--sr-line-heading);
-}
-
 .sr-export-dialog-footer {
   grid-template-columns: minmax(0, 1fr) auto auto;
   border-top: 1px solid var(--sr-border-subtle);
@@ -2841,20 +2860,21 @@ progress::-webkit-progress-value {
   gap: var(--sr-space-md);
   color: var(--sr-text-secondary);
   font-size: var(--sr-type-control);
-}
-
-.sr-export-row strong {
-  color: var(--sr-text-primary);
+  line-height: var(--sr-line-control);
 }
 
 .sr-metadata-row {
   align-items: flex-start;
 }
 
+.sr-export-row span:first-child,
 .sr-metadata-row span:first-child {
   flex: 0 0 auto;
+  color: var(--sr-text-secondary);
+  font-weight: 600;
 }
 
+.sr-export-row strong,
 .sr-metadata-row strong,
 .sr-metadata-row span:last-child {
   min-width: 0;
@@ -2940,6 +2960,7 @@ progress::-webkit-progress-value {
 }
 
 .sr-inspector-section {
+  gap: var(--sr-space-md);
   padding: var(--sr-space-lg);
   border-bottom: 1px solid var(--sr-border-subtle);
 }
@@ -2952,7 +2973,7 @@ progress::-webkit-progress-value {
 
 .sr-selection-summary {
   display: grid;
-  gap: var(--sr-space-xs);
+  gap: var(--sr-space-2xs);
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background: var(--sr-surface-card);
@@ -2980,6 +3001,20 @@ progress::-webkit-progress-value {
 
 .sr-selection-summary button {
   min-height: 30px;
+  margin-top: var(--sr-space-xs);
+}
+
+.sr-selection-summary button:disabled,
+.sr-rating-control-group button:disabled,
+.sr-inspector-action:disabled,
+.sr-adjustment-control button:disabled,
+.sr-export-dialog-footer button:disabled,
+.sr-preferences-row button:disabled {
+  border-color: var(--sr-border-subtle);
+  background: var(--sr-surface-panel);
+  color: var(--sr-text-disabled);
+  cursor: default;
+  opacity: 0.72;
 }
 
 .sr-rating-control-group {
@@ -3003,7 +3038,7 @@ progress::-webkit-progress-value {
 
 #cullingStatus {
   min-height: auto;
-  margin: var(--sr-space-xs) 0 0;
+  margin: 0;
   color: var(--sr-text-tertiary);
   font-size: var(--sr-type-control);
   line-height: var(--sr-line-control);
