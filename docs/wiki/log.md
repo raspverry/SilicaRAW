@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Inspector rhythm unified
+
+- Completed Q2.5 of the local alpha quality closure plan.
+- Right inspector, Export summary, Preferences selector, and disabled-control rhythm now share compact desktop panel treatment.
+- Batch export failures now separate file name from block reason, and ready Develop QA asserts mask support copy stays `Manual`.
+
 ## [2026-06-20] quality | Preview states made honest
 
 - Completed Q2.4 of the local alpha quality closure plan.

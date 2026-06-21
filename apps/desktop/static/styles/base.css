@@ -114,6 +114,12 @@ button:disabled {
   cursor: default;
 }
 
+button.primary:disabled {
+  border-color: var(--sr-border-subtle);
+  background: var(--sr-surface-panel);
+  color: var(--sr-text-disabled);
+}
+
 output {
   display: block;
   min-height: 72px;

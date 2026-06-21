@@ -1011,6 +1011,14 @@ def state_script(state):
     document.querySelector("#developPhotoName").textContent = "reference-urban.jpg";
     document.querySelector("#developPreviewStatus").textContent = "Preview Ready";
     document.querySelector("#developPreviewMessage").textContent = "Exposure 0.40, contrast 12.";
+    document.querySelector("#developMaskSelectedPhoto").value = "Selected photo: reference-urban.jpg";
+    document.querySelector("#developMaskSelectedPhoto").textContent = "Selected photo: reference-urban.jpg";
+    document.querySelector("#developMaskSupportStatus").value = "Manual";
+    document.querySelector("#developMaskSupportStatus").textContent = "Manual";
+    document.querySelector("#developMaskBoundaryStatus").value = "Manual masks read from committed edit state.";
+    document.querySelector("#developMaskBoundaryStatus").textContent = "Manual masks read from committed edit state.";
+    document.querySelector("#developMaskRawBoundaryStatus").value = "RAW masked export blocks before output until RAW decode is implemented.";
+    document.querySelector("#developMaskRawBoundaryStatus").textContent = "RAW masked export blocks before output until RAW decode is implemented.";
     document.querySelector("#developExposureSlider").value = "0.40";
     document.querySelector("#developExposureValue").value = "0.40";
     document.querySelector("#developContrastSlider").value = "12";
@@ -1853,6 +1861,8 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: develop photo selection not visible")
                     if develop_state["histogramStatus"] == "No photo selected.":
                         failures.append(f"{viewport_name} {surface_name}: histogram still reports no selection")
+                    if state == "develop" and metrics["maskState"]["supportStatus"] != "Manual":
+                        failures.append(f"{viewport_name} {surface_name}: ready Develop mask support state is inconsistent")
                     if develop_state["beforeDisabled"] or develop_state["afterDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: before/after controls disabled")
                     if develop_state["activePresetButtons"] != 1 or develop_state["disabledPresetButtons"] != 0:
