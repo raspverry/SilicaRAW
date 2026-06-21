@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="./styles/app-frame.css">
   </head>
   <body>
-    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome" data-sidebar-collapsed="false" data-inspector-collapsed="false" data-filmstrip-visible="true">
+    <div class="app-frame" id="appFrame" data-active-mode="library" data-library-state="welcome" data-library-view="welcome" data-library-has-photos="false" data-sidebar-collapsed="false" data-inspector-collapsed="false" data-filmstrip-visible="true">
       <header class="sr-toolbar" id="appToolbar" role="banner">
         <div class="sr-window-cluster" aria-hidden="true">
           <span class="sr-window-dot sr-window-dot-red"></span>
@@ -4371,6 +4371,7 @@
 
         const totalRows = libraryGridPage.totalCount;
         const pageRows = libraryPhotos.length;
+        appFrame.dataset.libraryHasPhotos = String(totalRows > 0);
         libraryPhotoCount.textContent = `${totalRows} photos`;
         allPhotosCount.textContent = String(totalRows);
         recentImportCount.textContent = String(pageRows);
@@ -6966,6 +6967,8 @@
         libraryGridShell.hidden = true;
         aiReviewSurface.hidden = true;
         appFrame.dataset.aiReviewActive = "false";
+        appFrame.dataset.libraryView = "loupe";
+        setLibraryWorkbenchChromeVisible(false);
         loupeSurface.hidden = false;
         renderLoupeFilmstrip();
         await previewSelectedPhoto();
@@ -6974,6 +6977,7 @@
       function closeLoupeView() {
         loupeSurface.hidden = true;
         aiReviewSurface.hidden = true;
+        appFrame.dataset.libraryView = "grid";
         libraryGridShell.hidden = false;
         setLibraryWorkbenchChromeVisible(true);
         setStatus("Library grid loaded.");
@@ -7164,6 +7168,7 @@
         loupeSurface.hidden = true;
         libraryGridShell.hidden = true;
         setLibraryWorkbenchChromeVisible(false);
+        appFrame.dataset.libraryView = "ai-review";
         libraryAllPhotosNav.classList.remove("is-active");
         openAiReviewButton.classList.add("is-active");
         appFrame.dataset.aiReviewActive = "true";
@@ -7176,6 +7181,7 @@
         aiReviewSurface.hidden = true;
         loupeSurface.hidden = true;
         appFrame.dataset.aiReviewActive = "false";
+        appFrame.dataset.libraryView = "grid";
         setLibraryWorkbenchChromeVisible(true);
         openAiReviewButton.classList.remove("is-active");
         libraryAllPhotosNav.classList.add("is-active");
@@ -7361,6 +7367,12 @@
 
       function setLibraryState(state) {
         appFrame.dataset.libraryState = state;
+        if (state === "welcome") {
+          appFrame.dataset.libraryView = "welcome";
+          appFrame.dataset.libraryHasPhotos = "false";
+        } else if (appFrame.dataset.libraryView === "welcome") {
+          appFrame.dataset.libraryView = "grid";
+        }
         libraryStatePanels.forEach((panel) => {
           panel.hidden = panel.dataset.libraryStatePanel !== state;
         });
