@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Photo-first Library hierarchy restored
+
+- Completed Q2.2 of the local alpha quality closure plan.
+- Populated Library now shows the photo grid before disposable cache maintenance when photos exist.
+- Loupe now hides Library header and maintenance chrome so the preview viewer is the primary surface.
+
 ## [2026-06-20] quality | UI mockup parity checklist added
 
 - Completed Q2.1 of the local alpha quality closure plan.

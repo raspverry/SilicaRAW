@@ -28,6 +28,8 @@ Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds 
 
 Task Q2.1 adds a separate [UI Mockup Parity Checklist](ui-mockup-parity-checklist.md) for product-level visual review. The checklist exists because automated visual QA can pass while a screen still fails the mockup's photo-first hierarchy, density, or state-treatment target.
 
+Task Q2.2 updates the visual QA state seeding for populated Library and Loupe parity. Populated Library screenshots now place the photo grid before disposable cache maintenance when photos exist, and Loupe screenshots hide Library maintenance chrome so the viewer surface is the first read.
+
 Expanded Task 22.1 surfaces:
 
 | Surface | State |

@@ -40,8 +40,8 @@ python3 scripts/harness/run-final-visual-qa.py
 
 | Surface | References | Current artifact | Severity | Actionable delta |
 |---|---|---|---|---|
-| Library Grid | `MockupUI/M003_Library_Grid_populated.png`, `M011`, `M012` | `desktop-1440-M003-library-populated.png` | P1 | Photo grid is not the first visual read. Maintenance, histogram, quick review, and metadata compete with thumbnails. Move maintenance/status treatment behind the browsing task and make supported photo thumbnails dominate. |
-| Library Loupe | `MockupUI/M004_Library_Loupe.png` | `desktop-1440-M004-loupe.png` | P0 | Loupe currently reads like a Library sub-state with a large card. Restore viewer dominance, reduce non-photo panels, and make selected-photo navigation/status feel like a dedicated viewing mode. |
+| Library Grid | `MockupUI/M003_Library_Grid_populated.png`, `M011`, `M012` | `desktop-1440-M003-library-populated.png` | P1 | Q2.2 moves the photo grid ahead of disposable cache maintenance when photos exist. Remaining work belongs to Q2.3 and Q2.5: reduce thumbnail badge/fixture noise and make inspector density less competitive with browsing. |
+| Library Loupe | `MockupUI/M004_Library_Loupe.png` | `desktop-1440-M004-loupe.png` | P1 | Q2.2 hides Library header and maintenance chrome in Loupe so the viewer becomes the primary read. Remaining work belongs to Q2.4 and Q2.5: make preview imagery/state more honest and reduce inspector competition. |
 | Develop | `MockupUI/M005_Develop_default.png`, `M013`, `M014` | `desktop-1440-M005-develop.png` | P0 | Develop currently reads as fixture/status plus controls. Increase real preview dominance, reduce boundary copy prominence, tighten preset rail density, and keep inspector groups visually restrained. |
 | Export Dialog | `MockupUI/M007_Export_Dialog.png`, `M015`, `M016` | `desktop-1440-M007-export.png` | P1 | Dialog structure is close, but it reads like a form dump. Improve section hierarchy, label/value rhythm, summary grouping, path truncation, and empty progress treatment without adding unsupported formats. |
 | Preferences Appearance | `MockupUI/M008_Preferences_Appearance.png` | `desktop-1440-M020-preferences-appearance.png` | P2 | Current scope is intentionally smaller than the mockup, but the page looks like a basic form. Strengthen section rail hierarchy, group supported Appearance controls, and reduce footer/status noise. |
@@ -54,7 +54,7 @@ Use this routing when implementing Phase Q2. Keep the execution order from the L
 
 | Task | Primary screens | Fix scope |
 |---|---|---|
-| Q2.2 Restore Photo-First Library Hierarchy | M003, M004 | Make the grid/loupe photo-first. Demote maintenance and diagnostic panels when photos exist. |
+| Q2.2 Restore Photo-First Library Hierarchy | M003, M004 | Completed: make the grid/loupe photo-first and demote maintenance when photos exist. |
 | Q2.3 Fix Thumbnail Card State Density | M003, M025 | Keep card badges, filename, rating, pick/reject, and unsupported state readable without repeated warning noise. |
 | Q2.4 Make Image Preview States Honest | M004, M005 | Render supported JPEG/JPG as real photos. Use neutral blocked states for unsupported or missing originals. Avoid fake-looking tinted or fixture imagery as product proof. |
 | Q2.5 Unify Inspector Density and Panel Rhythm | M003, M004, M005, M007, M008 | Align headings, row spacing, labels, button sizes, disabled states, and copy rhythm across right panels and dialogs. |
@@ -90,4 +90,3 @@ Manual review must inspect at least the standard `1440x900` screenshot for each 
 ## Notes for LLM Agents
 
 Passing DOM metrics does not mean the UI meets the mockup target. Use this page to choose the smallest visual fix that moves the current task forward. Keep visual polish tied to the local alpha workflow: import, browse, rate/pick/reject, preview, adjust exposure/contrast, persist, and export JPEG sRGB.
-

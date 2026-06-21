@@ -156,6 +156,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Reduce maintenance/status-board dominance, keep import and cache controls secondary, and make the photo grid the primary surface when photos exist.
 - **Acceptance:** The populated Library screen reads as a photo browser, not a diagnostic page.
 - **Validation:** `python3 scripts/harness/check-static-ui.py`, visual QA, manual screenshot review.
+- **Status:** Completed on 2026-06-20. Populated Library now uses explicit `grid`, `loupe`, and `ai-review` view state, places the photo grid before disposable cache maintenance when photos exist, demotes cache clear to a bottom utility strip, and hides Library maintenance chrome in Loupe so the viewer reads as the primary surface.
 
 ### Q2.3: Fix Thumbnail Card State Density
 

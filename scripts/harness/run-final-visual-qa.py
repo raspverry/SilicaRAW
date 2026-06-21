@@ -755,6 +755,8 @@ def state_script(state):
 
   function openLibraryBase(withPhotos = true) {{
     setMode("library");
+    app.dataset.libraryHasPhotos = String(withPhotos);
+    app.dataset.libraryView = "grid";
     app.dataset.aiReviewActive = "false";
     setLibraryState("open");
     importPanel.hidden = true;
@@ -789,6 +791,7 @@ def state_script(state):
     openLibraryBase(false);
   }} else if (state === "unsupported-grid") {{
     openLibraryBase(false);
+    app.dataset.libraryHasPhotos = "true";
     populateUnsupportedGrid();
     setHistogramState(true);
     document.querySelector("#appStatus").value = "Library grid loaded.";
@@ -874,7 +877,10 @@ def state_script(state):
     }});
   }} else if (state === "loupe") {{
     openLibraryBase(true);
+    app.dataset.libraryView = "loupe";
     gridShell.hidden = true;
+    libraryHeader.hidden = true;
+    cacheMaintenance.hidden = true;
     loupeSurface.hidden = false;
     document.querySelector("#loupePhotoName").textContent = "synthetic-gradient.jpg";
     document.querySelector("#loupePhotoRating").textContent = "****-";
