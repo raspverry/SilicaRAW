@@ -26,6 +26,8 @@ The earlier Phase 5.5 notes remain historical context. The current final runner 
 
 Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. Task 24.5 adds the AI approval state. The blocked-gate UI hardening path adds the unsupported-grid state. The runner now checks 25 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 75 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
 
+Task Q2.1 adds a separate [UI Mockup Parity Checklist](ui-mockup-parity-checklist.md) for product-level visual review. The checklist exists because automated visual QA can pass while a screen still fails the mockup's photo-first hierarchy, density, or state-treatment target.
+
 Expanded Task 22.1 surfaces:
 
 | Surface | State |
@@ -234,5 +236,6 @@ The CSS fix:
 
 - [UI MVP Baseline](ui-mvp-baseline.md)
 - [UI Mockups](ui-mockups.md)
+- [UI Mockup Parity Checklist](ui-mockup-parity-checklist.md)
 - [Product Alpha Runtime Completion](product-alpha-runtime-completion.md)
 - [Local DMG Distribution Plan](../roadmaps/local-dmg-distribution-plan.md)

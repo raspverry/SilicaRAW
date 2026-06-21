@@ -147,6 +147,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Compare actual screenshots against `MockupUI/M003`, `M004`, `M005`, `M007`, `M008`, `M009`, and `M010`. Record only actionable deltas.
 - **Acceptance:** The checklist prioritizes visual hierarchy, spacing, typography, panel density, image state, and copy problems. It does not ask for new product features.
 - **Validation:** manual screenshot review plus visual QA artifacts.
+- **Status:** Completed on 2026-06-20. Added the linked UI Mockup Parity Checklist for 25-surface visual QA artifacts, prioritizing photo-first hierarchy, viewer dominance, thumbnail/card density, honest preview states, inspector rhythm, and disabled/future-state demotion without adding product features.
 
 ### Q2.2: Restore Photo-First Library Hierarchy
 

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | UI mockup parity checklist added
+
+- Completed Q2.1 of the local alpha quality closure plan.
+- Added a UI mockup parity checklist comparing current visual QA artifacts against M003, M004, M005, M007, M008, M009, and M010.
+- Routed actionable visual deltas into Q2.2 through Q2.6 without requesting new product features.
+
 ## [2026-06-20] quality | Cache clear symlink boundary verified
 
 - Completed Q1.5 of the local alpha quality closure plan.
