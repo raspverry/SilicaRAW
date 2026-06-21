@@ -1242,10 +1242,10 @@ progress::-webkit-progress-value {
   display: block;
   min-height: auto;
   margin: 0;
-  padding: var(--sr-space-sm) var(--sr-space-md);
-  border: 1px solid var(--sr-border-default);
+  padding: var(--sr-space-xs) var(--sr-space-sm);
+  border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
-  background: color-mix(in srgb, var(--sr-accent-system) 12%, transparent);
+  background: color-mix(in srgb, var(--sr-surface-card) 78%, transparent);
   color: var(--sr-text-secondary);
   font-size: var(--sr-type-control);
   line-height: var(--sr-line-control);
@@ -1302,8 +1302,8 @@ progress::-webkit-progress-value {
 .sr-ai-review-card {
   min-width: 0;
   display: grid;
-  gap: var(--sr-space-sm);
-  padding: var(--sr-space-md);
+  gap: var(--sr-space-xs);
+  padding: var(--sr-space-sm);
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background: var(--sr-surface-card);
@@ -1316,8 +1316,7 @@ progress::-webkit-progress-value {
 }
 
 .sr-ai-review-card.is-selected {
-  border-color: var(--sr-accent-system);
-  box-shadow: 0 0 0 1px var(--sr-accent-system);
+  border-color: color-mix(in srgb, var(--sr-accent-system) 58%, var(--sr-border-subtle));
 }
 
 .sr-ai-review-card.is-approvable {
@@ -1332,8 +1331,8 @@ progress::-webkit-progress-value {
 
 .sr-ai-review-card strong {
   color: var(--sr-text-primary);
-  font-size: var(--sr-type-body);
-  line-height: var(--sr-line-body);
+  font-size: var(--sr-type-control);
+  line-height: var(--sr-line-control);
 }
 
 .sr-ai-review-card span,
@@ -1394,7 +1393,7 @@ progress::-webkit-progress-value {
 .sr-ai-review-action-preview {
   display: grid;
   gap: var(--sr-space-xs);
-  padding: var(--sr-space-md);
+  padding: var(--sr-space-sm);
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-sm);
   background: var(--sr-surface-card);
@@ -1414,6 +1413,11 @@ progress::-webkit-progress-value {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--sr-space-sm);
+}
+
+.sr-ai-review-approval-actions button.primary {
+  border-color: color-mix(in srgb, var(--sr-accent-silica-muted) 68%, var(--sr-border-subtle));
+  background: color-mix(in srgb, var(--sr-accent-silica) 82%, var(--sr-surface-raised));
 }
 
 .sr-ai-review-approval-note {
@@ -2511,6 +2515,28 @@ progress::-webkit-progress-value {
   color: var(--sr-text-tertiary);
   font-size: var(--sr-type-caption);
   line-height: var(--sr-line-caption);
+}
+
+.sr-preferences-panel[data-preferences-panel="advanced"] .sr-permission-contract-grid dd {
+  display: none;
+}
+
+.sr-preferences-panel[data-preferences-panel="advanced"] .sr-permission-contract {
+  gap: var(--sr-space-xs);
+  padding: var(--sr-space-xs);
+}
+
+.sr-preferences-panel[data-preferences-panel="advanced"] .sr-permission-contract-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sr-space-xs);
+}
+
+.sr-preferences-panel[data-preferences-panel="advanced"] .sr-permission-contract-grid div {
+  padding: var(--sr-space-2xs) var(--sr-space-xs);
+}
+
+.sr-preferences-panel[data-preferences-panel="advanced"] .sr-permission-contract > p {
+  margin-top: 0;
 }
 
 .sr-preferences-dialog-footer {
@@ -3825,6 +3851,7 @@ progress::-webkit-progress-value {
   gap: var(--sr-space-sm);
   padding-block: var(--sr-space-sm);
   border-block: 1px solid var(--sr-border-subtle);
+  scroll-margin-block-start: var(--sr-space-md);
 }
 
 .sr-history-command-row {

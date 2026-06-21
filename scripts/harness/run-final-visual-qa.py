@@ -1198,7 +1198,7 @@ def state_script(state):
           return item;
         }})
       );
-      document.querySelector("#developHistoryPanel").scrollIntoView({{ block: "center" }});
+      document.querySelector("#developHistoryPanel").scrollIntoView({{ block: "start" }});
     }} else if (state === "mask-active" || state === "mask-editor") {{
       const maskRows = {{
         brush: ["#developMaskBrushRow", "#developMaskBrushName", "#developMaskBrushSummary", "#developMaskBrushState"],
@@ -1265,7 +1265,7 @@ def state_script(state):
     }} else if (state === "develop-expanded") {{
       document.querySelector("#developHslPanel").scrollIntoView({{ block: "center" }});
     }} else if (state === "develop-history") {{
-      document.querySelector("#developHistoryPanel").scrollIntoView({{ block: "center" }});
+      document.querySelector("#developHistoryPanel").scrollIntoView({{ block: "start" }});
     }} else if (state === "develop") {{
       document.querySelector("#rightInspector").scrollTop = 0;
     }} else {{
@@ -1679,6 +1679,12 @@ def metric_script(surface):
       ].every((selector) => disabled(selector)),
       promptContractVisible: visible(document.querySelector("#permissionPromptContract")),
       promptContractText: text("#permissionPromptContract"),
+      pluginContractVisible: visible(document.querySelector("#pluginPermissionReview")),
+      pluginContractFullyVisible: (() => {{
+        const plugin = document.querySelector("#pluginPermissionReview")?.getBoundingClientRect();
+        const pane = document.querySelector(".sr-preferences-pane")?.getBoundingClientRect();
+        return !plugin || !pane || (plugin.top >= pane.top && plugin.bottom <= pane.bottom);
+      }})(),
       status: text("#preferencesStatus"),
     }},
     exportWorkflow: {{
@@ -1694,6 +1700,7 @@ def metric_script(surface):
       metadataSummary: text("#exportSummaryMetadata"),
       colorSummary: text("#exportSummaryColor"),
       selectedPhoto: text("#exportSelectedPhotoName"),
+      safetyText: text("#exportSafetyNote"),
     }},
   }};
 }})()
@@ -1984,6 +1991,8 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: advanced access status missing")
                     if not preferences_state["promptContractVisible"]:
                         failures.append(f"{viewport_name} {surface_name}: permission prompt contract not visible")
+                    if not preferences_state["pluginContractVisible"] or not preferences_state["pluginContractFullyVisible"]:
+                        failures.append(f"{viewport_name} {surface_name}: plugin permission review is clipped")
                     for marker in [
                         "Actor",
                         "Requested permission",
@@ -2001,6 +2010,8 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: export workflow selection not visible")
                     if export_workflow["colorSpace"] != "Display P3" or not export_workflow["displayP3Selected"]:
                         failures.append(f"{viewport_name} {surface_name}: export Display P3 state not visible")
+                    if export_workflow["colorSummary"] != "Display P3" or "Display P3" not in export_workflow["safetyText"]:
+                        failures.append(f"{viewport_name} {surface_name}: export color summary or safety copy contradicts Display P3")
                     if export_workflow["metadataPolicy"] != "preserve" or export_workflow["metadataSummary"] != "Preserve":
                         failures.append(f"{viewport_name} {surface_name}: export metadata policy not visible")
                     if str(export_workflow["progress"]) != "50" or export_workflow["progressLabel"] != "1 / 2":

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Visual contradictions resolved
+
+- Completed Q2.6 of the local alpha quality closure plan.
+- Export Display P3 state now keeps field, summary, and safety copy coherent in visual QA.
+- Advanced Preferences, Develop History, and AI Review states now stay readable without making deferred or approval-gated paths louder than the editor workflow.
+
 ## [2026-06-20] quality | Inspector rhythm unified
 
 - Completed Q2.5 of the local alpha quality closure plan.

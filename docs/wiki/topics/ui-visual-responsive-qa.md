@@ -36,6 +36,8 @@ Task Q2.4 updates preview-state honesty. Legal JPEG/JPG fixtures now use determi
 
 Task Q2.5 updates inspector density and panel rhythm. Right inspector sections, Export summary rows, Preferences two-line selectors, scoped disabled controls, and batch export failure rows now use consistent compact desktop rhythm. The runner also checks that the ready Develop state does not display unsupported mask support copy.
 
+Task Q2.6 resolves the remaining visual contradictions in the Q2 polish pass. The runner now checks that Export Display P3 selection does not contradict summary or safety copy, Advanced Preferences keeps plugin permission review visible, Develop History opens on the readable history panel, and AI Review states are quieter than the core editing workflow while still showing explicit approval gates.
+
 Expanded Task 22.1 surfaces:
 
 | Surface | State |

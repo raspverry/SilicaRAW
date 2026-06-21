@@ -192,6 +192,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Fix contradictory export states, clipped advanced preferences content, unreadable history density, and over-prominent AI review states while keeping disabled future paths honest.
 - **Acceptance:** Blocked or future features are clear but not visually louder than the editor workflow.
 - **Validation:** visual QA surfaces `M017`, `M021`, `M022`, `M023`, and `M024`.
+- **Status:** Completed on 2026-06-20. Export workflow Display P3 state now keeps the read-only field, summary, and safety copy consistent; Advanced Preferences compresses permission-contract readback so the plugin review is not clipped; Develop History opens directly on the readable history panel; and AI Review/approval states use quieter status, selected-card, and action emphasis while preserving explicit approval gates.
 
 ## Phase Q3: Interaction, Keyboard, Accessibility, and Resize Gate
 
