@@ -30,6 +30,8 @@ Task Q2.1 adds a separate [UI Mockup Parity Checklist](ui-mockup-parity-checklis
 
 Task Q2.2 updates the visual QA state seeding for populated Library and Loupe parity. Populated Library screenshots now place the photo grid before disposable cache maintenance when photos exist, and Loupe screenshots hide Library maintenance chrome so the viewer surface is the first read.
 
+Task Q2.3 updates thumbnail card density. Unsupported and missing card states keep a single textual state badge while removing repeated file-type and empty-rating labels; supported cards keep a fixed-width rating slot so filenames and ratings do not push into each other at compact width.
+
 Expanded Task 22.1 surfaces:
 
 | Surface | State |

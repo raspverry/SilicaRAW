@@ -470,20 +470,26 @@ def state_script(state):
     card.type = "button";
     card.classList.toggle("is-selected", index === 0);
     card.classList.toggle("is-rejected", Boolean(photo.rejected));
+    card.classList.toggle("is-missing", Boolean(photo.missing) || photo.state === "Missing");
+    card.classList.toggle("is-unsupported", Boolean(photo.unsupported) || photo.state === "Unsupported");
     if (photo.src) {{
       card.append(thumb(photo.src));
     }} else {{
       card.append(placeholder());
     }}
-    const badge = document.createElement("span");
-    badge.className = "sr-file-badge";
-    badge.textContent = photo.fileType;
     const badgeRow = document.createElement("span");
     badgeRow.className = "sr-card-badges";
-    badgeRow.append(badge);
+    const isUnavailable = Boolean(photo.missing) || photo.state === "Missing" || Boolean(photo.unsupported) || photo.state === "Unsupported";
+    if (!isUnavailable) {{
+      const badge = document.createElement("span");
+      badge.className = "sr-file-badge";
+      badge.textContent = photo.fileType;
+      badgeRow.append(badge);
+    }}
     if (photo.state) {{
       const stateBadge = document.createElement("span");
-      stateBadge.className = `sr-card-state ${{photo.stateClass || ""}}`.trim();
+      const stateClass = photo.stateClass || (photo.state === "Missing" || photo.state === "Unsupported" || photo.state === "Blocked" ? "sr-card-state-muted" : "");
+      stateBadge.className = `sr-card-state ${{stateClass}}`.trim();
       stateBadge.textContent = photo.state;
       badgeRow.append(stateBadge);
     }}
@@ -493,6 +499,7 @@ def state_script(state):
     const name = document.createElement("span");
     name.textContent = photo.fileName;
     const rating = document.createElement("span");
+    rating.className = "sr-card-rating";
     rating.textContent = photo.rating || "-----";
     footer.append(name, rating);
     card.append(footer);

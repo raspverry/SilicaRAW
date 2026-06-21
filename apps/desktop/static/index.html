@@ -4200,10 +4200,10 @@
 
       function cardState(photo) {
         if (photo.missing) {
-          return { className: "", label: "Missing" };
+          return { className: "sr-card-state-muted", label: "Missing" };
         }
         if (photo.unsupported) {
-          return { className: "", label: "Unsupported" };
+          return { className: "sr-card-state-muted", label: "Unsupported" };
         }
         if (photo.rejected) {
           return { className: "sr-card-state-reject", label: "Reject" };
@@ -4662,10 +4662,12 @@
         const badgeRow = document.createElement("span");
         badgeRow.className = "sr-card-badges";
 
-        const badge = document.createElement("span");
-        badge.className = "sr-file-badge";
-        badge.textContent = photo.fileType || "FILE";
-        badgeRow.append(badge);
+        if (!photo.missing && !photo.unsupported) {
+          const badge = document.createElement("span");
+          badge.className = "sr-file-badge";
+          badge.textContent = photo.fileType || "FILE";
+          badgeRow.append(badge);
+        }
 
         if (state) {
           const stateBadge = document.createElement("span");
@@ -4680,6 +4682,7 @@
         const name = document.createElement("span");
         name.textContent = photo.fileName;
         const rating = document.createElement("span");
+        rating.className = "sr-card-rating";
         rating.textContent = stars(photo.rating);
         footer.append(name, rating);
         card.append(footer);

@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Thumbnail card density reduced
+
+- Completed Q2.3 of the local alpha quality closure plan.
+- Unsupported and missing thumbnail cards now keep one text state badge instead of repeating file-type and empty rating labels.
+- Supported thumbnail ratings now use a fixed-width footer slot to reduce filename/rating pressure at compact width.
+
 ## [2026-06-20] quality | Photo-first Library hierarchy restored
 
 - Completed Q2.2 of the local alpha quality closure plan.

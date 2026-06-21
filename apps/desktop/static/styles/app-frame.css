@@ -1622,6 +1622,12 @@ progress::-webkit-progress-value {
   color: var(--sr-text-secondary);
 }
 
+.sr-card-state-muted {
+  border-color: color-mix(in srgb, var(--sr-border-subtle) 72%, transparent);
+  background: color-mix(in srgb, var(--sr-bg-secondary) 72%, transparent);
+  color: var(--sr-text-tertiary);
+}
+
 .sr-card-state-pick {
   border-color: var(--sr-success);
   color: var(--sr-success);
@@ -1647,9 +1653,27 @@ progress::-webkit-progress-value {
   line-height: var(--sr-line-caption);
 }
 
+.sr-photo-card.is-missing .sr-card-footer,
+.sr-photo-card.is-unsupported .sr-card-footer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sr-photo-card.is-missing .sr-card-rating,
+.sr-photo-card.is-unsupported .sr-card-rating {
+  display: none;
+}
+
 .sr-card-footer span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-card-rating {
+  width: 5ch;
+  justify-self: end;
+  overflow: hidden;
+  text-align: right;
   white-space: nowrap;
 }
 
