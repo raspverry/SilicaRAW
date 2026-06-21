@@ -165,6 +165,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Prevent metadata, filename, badges, and unsupported labels from overlapping. Keep unsupported state compact and non-repetitive.
 - **Acceptance:** Grid cards remain readable at standard and compact desktop widths. Unsupported files are clear without filling every card with noisy warnings.
 - **Validation:** visual QA including `M025-library-unsupported-grid`.
+- **Status:** Completed on 2026-06-20. Unsupported and missing thumbnail cards now keep one textual state badge, remove duplicated file-type and empty-rating noise, and keep supported-card ratings on a fixed-width footer slot for compact and standard grid widths.
 
 ### Q2.4: Make Image Preview States Honest
 
