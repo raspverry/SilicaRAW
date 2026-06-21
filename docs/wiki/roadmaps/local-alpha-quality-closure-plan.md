@@ -22,7 +22,7 @@ The current product is not yet a user-ready local alpha DMG. Until the signed/no
 - Storage review: source support, export overwrite, and missing-original states need trust hardening before visual polish.
 - Architecture review: scope must freeze until the local alpha workflow is sealed.
 - Mockup source set: `MockupUI/M001` through `MockupUI/M016`.
-- Current automated visual QA result: 25 surfaces, 75 screenshots across `1280x800`, `1440x900`, and `1728x965`.
+- Current automated visual QA result: 28 surfaces, 84 screenshots across `1280x800`, `1440x900`, and `1728x965`.
 
 ## Closure Order
 
@@ -71,7 +71,7 @@ Follow this order. Do not polish around broken trust states.
 
 - **Location:** `docs/wiki/topics/ui-visual-responsive-qa.md`, `scripts/harness/run-final-visual-qa.py`
 - **Dependencies:** none
-- **Work:** Align docs with the runner's current 25-surface, 75-screenshot result set, including `M025-library-unsupported-grid`.
+- **Work:** Align docs with the runner's current 28-surface, 84-screenshot result set, including `M025-library-unsupported-grid`, `M026-loupe-unsupported`, `M027-loupe-missing`, and `M028-develop-unsupported`.
 - **Acceptance:** Docs and runner agree on surface count, viewport count, and artifact location.
 - **Validation:** `python3 scripts/harness/run-final-visual-qa.py` when UI files change; docs-only changes may use link checks.
 
@@ -147,7 +147,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Compare actual screenshots against `MockupUI/M003`, `M004`, `M005`, `M007`, `M008`, `M009`, and `M010`. Record only actionable deltas.
 - **Acceptance:** The checklist prioritizes visual hierarchy, spacing, typography, panel density, image state, and copy problems. It does not ask for new product features.
 - **Validation:** manual screenshot review plus visual QA artifacts.
-- **Status:** Completed on 2026-06-20. Added the linked UI Mockup Parity Checklist for 25-surface visual QA artifacts, prioritizing photo-first hierarchy, viewer dominance, thumbnail/card density, honest preview states, inspector rhythm, and disabled/future-state demotion without adding product features.
+- **Status:** Completed on 2026-06-20. Added the linked UI Mockup Parity Checklist for the then-current 25-surface visual QA artifacts, prioritizing photo-first hierarchy, viewer dominance, thumbnail/card density, honest preview states, inspector rhythm, and disabled/future-state demotion without adding product features.
 
 ### Q2.2: Restore Photo-First Library Hierarchy
 
@@ -174,6 +174,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Supported JPEG/JPG photos should render as normal photos. Unsupported or missing originals should use a deliberate neutral blocked state, not tinted mockup imagery or fake preview content.
 - **Acceptance:** Users can tell whether they are seeing a real selected photo, a cached thumbnail, or an unavailable source state.
 - **Validation:** workflow smoke plus manual screenshot review with a real local sample folder.
+- **Status:** Completed on 2026-06-20. Supported visual QA JPEG fixtures now render as deterministic photo-like reference images instead of gradient/checker mockups, unavailable rows cannot leak stale thumbnail bytes through the desktop command boundary, and Loupe/Develop explicitly distinguish ready, unsupported, and missing-original states with no preview image for unavailable sources.
 
 ### Q2.5: Unify Inspector Density and Panel Rhythm
 
@@ -248,7 +249,7 @@ Follow this order. Do not polish around broken trust states.
 - **Location:** harness or lightweight docs check
 - **Dependencies:** Q0.2
 - **Work:** Detect runner/docs mismatch for surface count or known surface IDs without making screenshot generation mandatory.
-- **Acceptance:** A future `M026` cannot be added to the runner while the wiki still claims `M025`.
+- **Acceptance:** A future `M029` cannot be added to the runner while the wiki still claims `M028`.
 - **Validation:** targeted script check or documented manual gate.
 
 ### Q4.3: Separate Static UI QA from Installed App QA

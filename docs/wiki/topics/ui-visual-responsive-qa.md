@@ -24,13 +24,15 @@ The earlier Phase 5.5 notes remain historical context. The current final runner 
 
 ## Phase 22 Expanded Surface Set
 
-Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. Task 24.5 adds the AI approval state. The blocked-gate UI hardening path adds the unsupported-grid state. The runner now checks 25 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 75 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
+Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. Task 24.5 adds the AI approval state. The blocked-gate UI hardening path adds the unsupported-grid state. Q2.4 adds explicit unavailable preview surfaces. The runner now checks 28 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 84 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
 
 Task Q2.1 adds a separate [UI Mockup Parity Checklist](ui-mockup-parity-checklist.md) for product-level visual review. The checklist exists because automated visual QA can pass while a screen still fails the mockup's photo-first hierarchy, density, or state-treatment target.
 
 Task Q2.2 updates the visual QA state seeding for populated Library and Loupe parity. Populated Library screenshots now place the photo grid before disposable cache maintenance when photos exist, and Loupe screenshots hide Library maintenance chrome so the viewer surface is the first read.
 
 Task Q2.3 updates thumbnail card density. Unsupported and missing card states keep a single textual state badge while removing repeated file-type and empty-rating labels; supported cards keep a fixed-width rating slot so filenames and ratings do not push into each other at compact width.
+
+Task Q2.4 updates preview-state honesty. Legal JPEG/JPG fixtures now use deterministic photo-like reference scenes instead of gradient/checker mockups, unavailable rows cannot leak stale thumbnail bytes through the desktop command boundary, and the runner captures ready, unsupported, and missing-original preview states separately.
 
 Expanded Task 22.1 surfaces:
 
@@ -47,6 +49,9 @@ Expanded Task 22.1 surfaces:
 | `M023-ai-review` | Read-only blur review, disabled approval, and non-mutating action preview |
 | `M024-ai-approval` | Approvable AI suggestion, enabled approve/reject controls, and undo/rejection trust copy |
 | `M025-library-unsupported-grid` | Unsupported imported rows in the Library grid without card overlap or repeated noisy warnings |
+| `M026-loupe-unsupported` | Loupe selected unsupported catalog row with no preview image, no ready histogram, and consistent inspector scope |
+| `M027-loupe-missing` | Loupe selected missing-original row with no preview image, missing-original copy, and consistent inspector scope |
+| `M028-develop-unsupported` | Develop selected unsupported row with no preview image, disabled core edit state, and unsupported mask copy |
 
 Current QA command:
 

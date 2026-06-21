@@ -614,6 +614,9 @@ def main():
             "M023-ai-review",
             "M024-ai-approval",
             "M025-library-unsupported-grid",
+            "M026-loupe-unsupported",
+            "M027-loupe-missing",
+            "M028-develop-unsupported",
         ]:
             require(
                 surface_name in visual_qa_source,
