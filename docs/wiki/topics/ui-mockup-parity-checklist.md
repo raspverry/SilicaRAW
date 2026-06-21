@@ -19,7 +19,7 @@ The current screenshots pass the automated layout gate for overflow, toolbar ove
 - Mockup references: `MockupUI/M003`, `M004`, `M005`, `M007`, `M008`, `M009`, and `M010`.
 - Current visual QA artifacts: `.tmp/final-visual-responsive-qa/screenshots`.
 - Current visual QA result file: `.tmp/final-visual-responsive-qa/visual-qa-results.json`.
-- Current runner result: 25 surfaces, 75 screenshots, 3 desktop viewports.
+- Current runner result: 28 surfaces, 84 screenshots, 3 desktop viewports.
 - Review baseline: dark professional desktop photo editor, content-first, image-first, dense but readable controls.
 
 Regenerate current screenshots before using this page for implementation:
@@ -40,9 +40,9 @@ python3 scripts/harness/run-final-visual-qa.py
 
 | Surface | References | Current artifact | Severity | Actionable delta |
 |---|---|---|---|---|
-| Library Grid | `MockupUI/M003_Library_Grid_populated.png`, `M011`, `M012` | `desktop-1440-M003-library-populated.png` | P1 | Q2.2 moves the photo grid ahead of disposable cache maintenance when photos exist. Q2.3 reduces thumbnail state noise by removing repeated file-type and empty-rating labels from unsupported/missing cards. Remaining work belongs to Q2.4 and Q2.5: make fixture/preview states more honest and make inspector density less competitive with browsing. |
-| Library Loupe | `MockupUI/M004_Library_Loupe.png` | `desktop-1440-M004-loupe.png` | P1 | Q2.2 hides Library header and maintenance chrome in Loupe so the viewer becomes the primary read. Remaining work belongs to Q2.4 and Q2.5: make preview imagery/state more honest and reduce inspector competition. |
-| Develop | `MockupUI/M005_Develop_default.png`, `M013`, `M014` | `desktop-1440-M005-develop.png` | P0 | Develop currently reads as fixture/status plus controls. Increase real preview dominance, reduce boundary copy prominence, tighten preset rail density, and keep inspector groups visually restrained. |
+| Library Grid | `MockupUI/M003_Library_Grid_populated.png`, `M011`, `M012` | `desktop-1440-M003-library-populated.png` | P1 | Q2.2 moves the photo grid ahead of disposable cache maintenance when photos exist. Q2.3 reduces thumbnail state noise by removing repeated file-type and empty-rating labels from unsupported/missing cards. Q2.4 replaces gradient/checker fixtures with photo-like reference JPEGs and prevents unavailable rows from leaking stale thumbnails. Remaining work belongs to Q2.5: make inspector density less competitive with browsing. |
+| Library Loupe | `MockupUI/M004_Library_Loupe.png` | `desktop-1440-M004-loupe.png`, `M026`, `M027` | P1 | Q2.2 hides Library header and maintenance chrome in Loupe so the viewer becomes the primary read. Q2.4 adds separate ready, unsupported, and missing-original evidence; unavailable states show no preview image and no ready histogram. Remaining work belongs to Q2.5: reduce inspector competition. |
+| Develop | `MockupUI/M005_Develop_default.png`, `M013`, `M014` | `desktop-1440-M005-develop.png`, `M028` | P0 | Q2.4 adds explicit unsupported Develop evidence with no preview image and unsupported mask copy. Remaining work belongs to Q2.5 and Q2.6: increase supported preview dominance, reduce boundary copy prominence, tighten preset rail density, and keep inspector groups visually restrained. |
 | Export Dialog | `MockupUI/M007_Export_Dialog.png`, `M015`, `M016` | `desktop-1440-M007-export.png` | P1 | Dialog structure is close, but it reads like a form dump. Improve section hierarchy, label/value rhythm, summary grouping, path truncation, and empty progress treatment without adding unsupported formats. |
 | Preferences Appearance | `MockupUI/M008_Preferences_Appearance.png` | `desktop-1440-M020-preferences-appearance.png` | P2 | Current scope is intentionally smaller than the mockup, but the page looks like a basic form. Strengthen section rail hierarchy, group supported Appearance controls, and reduce footer/status noise. |
 | Import Progress | `MockupUI/M009_Import_Progress.png` | `desktop-1440-M009-import-progress.png` | P1 | Import sheet is honest but visually weak. Increase modal prominence, clarify completed/in-progress step contrast, align summary cards, and suppress background competition. |
@@ -56,7 +56,7 @@ Use this routing when implementing Phase Q2. Keep the execution order from the L
 |---|---|---|
 | Q2.2 Restore Photo-First Library Hierarchy | M003, M004 | Completed: make the grid/loupe photo-first and demote maintenance when photos exist. |
 | Q2.3 Fix Thumbnail Card State Density | M003, M025 | Completed: keep card badges, filename, rating, pick/reject, and unsupported state readable without repeated warning noise. |
-| Q2.4 Make Image Preview States Honest | M004, M005 | Render supported JPEG/JPG as real photos. Use neutral blocked states for unsupported or missing originals. Avoid fake-looking tinted or fixture imagery as product proof. |
+| Q2.4 Make Image Preview States Honest | M004, M005, M026, M027, M028 | Completed: render supported JPEG/JPG from photo-like legal fixtures, block stale thumbnail leakage for unavailable rows, and keep unsupported/missing preview surfaces image-free with explicit copy. |
 | Q2.5 Unify Inspector Density and Panel Rhythm | M003, M004, M005, M007, M008 | Align headings, row spacing, labels, button sizes, disabled states, and copy rhythm across right panels and dialogs. |
 | Q2.6 Resolve Known Visual Contradictions | M007, M008, M010, plus M017/M021/M022/M023/M024 | Keep future or blocked paths honest without making unavailable features louder than the editor workflow. |
 

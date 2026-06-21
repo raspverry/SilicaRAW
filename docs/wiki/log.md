@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-20] quality | Preview states made honest
+
+- Completed Q2.4 of the local alpha quality closure plan.
+- Legal visual QA JPEG fixtures now render as photo-like reference scenes instead of gradient/checker mockup blocks.
+- Loupe and Develop now separate ready, unsupported, and missing-original preview states; unavailable rows do not show stale thumbnail bytes or ready histogram evidence.
+
 ## [2026-06-20] quality | Thumbnail card density reduced
 
 - Completed Q2.3 of the local alpha quality closure plan.

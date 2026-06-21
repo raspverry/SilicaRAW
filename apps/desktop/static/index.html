@@ -3766,6 +3766,19 @@
         );
       }
 
+      function manualMaskBlockedMessage(photo) {
+        if (!photo) {
+          return "Select a photo to inspect committed manual masks.";
+        }
+        if (photo.missing) {
+          return "Manual masks unavailable because the referenced original is missing.";
+        }
+        if (photo.unsupported) {
+          return "Manual masks unavailable for unsupported sources.";
+        }
+        return MASK_RAW_BLOCKED_MESSAGE;
+      }
+
       function renderToneCurveControlState(state) {
         const midpoint = toneCurvePoint(state?.draftToneCurveMidpoint ?? 0.5);
         developToneCurveLine.setAttribute("points", `0,100 50,${100 - midpoint * 100} 100,0`);
@@ -3833,18 +3846,25 @@
               ? "active"
               : "ready";
         setMaskOutput(developMaskSelectedPhoto, `Selected photo: ${photo?.fileName || "None"}`);
-        setMaskOutput(developMaskSupportStatus, activeMask ? "Manual Active" : "Manual");
+        const blockedMaskMessage = manualMaskBlockedMessage(photo);
+        setMaskOutput(developMaskSupportStatus, !photo
+          ? "Manual"
+          : !developable
+            ? "Unsupported"
+            : activeMask
+              ? "Manual Active"
+              : "Manual");
         setMaskOutput(
           developMaskBoundaryStatus,
           !photo
             ? "Select a photo to inspect committed manual masks."
             : !developable
-              ? MASK_RAW_BLOCKED_MESSAGE
+              ? blockedMaskMessage
               : activeMask
                 ? `${activeMask.name} is scoped to the selected photo.`
                 : MASK_NO_SELECTION_MESSAGE,
         );
-        setMaskOutput(developMaskRawBoundaryStatus, MASK_RAW_BLOCKED_MESSAGE);
+        setMaskOutput(developMaskRawBoundaryStatus, developable ? MASK_RAW_BLOCKED_MESSAGE : blockedMaskMessage);
 
         MANUAL_MASK_KINDS.forEach((kind) => {
           renderMaskRow(kind, masks.find((mask) => mask.kind === kind), activeMask);
@@ -5759,20 +5779,11 @@
 
       function renderDevelopPreviewState(preview) {
         lastDevelopPreviewState = preview;
-        const normalized = preview.status === "Ready"
-          ? "ready"
-          : preview.status === "Unsupported"
-            ? "unsupported"
-            : "blocked";
-        developPreviewSurface.dataset.previewStatus = normalized;
+        developPreviewSurface.dataset.previewStatus = previewVisualStatus(preview);
         developPreviewSurface.dataset.beforeAfterMode = developBeforeAfterMode;
         developPreviewStatus.textContent = developBeforeAfterMode === "before" && preview.status === "Ready"
           ? "Before Preview"
-          : preview.status === "BlockedByDecode"
-          ? "Blocked by Decode"
-          : preview.status === "Ready"
-            ? "Preview Ready"
-            : preview.status || "No Preview";
+          : previewStatusLabel(preview);
         developPreviewMessage.textContent = developBeforeAfterMode === "before" && preview.status === "Ready"
           ? "Before view is display-only and writes no edit history."
           : preview.message || "No preview session.";
@@ -6893,16 +6904,38 @@
         };
       }
 
+      function previewVisualStatus(preview) {
+        const status = preview?.status || "";
+        const message = (preview?.message || "").toLowerCase();
+        if (status === "Ready") {
+          return "ready";
+        }
+        if (status === "Unsupported") {
+          return "unsupported";
+        }
+        if (status === "Missing" || message.includes("missing")) {
+          return "missing";
+        }
+        return "blocked";
+      }
+
+      function previewStatusLabel(preview, readyLabel = "Preview Ready") {
+        const visualStatus = previewVisualStatus(preview);
+        if (visualStatus === "missing") {
+          return "Missing Original";
+        }
+        if (preview.status === "BlockedByDecode") {
+          return "Blocked by Decode";
+        }
+        if (preview.status === "Ready") {
+          return readyLabel;
+        }
+        return preview.status || "No Preview";
+      }
+
       function renderPreviewState(preview) {
-        const normalized = preview.status === "Ready"
-          ? "ready"
-          : preview.status === "Unsupported"
-            ? "unsupported"
-            : "blocked";
-        loupeViewer.dataset.previewStatus = normalized;
-        loupePreviewStatus.textContent = preview.status === "BlockedByDecode"
-          ? "Blocked by Decode"
-          : preview.status || "No Preview";
+        loupeViewer.dataset.previewStatus = previewVisualStatus(preview);
+        loupePreviewStatus.textContent = previewStatusLabel(preview);
         loupePreviewMessage.textContent = preview.message || "No preview session.";
         if (preview.fileName) {
           loupePhotoName.textContent = preview.fileName;

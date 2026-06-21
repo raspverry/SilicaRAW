@@ -33,7 +33,10 @@ SURFACES = [
     ("M003-library-populated", "grid"),
     ("M025-library-unsupported-grid", "unsupported-grid"),
     ("M004-loupe", "loupe"),
+    ("M026-loupe-unsupported", "loupe-unsupported"),
+    ("M027-loupe-missing", "loupe-missing"),
     ("M005-develop", "develop"),
+    ("M028-develop-unsupported", "develop-unsupported"),
     ("M006-mask-active", "mask-active"),
     ("M014-edit-clipboard-sync", "clipboard"),
     ("M007-export", "export"),
@@ -396,8 +399,8 @@ def generate_fixtures():
 
 
 def state_script(state):
-    image_path = "/.tmp/final-visual-responsive-qa/fixtures/supported/synthetic-gradient.jpg"
-    secondary_path = "/.tmp/final-visual-responsive-qa/fixtures/supported/synthetic-checker.jpeg"
+    image_path = "/.tmp/final-visual-responsive-qa/fixtures/supported/reference-urban.jpg"
+    secondary_path = "/.tmp/final-visual-responsive-qa/fixtures/supported/reference-still-life.jpeg"
     return f"""
 (() => {{
   const state = {json.dumps(state)};
@@ -458,9 +461,10 @@ def state_script(state):
     return image;
   }}
 
-  function placeholder() {{
+  function placeholder(state = "pending") {{
     const art = document.createElement("span");
     art.className = "sr-thumb-placeholder";
+    art.dataset.placeholderState = state;
     return art;
   }}
 
@@ -472,10 +476,17 @@ def state_script(state):
     card.classList.toggle("is-rejected", Boolean(photo.rejected));
     card.classList.toggle("is-missing", Boolean(photo.missing) || photo.state === "Missing");
     card.classList.toggle("is-unsupported", Boolean(photo.unsupported) || photo.state === "Unsupported");
+    const placeholderState = photo.missing || photo.state === "Missing"
+      ? "missing"
+      : photo.unsupported || photo.state === "Unsupported"
+        ? "unsupported"
+        : photo.state === "Blocked"
+          ? "blocked"
+          : "pending";
     if (photo.src) {{
       card.append(thumb(photo.src));
     }} else {{
-      card.append(placeholder());
+      card.append(placeholder(placeholderState));
     }}
     const badgeRow = document.createElement("span");
     badgeRow.className = "sr-card-badges";
@@ -507,10 +518,11 @@ def state_script(state):
   }}
 
   const photos = [
-    {{ fileName: "synthetic-gradient.jpg", fileType: "JPG", rating: "****-", state: "Pick", stateClass: "sr-card-state-pick", src: imagePath }},
-    {{ fileName: "synthetic-checker.jpeg", fileType: "JPEG", rating: "***--", src: secondaryPath }},
+    {{ fileName: "reference-urban.jpg", fileType: "JPG", rating: "****-", state: "Pick", stateClass: "sr-card-state-pick", src: imagePath }},
+    {{ fileName: "reference-still-life.jpeg", fileType: "JPEG", rating: "***--", src: secondaryPath }},
     {{ fileName: "blocked-raw.DNG", fileType: "DNG", rating: "-----", state: "Blocked" }},
     {{ fileName: "notes.txt", fileType: "TXT", rating: "-----", state: "Unsupported" }},
+    {{ fileName: "missing-original.jpg", fileType: "JPG", rating: "-----", state: "Missing", missing: true }},
     {{ fileName: "contact-sheet-qa.jpg", fileType: "JPG", rating: "**---", src: imagePath }},
     {{ fileName: "export-candidate.jpg", fileType: "JPG", rating: "*****", src: secondaryPath }},
   ];
@@ -610,8 +622,22 @@ def state_script(state):
     }});
   }}
 
+  function setInspectorSelection(fileName, fileType, ratingText, cullingText) {{
+    document.querySelector("#selectedPhotoName").textContent = fileName;
+    document.querySelector("#selectedPhotoRating").textContent = ratingText;
+    document.querySelector("#primarySelectedPhotoName").textContent = fileName;
+    document.querySelector("#metadataFileType").textContent = fileType;
+    document.querySelector("#cullingStatus").value = cullingText;
+    document.querySelector("#cullingStatus").textContent = cullingText;
+    document.querySelectorAll("[data-rating-value]").forEach((button) => {{
+      button.setAttribute("aria-pressed", String(button.dataset.ratingValue === "0" && ratingText === "-----"));
+    }});
+    document.querySelector("#pickSelectedPhoto").setAttribute("aria-pressed", "false");
+    document.querySelector("#rejectSelectedPhoto").setAttribute("aria-pressed", "false");
+  }}
+
   function setLibraryFilters() {{
-    document.querySelector("#librarySearch").value = "synthetic";
+    document.querySelector("#librarySearch").value = "reference";
     document.querySelector("#fileTypeFilter").value = "jpeg";
     document.querySelector("#metadataFilter").value = "has_dimensions";
     document.querySelector("#minRatingFilter").value = "3";
@@ -622,7 +648,7 @@ def state_script(state):
   }}
 
   function setMetadataReadback() {{
-    document.querySelector("#selectedPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#selectedPhotoName").textContent = "reference-urban.jpg";
     document.querySelector("#metadataFileType").textContent = "JPG";
     document.querySelector("#metadataFileType").dataset.metadataState = "known";
     document.querySelector("#metadataDimensions").textContent = "1600 x 1067";
@@ -680,6 +706,16 @@ def state_script(state):
     }});
   }}
 
+  function setHistogramUnavailable(message) {{
+    const histogram = document.querySelector("#photoHistogram");
+    const bars = document.querySelector("#photoHistogramBars");
+    const status = document.querySelector("#photoHistogramStatus");
+    bars.replaceChildren();
+    histogram.dataset.histogramState = "blocked";
+    status.value = message;
+    status.textContent = message;
+  }}
+
   function populateFilmstrip(selector) {{
     const filmstrip = document.querySelector(selector);
     filmstrip.replaceChildren(...photos.slice(0, 5).map((photo, index) => {{
@@ -687,12 +723,25 @@ def state_script(state):
       card.className = "sr-filmstrip-card";
       card.type = "button";
       card.classList.toggle("is-selected", index === 0);
-      card.append(photo.src ? thumb(photo.src) : placeholder());
+      const placeholderState = photo.missing || photo.state === "Missing"
+        ? "missing"
+        : photo.unsupported || photo.state === "Unsupported"
+          ? "unsupported"
+          : photo.state === "Blocked"
+            ? "blocked"
+            : "pending";
+      card.append(photo.src ? thumb(photo.src) : placeholder(placeholderState));
       const name = document.createElement("span");
       name.textContent = photo.fileName;
       card.append(name);
       return card;
     }}));
+  }}
+
+  function selectFilmstripCard(selector, fileName) {{
+    document.querySelectorAll(`${{selector}} .sr-filmstrip-card`).forEach((card) => {{
+      card.classList.toggle("is-selected", card.textContent.includes(fileName));
+    }});
   }}
 
   function aiReviewCard(label, recommendation, confidence, modelId, approvable = false, selected = false) {{
@@ -725,7 +774,7 @@ def state_script(state):
     loupeSurface.hidden = true;
     aiReviewSurface.hidden = false;
     aiReviewSurface.dataset.aiReviewState = "review-available";
-    document.querySelector("#aiReviewSelectedPhoto").textContent = "Selected photo: synthetic-gradient.jpg";
+    document.querySelector("#aiReviewSelectedPhoto").textContent = "Selected photo: reference-urban.jpg";
     const status = approvalEnabled
       ? "Stored AI suggestion is ready for explicit approval. Approval writes one undoable edit checkpoint and does not write flags or originals."
       : "Blur review suggestions are information only until explicit approval is implemented. Review information only; this does not write edits, flags, or originals.";
@@ -800,7 +849,10 @@ def state_script(state):
     openLibraryBase(false);
     app.dataset.libraryHasPhotos = "true";
     populateUnsupportedGrid();
-    setHistogramState(true);
+    setHistogramUnavailable("No histogram: unsupported source.");
+    document.querySelector("#cullingStatus").value = "Catalog-only row; preview and Develop unavailable.";
+    document.querySelector("#cullingStatus").textContent = "Catalog-only row; preview and Develop unavailable.";
+    document.querySelector("#metadataFileType").textContent = "Catalog";
     document.querySelector("#appStatus").value = "Library grid loaded.";
     document.querySelector("#appStatus").textContent = "Library grid loaded.";
   }} else if (state === "grid" || state === "maintenance" || state === "library-filters" || state === "library-metadata") {{
@@ -882,24 +934,81 @@ def state_script(state):
     document.querySelectorAll("[data-import-step-output]").forEach((output) => {{
       output.textContent = "Completed";
     }});
-  }} else if (state === "loupe") {{
+  }} else if (state === "loupe" || state === "loupe-unsupported" || state === "loupe-missing") {{
     openLibraryBase(true);
     app.dataset.libraryView = "loupe";
     gridShell.hidden = true;
     libraryHeader.hidden = true;
     cacheMaintenance.hidden = true;
     loupeSurface.hidden = false;
-    document.querySelector("#loupePhotoName").textContent = "synthetic-gradient.jpg";
-    document.querySelector("#loupePhotoRating").textContent = "****-";
-    document.querySelector("#loupePreviewStatus").textContent = "Preview Ready";
-    document.querySelector("#loupePreviewMessage").textContent = "Preview source is ready for a display-profile-aware surface.";
-    loupeViewer.dataset.previewStatus = "ready";
     loupeViewer.querySelectorAll(".sr-loupe-image").forEach((image) => image.remove());
-    loupeViewer.prepend(thumb(imagePath, "sr-loupe-image"));
+    if (state === "loupe") {{
+      document.querySelector("#loupePhotoName").textContent = "reference-urban.jpg";
+      document.querySelector("#loupePhotoRating").textContent = "****-";
+      document.querySelector("#loupePreviewStatus").textContent = "Preview Ready";
+      document.querySelector("#loupePreviewMessage").textContent = "Preview source is ready for a display-profile-aware surface.";
+      loupeViewer.dataset.previewStatus = "ready";
+      loupeViewer.prepend(thumb(imagePath, "sr-loupe-image"));
+    }} else if (state === "loupe-unsupported") {{
+      document.querySelector("#loupePhotoName").textContent = "notes.txt";
+      document.querySelector("#loupePhotoRating").textContent = "-----";
+      document.querySelector("#loupePreviewStatus").textContent = "Unsupported";
+      document.querySelector("#loupePreviewMessage").textContent = "Unsupported file type for SilicaRAW preview.";
+      loupeViewer.dataset.previewStatus = "unsupported";
+      setHistogramUnavailable("No histogram: unsupported source.");
+      setInspectorSelection("notes.txt", "Catalog", "-----", "Catalog-only row; preview and Develop unavailable.");
+      selectFilmstripCard("#loupeFilmstrip", "notes.txt");
+    }} else {{
+      document.querySelector("#loupePhotoName").textContent = "missing-original.jpg";
+      document.querySelector("#loupePhotoRating").textContent = "-----";
+      document.querySelector("#loupePreviewStatus").textContent = "Missing Original";
+      document.querySelector("#loupePreviewMessage").textContent = "Preview unavailable because the referenced source file is missing.";
+      loupeViewer.dataset.previewStatus = "missing";
+      setHistogramUnavailable("No histogram: missing original.");
+      setInspectorSelection("missing-original.jpg", "JPG", "-----", "Referenced original is missing.");
+      selectFilmstripCard("#loupeFilmstrip", "missing-original.jpg");
+    }}
+  }} else if (state === "develop-unsupported") {{
+    openLibraryBase(true);
+    setMode("develop");
+    document.querySelector("#developPhotoName").textContent = "notes.txt";
+    document.querySelector("#developPreviewStatus").textContent = "Unsupported";
+    document.querySelector("#developPreviewMessage").textContent = "Unsupported files cannot receive Develop edits.";
+    document.querySelector("#developExposureSlider").value = "0";
+    document.querySelector("#developExposureValue").value = "0.00";
+    document.querySelector("#developContrastSlider").value = "0";
+    document.querySelector("#developContrastValue").value = "0";
+    document.querySelector("#developMaskSelectedPhoto").value = "Selected photo: notes.txt";
+    document.querySelector("#developMaskSelectedPhoto").textContent = "Selected photo: notes.txt";
+    document.querySelector("#developMaskSupportStatus").value = "Unsupported";
+    document.querySelector("#developMaskSupportStatus").textContent = "Unsupported";
+    document.querySelector("#developMaskBoundaryStatus").value = "Manual masks unavailable for unsupported sources.";
+    document.querySelector("#developMaskBoundaryStatus").textContent = "Manual masks unavailable for unsupported sources.";
+    document.querySelector("#developMaskRawBoundaryStatus").value = "Manual masks unavailable for unsupported sources.";
+    document.querySelector("#developMaskRawBoundaryStatus").textContent = "Manual masks unavailable for unsupported sources.";
+    developSurface.dataset.previewStatus = "unsupported";
+    developSurface.dataset.hasPreviewImage = "false";
+    developSurface.querySelectorAll(".sr-develop-image").forEach((image) => image.remove());
+    setHistogramUnavailable("No histogram: unsupported source.");
+    setInspectorSelection("notes.txt", "Catalog", "-----", "Catalog-only row; preview and Develop unavailable.");
+    selectFilmstripCard("#developFilmstrip", "notes.txt");
+    [
+      "#developExposureSlider",
+      "#developExposureValue",
+      "#developExposureReset",
+      "#developContrastSlider",
+      "#developContrastValue",
+      "#developContrastReset",
+      "#developCommitEdit",
+      "#developRevertEdit",
+    ].forEach((selector) => {{
+      const control = document.querySelector(selector);
+      if (control) control.disabled = true;
+    }});
   }} else if (state === "develop" || state === "develop-expanded" || state === "develop-history" || state === "mask-active" || state === "mask-editor") {{
     openLibraryBase(true);
     setMode("develop");
-    document.querySelector("#developPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#developPhotoName").textContent = "reference-urban.jpg";
     document.querySelector("#developPreviewStatus").textContent = "Preview Ready";
     document.querySelector("#developPreviewMessage").textContent = "Exposure 0.40, contrast 12.";
     document.querySelector("#developExposureSlider").value = "0.40";
@@ -1100,8 +1209,8 @@ def state_script(state):
         document.querySelector(stateSelector).textContent = stateText;
       }};
       document.querySelector("#developMaskPanel").dataset.maskState = "active";
-      document.querySelector("#developMaskSelectedPhoto").value = "Selected photo: synthetic-gradient.jpg";
-      document.querySelector("#developMaskSelectedPhoto").textContent = "Selected photo: synthetic-gradient.jpg";
+      document.querySelector("#developMaskSelectedPhoto").value = "Selected photo: reference-urban.jpg";
+      document.querySelector("#developMaskSelectedPhoto").textContent = "Selected photo: reference-urban.jpg";
       document.querySelector("#developMaskSupportStatus").value = "Manual Active";
       document.querySelector("#developMaskSupportStatus").textContent = "Manual Active";
       document.querySelector("#developMaskBoundaryStatus").value = "Linear Gradient 1 is scoped to the selected photo.";
@@ -1157,16 +1266,16 @@ def state_script(state):
   }} else if (state === "clipboard") {{
     openLibraryBase(true);
     setMode("develop");
-    document.querySelector("#developPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#developPhotoName").textContent = "reference-urban.jpg";
     document.querySelector("#developPreviewStatus").textContent = "Preview Ready";
     document.querySelector("#developPreviewMessage").textContent = "Exposure 0.40, contrast 12.";
     document.querySelector("#selectionSummary").dataset.multiSelectionState = "multi";
-    document.querySelector("#primarySelectedPhotoName").textContent = "synthetic-gradient.jpg";
+    document.querySelector("#primarySelectedPhotoName").textContent = "reference-urban.jpg";
     document.querySelector("#multiSelectionCount").value = "2 selected";
     document.querySelector("#multiSelectionCount").textContent = "2 selected";
     document.querySelector("#developClipboardPanel").dataset.clipboardState = "ready";
-    document.querySelector("#developClipboardSource").value = "Copied 3 subset(s) from synthetic-gradient.jpg.";
-    document.querySelector("#developClipboardSource").textContent = "Copied 3 subset(s) from synthetic-gradient.jpg.";
+    document.querySelector("#developClipboardSource").value = "Copied 3 subset(s) from reference-urban.jpg.";
+    document.querySelector("#developClipboardSource").textContent = "Copied 3 subset(s) from reference-urban.jpg.";
     document.querySelector("#developClipboardSelectionCount").value = "2 selected on this page";
     document.querySelector("#developClipboardSelectionCount").textContent = "2 selected on this page";
     document.querySelector("#clipboardSubsetBasic").checked = true;
@@ -1185,8 +1294,8 @@ def state_script(state):
     const plan = document.querySelector("#editClipboardPlanList");
     plan.replaceChildren(
       ...[
-        ["ready", "synthetic-gradient.jpg", "ready", "Ready for batch sync."],
-        ["unchanged", "synthetic-checker.jpeg", "unchanged: no_effect", "Clipboard payload does not change this target."],
+        ["ready", "reference-urban.jpg", "ready", "Ready for batch sync."],
+        ["unchanged", "reference-still-life.jpeg", "unchanged: no_effect", "Clipboard payload does not change this target."],
       ].map(([status, name, stateText, message]) => {{
         const row = document.createElement("div");
         row.className = "sr-edit-clipboard-plan-row";
@@ -1221,18 +1330,18 @@ def state_script(state):
     openLibraryBase(true);
     setMode("export");
     exportDialog.hidden = false;
-    document.querySelector("#exportSelectedPhotoName").textContent = "synthetic-gradient.jpg";
-    document.querySelector("#exportSelectedInline").textContent = "synthetic-gradient.jpg";
-    document.querySelector("#exportOutputPath").value = "/Users/you/Pictures/Exports/synthetic-gradient_SilicaRAW.jpg";
+    document.querySelector("#exportSelectedPhotoName").textContent = "reference-urban.jpg";
+    document.querySelector("#exportSelectedInline").textContent = "reference-urban.jpg";
+    document.querySelector("#exportOutputPath").value = "/Users/you/Pictures/Exports/reference-urban_SilicaRAW.jpg";
     document.querySelector("#exportStatus").value = "Enter an output path, then export the selected photo.";
-    document.querySelector("#exportSummaryFile").textContent = "synthetic-gradient_SilicaRAW.jpg";
+    document.querySelector("#exportSummaryFile").textContent = "reference-urban_SilicaRAW.jpg";
     renderExportPreview();
     if (state === "export-workflow") {{
       document.querySelector("#selectionSummary").dataset.multiSelectionState = "multi";
-      document.querySelector("#primarySelectedPhotoName").textContent = "synthetic-gradient.jpg";
+      document.querySelector("#primarySelectedPhotoName").textContent = "reference-urban.jpg";
       document.querySelector("#multiSelectionCount").value = "2 selected";
       document.querySelector("#multiSelectionCount").textContent = "2 selected";
-      document.querySelector("#exportSelectedPhotoName").textContent = "2 photos, primary synthetic-gradient.jpg";
+      document.querySelector("#exportSelectedPhotoName").textContent = "2 photos, primary reference-urban.jpg";
       document.querySelector("#exportSelectedInline").textContent = "2 photos";
       const exportPreset = document.querySelector("#exportPreset");
       if (!Array.from(exportPreset.options).some((option) => option.value === "")) {{
@@ -1272,8 +1381,8 @@ def state_script(state):
       document.querySelector("#recentExportsEmpty").hidden = true;
       const recent = document.querySelector("#recentExportsList");
       recent.replaceChildren(...[
-        ["/Users/you/Pictures/Exports/synthetic-gradient_SilicaRAW.jpg", "Exists"],
-        ["/Users/you/Pictures/Exports/synthetic-checker_SilicaRAW.jpg", "Missing"],
+        ["/Users/you/Pictures/Exports/reference-urban_SilicaRAW.jpg", "Exists"],
+        ["/Users/you/Pictures/Exports/reference-still-life_SilicaRAW.jpg", "Missing"],
       ].map(([path, stateText]) => {{
         const item = document.createElement("li");
         item.className = "sr-recent-export-row";
@@ -1402,8 +1511,19 @@ def metric_script(surface):
       status: text("#metadataStatus"),
       knownFields: Array.from(document.querySelectorAll("[data-metadata-state='known']")).filter(visible).length,
     }},
+    loupeState: {{
+      photoName: text("#loupePhotoName"),
+      previewStatus: document.querySelector("#loupeViewer")?.dataset.previewStatus || "",
+      statusText: text("#loupePreviewStatus"),
+      message: text("#loupePreviewMessage"),
+      visibleImage: Boolean(box(".sr-loupe-image")),
+    }},
     developState: {{
       photoName: text("#developPhotoName"),
+      previewStatus: document.querySelector("#developPreviewSurface")?.dataset.previewStatus || "",
+      previewStatusText: text("#developPreviewStatus"),
+      previewMessage: text("#developPreviewMessage"),
+      visibleImage: Boolean(box(".sr-develop-image")),
       histogramStatus: text("#photoHistogramStatus"),
       beforeDisabled: disabled("#developBeforeView"),
       afterDisabled: disabled("#developAfterView"),
@@ -1643,7 +1763,7 @@ def capture(url):
                     failures.append(f"{viewport_name} {surface_name}: import issue review not visible")
                 if state == "library-filters":
                     filters = metrics["libraryFilters"]
-                    if filters["search"] != "synthetic" or filters["fileType"] != "jpeg" or filters["metadata"] != "has_dimensions":
+                    if filters["search"] != "reference" or filters["fileType"] != "jpeg" or filters["metadata"] != "has_dimensions":
                         failures.append(f"{viewport_name} {surface_name}: library filter controls not seeded")
                     if filters["minRating"] != "3" or filters["culling"] != "picked" or filters["sort"] != "rating_desc":
                         failures.append(f"{viewport_name} {surface_name}: library rating/culling/sort filters not visible")
@@ -1670,7 +1790,7 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: virtual grid focus not preserved after scroll")
                 if state == "library-metadata":
                     metadata = metrics["metadataState"]
-                    if metadata["fileName"] != "synthetic-gradient.jpg" or metadata["fileType"] != "JPG":
+                    if metadata["fileName"] != "reference-urban.jpg" or metadata["fileType"] != "JPG":
                         failures.append(f"{viewport_name} {surface_name}: metadata selected photo not visible")
                     if metadata["dimensions"] != "1600 x 1067" or metadata["knownFields"] < 7:
                         failures.append(f"{viewport_name} {surface_name}: metadata readback fields not populated")
@@ -1692,9 +1812,44 @@ def capture(url):
                     or not metrics["inspectorVisible"]
                 ):
                     failures.append(f"{viewport_name} {surface_name}: layout reset state not applied")
+                if state == "loupe":
+                    loupe_state = metrics["loupeState"]
+                    if loupe_state["photoName"] != "reference-urban.jpg" or loupe_state["previewStatus"] != "ready":
+                        failures.append(f"{viewport_name} {surface_name}: ready Loupe photo state not visible")
+                    if not loupe_state["visibleImage"] or loupe_state["statusText"] != "Preview Ready":
+                        failures.append(f"{viewport_name} {surface_name}: ready Loupe image/status missing")
+                if state == "loupe-unsupported":
+                    loupe_state = metrics["loupeState"]
+                    if loupe_state["photoName"] != "notes.txt" or loupe_state["previewStatus"] != "unsupported":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Loupe state not visible")
+                    if loupe_state["visibleImage"] or loupe_state["statusText"] != "Unsupported" or "Unsupported file type" not in loupe_state["message"]:
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Loupe shows image or unclear copy")
+                    if metrics["developState"]["histogramStatus"] != "No histogram: unsupported source.":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Loupe histogram readiness is misleading")
+                if state == "loupe-missing":
+                    loupe_state = metrics["loupeState"]
+                    if loupe_state["photoName"] != "missing-original.jpg" or loupe_state["previewStatus"] != "missing":
+                        failures.append(f"{viewport_name} {surface_name}: missing Loupe state not visible")
+                    if loupe_state["visibleImage"] or loupe_state["statusText"] != "Missing Original" or "source file is missing" not in loupe_state["message"]:
+                        failures.append(f"{viewport_name} {surface_name}: missing Loupe shows image or unclear copy")
+                    if metrics["developState"]["histogramStatus"] != "No histogram: missing original.":
+                        failures.append(f"{viewport_name} {surface_name}: missing Loupe histogram readiness is misleading")
+                if state == "develop-unsupported":
+                    develop_state = metrics["developState"]
+                    if develop_state["photoName"] != "notes.txt" or develop_state["previewStatus"] != "unsupported":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Develop state not visible")
+                    if develop_state["visibleImage"] or develop_state["previewStatusText"] != "Unsupported" or "Unsupported files cannot receive Develop edits." not in develop_state["previewMessage"]:
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Develop shows image or unclear copy")
+                    if metrics["developState"]["histogramStatus"] != "No histogram: unsupported source.":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Develop histogram readiness is misleading")
+                    mask_state = metrics["maskState"]
+                    if mask_state["selectedPhoto"] != "Selected photo: notes.txt" or mask_state["supportStatus"] != "Unsupported":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Develop mask scope unclear")
+                    if mask_state["boundary"] != "Manual masks unavailable for unsupported sources." or mask_state["rawBoundary"] != "Manual masks unavailable for unsupported sources.":
+                        failures.append(f"{viewport_name} {surface_name}: unsupported Develop mask boundary copy wrong")
                 if state in {"develop", "develop-expanded", "develop-history"}:
                     develop_state = metrics["developState"]
-                    if develop_state["photoName"] != "synthetic-gradient.jpg":
+                    if develop_state["photoName"] != "reference-urban.jpg":
                         failures.append(f"{viewport_name} {surface_name}: develop photo selection not visible")
                     if develop_state["histogramStatus"] == "No photo selected.":
                         failures.append(f"{viewport_name} {surface_name}: histogram still reports no selection")
@@ -1744,7 +1899,7 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: AI review should replace the generic inspector rail")
                     if not ai_review["visible"] or ai_review["panelState"] != "review-available":
                         failures.append(f"{viewport_name} {surface_name}: AI review panel state not visible")
-                    if ai_review["selectedPhoto"] != "Selected photo: synthetic-gradient.jpg":
+                    if ai_review["selectedPhoto"] != "Selected photo: reference-urban.jpg":
                         failures.append(f"{viewport_name} {surface_name}: AI review selected-photo scope unclear")
                     if ai_review["resultCards"] < 3 or ai_review["summaryCount"] != "3":
                         failures.append(f"{viewport_name} {surface_name}: AI review result cards missing")
@@ -1766,7 +1921,7 @@ def capture(url):
                     mask_state = metrics["maskState"]
                     if not mask_state["visible"] or mask_state["panelState"] != "active":
                         failures.append(f"{viewport_name} {surface_name}: mask panel active state not visible")
-                    if mask_state["selectedPhoto"] != "Selected photo: synthetic-gradient.jpg":
+                    if mask_state["selectedPhoto"] != "Selected photo: reference-urban.jpg":
                         failures.append(f"{viewport_name} {surface_name}: mask selected-photo scope unclear")
                     if mask_state["supportStatus"] != "Manual Active":
                         failures.append(f"{viewport_name} {surface_name}: mask support status wrong")
@@ -1848,7 +2003,7 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: edit clipboard panel not visible")
                     if clipboard_state["selectedCount"] != "2 selected on this page":
                         failures.append(f"{viewport_name} {surface_name}: edit clipboard selected count unclear")
-                    if "synthetic-gradient.jpg" not in clipboard_state["source"]:
+                    if "reference-urban.jpg" not in clipboard_state["source"]:
                         failures.append(f"{viewport_name} {surface_name}: edit clipboard source not visible")
                     if clipboard_state["planRows"] < 2:
                         failures.append(f"{viewport_name} {surface_name}: edit clipboard target plan rows missing")

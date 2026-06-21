@@ -1067,16 +1067,21 @@ struct DesktopMetadataField<T> {
 
 impl From<silica_core::LibraryPhotoGridItem> for DesktopPhotoGridItem {
     fn from(photo: silica_core::LibraryPhotoGridItem) -> Self {
+        let thumbnail_path = if photo.missing || photo.unsupported {
+            None
+        } else {
+            photo.thumbnail_path
+        };
+        let thumbnail_bytes = thumbnail_path
+            .as_ref()
+            .and_then(|path| std::fs::read(path).ok());
         Self {
             photo_id: photo.photo_id,
             file_name: photo.file_name,
             path: photo.path,
             file_type: photo.file_type,
-            thumbnail_bytes: photo
-                .thumbnail_path
-                .as_ref()
-                .and_then(|path| std::fs::read(path).ok()),
-            thumbnail_path: photo.thumbnail_path,
+            thumbnail_bytes,
+            thumbnail_path,
             missing: photo.missing,
             unsupported: photo.unsupported,
             rating: photo.rating,
@@ -5663,6 +5668,51 @@ mod tests {
     }
 
     #[test]
+    fn desktop_grid_does_not_read_unavailable_thumbnail_bytes() {
+        let workspace = unique_library_root("desktop-unavailable-thumbnail");
+        let stale_thumbnail = workspace.join("thumbnails").join("stale.jpg");
+        std::fs::create_dir_all(stale_thumbnail.parent().expect("thumbnail parent"))
+            .expect("create thumbnail directory");
+        std::fs::write(&stale_thumbnail, b"stale jpeg bytes").expect("write stale thumbnail");
+
+        let unsupported = super::DesktopPhotoGridItem::from(silica_core::LibraryPhotoGridItem {
+            photo_id: "photo-unsupported".to_string(),
+            file_name: "sample.png".to_string(),
+            path: "/tmp/sample.png".to_string(),
+            file_type: "PNG".to_string(),
+            thumbnail_path: Some(stale_thumbnail.display().to_string()),
+            thumbnail_cache_key: Some("stale-cache".to_string()),
+            missing: false,
+            unsupported: true,
+            rating: 0,
+            picked: false,
+            rejected: false,
+            color_label: None,
+        });
+        assert!(unsupported.thumbnail_path.is_none());
+        assert!(unsupported.thumbnail_bytes.is_none());
+
+        let missing = super::DesktopPhotoGridItem::from(silica_core::LibraryPhotoGridItem {
+            photo_id: "photo-missing".to_string(),
+            file_name: "missing.jpg".to_string(),
+            path: "/tmp/missing.jpg".to_string(),
+            file_type: "JPG".to_string(),
+            thumbnail_path: Some(stale_thumbnail.display().to_string()),
+            thumbnail_cache_key: Some("stale-cache".to_string()),
+            missing: true,
+            unsupported: false,
+            rating: 0,
+            picked: false,
+            rejected: false,
+            color_label: None,
+        });
+        assert!(missing.thumbnail_path.is_none());
+        assert!(missing.thumbnail_bytes.is_none());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
     fn paged_grid_command_returns_typed_page_and_structured_errors() {
         let workspace = unique_library_root("desktop-paged-grid");
         let library_root = workspace.join("SilicaRAW Library");
@@ -7566,8 +7616,8 @@ mod tests {
             fixtures_root.join("fixture-manifest.json").is_file(),
             "connected runtime smoke requires generated legal fixture metadata"
         );
-        let primary_original = import_root.join("synthetic-gradient.jpg");
-        let secondary_original = import_root.join("synthetic-checker.jpeg");
+        let primary_original = import_root.join("reference-urban.jpg");
+        let secondary_original = import_root.join("reference-still-life.jpeg");
         let raw_placeholder = import_root.join("blocked-raw.DNG");
         let unsupported_original = import_root.join("notes.txt");
         let recursive_root = import_root.join("Recursive");
@@ -7578,12 +7628,12 @@ mod tests {
         let recursive_package_child = recursive_package.join("package-child.jpg");
         std::fs::create_dir_all(&recursive_package).expect("create recursive smoke package");
         std::fs::copy(
-            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            fixtures_root.join("supported/reference-urban.jpg"),
             &primary_original,
         )
         .expect("copy primary JPEG fixture");
         std::fs::copy(
-            fixtures_root.join("supported/synthetic-checker.jpeg"),
+            fixtures_root.join("supported/reference-still-life.jpeg"),
             &secondary_original,
         )
         .expect("copy secondary JPEG fixture");
@@ -7598,7 +7648,7 @@ mod tests {
         )
         .expect("copy unsupported fixture");
         std::fs::copy(
-            fixtures_root.join("supported/synthetic-checker.jpeg"),
+            fixtures_root.join("supported/reference-still-life.jpeg"),
             &recursive_original,
         )
         .expect("copy recursive JPEG fixture");
@@ -7608,12 +7658,12 @@ mod tests {
         )
         .expect("copy recursive unsupported fixture");
         std::fs::copy(
-            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            fixtures_root.join("supported/reference-urban.jpg"),
             &recursive_hidden,
         )
         .expect("copy recursive hidden fixture");
         std::fs::copy(
-            fixtures_root.join("supported/synthetic-gradient.jpg"),
+            fixtures_root.join("supported/reference-urban.jpg"),
             &recursive_package_child,
         )
         .expect("copy recursive package fixture");
@@ -7684,7 +7734,7 @@ mod tests {
                 assert_eq!(photos.len(), 4);
                 let primary = photos
                     .iter()
-                    .find(|photo| photo.file_name == "synthetic-gradient.jpg")
+                    .find(|photo| photo.file_name == "reference-urban.jpg")
                     .expect("primary JPEG grid row");
                 assert!(!primary.unsupported);
                 assert!(primary.thumbnail_path.is_some());
@@ -7870,7 +7920,7 @@ mod tests {
         assert!(committed.ok, "commit edit failed: {committed:?}");
         assert_originals_unchanged(&originals, "develop edit preview and commit");
 
-        let output_path = export_root.join("synthetic-gradient-export.jpg");
+        let output_path = export_root.join("reference-urban-export.jpg");
         let exported = super::export_photo_jpeg_srgb(
             library_root.display().to_string(),
             photo_id.clone(),

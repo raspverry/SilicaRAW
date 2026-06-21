@@ -48,7 +48,139 @@ def convert_ppm_to_jpeg(ppm_path, jpeg_path):
     if result.returncode != 0:
         raise RuntimeError(
             f"sips failed while creating {jpeg_path.name}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
+    )
+
+
+def clamp_channel(value):
+    return max(0, min(255, int(round(value))))
+
+
+def blend_channel(base, overlay, amount):
+    return base + (overlay - base) * amount
+
+
+def blend_rgb(base, overlay, amount):
+    amount = max(0.0, min(1.0, amount))
+    return tuple(clamp_channel(blend_channel(base[index], overlay[index], amount)) for index in range(3))
+
+
+def pseudo_noise(x, y, seed):
+    value = (x * 73_856_093) ^ (y * 19_349_663) ^ (seed * 83_492_791)
+    value ^= value >> 13
+    value *= 1_274_126_177
+    return (value & 255) / 255.0
+
+
+def vignette(base, x, y, width, height):
+    nx = (x / max(width - 1, 1) - 0.5) * 2.0
+    ny = (y / max(height - 1, 1) - 0.5) * 2.0
+    falloff = max(0.0, 1.0 - 0.28 * (nx * nx + ny * ny))
+    return tuple(clamp_channel(channel * falloff) for channel in base)
+
+
+def add_noise(base, x, y, seed, strength=8):
+    noise = (pseudo_noise(x, y, seed) - 0.5) * strength
+    return tuple(clamp_channel(channel + noise) for channel in base)
+
+
+def reference_urban_pixel(x, y, width, height):
+    nx = x / max(width - 1, 1)
+    ny = y / max(height - 1, 1)
+
+    if ny < 0.42:
+        horizon = ny / 0.42
+        base = blend_rgb((34, 53, 72), (164, 128, 101), horizon)
+        cloud = max(0.0, 1.0 - abs(ny - 0.22 - 0.025 * pseudo_noise(x // 16, y // 9, 1)) * 18.0)
+        base = blend_rgb(base, (188, 176, 158), cloud * 0.18)
+    else:
+        road_center = 0.5
+        road_half_width = 0.08 + (ny - 0.42) * 0.72
+        on_road = abs(nx - road_center) < road_half_width
+        if on_road:
+            distance = (ny - 0.42) / 0.58
+            base = blend_rgb((49, 52, 54), (73, 72, 68), distance)
+            lane_width = 0.005 + distance * 0.006
+            lane = abs(nx - road_center) < lane_width and int((ny * height) // 36) % 2 == 0
+            if lane:
+                base = blend_rgb(base, (225, 204, 151), 0.7)
+        else:
+            left_side = nx < road_center
+            side = (road_center - nx) if left_side else (nx - road_center)
+            base = blend_rgb((58, 46, 42), (26, 31, 38), min(1.0, side * 2.1))
+
+    buildings = [
+        (0.02, 0.18, 0.20, 0.86, (54, 50, 48)),
+        (0.20, 0.12, 0.36, 0.75, (66, 58, 50)),
+        (0.64, 0.16, 0.80, 0.78, (47, 55, 59)),
+        (0.80, 0.08, 0.97, 0.88, (39, 48, 60)),
+    ]
+    for x0, y0, x1, y1, color in buildings:
+        if x0 <= nx <= x1 and y0 <= ny <= y1:
+            wall_light = 0.85 + 0.18 * (1.0 - ny)
+            base = tuple(clamp_channel(channel * wall_light) for channel in color)
+            wx = int((nx - x0) / max(x1 - x0, 0.01) * 8)
+            wy = int((ny - y0) / max(y1 - y0, 0.01) * 12)
+            window_x = 0.24 < (((nx - x0) * 8) % 1.0) < 0.74
+            window_y = 0.22 < (((ny - y0) * 12) % 1.0) < 0.62
+            lit = ((wx * 7 + wy * 11 + int(x0 * 100)) % 5) in (0, 2)
+            if window_x and window_y and lit:
+                base = blend_rgb(base, (236, 180, 96), 0.72)
+
+    for cx, cy, radius, color in [
+        (0.30, 0.56, 0.070, (236, 172, 91)),
+        (0.70, 0.50, 0.055, (122, 190, 211)),
+        (0.49, 0.66, 0.038, (242, 215, 154)),
+    ]:
+        distance = ((nx - cx) ** 2 + ((ny - cy) * 1.25) ** 2) ** 0.5
+        glow = max(0.0, 1.0 - distance / radius)
+        base = blend_rgb(base, color, glow * 0.42)
+
+    base = vignette(base, x, y, width, height)
+    return add_noise(base, x, y, 17, 7)
+
+
+def reference_still_life_pixel(x, y, width, height):
+    nx = x / max(width - 1, 1)
+    ny = y / max(height - 1, 1)
+    base = blend_rgb((64, 69, 72), (154, 139, 118), ny * 0.85)
+
+    if 0.08 < nx < 0.45 and 0.08 < ny < 0.54:
+        window_light = 1.0 - abs(nx - 0.26) * 1.2 - abs(ny - 0.28) * 0.9
+        base = blend_rgb(base, (196, 205, 195), max(0.0, window_light) * 0.55)
+
+    if ny > 0.58:
+        table_gradient = (ny - 0.58) / 0.42
+        base = blend_rgb((83, 68, 57), (129, 102, 78), table_gradient)
+
+    cup_dx = (nx - 0.54) / 0.145
+    cup_dy = (ny - 0.55) / 0.18
+    if cup_dx * cup_dx + cup_dy * cup_dy < 1.0:
+        base = blend_rgb((196, 188, 176), (133, 124, 115), max(0.0, cup_dy + 0.2) * 0.45)
+        rim = abs(cup_dx * cup_dx + ((ny - 0.43) / 0.045) ** 2 - 1.0)
+        if rim < 0.17:
+            base = blend_rgb(base, (234, 228, 216), 0.65)
+    coffee_dx = (nx - 0.54) / 0.112
+    coffee_dy = (ny - 0.43) / 0.037
+    if coffee_dx * coffee_dx + coffee_dy * coffee_dy < 1.0:
+        base = blend_rgb(base, (72, 49, 35), 0.88)
+
+    if 0.18 < nx < 0.40 and 0.68 < ny < 0.84:
+        base = blend_rgb(base, (181, 170, 148), 0.78)
+        line = abs((ny - 0.76) - (nx - 0.29) * 0.28)
+        if line < 0.008:
+            base = blend_rgb(base, (78, 76, 73), 0.55)
+
+    for cx, cy, sx, sy, color in [
+        (0.72, 0.36, 0.030, 0.12, (67, 95, 77)),
+        (0.78, 0.28, 0.035, 0.11, (74, 113, 88)),
+        (0.68, 0.24, 0.027, 0.10, (89, 126, 96)),
+    ]:
+        leaf = ((nx - cx) / sx) ** 2 + ((ny - cy) / sy) ** 2
+        if leaf < 1.0:
+            base = blend_rgb(base, color, 0.75)
+
+    base = vignette(base, x, y, width, height)
+    return add_noise(base, x, y, 29, 6)
 
 
 def record_fixture(fixtures, root, relative_path, role, media_type, expected):
@@ -72,38 +204,20 @@ def create_supported_jpegs(output, fixtures):
     supported.mkdir(parents=True, exist_ok=True)
     source.mkdir(parents=True, exist_ok=True)
 
-    gradient_ppm = source / "synthetic-gradient.ppm"
-    gradient_jpg = supported / "synthetic-gradient.jpg"
-    write_ppm(
-        gradient_ppm,
-        96,
-        64,
-        lambda x, y, width, height: (
-            int(32 + (x / max(width - 1, 1)) * 192),
-            int(48 + (y / max(height - 1, 1)) * 160),
-            int(224 - (x / max(width - 1, 1)) * 96),
-        ),
-    )
-    convert_ppm_to_jpeg(gradient_ppm, gradient_jpg)
+    urban_ppm = source / "reference-urban.ppm"
+    urban_jpg = supported / "reference-urban.jpg"
+    write_ppm(urban_ppm, 720, 480, reference_urban_pixel)
+    convert_ppm_to_jpeg(urban_ppm, urban_jpg)
 
-    checker_ppm = source / "synthetic-checker.ppm"
-    checker_jpeg = supported / "synthetic-checker.jpeg"
-    write_ppm(
-        checker_ppm,
-        80,
-        80,
-        lambda x, y, _width, _height: (
-            (240, 235, 222)
-            if ((x // 10) + (y // 10)) % 2 == 0
-            else (48, 68, 78)
-        ),
-    )
-    convert_ppm_to_jpeg(checker_ppm, checker_jpeg)
+    still_life_ppm = source / "reference-still-life.ppm"
+    still_life_jpeg = supported / "reference-still-life.jpeg"
+    write_ppm(still_life_ppm, 640, 640, reference_still_life_pixel)
+    convert_ppm_to_jpeg(still_life_ppm, still_life_jpeg)
 
     shutil.rmtree(source)
     for relative_path in [
-        Path("supported/synthetic-gradient.jpg"),
-        Path("supported/synthetic-checker.jpeg"),
+        Path("supported/reference-urban.jpg"),
+        Path("supported/reference-still-life.jpeg"),
     ]:
         record_fixture(
             fixtures,
