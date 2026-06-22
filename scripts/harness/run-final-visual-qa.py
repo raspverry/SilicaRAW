@@ -22,6 +22,9 @@ SCREENSHOTS = ARTIFACTS / "screenshots"
 RESULTS = ARTIFACTS / "visual-qa-results.json"
 
 VIEWPORTS = [
+    ("rail-1023", 1023, 768),
+    ("default-1180", 1180, 760),
+    ("boundary-1279", 1279, 800),
     ("compact-1280", 1280, 800),
     ("desktop-1440", 1440, 900),
     ("large-1728", 1728, 965),
@@ -1455,6 +1458,9 @@ def metric_script(surface):
   const preferencesDialog = box("#preferencesDialog");
   const app = document.querySelector("#appFrame");
   const presetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
+  const sidebarTextVisible = Array.from(document.querySelectorAll(
+    "#leftSidebar .sr-sidebar-item span:first-child, #leftSidebar .sr-preset-row span:last-child"
+  )).some((element) => visible(element) && element.textContent.trim().length > 0);
   return {{
     surface: {json.dumps(surface)},
     viewport: {{ width: innerWidth, height: innerHeight }},
@@ -1493,6 +1499,7 @@ def metric_script(surface):
     inspectorCollapsed: app.dataset.inspectorCollapsed,
     filmstripVisible: app.dataset.filmstripVisible,
     sidebarVisible: Boolean(box("#leftSidebar")),
+    sidebarTextVisible,
     inspectorVisible: Boolean(box("#rightInspector")),
     libraryFilters: {{
       search: value("#librarySearch"),
@@ -1827,6 +1834,12 @@ def capture(url):
                     or not metrics["inspectorVisible"]
                 ):
                     failures.append(f"{viewport_name} {surface_name}: layout reset state not applied")
+                if state == "layout-reset" and width >= 1180 and not metrics["sidebarTextVisible"]:
+                    failures.append(f"{viewport_name} {surface_name}: standard desktop sidebar text collapsed")
+                if state == "layout-reset" and width == 1279 and not metrics["sidebarTextVisible"]:
+                    failures.append(f"{viewport_name} {surface_name}: sidebar rail triggered at 1279px")
+                if state == "layout-reset" and width <= 1023 and metrics["sidebarTextVisible"]:
+                    failures.append(f"{viewport_name} {surface_name}: narrow rail sidebar labels still visible")
                 if state == "loupe":
                     loupe_state = metrics["loupeState"]
                     if loupe_state["photoName"] != "reference-urban.jpg" or loupe_state["previewStatus"] != "ready":
