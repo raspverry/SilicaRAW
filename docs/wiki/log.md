@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] quality | Visual QA docs drift check added
+
+- Completed Q4.2 of the local alpha quality closure plan.
+- Added `scripts/harness/check-visual-qa-docs.py` to compare the final visual QA runner's surfaces and viewports with the wiki.
+- Wired the drift check into `scripts/harness/check.sh` so runner/docs mismatch is caught without generating screenshots.
+
 ## [2026-06-22] quality | Final visual QA gate defined
 
 - Completed Q4.1 of the local alpha quality closure plan.

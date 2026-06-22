@@ -259,6 +259,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Detect runner/docs mismatch for surface count or known surface IDs without making screenshot generation mandatory.
 - **Acceptance:** A future `M029` cannot be added to the runner while the wiki still claims `M028`.
 - **Validation:** targeted script check or documented manual gate.
+- **Status:** Completed on 2026-06-22. Added `scripts/harness/check-visual-qa-docs.py` and wired it into `scripts/harness/check.sh`. The check parses `SURFACES` and `VIEWPORTS` from the final visual QA runner, then verifies the wiki records the current surface count, screenshot count, viewport dimensions, latest surface ID, and all known `M###` IDs without generating screenshots.
 
 ### Q4.3: Separate Static UI QA from Installed App QA
 
