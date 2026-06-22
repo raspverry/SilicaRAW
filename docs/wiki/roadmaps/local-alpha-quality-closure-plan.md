@@ -2,7 +2,7 @@
 title: Local Alpha Quality Closure Plan
 status: active
 audience: maintainers
-updated: 2026-06-20
+updated: 2026-06-22
 source_of_truth: docs/wiki/roadmaps/local-dmg-distribution-plan.md
 ---
 
@@ -22,7 +22,7 @@ The current product is not yet a user-ready local alpha DMG. Until the signed/no
 - Storage review: source support, export overwrite, and missing-original states need trust hardening before visual polish.
 - Architecture review: scope must freeze until the local alpha workflow is sealed.
 - Mockup source set: `MockupUI/M001` through `MockupUI/M016`.
-- Current automated visual QA result: 28 surfaces, 84 screenshots across `1280x800`, `1440x900`, and `1728x965`.
+- Current automated visual QA result: 29 surfaces, 174 screenshots across `1023x768`, `1180x760`, `1279x800`, `1280x800`, `1440x900`, and `1728x965`.
 
 ## Closure Order
 
@@ -250,6 +250,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Keep `scripts/harness/check.sh` reasonably small, but require `python3 scripts/harness/run-final-visual-qa.py` for UI-affecting changes.
 - **Acceptance:** UI regressions are not hidden behind a passing default harness, and non-UI PRs are not slowed unnecessarily.
 - **Validation:** docs link check and PR template/workflow review if touched.
+- **Status:** Completed on 2026-06-22. The PR template, contributor workflow, and UI Visual QA topic now define the UI-affecting path set. A separate **Final Visual QA** GitHub Actions workflow runs `python3 scripts/harness/run-final-visual-qa.py` only for those paths, while default CI keeps using `scripts/harness/check.sh`.
 
 ### Q4.2: Add Drift Detection for Visual QA Docs
 

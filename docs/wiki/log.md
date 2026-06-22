@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] quality | Final visual QA gate defined
+
+- Completed Q4.1 of the local alpha quality closure plan.
+- Added a path-filtered GitHub Actions workflow that runs final visual QA only for UI-affecting paths.
+- Updated the PR template, contributor workflow, and UI Visual QA topic so contributors and agents know when screenshot QA is required.
+
 ## [2026-06-22] quality | Modal text fit verified
 
 - Completed Q3.5 of the local alpha quality closure plan.
