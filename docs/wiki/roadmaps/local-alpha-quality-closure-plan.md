@@ -230,6 +230,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Cover `1180px` default app width, `1280px`, `1440px`, `1728px`, and narrow rail behavior near `1024px` or explicit collapsed sidebar state.
 - **Acceptance:** Standard desktop keeps readable sidebar text. Narrow rail behavior is intentional, reversible, and not triggered at `1279px`.
 - **Validation:** visual QA runner or manual screenshot evidence for each breakpoint.
+- **Status:** Completed on 2026-06-22. Final visual QA now captures `1023px`, `1180px`, `1279px`, `1280px`, `1440px`, and `1728px`; `layout-reset` asserts readable sidebar labels at standard desktop widths and asserts rail-label hiding only at the narrow boundary.
 
 ### Q3.5: Check Modal Scroll and Text Fit
 

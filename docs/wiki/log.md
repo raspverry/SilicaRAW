@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] quality | Resize boundaries verified
+
+- Completed Q3.4 of the local alpha quality closure plan.
+- Final visual QA now captures `1023px`, `1180px`, `1279px`, `1280px`, `1440px`, and `1728px`.
+- The runner checks that standard desktop widths keep sidebar labels readable and that narrow rail label hiding is limited to the narrow breakpoint.
+
 ## [2026-06-22] interaction | Focus return path verified
 
 - Completed Q3.3 of the local alpha quality closure plan.

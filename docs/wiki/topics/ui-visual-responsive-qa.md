@@ -38,6 +38,8 @@ Task Q2.5 updates inspector density and panel rhythm. Right inspector sections, 
 
 Task Q2.6 resolves the remaining visual contradictions in the Q2 polish pass. The runner now checks that Export Display P3 selection does not contradict summary or safety copy, Advanced Preferences keeps plugin permission review visible, Develop History opens on the readable history panel, and AI Review states are quieter than the core editing workflow while still showing explicit approval gates.
 
+Task Q3.4 extends responsive breakpoint evidence. Final visual QA now captures `1023px`, `1180px`, `1279px`, `1280px`, `1440px`, and `1728px`; `layout-reset` checks that sidebar labels remain readable at standard desktop widths and only hide at the narrow rail boundary.
+
 Expanded Task 22.1 surfaces:
 
 | Surface | State |

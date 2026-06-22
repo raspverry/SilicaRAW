@@ -2968,17 +2968,15 @@ progress::-webkit-progress-value {
   bottom: var(--sr-space-xs);
   left: var(--sr-space-md);
   z-index: 1;
-  width: fit-content;
   max-width: calc(100% - (var(--sr-space-md) * 2));
   padding: 2px var(--sr-space-xs);
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-xs);
   background: var(--sr-bg-secondary);
-  overflow: hidden;
   color: var(--sr-text-secondary);
   font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .sr-histogram[data-histogram-state="blocked"] .sr-histogram-bars {
@@ -4060,6 +4058,11 @@ progress::-webkit-progress-value {
   .sr-preferences-dialog-body {
     grid-template-columns: 190px minmax(0, 1fr);
     gap: var(--sr-space-lg);
+  }
+
+  .sr-preferences-panel[data-preferences-panel="advanced"] .sr-preferences-toggle small,
+  .sr-preferences-panel[data-preferences-panel="advanced"] .sr-permission-contract > p {
+    display: none;
   }
 
   .sr-export-dialog-body {
