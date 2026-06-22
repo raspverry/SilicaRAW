@@ -753,6 +753,7 @@ body {
   display: grid;
   gap: var(--sr-space-sm);
   overflow: hidden auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--sr-border-default);
   border-radius: var(--sr-radius-lg);
   background: var(--sr-surface-panel);
@@ -904,6 +905,7 @@ body {
   max-height: min(220px, 24vh);
   display: grid;
   overflow: hidden auto;
+  scrollbar-gutter: stable;
   border-top: 1px solid var(--sr-border-subtle);
 }
 
@@ -956,9 +958,8 @@ body {
 .sr-import-issue-body span,
 .sr-import-issue-body small {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .sr-import-issue-body strong {
@@ -2247,6 +2248,7 @@ progress::-webkit-progress-value {
   display: grid;
   gap: var(--sr-space-xl);
   overflow: hidden auto;
+  scrollbar-gutter: stable;
   padding: var(--sr-space-xl);
 }
 
@@ -2335,6 +2337,7 @@ progress::-webkit-progress-value {
 .sr-preferences-pane {
   max-height: 100%;
   overflow: hidden auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--sr-border-subtle);
   border-radius: var(--sr-radius-md);
   background: var(--sr-bg-secondary);
@@ -2604,6 +2607,7 @@ progress::-webkit-progress-value {
   grid-template-columns: minmax(0, 1fr) 304px;
   gap: var(--sr-space-xl);
   overflow: hidden auto;
+  scrollbar-gutter: stable;
   padding: var(--sr-space-xl);
 }
 
@@ -2803,8 +2807,8 @@ progress::-webkit-progress-value {
 .sr-export-failure-list li strong,
 .sr-export-failure-list li span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .sr-export-failure-list li strong {
@@ -2848,9 +2852,10 @@ progress::-webkit-progress-value {
 }
 
 #exportStatus {
-  min-height: 44px;
+  min-height: 0;
   margin: 0;
   color: var(--sr-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .sr-export-preview-card {
@@ -4051,6 +4056,11 @@ progress::-webkit-progress-value {
     width: min(760px, 100%);
   }
 
+  .sr-export-dialog-header,
+  .sr-export-dialog-footer {
+    padding: var(--sr-space-md) var(--sr-space-lg);
+  }
+
   .sr-preferences-dialog-panel {
     width: min(740px, 100%);
   }
@@ -4066,7 +4076,17 @@ progress::-webkit-progress-value {
   }
 
   .sr-export-dialog-body {
+    gap: var(--sr-space-lg);
+    padding: var(--sr-space-lg);
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-export-settings {
+    gap: var(--sr-space-sm);
+  }
+
+  .sr-export-batch-panel {
+    padding: var(--sr-space-sm);
   }
 
   .sr-export-summary {

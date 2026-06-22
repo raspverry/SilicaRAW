@@ -2,7 +2,7 @@
 title: UI Visual and Responsive QA
 status: active
 audience: all
-updated: 2026-06-20
+updated: 2026-06-22
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md#task-221-expanded-visual-qa-surface-set
 ---
 
@@ -15,7 +15,7 @@ Final visual QA verifies the connected desktop UI against the current product su
 The checked route now covers:
 
 ```txt
-Welcome -> Library -> Loupe -> Develop -> Masks -> History -> Preferences -> Export
+Welcome -> Library -> Loupe -> Develop -> Masks -> History -> Preferences -> Shortcuts -> Export
 ```
 
 This is a visual and responsive QA pass only. It does not add product functionality, RAW decoding, Metal rendering, native folder picking, MLX, MCP, plugin runtime, or broad fallback behavior.
@@ -24,7 +24,7 @@ The earlier Phase 5.5 notes remain historical context. The current final runner 
 
 ## Phase 22 Expanded Surface Set
 
-Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. Task 24.5 adds the AI approval state. The blocked-gate UI hardening path adds the unsupported-grid state. Q2.4 adds explicit unavailable preview surfaces. The runner now checks 28 surfaces at `1280x800`, `1440x900`, and `1728x965`, producing 84 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
+Task 22.1 expanded final visual QA beyond the original MVP path. Task 24.4 adds the AI Review surface. Task 24.5 adds the AI approval state. The blocked-gate UI hardening path adds the unsupported-grid state. Q2.4 adds explicit unavailable preview surfaces. The runner now checks 29 surfaces at `1023x768`, `1180x760`, `1279x800`, `1280x800`, `1440x900`, and `1728x965`, producing 174 screenshots with no horizontal overflow, toolbar overlap, clipped controls, or seeded-state failures.
 
 Task Q2.1 adds a separate [UI Mockup Parity Checklist](ui-mockup-parity-checklist.md) for product-level visual review. The checklist exists because automated visual QA can pass while a screen still fails the mockup's photo-first hierarchy, density, or state-treatment target.
 
@@ -39,6 +39,8 @@ Task Q2.5 updates inspector density and panel rhythm. Right inspector sections, 
 Task Q2.6 resolves the remaining visual contradictions in the Q2 polish pass. The runner now checks that Export Display P3 selection does not contradict summary or safety copy, Advanced Preferences keeps plugin permission review visible, Develop History opens on the readable history panel, and AI Review states are quieter than the core editing workflow while still showing explicit approval gates.
 
 Task Q3.4 extends responsive breakpoint evidence. Final visual QA now captures `1023px`, `1180px`, `1279px`, `1280px`, `1440px`, and `1728px`; `layout-reset` checks that sidebar labels remain readable at standard desktop widths and only hide at the narrow rail boundary.
+
+Task Q3.5 adds modal text-fit evidence. Final visual QA now captures `M029-shortcuts` and checks modal copy clipping across Preferences, Export, shortcuts, and import issue review states. The runner asserts active shortcut rows, disabled custom-remapping copy, viewport containment, and scroll overflow behavior for Preferences, Export, shortcuts, and import review containers when the body is smaller than the content.
 
 Expanded Task 22.1 surfaces:
 
@@ -58,6 +60,7 @@ Expanded Task 22.1 surfaces:
 | `M026-loupe-unsupported` | Loupe selected unsupported catalog row with no preview image, no ready histogram, and consistent inspector scope |
 | `M027-loupe-missing` | Loupe selected missing-original row with no preview image, missing-original copy, and consistent inspector scope |
 | `M028-develop-unsupported` | Develop selected unsupported row with no preview image, disabled core edit state, and unsupported mask copy |
+| `M029-shortcuts` | Shortcuts dialog with active local-alpha shortcuts, disabled custom remapping, and scroll/text-fit contract |
 
 Current QA command:
 

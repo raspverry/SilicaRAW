@@ -239,6 +239,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Verify long copy, disabled states, and buttons do not clip or overlap when dialogs are smaller than ideal.
 - **Acceptance:** Text fits within containers without crowding, and scroll areas are obvious where needed.
 - **Validation:** visual QA plus manual resize screenshots.
+- **Status:** Completed on 2026-06-22. Final visual QA now captures the shortcuts dialog and checks modal copy clipping for Preferences, Export, shortcuts, and import issue review surfaces across responsive breakpoints. The modal contract also asserts active shortcut rows, disabled remapping copy, viewport containment, and scroll overflow behavior for Preferences, Export, shortcuts, and import review containers.
 
 ## Phase Q4: Harness and Evidence Gate
 

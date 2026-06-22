@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] quality | Modal text fit verified
+
+- Completed Q3.5 of the local alpha quality closure plan.
+- Final visual QA now captures `M029-shortcuts` across all responsive breakpoints.
+- The runner checks modal copy clipping, shortcuts dialog viewport containment, active shortcut rows, disabled remapping copy, and scroll overflow behavior for Preferences, Export, shortcuts, and import review containers.
+
 ## [2026-06-22] quality | Resize boundaries verified
 
 - Completed Q3.4 of the local alpha quality closure plan.
