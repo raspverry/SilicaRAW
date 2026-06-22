@@ -2,7 +2,7 @@
 title: Developer Preview Artifact Runbook
 status: active
 audience: maintainers
-updated: 2026-06-11
+updated: 2026-06-22
 source_of_truth: docs/wiki/decisions/adr-0006-unsigned-developer-preview-dmg.md
 ---
 
@@ -111,6 +111,12 @@ hdiutil detach /tmp/SilicaRAWDeveloperPreview
 ```
 
 For installed-app workflow testing, use [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) and record that the artifact is unsigned.
+
+## Evidence Boundary
+
+This runbook proves developer-preview artifact mechanics: workflow execution, artifact download, checksum verification, DMG verification, mount behavior, and optional build-Mac install smoke.
+
+It does not prove user-ready local distribution, signed or notarized behavior, clean-Mac behavior, or normal Gatekeeper acceptance. Browser/static visual QA also cannot be used as a substitute for this runbook because screenshots only prove layout and seeded UI state. Installed app workflow evidence must come from launching the artifact's `SilicaRAW.app`, preferably from `/Applications`, and completing the relevant [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) steps against that installed app.
 
 ## Required Record
 

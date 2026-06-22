@@ -268,6 +268,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** State clearly that browser/static screenshots prove layout only. Installed app QA proves desktop command, app bundle, native shell, and local persistence behavior.
 - **Acceptance:** Agents stop treating static UI screenshots as installed product readiness.
 - **Validation:** docs link check.
+- **Status:** Completed on 2026-06-22. UI Visual QA now has an explicit evidence boundary: browser/static screenshots prove seeded layout and responsive behavior only. Developer-preview and release runbooks now separate static screenshot evidence from installed app, `.app` bundle, native shell, persistence, export, original-file safety, DMG, Gatekeeper, signing, and notarization evidence.
 
 ### Q4.4: Maintain a Closure Evidence Index
 
@@ -409,4 +410,4 @@ Follow this order. Do not polish around broken trust states.
 
 ## Notes for LLM Agents
 
-Read this plan before starting more product feature work while Task 27.2 is blocked. If you find a visual issue, first decide whether it is a Q1 trust problem, Q2 product hierarchy problem, Q3 interaction problem, or Q4 evidence problem. Do not treat screenshots as implementation evidence for installed app behavior.
+Read this plan before starting more product feature work while Task 27.2 is blocked. If you find a visual issue, first decide whether it is a Q1 trust problem, Q2 product hierarchy problem, Q3 interaction problem, or Q4 evidence problem. Do not treat browser/static screenshots as implementation evidence for installed app or DMG behavior.

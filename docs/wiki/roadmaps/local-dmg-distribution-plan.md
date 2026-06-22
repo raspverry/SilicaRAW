@@ -734,10 +734,11 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
   - M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces remain visually coherent.
   - Real thumbnails/previews do not create overflow, clipping, or text overlap.
   - The UI remains usable at compact, standard, and large desktop widths.
-  - Final QA notes explicitly supersede the static-only Phase 5.5 visual pass as the Phase 6 readiness gate.
+  - Final QA notes explicitly supersede the static-only Phase 5.5 visual pass for UI/layout evidence before Phase 6.
+  - Final visual QA is not Phase 6 installed-app or DMG readiness evidence.
 - **Validation:** Screenshot review, DOM overflow/clipping checks, runtime smoke, and harness pass.
 
-**Status:** Completed on 2026-06-10. Added `scripts/harness/run-final-visual-qa.py` to generate legal JPEG/JPG fixture pixels, drive the static desktop UI through Agent Browser, capture 24 screenshots across `1280x800`, `1440x900`, and `1728x965`, and record DOM overflow/clipping metrics for M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces. The final pass found and fixed viewer image natural-size rendering in Loupe/Develop, replaced the Export dialog placeholder preview with selected-photo thumbnail pixels, synchronized Import step rows with completed progress, and shortened cache-maintenance status copy. Final QA notes are recorded in [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) and supersede the static-only Phase 5.5 visual pass for Phase 6 readiness.
+**Status:** Completed on 2026-06-10. Added `scripts/harness/run-final-visual-qa.py` to generate legal JPEG/JPG fixture pixels, drive the static desktop UI through Agent Browser, capture 24 screenshots across `1280x800`, `1440x900`, and `1728x965`, and record DOM overflow/clipping metrics for M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces. The final pass found and fixed viewer image natural-size rendering in Loupe/Develop, replaced the Export dialog placeholder preview with selected-photo thumbnail pixels, synchronized Import step rows with completed progress, and shortened cache-maintenance status copy. Final QA notes are recorded in [UI Visual and Responsive QA](../topics/ui-visual-responsive-qa.md) and supersede the static-only Phase 5.5 visual pass for UI/layout evidence before Phase 6. They do not replace Phase 6 installed-app or DMG readiness evidence.
 
 ## Phase 6: Local Install QA
 

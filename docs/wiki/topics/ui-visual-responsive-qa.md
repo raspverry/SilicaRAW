@@ -10,7 +10,7 @@ source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md#task-221-expan
 
 ## Summary
 
-Final visual QA verifies the connected desktop UI against the current product surface set at compact, standard desktop, and large desktop widths.
+Final visual QA verifies the browser/static seeded desktop UI surfaces against the current product surface set at compact, standard desktop, and large desktop widths.
 
 The checked route now covers:
 
@@ -21,6 +21,14 @@ Welcome -> Library -> Loupe -> Develop -> Masks -> History -> Preferences -> Sho
 This is a visual and responsive QA pass only. It does not add product functionality, RAW decoding, Metal rendering, native folder picking, MLX, MCP, plugin runtime, or broad fallback behavior.
 
 The earlier Phase 5.5 notes remain historical context. The current final runner is `scripts/harness/run-final-visual-qa.py`.
+
+## Evidence Boundary
+
+Final visual QA is browser/static evidence. It proves that the seeded desktop UI surfaces render with the expected visual hierarchy, responsive breakpoints, DOM state, disabled-state copy, overflow behavior, and modal text fit.
+
+It does not prove installed-product behavior. In particular, it does not prove the Tauri command boundary, the `.app` bundle, native shell behavior, file picker behavior, local filesystem permissions, library persistence, export writes, disposable cache clearing, original-file safety, DMG mount/install behavior, quarantine handling, Gatekeeper behavior, signing, notarization, or launch from `/Applications`.
+
+Installed app and DMG readiness must be proven by the connected runtime smoke, installed-app preflight, [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md), [Developer Preview Artifact Runbook](../roadmaps/developer-preview-artifact-runbook.md), and [Local DMG Release Runbook](../roadmaps/local-dmg-release-runbook.md), depending on the gate being evaluated. Static screenshots can support UI review, but they cannot substitute for installed app workflow evidence.
 
 ## Phase 22 Expanded Surface Set
 
