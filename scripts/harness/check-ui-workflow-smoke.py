@@ -754,6 +754,20 @@ def main():
     ]:
         require(marker in source, f"escape dismiss marker missing: {marker}", failures)
     for marker in [
+        "function shouldRestoreFocusFromSurface",
+        "const mainSurface = document.querySelector(\"#mainSurface\")",
+        "[target, fallback, mainSurface].find",
+        "shouldRestoreFocusFromSurface(importIssueReview)",
+        "shouldRestoreFocusFromSurface(importPanel)",
+        "shouldRestoreFocusFromSurface(loupeSurface)",
+        "shouldRestoreFocusFromSurface(aiReviewSurface)",
+        "restoreFocus(viewImportErrorsButton)",
+        "restoreFocus(showImportPanelButton, libraryGrid)",
+        "restoreFocus(openLoupeButton, libraryGrid)",
+        "restoreFocus(openAiReviewButton, libraryGrid)",
+    ]:
+        require(marker in source, f"focus return marker missing: {marker}", failures)
+    for marker in [
         "previewBytes",
         "loupeObjectUrls",
         "renderLoupePreviewImage",

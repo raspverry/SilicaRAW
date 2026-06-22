@@ -790,7 +790,10 @@ def main():
         failures,
     )
     require(
-        "target && document.contains(target) && !isHiddenFromFocus(target)" in source,
+        (
+            "target && document.contains(target) && !isHiddenFromFocus(target)" in source
+            or "[target, fallback, mainSurface].find" in source
+        ),
         "focus restore must reject hidden modal descendants before falling back",
         failures,
     )
