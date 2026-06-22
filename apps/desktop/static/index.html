@@ -5586,7 +5586,12 @@
         return tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable;
       }
 
+      function hasGridMultiSelection() {
+        return selectedPhotoIds.size > 1;
+      }
+
       function dismissTopSurface() {
+        // Keep this order aligned with docs/wiki/roadmaps/blocked-public-beta-ui-hardening-plan.md.
         if (!shortcutsDialog.hidden) {
           closeShortcutsDialog();
           return true;
@@ -5618,6 +5623,12 @@
         if (!aiReviewSurface.hidden) {
           closeAiReviewView();
           restoreFocus(openAiReviewButton, libraryGrid);
+          return true;
+        }
+        if (hasGridMultiSelection()) {
+          clearMultiSelection();
+          restoreFocus(libraryGrid);
+          setStatus("Grid multi-select cleared.");
           return true;
         }
         return false;

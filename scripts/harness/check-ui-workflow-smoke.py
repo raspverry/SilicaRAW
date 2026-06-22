@@ -575,6 +575,19 @@ def require(condition, message, failures):
         failures.append(message)
 
 
+def require_ordered_markers(source, markers, message, failures):
+    cursor = -1
+    for marker in markers:
+        position = source.find(marker)
+        if position == -1:
+            failures.append(f"{message}: missing {marker}")
+            return
+        if position <= cursor:
+            failures.append(f"{message}: {marker} is out of order")
+            return
+        cursor = position
+
+
 def command_names(source):
     direct_invokes = set(re.findall(r"""invoke\(\s*["']([^"']+)["']""", source))
     delegated_library_commands = set(
@@ -713,6 +726,33 @@ def main():
         "clearMultiSelection",
     ]:
         require(marker in source, f"real thumbnail grid marker missing: {marker}", failures)
+    dismiss_start = source.find("function dismissTopSurface()")
+    dismiss_end = source.find("function handleGlobalKeydown", dismiss_start)
+    require(dismiss_start != -1 and dismiss_end > dismiss_start, "escape dismiss handler missing", failures)
+    dismiss_source = source[dismiss_start:dismiss_end] if dismiss_start != -1 and dismiss_end > dismiss_start else ""
+    require_ordered_markers(
+        dismiss_source,
+        [
+            "if (!shortcutsDialog.hidden)",
+            "if (!preferencesDialog.hidden)",
+            "if (!exportDialog.hidden)",
+            "if (!importIssueReview.hidden)",
+            "if (!importPanel.hidden)",
+            "if (!loupeSurface.hidden)",
+            "if (!aiReviewSurface.hidden)",
+            "if (hasGridMultiSelection())",
+        ],
+        "escape dismiss priority must match documented order",
+        failures,
+    )
+    for marker in [
+        "function hasGridMultiSelection()",
+        "selectedPhotoIds.size > 1",
+        'setStatus("Grid multi-select cleared.")',
+        'document.addEventListener("keydown", handleGlobalKeydown, true)',
+        'event.stopPropagation()',
+    ]:
+        require(marker in source, f"escape dismiss marker missing: {marker}", failures)
     for marker in [
         "previewBytes",
         "loupeObjectUrls",
