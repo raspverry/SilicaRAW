@@ -2,7 +2,7 @@
 title: Git and PR Workflow
 status: active
 audience: contributors
-updated: 2026-06-08
+updated: 2026-06-22
 source_of_truth: none
 ---
 
@@ -66,6 +66,23 @@ git push -u origin feature/phase-2-desktop-shell
 - Do not add dependencies without updating `docs/DEPENDENCIES.md`.
 - Do not combine risky implementation work with unrelated formatting or large documentation rewrites.
 - Do not merge if CI fails.
+
+## Visual QA Gate
+
+Keep the default `scripts/harness/check.sh` path reasonably small. UI-affecting PRs must also run:
+
+```bash
+python3 scripts/harness/run-final-visual-qa.py
+```
+
+A PR is UI-affecting when it changes any of these areas:
+
+- `apps/desktop/static/**`
+- `MockupUI/**`
+- `scripts/harness/run-final-visual-qa.py`
+- visual QA docs or plans that define screenshot surfaces, viewport coverage, mockup parity, or UI gate policy
+
+GitHub Actions runs the separate **Final Visual QA** workflow for those paths and for gate-policy files such as `.github/PULL_REQUEST_TEMPLATE.md`, this page, and the workflow itself. Non-UI PRs keep the normal CI harness without screenshot generation.
 
 ## Commit Message Style
 

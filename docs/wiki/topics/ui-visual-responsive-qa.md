@@ -68,6 +68,12 @@ Current QA command:
 python3 scripts/harness/run-final-visual-qa.py
 ```
 
+## Required Gate
+
+Run final visual QA for UI-affecting PRs. UI-affecting means changes under `apps/desktop/static/**`, `MockupUI/**`, `scripts/harness/run-final-visual-qa.py`, or visual QA docs and plans that define screenshot surfaces, viewport coverage, mockup parity, or UI gate policy.
+
+The default project harness remains `scripts/harness/check.sh`. The separate GitHub Actions **Final Visual QA** workflow runs only for the UI-affecting paths above and gate-policy files such as `.github/PULL_REQUEST_TEMPLATE.md`, [Git and PR Workflow](../contributing/git-and-pr-workflow.md), and its own workflow file, so non-UI PRs are not slowed by screenshot generation.
+
 ## Phase 17 Histogram Note
 
 Task 17.3 replaces the inspector's fake histogram placeholder with command-backed luminance bars from real histogram data. The histogram surface must keep the existing inspector footprint, avoid text overlap at the checked desktop widths, and show explicit blocked or unavailable text when real data is not available.

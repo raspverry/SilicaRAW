@@ -11,9 +11,11 @@
 ## Tests
 
 - [ ] `scripts/harness/check.sh`
+- [ ] `python3 scripts/harness/run-final-visual-qa.py` for UI-affecting changes
 - [ ] Unit tests
 - [ ] Integration tests
 - [ ] Manual testing
+- [ ] Not UI-affecting, explain:
 - [ ] Not applicable, explain:
 
 ## Local Alpha Safety

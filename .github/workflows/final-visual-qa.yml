@@ -1,0 +1,62 @@
+name: Final Visual QA
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/workflows/final-visual-qa.yml"
+      - "MockupUI/**"
+      - "apps/desktop/static/**"
+      - "docs/wiki/contributing/git-and-pr-workflow.md"
+      - "docs/wiki/roadmaps/local-alpha-quality-closure-plan.md"
+      - "docs/wiki/topics/ui-mockup-parity-checklist.md"
+      - "docs/wiki/topics/ui-visual-responsive-qa.md"
+      - "scripts/harness/run-final-visual-qa.py"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/workflows/final-visual-qa.yml"
+      - "MockupUI/**"
+      - "apps/desktop/static/**"
+      - "docs/wiki/contributing/git-and-pr-workflow.md"
+      - "docs/wiki/roadmaps/local-alpha-quality-closure-plan.md"
+      - "docs/wiki/topics/ui-mockup-parity-checklist.md"
+      - "docs/wiki/topics/ui-visual-responsive-qa.md"
+      - "scripts/harness/run-final-visual-qa.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-visual-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  final-visual-qa:
+    name: Final Visual QA
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show Chrome path
+        run: ls -l "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+      - name: Run final visual QA
+        env:
+          SILICARAW_CHROME: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+        run: python3 scripts/harness/run-final-visual-qa.py
+
+      - name: Upload visual QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-visual-qa
+          path: .tmp/final-visual-responsive-qa/
+          if-no-files-found: ignore
+          retention-days: 7
