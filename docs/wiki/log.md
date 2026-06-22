@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-20
+updated: 2026-06-22
 source_of_truth: none
 ---
 
@@ -13,6 +13,13 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-22] quality | Static and installed QA boundaries separated
+
+- Completed Q4.3 of the local alpha quality closure plan.
+- Added an explicit evidence boundary to UI Visual QA: browser/static screenshots prove seeded layout and responsive behavior only.
+- Updated developer-preview and local DMG release runbooks so installed app, `.app` bundle, persistence, export, original-file safety, DMG, Gatekeeper, signing, and notarization evidence cannot be replaced by static screenshots.
+- Tightened PR workflow, release-plan, and mockup-parity wording so visual QA and mockup parity cannot be mistaken for installed-product readiness.
 
 ## [2026-06-22] quality | Visual QA docs drift check added
 
@@ -893,7 +900,7 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 - Added a final visual/responsive QA runner for M001, M002, M003, M004, M005, M007, M008-minimal, and M009 surfaces across compact, desktop, and large viewports.
 - Fixed final QA findings in Loupe/Develop image scaling, Export preview pixels, Import step progress state, and cache-maintenance status copy.
-- Recorded that the Phase 5.6.12 QA notes supersede the static-only Phase 5.5 visual pass for Phase 6 readiness.
+- Recorded that the Phase 5.6.12 QA notes supersede the static-only Phase 5.5 visual pass for UI/layout evidence before Phase 6, not installed app or DMG readiness.
 
 ## [2026-06-10] phase-5.6 | Connected runtime smoke added
 

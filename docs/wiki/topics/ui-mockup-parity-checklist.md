@@ -2,7 +2,7 @@
 title: UI Mockup Parity Checklist
 status: active
 audience: designers, maintainers, agents
-updated: 2026-06-20
+updated: 2026-06-22
 source_of_truth: docs/wiki/roadmaps/local-alpha-quality-closure-plan.md
 ---
 
@@ -12,14 +12,14 @@ source_of_truth: docs/wiki/roadmaps/local-alpha-quality-closure-plan.md
 
 This checklist compares the current visual QA screenshots against the committed `MockupUI/` targets for the local alpha UI polish phase.
 
-The current screenshots pass the automated layout gate for overflow, toolbar overlap, and obvious clipping. They do not yet meet the product-level visual target. The largest remaining issue is that several screens still read like a diagnostic shell instead of a photo-first editor.
+The current screenshots pass the automated layout gate for overflow, toolbar overlap, and obvious clipping. This is a product-level visual design target, not installed-product readiness evidence. The largest remaining issue is that several screens still read like a diagnostic shell instead of a photo-first editor.
 
 ## Inputs
 
 - Mockup references: `MockupUI/M003`, `M004`, `M005`, `M007`, `M008`, `M009`, and `M010`.
 - Current visual QA artifacts: `.tmp/final-visual-responsive-qa/screenshots`.
 - Current visual QA result file: `.tmp/final-visual-responsive-qa/visual-qa-results.json`.
-- Current runner result: 28 surfaces, 84 screenshots, 3 desktop viewports.
+- Current runner result: 29 surfaces, 174 screenshots, 6 desktop viewports.
 - Review baseline: dark professional desktop photo editor, content-first, image-first, dense but readable controls.
 
 Regenerate current screenshots before using this page for implementation:

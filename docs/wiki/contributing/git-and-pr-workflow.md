@@ -84,6 +84,8 @@ A PR is UI-affecting when it changes any of these areas:
 
 GitHub Actions runs the separate **Final Visual QA** workflow for those paths and for gate-policy files such as `.github/PULL_REQUEST_TEMPLATE.md`, this page, and the workflow itself. Non-UI PRs keep the normal CI harness without screenshot generation.
 
+Final visual QA is UI-only evidence. It does not satisfy installed app, DMG, Gatekeeper, signing, notarization, or release readiness gates.
+
 ## Commit Message Style
 
 Use short, conventional-style messages without requiring a strict release automation contract yet:

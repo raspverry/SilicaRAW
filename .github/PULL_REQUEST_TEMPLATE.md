@@ -11,7 +11,7 @@
 ## Tests
 
 - [ ] `scripts/harness/check.sh`
-- [ ] `python3 scripts/harness/run-final-visual-qa.py` for UI-affecting changes
+- [ ] `python3 scripts/harness/run-final-visual-qa.py` for UI-affecting changes; UI-only, not installed app, DMG, Gatekeeper, or release readiness
 - [ ] Unit tests
 - [ ] Integration tests
 - [ ] Manual testing

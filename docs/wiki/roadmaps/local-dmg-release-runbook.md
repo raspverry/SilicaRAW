@@ -2,7 +2,7 @@
 title: Local DMG Release Runbook
 status: active
 audience: maintainers
-updated: 2026-06-11
+updated: 2026-06-22
 source_of_truth: docs/wiki/roadmaps/local-dmg-distribution-plan.md
 ---
 
@@ -60,6 +60,17 @@ For signed user-ready releases, also require:
 - Notarization succeeds.
 - Stapling succeeds.
 - Clean-Mac downloaded-artifact QA passes.
+
+## QA Evidence Boundary
+
+Release QA uses several evidence types, and they are not interchangeable:
+
+- `scripts/harness/check.sh` proves the repository's default code, docs, and harness contracts.
+- `python3 scripts/harness/run-final-visual-qa.py` proves browser/static UI layout, responsive behavior, and seeded visual states for UI-affecting changes.
+- Connected runtime smoke and installed-app preflight prove desktop command behavior and local workflow safety from a developer runtime path.
+- DMG install smoke proves artifact install, launch from `/Applications`, native app-shell behavior, local persistence, export behavior, and original-file safety from the packaged app.
+
+Do not approve a local DMG release candidate from static screenshots alone. User-ready local alpha approval requires downloaded signed/notarized DMG evidence plus clean-Mac installed workflow evidence. Unsigned developer-preview approval requires the developer-preview artifact evidence and must remain internal/testing-only.
 
 ## User-Ready Release Flow
 
