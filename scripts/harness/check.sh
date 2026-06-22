@@ -54,6 +54,9 @@ python3 scripts/harness/check-qa-fixtures.py
 echo "==> Checking static UI contract"
 python3 scripts/harness/check-static-ui.py
 
+echo "==> Checking visual QA docs drift"
+python3 scripts/harness/check-visual-qa-docs.py
+
 echo "==> Checking native viewer QA routing"
 python3 scripts/harness/check-native-viewer-qa.py
 
