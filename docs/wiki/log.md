@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] interaction | Focus return path verified
+
+- Completed Q3.3 of the local alpha quality closure plan.
+- Hidden import review, import panel, Loupe, and AI Review surfaces now return focus to a visible trigger or the grid when closed from inside the surface.
+- UI workflow smoke now checks the focus-return markers alongside the keyboard/dismissal contracts.
+
 ## [2026-06-22] interaction | Shortcuts discovery verified
 
 - Completed Q3.2 of the local alpha quality closure plan.

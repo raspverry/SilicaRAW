@@ -1418,6 +1418,7 @@
       const importIssueReviewSummary = document.querySelector("#importIssueReviewSummary");
       const importIssueList = document.querySelector("#importIssueList");
       const importPanel = document.querySelector("#importPanel");
+      const mainSurface = document.querySelector("#mainSurface");
       const libraryGrid = document.querySelector("#libraryGrid");
       const librarySurfaceHeader = document.querySelector("#librarySurfaceHeader");
       const libraryAllPhotosNav = document.querySelector("#libraryAllPhotosNav");
@@ -2037,8 +2038,12 @@
       }
 
       function closeImportIssueReview() {
+        const shouldRestoreFocus = shouldRestoreFocusFromSurface(importIssueReview);
         importIssueReview.hidden = true;
         viewImportErrorsButton.setAttribute("aria-expanded", "false");
+        if (shouldRestoreFocus) {
+          restoreFocus(viewImportErrorsButton);
+        }
       }
 
       function openImportPanel() {
@@ -2047,7 +2052,11 @@
       }
 
       function closeImportPanel() {
+        const shouldRestoreFocus = shouldRestoreFocusFromSurface(importPanel);
         importPanel.hidden = true;
+        if (shouldRestoreFocus) {
+          restoreFocus(showImportPanelButton, libraryGrid);
+        }
         setStatus("Import panel minimized.");
       }
 
@@ -5520,10 +5529,19 @@
       }
 
       function restoreFocus(target, fallback = null) {
-        const focusTarget = target && document.contains(target) && !isHiddenFromFocus(target) ? target : fallback;
+        const focusTarget = [target, fallback, mainSurface].find((candidate) => (
+          candidate
+          && document.contains(candidate)
+          && !isHiddenFromFocus(candidate)
+          && typeof candidate.focus === "function"
+        ));
         if (focusTarget && typeof focusTarget.focus === "function") {
           focusTarget.focus({ preventScroll: true });
         }
+      }
+
+      function shouldRestoreFocusFromSurface(surface) {
+        return Boolean(surface?.contains(document.activeElement));
       }
 
       function openPreferencesDialog() {
@@ -7026,11 +7044,15 @@
       }
 
       function closeLoupeView() {
+        const shouldRestoreFocus = shouldRestoreFocusFromSurface(loupeSurface);
         loupeSurface.hidden = true;
         aiReviewSurface.hidden = true;
         appFrame.dataset.libraryView = "grid";
         libraryGridShell.hidden = false;
         setLibraryWorkbenchChromeVisible(true);
+        if (shouldRestoreFocus) {
+          restoreFocus(openLoupeButton, libraryGrid);
+        }
         setStatus("Library grid loaded.");
       }
 
@@ -7229,6 +7251,7 @@
       }
 
       function closeAiReviewView() {
+        const shouldRestoreFocus = shouldRestoreFocusFromSurface(aiReviewSurface);
         aiReviewSurface.hidden = true;
         loupeSurface.hidden = true;
         appFrame.dataset.aiReviewActive = "false";
@@ -7237,6 +7260,9 @@
         openAiReviewButton.classList.remove("is-active");
         libraryAllPhotosNav.classList.add("is-active");
         libraryGridShell.hidden = false;
+        if (shouldRestoreFocus) {
+          restoreFocus(openAiReviewButton, libraryGrid);
+        }
         setStatus("Library grid loaded.");
       }
 

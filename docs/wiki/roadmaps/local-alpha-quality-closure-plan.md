@@ -221,6 +221,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Closing a dialog returns focus to a sensible opener or work surface. Keyboard-only operation can import, select, rate, open preview, edit supported controls, and export where supported.
 - **Acceptance:** No modal trap, lost focus, or invisible focus state in the local alpha path.
 - **Validation:** targeted smoke checks plus manual keyboard pass.
+- **Status:** Completed on 2026-06-22. Dialogs keep opener focus restoration, and import issue review, import panel, Loupe, and AI Review now restore focus to their trigger or the grid when the active element is inside the surface being hidden.
 
 ### Q3.4: Test Realistic Resize Boundaries
 
