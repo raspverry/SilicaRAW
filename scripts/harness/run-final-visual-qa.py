@@ -59,6 +59,7 @@ SURFACES = [
     ("M022-export-workflow", "export-workflow"),
     ("M023-ai-review", "ai-review"),
     ("M024-ai-approval", "ai-approval"),
+    ("M029-shortcuts", "shortcuts"),
 ]
 
 
@@ -828,6 +829,7 @@ def state_script(state):
     gridShell.hidden = false;
     exportDialog.hidden = true;
     preferencesDialog.hidden = true;
+    document.querySelector("#shortcutsDialog").hidden = true;
     populateGrid(withPhotos);
     setHistogramState(withPhotos);
     populateFilmstrip("#loupeFilmstrip");
@@ -843,6 +845,7 @@ def state_script(state):
   setLayout(false, false, true);
   exportDialog.hidden = true;
   preferencesDialog.hidden = true;
+  document.querySelector("#shortcutsDialog").hidden = true;
 
   if (state === "welcome") {{
     document.querySelector("#welcomeStatus").value = "Enter a local library folder path to begin.";
@@ -1337,6 +1340,9 @@ def state_script(state):
   }} else if (state === "preferences-advanced") {{
     openLibraryBase(true);
     setPreferenceSection("advanced");
+  }} else if (state === "shortcuts") {{
+    openLibraryBase(true);
+    document.querySelector("#shortcutsDialog").hidden = false;
   }} else if (state === "export" || state === "export-workflow") {{
     openLibraryBase(true);
     setMode("export");
@@ -1443,6 +1449,25 @@ def metric_script(surface):
   const text = (selector) => (document.querySelector(selector)?.textContent || "").trim();
   const value = (selector) => document.querySelector(selector)?.value || "";
   const disabled = (selector) => Boolean(document.querySelector(selector)?.disabled);
+  const scrollState = (selector) => {{
+    const element = document.querySelector(selector);
+    if (!visible(element)) {{
+      return {{ visible: false, scrollable: false, overflowX: "", overflowY: "", clipped: false }};
+    }}
+    const style = getComputedStyle(element);
+    const scrollableX = element.scrollWidth > element.clientWidth + 1;
+    const scrollableY = element.scrollHeight > element.clientHeight + 1;
+    return {{
+      visible: true,
+      scrollable: scrollableX || scrollableY,
+      overflowX: style.overflowX,
+      overflowY: style.overflowY,
+      clipped: (
+        (scrollableX && !["auto", "scroll"].includes(style.overflowX))
+        || (scrollableY && !["auto", "scroll"].includes(style.overflowY))
+      ),
+    }};
+  }};
   const mode = box("#modeNavigation");
   const actions = box(".sr-toolbar-actions");
   const toolbarOverlap = Boolean(mode && actions && mode.right > actions.left && mode.left < actions.right);
@@ -1456,6 +1481,34 @@ def metric_script(surface):
     .slice(0, 12);
   const dialog = box("#exportDialog");
   const preferencesDialog = box("#preferencesDialog");
+  const shortcutsDialog = box("#shortcutsDialog");
+  const modalTextClipping = Array.from(document.querySelectorAll(
+    ".sr-preferences-dialog h2, .sr-preferences-dialog h3, .sr-preferences-dialog h4, " +
+    ".sr-preferences-dialog p, .sr-preferences-dialog label, .sr-preferences-dialog dt, " +
+    ".sr-preferences-dialog dd, .sr-preferences-dialog small, .sr-preferences-dialog strong, " +
+    ".sr-export-dialog-header h2, .sr-export-dialog-header p, .sr-export-settings label, " +
+    ".sr-export-color-proof, .sr-export-safety, .sr-export-batch-header strong, " +
+    ".sr-export-batch-header span, .sr-export-failure-list li strong, " +
+    ".sr-export-failure-list li span, #exportStatus, .sr-export-summary h3, " +
+    ".sr-export-row span, .sr-export-row strong, .sr-recent-export-panel h3, " +
+    ".sr-recent-export-empty, .sr-shortcuts-dialog h2, .sr-shortcuts-dialog h3, " +
+    ".sr-shortcuts-dialog p, .sr-shortcuts-dialog dt, .sr-shortcuts-dialog dd, " +
+    ".sr-shortcuts-dialog small, .sr-shortcuts-dialog strong, .sr-import-review h3, " +
+    ".sr-import-review p, .sr-import-review output, .sr-import-issue-badge, " +
+    ".sr-import-issue-body strong, .sr-import-issue-body span, .sr-import-issue-body small"
+  ))
+    .filter(visible)
+    .filter((element) => {{
+      const style = getComputedStyle(element);
+      const clippedX = element.scrollWidth > element.clientWidth + 2 && !["auto", "scroll"].includes(style.overflowX);
+      const clippedY = element.scrollHeight > element.clientHeight + 2 && !["auto", "scroll"].includes(style.overflowY);
+      return clippedX || clippedY;
+    }})
+    .map((element) => {{
+      const id = element.id ? `#${{element.id}}` : element.className || element.tagName.toLowerCase();
+      return `${{element.tagName.toLowerCase()}}${{id}}`;
+    }})
+    .slice(0, 12);
   const app = document.querySelector("#appFrame");
   const presetButtons = Array.from(document.querySelectorAll("[data-basic-preset]"));
   const sidebarTextVisible = Array.from(document.querySelectorAll(
@@ -1467,6 +1520,7 @@ def metric_script(surface):
     horizontalOverflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > innerWidth + 1,
     toolbarOverlap,
     controlClipping,
+    modalTextClipping,
     renderedPhotoCards: document.querySelectorAll(".sr-photo-card").length,
     visiblePhotoCards: Array.from(document.querySelectorAll(".sr-photo-card")).filter(visible).length,
     overlappingPhotoCards: (() => {{
@@ -1492,9 +1546,22 @@ def metric_script(surface):
     importIssueReviewVisible: Boolean(box("#importIssueReview")),
     visibleImportIssueRows: Array.from(document.querySelectorAll(".sr-import-issue-row")).filter(visible).length,
     exportDialogWithinViewport: !dialog || (dialog.left >= 0 && dialog.right <= innerWidth && dialog.top >= 0 && dialog.bottom <= innerHeight),
+    shortcutsDialogWithinViewport: !shortcutsDialog || (
+      shortcutsDialog.left >= 0
+      && shortcutsDialog.right <= innerWidth
+      && shortcutsDialog.top >= 0
+      && shortcutsDialog.bottom <= innerHeight
+    ),
     activeMode: app.dataset.activeMode,
     libraryState: app.dataset.libraryState,
     aiReviewActive: app.dataset.aiReviewActive,
+    modalScrollState: {{
+      preferencesPane: scrollState("#preferencesDialog .sr-preferences-pane"),
+      exportBody: scrollState("#exportDialog .sr-export-dialog-body"),
+      shortcutsBody: scrollState("#shortcutsDialog .sr-shortcuts-dialog-body"),
+      importShell: scrollState("#importPanel .sr-import-shell"),
+      importIssueList: scrollState("#importIssueList"),
+    }},
     sidebarCollapsed: app.dataset.sidebarCollapsed,
     inspectorCollapsed: app.dataset.inspectorCollapsed,
     filmstripVisible: app.dataset.filmstripVisible,
@@ -1694,6 +1761,21 @@ def metric_script(surface):
       }})(),
       status: text("#preferencesStatus"),
     }},
+    shortcutsState: {{
+      visible: Boolean(shortcutsDialog),
+      description: text("#shortcutsDialogDescription"),
+      globalRows: Array.from(document.querySelectorAll("#shortcutsDialog .sr-shortcut-list")).at(0)?.querySelectorAll("div").length || 0,
+      gridRows: Array.from(document.querySelectorAll("#shortcutsDialog .sr-shortcut-list")).at(1)?.querySelectorAll("div").length || 0,
+      remappingText: text("#shortcutsDialog .sr-shortcuts-disabled"),
+      bodyScrollable: (() => {{
+        const body = document.querySelector("#shortcutsDialog .sr-shortcuts-dialog-body");
+        return body ? body.scrollHeight > body.clientHeight + 1 : false;
+      }})(),
+      bodyOverflowY: (() => {{
+        const body = document.querySelector("#shortcutsDialog .sr-shortcuts-dialog-body");
+        return body ? getComputedStyle(body).overflowY : "";
+      }})(),
+    }},
     exportWorkflow: {{
       dialogVisible: Boolean(dialog),
       colorSpace: value("#exportColorSpace"),
@@ -1771,8 +1853,32 @@ def capture(url):
                     failures.append(
                         f"{viewport_name} {surface_name}: clipped controls {', '.join(metrics['controlClipping'])}"
                     )
+                if state in {
+                    "preferences-appearance",
+                    "preferences-advanced",
+                    "export",
+                    "export-workflow",
+                    "import-review",
+                    "shortcuts",
+                } and metrics["modalTextClipping"]:
+                    failures.append(
+                        f"{viewport_name} {surface_name}: clipped modal copy {', '.join(metrics['modalTextClipping'])}"
+                    )
                 if not metrics["exportDialogWithinViewport"]:
                     failures.append(f"{viewport_name} {surface_name}: export dialog leaves viewport")
+                if state == "shortcuts" and not metrics["shortcutsDialogWithinViewport"]:
+                    failures.append(f"{viewport_name} {surface_name}: shortcuts dialog leaves viewport")
+                modal_scroll = metrics["modalScrollState"]
+                if state.startswith("preferences-") and modal_scroll["preferencesPane"]["clipped"]:
+                    failures.append(f"{viewport_name} {surface_name}: preferences pane clips scrollable modal content")
+                if state in {"export", "export-workflow"} and modal_scroll["exportBody"]["clipped"]:
+                    failures.append(f"{viewport_name} {surface_name}: export body clips scrollable modal content")
+                if state == "shortcuts" and modal_scroll["shortcutsBody"]["clipped"]:
+                    failures.append(f"{viewport_name} {surface_name}: shortcuts body clips scrollable modal content")
+                if state == "import-review" and modal_scroll["importShell"]["clipped"]:
+                    failures.append(f"{viewport_name} {surface_name}: import panel clips scrollable review content")
+                if state == "import-review" and modal_scroll["importIssueList"]["clipped"]:
+                    failures.append(f"{viewport_name} {surface_name}: import issue list clips scrollable modal content")
                 if metrics["overlappingPhotoCards"]:
                     failures.append(
                         f"{viewport_name} {surface_name}: {metrics['overlappingPhotoCards']} overlapping photo cards"
@@ -2017,6 +2123,18 @@ def capture(url):
                     ]:
                         if marker not in preferences_state["promptContractText"]:
                             failures.append(f"{viewport_name} {surface_name}: permission prompt contract missing {marker}")
+                if state == "shortcuts":
+                    shortcuts_state = metrics["shortcutsState"]
+                    if not shortcuts_state["visible"]:
+                        failures.append(f"{viewport_name} {surface_name}: shortcuts dialog not visible")
+                    if "Active local alpha shortcuts only" not in shortcuts_state["description"]:
+                        failures.append(f"{viewport_name} {surface_name}: shortcuts dialog scope copy missing")
+                    if shortcuts_state["globalRows"] != 3 or shortcuts_state["gridRows"] != 4:
+                        failures.append(f"{viewport_name} {surface_name}: shortcuts dialog rows do not match active-only shortcuts")
+                    if "Shortcut remapping is disabled" not in shortcuts_state["remappingText"]:
+                        failures.append(f"{viewport_name} {surface_name}: disabled shortcut remapping copy missing")
+                    if shortcuts_state["bodyScrollable"] and shortcuts_state["bodyOverflowY"] not in {"auto", "scroll"}:
+                        failures.append(f"{viewport_name} {surface_name}: shortcuts dialog scroll area is not obvious")
                 if state == "export-workflow":
                     export_workflow = metrics["exportWorkflow"]
                     if not export_workflow["dialogVisible"] or "2 photos" not in export_workflow["selectedPhoto"]:
