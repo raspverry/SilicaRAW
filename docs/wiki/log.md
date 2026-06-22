@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] interaction | Escape dismiss priority verified
+
+- Completed Q3.1 of the local alpha quality closure plan.
+- `Escape` now follows the documented top-surface order through the global dismiss handler, with grid multi-selection handled as the lowest-priority dismissible state.
+- UI workflow smoke now checks the dismiss order so dialogs, import review, import panel, Loupe, AI Review, and multi-select do not regress into competing `Escape` behavior.
+
 ## [2026-06-20] quality | Visual contradictions resolved
 
 - Completed Q2.6 of the local alpha quality closure plan.

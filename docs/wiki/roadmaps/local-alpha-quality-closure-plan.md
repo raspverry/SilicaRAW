@@ -203,6 +203,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Ensure `Escape` closes exactly one topmost dismissible surface in the documented order.
 - **Acceptance:** Dialogs, import issue review, import panel, Loupe, AI Review, and grid multi-select do not fight each other.
 - **Validation:** `python3 scripts/harness/check-ui-workflow-smoke.py`
+- **Status:** Completed on 2026-06-22. The global dismiss handler now follows the documented order from the public beta UI hardening plan, and Library grid multi-selection is the lowest-priority dismissible state so `Escape` clears it even when grid focus has moved elsewhere.
 
 ### Q3.2: Verify Read-Only Shortcuts Discovery
 
