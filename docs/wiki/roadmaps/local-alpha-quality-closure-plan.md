@@ -212,6 +212,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Keep shortcuts discoverable from UI and `?`, but do not implement custom shortcut binding.
 - **Acceptance:** Users can find active shortcuts without a settings system that does not exist.
 - **Validation:** workflow smoke plus manual keyboard check.
+- **Status:** Completed on 2026-06-22. The shortcuts dialog is reachable from the Welcome footer, Preferences > Shortcuts, and the `?` key, describes those access paths, lists only active local-alpha shortcuts, and keeps custom remapping disabled.
 
 ### Q3.3: Verify Focus Return and Keyboard-Only Flow
 

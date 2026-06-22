@@ -866,6 +866,24 @@ def main():
     ]:
         require(marker in source, f"preferences color/export marker missing: {marker}", failures)
     for marker in [
+        "shortcutsDialogDescription",
+        "Active local alpha shortcuts only. Open from Welcome, Preferences > Shortcuts, or ?.",
+        "preferencesSectionShortcuts",
+        "preferencesOpenShortcuts",
+        "preferencesShortcutRemapping",
+        "Shortcut remapping is disabled in the local alpha.",
+        '[data-open-shortcuts-dialog]',
+        'event.key === "?"',
+        "isTextEntryTarget(event.target)",
+        "openShortcutsDialog()",
+    ]:
+        require(marker in source, f"shortcuts discovery marker missing: {marker}", failures)
+    require(
+        "disabled" in parser.ids.get("preferencesShortcutRemapping", {}),
+        "shortcut remapping must remain disabled in local alpha",
+        failures,
+    )
+    for marker in [
         "preferencesAdvancedAgentAccess",
         "preferencesAdvancedMcpAccess",
         "preferencesAdvancedPluginRuntime",

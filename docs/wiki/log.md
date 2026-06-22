@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-06-22] interaction | Shortcuts discovery verified
+
+- Completed Q3.2 of the local alpha quality closure plan.
+- Shortcuts remain read-only and discoverable from Welcome, Preferences > Shortcuts, and `?`.
+- UI workflow smoke now checks the shortcuts discovery paths and disabled custom-remapping state.
+
 ## [2026-06-22] interaction | Escape dismiss priority verified
 
 - Completed Q3.1 of the local alpha quality closure plan.
