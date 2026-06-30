@@ -97,10 +97,10 @@ Follow this order. Do not polish around broken trust states.
 
 - **Location:** core catalog/readiness code, desktop state mapping, UI copy, docs
 - **Dependencies:** Q0
-- **Work:** Make the contract explicit: JPEG/JPG are the supported local alpha source formats. Unsupported files may be cataloged by reference, but they must not look preview-ready, develop-ready, or export-ready.
-- **Acceptance:** PNG, TIFF, HEIC, database files, and sidecar-like files are not shown as supported photo sources. Unsupported rows remain understandable and compact.
+- **Work:** Make the contract explicit: JPEG/JPG, PNG, TIF, and TIFF are the supported local alpha source formats. Unsupported files may be cataloged by reference, but they must not look preview-ready, develop-ready, or export-ready.
+- **Acceptance:** HEIC, WebP, RAW, database files, and sidecar-like files are not shown as supported photo sources. Unsupported rows remain understandable and compact.
 - **Validation:** targeted core/storage tests plus `python3 scripts/harness/check-ui-workflow-smoke.py`
-- **Status:** Completed on 2026-06-20. Catalog, preview, Develop commit, desktop static UI, fixture generator, and docs now use the JPEG/JPG-only installed-alpha source contract.
+- **Status:** Completed on 2026-06-20, then superseded on 2026-06-27 by the supported-raster source contract for JPEG/JPG, PNG, TIF, and TIFF. Catalog, preview, Develop commit, desktop static UI, fixture generator, and docs now use the supported-raster installed-alpha source contract.
 
 ### Q1.2: Harden Export Against Same-File and Hard-Link Writes
 
@@ -308,7 +308,7 @@ Follow this order. Do not polish around broken trust states.
 
 - **Location:** export workflow
 - **Dependencies:** Q5.3
-- **Work:** Export a supported JPEG/JPG photo to JPEG sRGB and verify output exists, opens, and does not overwrite any original.
+- **Work:** Export a supported raster photo to JPEG sRGB and verify output exists, opens, and does not overwrite any original.
 - **Acceptance:** Export creates a new artifact with evidence and leaves originals unchanged.
 - **Validation:** output inspection plus original hash manifest before/after.
 

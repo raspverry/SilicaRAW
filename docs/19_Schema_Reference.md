@@ -523,10 +523,10 @@ Task 11.7 records the local alpha metadata contract without adding a parser depe
 
 - `photo_metadata` normalized fields: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
 - `photos.file_size` and `photos.modified_at` are file-system metadata captured during import and are not duplicated into `photo_metadata`.
-- Task 11.7.3 adds physical catalog columns for `width`, `height`, and `orientation`; JPEG/JPG import may store width and height from the existing raster path.
+- Task 11.7.3 adds physical catalog columns for `width`, `height`, and `orientation`; supported-raster import may store width and height from the existing raster path.
 - Camera make, camera model, lens model, orientation, and EXIF capture time remain unavailable until a parser dependency is selected and documented in `docs/DEPENDENCIES.md`.
 - `photo_metadata.raw_json` is parser-owned untrusted data and defaults to `{}`.
-- Unsupported files must not receive fake metadata rows. Existing imports are not backfilled on library open or session restore.
+- Unsupported files must not receive fake metadata rows. Legacy catalogs may be migrated on the first grid query after launch so existing PNG/TIF/TIFF rows are reclassified as supported raster rows without touching original files.
 - Metadata read APIs serialize each displayed field with an explicit `known`, `unknown`, or `unavailable` state and must not read original files during query.
 - The first metadata-backed grid filter is `has_dimensions`, defined as stored `photo_metadata.width IS NOT NULL AND photo_metadata.height IS NOT NULL`. It must not infer dimensions from original files during query.
 

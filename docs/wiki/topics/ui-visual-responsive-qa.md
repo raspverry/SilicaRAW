@@ -151,7 +151,7 @@ Visual QA now seeds a supported crop/flip state and verifies geometry readiness,
 
 ## Phase 18 Edit Clipboard Note
 
-Task 18.5.3 adds a Develop Copy & Sync panel with explicit selected-page scope, subset checkboxes, and separate Copy, Paste to Primary, and Batch Sync actions. Copy, paste, and batch sync are gated to JPEG/JPG Develop photos; Detail and Lens clipboard subsets remain disabled because their runtime behavior is not supported by the current alpha.
+Task 18.5.3 adds a Develop Copy & Sync panel with explicit selected-page scope, subset checkboxes, and separate Copy, Paste to Primary, and Batch Sync actions. Copy, paste, and batch sync are gated to supported-raster Develop photos; Detail and Lens clipboard subsets remain disabled because their runtime behavior is not supported by the current alpha.
 
 Visual QA now seeds an edit clipboard state and verifies source readback, selected-photo count, Basic/Tone/Geometry subset choice, disabled unsupported subsets, enabled paste/sync actions, and plan rows across `1280x800`, `1440x900`, and `1728x965`.
 

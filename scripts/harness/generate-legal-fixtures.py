@@ -35,20 +35,24 @@ def write_ppm(path, width, height, pixel_fn):
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
 
 
-def convert_ppm_to_jpeg(ppm_path, jpeg_path):
+def convert_ppm_to_image(ppm_path, output_path, format_name):
     sips = shutil.which("sips")
     if not sips:
-        raise RuntimeError("macOS sips command is required to generate JPEG fixtures")
+        raise RuntimeError("macOS sips command is required to generate raster fixtures")
     result = subprocess.run(
-        [sips, "-s", "format", "jpeg", str(ppm_path), "--out", str(jpeg_path)],
+        [sips, "-s", "format", format_name, str(ppm_path), "--out", str(output_path)],
         text=True,
         capture_output=True,
         check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"sips failed while creating {jpeg_path.name}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+            f"sips failed while creating {output_path.name}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+
+
+def convert_ppm_to_jpeg(ppm_path, jpeg_path):
+    convert_ppm_to_image(ppm_path, jpeg_path, "jpeg")
 
 
 def clamp_channel(value):
@@ -198,7 +202,7 @@ def record_fixture(fixtures, root, relative_path, role, media_type, expected):
     )
 
 
-def create_supported_jpegs(output, fixtures):
+def create_supported_rasters(output, fixtures):
     supported = output / "supported"
     source = output / "_sources"
     supported.mkdir(parents=True, exist_ok=True)
@@ -206,25 +210,31 @@ def create_supported_jpegs(output, fixtures):
 
     urban_ppm = source / "reference-urban.ppm"
     urban_jpg = supported / "reference-urban.jpg"
+    urban_png = supported / "reference-urban.png"
     write_ppm(urban_ppm, 720, 480, reference_urban_pixel)
     convert_ppm_to_jpeg(urban_ppm, urban_jpg)
+    convert_ppm_to_image(urban_ppm, urban_png, "png")
 
     still_life_ppm = source / "reference-still-life.ppm"
     still_life_jpeg = supported / "reference-still-life.jpeg"
+    still_life_tiff = supported / "reference-still-life.tiff"
     write_ppm(still_life_ppm, 640, 640, reference_still_life_pixel)
     convert_ppm_to_jpeg(still_life_ppm, still_life_jpeg)
+    convert_ppm_to_image(still_life_ppm, still_life_tiff, "tiff")
 
     shutil.rmtree(source)
-    for relative_path in [
-        Path("supported/reference-urban.jpg"),
-        Path("supported/reference-still-life.jpeg"),
+    for relative_path, role, media_type in [
+        (Path("supported/reference-urban.jpg"), "supported-jpeg", "image/jpeg"),
+        (Path("supported/reference-still-life.jpeg"), "supported-jpeg", "image/jpeg"),
+        (Path("supported/reference-urban.png"), "supported-png", "image/png"),
+        (Path("supported/reference-still-life.tiff"), "supported-tiff", "image/tiff"),
     ]:
         record_fixture(
             fixtures,
             output,
             relative_path,
-            "supported-jpeg",
-            "image/jpeg",
+            role,
+            media_type,
             {
                 "import_supported": True,
                 "preview_status": "ready_by_reference",
@@ -338,7 +348,7 @@ def main():
 
     fixtures = []
     try:
-        create_supported_jpegs(output, fixtures)
+        create_supported_rasters(output, fixtures)
         create_unsupported_files(output, fixtures)
         if args.include_raw_placeholders:
             create_raw_placeholders(output, fixtures)

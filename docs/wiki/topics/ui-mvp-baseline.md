@@ -151,8 +151,8 @@ Task 5.5.6 adds the M004 Loupe MVP inside Library mode:
 
 - Loupe opens from the currently selected Library grid photo.
 - Runtime preview state uses the existing desktop `open_photo_preview` command.
-- JPEG/JPG source rows render the ready preview surface.
-- RAW, PNG, TIFF, HEIC, database, and sidecar-like rows render a clear unsupported state in the installed alpha and must not imply decoding is implemented.
+- JPEG/JPG, PNG, TIF, and TIFF source rows render the ready preview surface.
+- RAW, HEIC, WebP, database, and sidecar-like rows render a clear unsupported state in the installed alpha and must not imply decoding is implemented.
 - Fixture-backed RAW proof paths remain separate from the product preview route.
 - The bottom filmstrip mirrors the current grid selection and keeps M004 navigation visible.
 - Real image pixels, Metal output, RAW decoding, and Develop edits remain future work in this baseline. Phase 11 later shares the catalog-backed metadata inspector with Loupe.
@@ -167,7 +167,7 @@ Task 5.5.7 adds the M005 Develop Panel MVP:
 - Draft slider and numeric input changes call only the preview path.
 - `Commit Edit` is the explicit persistence action for final exposure and contrast values.
 - Unsupported and missing files disable Develop edit controls rather than implying an editable preview.
-- RAW, PNG, TIFF, HEIC, database, and sidecar-like rows must not accept Develop edits in the installed alpha.
+- RAW, HEIC, WebP, database, and sidecar-like rows must not accept Develop edits in the installed alpha.
 - Real image pixels, Metal output, RAW decoding, masks, full tone/color/detail controls, and sidecar writing remain future work.
 
 ## Task 5.5.8 Export Dialog
@@ -244,7 +244,7 @@ UI QA should happen in vertical slices, not after every future screen exists.
 
 1. First QA the connected core workflow through M001/M003/M005/M007-level screens.
 2. Then verify responsive variants for M003, M005, and M007.
-3. Then complete Phase 5.6 runtime behavior: real JPEG/JPG pixels, native/selectable paths, persisted edit-state readback, cache clearing, fixture generation, and installed/runtime smoke.
+3. Then complete Phase 5.6 runtime behavior: real supported-raster pixels, native/selectable paths, persisted edit-state readback, cache clearing, fixture generation, and installed/runtime smoke.
 4. Then expand secondary screens such as preferences, mask active, and AI review when they are explicitly scoped.
 
 Minimum UI MVP checks:

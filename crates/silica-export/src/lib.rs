@@ -504,7 +504,7 @@ pub struct JpegDevelopPreviewRequest {
     pub masks: Vec<ManualMaskAdjustment>,
 }
 
-/// Request to compute Develop histogram data from a supported JPEG source.
+/// Request to compute Develop histogram data from a supported raster source.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JpegHistogramRequest {
     pub source_path: PathBuf,

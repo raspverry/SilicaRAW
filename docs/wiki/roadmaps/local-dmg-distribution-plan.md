@@ -557,15 +557,15 @@ Phase 5.5 proved screen structure and command paths. It did not prove a real ins
 
 **Installed-alpha capability contract:**
 
-- JPEG/JPG originals are the first fully supported visible photo path for grid thumbnails, loupe preview, Develop preview, persisted exposure/contrast, and JPEG sRGB export.
+- JPEG/JPG, PNG, TIF, and TIFF originals are the supported standard-raster visible photo path for grid thumbnails, loupe preview, Develop preview, persisted edits, and JPEG/PNG/TIFF sRGB export.
 - RAW files may be imported only as clearly decode-blocked catalog entries until RAW decoding is explicitly implemented.
 - Unsupported files must never look editable or exportable.
-- PNG, TIFF, HEIC, and other raster formats are not guaranteed installed-alpha edit/export inputs until codec support, UI behavior, and tests are explicitly added.
+- HEIC, WebP, RAW, and other non-supported formats are not guaranteed installed-alpha edit/export inputs until codec support, UI behavior, and tests are explicitly added.
 - Original source files must remain unmodified.
 
 **Demo/Validation:**
 
-- A tester can use the installed app to create/open a library, import JPEG/JPG originals by reference, see real thumbnails, open a real loupe preview, visibly adjust exposure/contrast, commit the edit, export JPEG sRGB, clear disposable caches, restart, reopen, and see persisted state.
+- A tester can use the installed app to create/open a library, import supported raster originals by reference, see real thumbnails, open a real loupe preview, visibly adjust exposure/contrast, commit the edit, export JPEG sRGB, clear disposable caches, restart, reopen, and see persisted state.
 - The same workflow is covered by a connected runtime smoke path before clean-Mac DMG QA begins.
 - Phase 6 clean-Mac install QA does not start until this phase is complete.
 
@@ -578,7 +578,7 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
 - **Dependencies:** Task 5.5.10
 - **Acceptance Criteria:**
   - Phase 5.6 is atomized before implementation continues.
-  - The installed-alpha visible photo path is scoped to JPEG/JPG until more codecs are proven.
+  - The installed-alpha visible photo path is scoped to supported standard raster sources until more codecs are proven.
   - Missing product runtime behavior is separated from Phase 6 packaging QA.
   - Phase 6 dependencies are updated so clean-Mac QA waits for Phase 5.6.
 - **Validation:** Markdown link check and harness pass.
@@ -616,26 +616,26 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
 ### Task 5.6.4: Real JPEG Thumbnail Cache MVP
 
 - **Location:** `crates/silica-storage`, `crates/silica-core`, `apps/desktop/static/`
-- **Description:** Generate and render real JPEG/JPG thumbnails for supported imported originals.
+- **Description:** Generate and render real supported-raster thumbnails for supported imported originals.
 - **Dependencies:** Task 5.6.2
 - **Acceptance Criteria:**
-  - JPEG/JPG catalog rows expose a safe thumbnail asset or encoded preview field.
+  - JPEG/JPG, PNG, TIF, and TIFF catalog rows expose a safe thumbnail asset or encoded preview field.
   - Thumbnail files live under the library `thumbnails/` directory.
   - `cache_records` or equivalent catalog state records disposable thumbnail cache metadata.
   - RAW/unsupported entries keep clear blocked/unsupported placeholders.
   - Original files are not modified.
 - **Validation:** Thumbnail cache test, UI smoke, original hash protection, and harness pass.
 
-**Status:** Completed on 2026-06-09. JPEG/JPG grid listing now generates disposable JPEG thumbnail files under each library `thumbnails/` directory, records them in `cache_records` with cache type `thumbnail`, reuses a fresh cache when the source fingerprint is unchanged, and exposes `thumbnailPath` through storage/core plus `thumbnailBytes` through the desktop command response so the static frontend can render real grid and filmstrip pixels via Blob URLs without broadening Tauri asset protocol scope. RAW, missing, and unsupported rows retain placeholder/blocked states, corrupt JPEG bytes do not break the whole grid, and tests verify thumbnail generation does not mutate originals. The existing `image` dependency documentation was updated for this thumbnail use.
+**Status:** Completed on 2026-06-09 and widened for PNG/TIFF source inputs on 2026-06-27. Supported-raster grid listing now generates disposable JPEG thumbnail files under each library `thumbnails/` directory, records them in `cache_records` with cache type `thumbnail`, reuses a fresh cache when the source fingerprint is unchanged, and exposes `thumbnailPath` through storage/core plus `thumbnailBytes` through the desktop command response so the static frontend can render real grid and filmstrip pixels via Blob URLs without broadening Tauri asset protocol scope. RAW, missing, and unsupported rows retain placeholder/blocked states, corrupt raster bytes do not break the whole grid, and tests verify thumbnail generation does not mutate originals. The existing `image` dependency documentation was updated for this thumbnail use.
 
 ### Task 5.6.5: Real JPEG Loupe Preview MVP
 
 - **Location:** `crates/silica-core`, `apps/desktop/static/`, `crates/silica-storage`
-- **Description:** Show real JPEG/JPG preview pixels in the Loupe view.
+- **Description:** Show real supported-raster preview pixels in the Loupe view.
 - **Dependencies:** Task 5.6.4
 - **Acceptance Criteria:**
-  - Opening Loupe for JPEG/JPG displays the selected original or generated preview image.
-  - Non-JPEG/JPG source rows show unsupported or missing states without implying RAW decoding.
+  - Opening Loupe for JPEG/JPG, PNG, TIF, and TIFF displays the selected original or generated preview image.
+  - Non-supported source rows show unsupported or missing states without implying RAW decoding.
   - Missing/unsupported candidates show clear blocked states.
   - Preview cache data is disposable.
 - **Validation:** Preview UI smoke, cache/original safety test, and harness pass.
@@ -645,10 +645,10 @@ See [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completio
 ### Task 5.6.6: Real JPEG Develop Preview MVP
 
 - **Location:** `crates/silica-core`, `crates/silica-render`, `apps/desktop/static/`
-- **Description:** Make exposure/contrast changes visibly affect JPEG/JPG Develop preview pixels before commit.
+- **Description:** Make exposure/contrast changes visibly affect supported-raster Develop preview pixels before commit.
 - **Dependencies:** Task 5.6.5
 - **Acceptance Criteria:**
-  - Exposure/contrast slider changes update the visible Develop preview for JPEG/JPG.
+  - Exposure/contrast slider changes update the visible Develop preview for JPEG/JPG, PNG, TIF, and TIFF.
   - Draft preview updates remain non-persistent until commit.
   - Commit persists the active edit graph.
   - Unsupported source rows, including RAW placeholders, do not accept Develop commits in the installed alpha.

@@ -1049,13 +1049,13 @@ def main():
     ]:
         require(command in source, f"index.html must wire {command}", failures)
     require(
-        "function isJpegDevelopFileType" in source,
-        "Develop clipboard UI must gate copy/paste/sync to JPEG/JPG file types",
+        "function isSupportedRasterDevelopFileType" in source,
+        "Develop clipboard UI must gate copy/paste/sync to supported raster file types",
         failures,
     )
     require(
-        "isJpegDevelopFileType(photo?.fileType)" in source,
-        "isDevelopable must use the JPEG/JPG file-type gate",
+        "isSupportedRasterDevelopFileType(photo?.fileType)" in source,
+        "isDevelopable must use the supported raster file-type gate",
         failures,
     )
     for marker in [

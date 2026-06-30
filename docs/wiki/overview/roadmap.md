@@ -34,7 +34,7 @@ The current implementation order starts with:
 16. Implement exposure and contrast edit flow.
 17. Implement JPEG sRGB export.
 18. Establish UI MVP baseline and then implement the connected UI vertical slice.
-19. Complete the product alpha runtime loop before clean-Mac install QA: real JPEG/JPG pixels, native/selectable paths, persisted UI readback, cache clear, fixture generation, and installed/runtime smoke.
+19. Complete the product alpha runtime loop before clean-Mac install QA: real supported-raster pixels, native/selectable paths, persisted UI readback, cache clear, fixture generation, and installed/runtime smoke.
 20. Complete local DMG install, signing, notarization, GitHub Release, and release hardening.
 21. Follow the post-alpha product roadmap and master execution plan for fixture-backed RAW, color, Metal, Library, Develop, masks, export, permissions, MLX, plugins, MCP, public beta, and v1.0.
 
@@ -58,12 +58,12 @@ The current implementation order starts with:
 - Phase 4.2 adds local library create/open through `silica-core`, `silica-storage`, and the minimal Tauri shell.
 - Phase 4.3 adds non-recursive folder import scanning with path, partial hash, unsupported-state, and original-preservation tests.
 - Phase 4.4 adds catalog-authoritative rating, pick, reject, and color label persistence through `photo_flags`, core APIs, and minimal Tauri commands.
-- Phase 5.1 adds a minimal preview readiness path. Q1.1 later narrows the installed-alpha source contract to JPEG/JPG only: RAW, PNG, TIFF, HEIC, database, and sidecar-like rows remain catalogable as unsupported product rows unless a later task adds end-to-end codec evidence.
+- Phase 5.1 adds a minimal preview readiness path. Q1.1 initially narrowed the installed-alpha source contract to JPEG/JPG only; the current contract supports JPEG/JPG, PNG, TIF, and TIFF standard raster sources, while RAW, HEIC, WebP, database, and sidecar-like rows remain catalogable as unsupported product rows unless a later task adds end-to-end codec evidence.
 - Phase 5.2 adds typed edit graph structures and schema-aware validation in `silica-edit`; edit application, render integration, sidecar persistence, and UI controls remain later tasks.
 - Phase 5.3 adds command/API-level exposure and contrast edit flow: draft preview requests do not write SQLite, while commit persists the active edit graph.
 - Phase 5.4 adds command/API-level JPEG sRGB export with original overwrite protection and catalog export records.
 - Phase 5.5 completed the UI MVP vertical slice as screen structure plus command wiring. It is not the final installed-app readiness gate because several surfaces still use placeholder pixels, typed paths, string command parsing, and static/demo state.
-- Phase 5.6 is now the required Product Alpha Runtime Completion pass before Phase 6 clean-Mac install QA. Its first task records the runtime gap audit and narrows the installed-alpha guaranteed visible photo path to JPEG/JPG until additional codecs are explicitly implemented and tested.
+- Phase 5.6 is now the required Product Alpha Runtime Completion pass before Phase 6 clean-Mac install QA. Its current visible photo path is supported standard raster sources until additional codecs are explicitly implemented and tested.
 - The local DMG distribution plan runs through Phase 9. After that, the post-alpha product roadmap continues with evidence and trust gates before broad RAW, Metal, Develop, MLX, plugin, or MCP work.
 - Phase 10 has completed fixture manifest, golden tolerance policy, sidecar v1, rebuild dry-run, backup/restore boundaries, project license, contribution/security templates, and public trust regression checks.
 - Phase 11 is complete: app session, real recents, relaunch restore, layout persistence, paged grid queries, grid interaction behavior, stored metadata display/filtering, structured import issues, opt-in recursive import, and connected runtime smoke.

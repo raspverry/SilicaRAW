@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 KNOWN_LIMITATIONS = [
     "RAW decode is blocked in the local alpha; RAW placeholder files must remain non-decodable.",
-    "Metal viewer output is disabled in the local alpha; previews use the current JPEG/JPG runtime path.",
+    "Metal viewer output is disabled in the local alpha; previews use the current standard raster runtime path.",
     "AI tools are disabled in the local alpha; no MLX runtime, model loading, or MCP tooling is exercised.",
     "The developer preflight records unsigned/local artifact evidence only; clean-Mac DMG QA remains a later gate.",
 ]

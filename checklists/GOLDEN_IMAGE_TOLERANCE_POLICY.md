@@ -15,7 +15,7 @@ The repository currently has:
 
 ```txt
 - a fixture manifest contract for legal RAW/color fixture expectations
-- synthetic local-alpha JPEG/JPG smoke fixtures
+- synthetic local-alpha supported-raster smoke fixtures
 - original-file hash safety checks
 - JPEG sRGB export smoke coverage
 - fixture-backed profile probe evidence for local ignored Color Class F fixtures

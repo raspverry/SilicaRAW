@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-22
+updated: 2026-06-29
 source_of_truth: none
 ---
 
@@ -13,6 +13,19 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-29] runtime | Restored grids migrate legacy raster rows
+
+- Fixed the restored-library grid path so a legacy catalog below the current schema is migrated before the read-only paged grid query runs.
+- Added regression coverage for a schema 11 catalog where PNG rows were still marked unsupported; grid query now upgrades to schema 12 and reclassifies PNG as supported raster.
+- This preserves the read-only query path for current catalogs while allowing the one required catalog migration for older local alpha libraries.
+
+## [2026-06-27] runtime | Supported raster source contract widened
+
+- Superseded the JPEG/JPG-only installed-alpha source contract with a supported-raster contract for JPEG/JPG, PNG, TIF, and TIFF source inputs.
+- Catalog schema version 12 reclassifies existing PNG/TIF/TIFF rows from unsupported to supported raster rows while keeping RAW, HEIC, WebP, database, and sidecar-like files unsupported.
+- Core now routes supported raster sources through thumbnails, Loupe previews, Develop previews, histograms, edit commits, and JPEG sRGB export without mutating originals.
+- Desktop UI, static smoke checks, final visual QA seeds, and legal QA fixtures now treat PNG/TIFF as supported raster inputs instead of unsupported placeholders.
 
 ## [2026-06-22] quality | Static and installed QA boundaries separated
 

@@ -12,7 +12,7 @@ Phase 13.3 adds a non-default `color-probe` feature that reads JPEG marker/profi
 
 Task 17.2.1 carries white-balance-family values through preview/export request planning. It still does not create a Metal viewer, shader, Core Image context, ColorSync transform, ICC embedding, or render pixels.
 
-Task 17.2.2 carries tone recovery values through preview/export request planning under the same boundary. Pixel adjustment remains owned by `silica-export` for supported JPEG/JPG paths.
+Task 17.2.2 carries tone recovery values through preview/export request planning under the same boundary. Pixel adjustment remains owned by `silica-export` for supported raster paths.
 
 Task 17.2.3 carries color presence values through preview/export request planning under the same boundary.
 

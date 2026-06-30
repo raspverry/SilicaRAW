@@ -941,7 +941,7 @@ def main():
         "toggleSelectedPick",
         "toggleSelectedReject",
         "updateCullingControls",
-        "RAW, PNG, TIFF, and HEIC sources remain cataloged as unsupported in this alpha",
+        "RAW, HEIC, WebP, Metal viewer output, and AI tools remain disabled in this alpha",
     ]:
         require(marker in source, f"demo removal/culling marker missing: {marker}", failures)
     for forbidden in [

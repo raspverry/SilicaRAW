@@ -92,11 +92,11 @@
               <output class="sr-welcome-status" id="welcomeStatus" aria-live="polite">Enter a local library folder path to begin.</output>
               <div class="sr-welcome-tags" aria-label="Product traits">
                 <span>Built for macOS</span>
-                <span>JPEG/JPG alpha path</span>
+                <span>Raster alpha path</span>
                 <span>RAW decode blocked</span>
                 <span>Local-first</span>
               </div>
-              <p class="sr-alpha-scope-note">JPEG/JPG source previews and JPEG, PNG, and TIFF export outputs are enabled. RAW, PNG, TIFF, and HEIC sources remain cataloged as unsupported in this alpha; Metal viewer output and AI tools are also disabled.</p>
+              <p class="sr-alpha-scope-note">JPEG/JPG, PNG, and TIFF source previews plus JPEG, PNG, and TIFF export outputs are enabled for standard local raster files. RAW, HEIC, WebP, Metal viewer output, and AI tools remain disabled in this alpha.</p>
               <section class="sr-recent-libraries" aria-label="Recent libraries">
                 <div class="sr-recent-header">
                   <h2>Recent Libraries</h2>
@@ -220,6 +220,8 @@
                   <select id="fileTypeFilter" aria-label="File type filter">
                     <option value="">All Files</option>
                     <option value="jpeg">JPEG</option>
+                    <option value="png">PNG</option>
+                    <option value="tiff">TIFF</option>
                     <option value="raw">RAW legacy</option>
                     <option value="unsupported">Unsupported</option>
                   </select>
@@ -564,7 +566,7 @@
           <div class="sr-hsl-panel" id="developHslPanel" data-hsl-state="enabled">
             <div class="sr-hsl-title-row">
               <div class="sr-panel-heading">HSL Mixer</div>
-              <output id="developHslSupportStatus" aria-live="polite">JPEG/JPG</output>
+              <output id="developHslSupportStatus" aria-live="polite">Raster</output>
             </div>
             <div class="sr-hsl-channel-grid" role="group" aria-label="HSL color channels">
               <button id="developHslChannelRed" type="button" data-hsl-channel="red" aria-pressed="true"><span class="sr-hsl-swatch" aria-hidden="true"></span>Red</button>
@@ -2352,7 +2354,7 @@
             minRating: [1, 2, 3, 4, 5].includes(Number(filters.minRating)) ? Number(filters.minRating) : null,
             picked: typeof filters.picked === "boolean" ? filters.picked : null,
             rejected: typeof filters.rejected === "boolean" ? filters.rejected : null,
-            fileType: ["jpeg", "raw", "unsupported"].includes(filters.fileType) ? filters.fileType : null,
+            fileType: ["jpeg", "png", "tiff", "raw", "unsupported"].includes(filters.fileType) ? filters.fileType : null,
             metadata: filters.metadata === "has_dimensions" ? "has_dimensions" : null,
             search: typeof filters.search === "string" ? filters.search : "",
           },
@@ -3685,7 +3687,7 @@
           : noPhoto
             ? "Select a photo before copying edit settings."
             : !primaryDevelopable
-              ? "Unsupported target; JPEG/JPG Develop edits are required for copy and paste."
+              ? "Unsupported target; supported raster Develop edits are required for copy and paste."
               : !canUseRuntime
                 ? "Desktop runtime required to persist clipboard sync; static UI remains read-only."
                 : hasPayload
@@ -3711,7 +3713,7 @@
           photo
           && !photo.missing
           && !photo.unsupported
-          && isJpegDevelopFileType(photo.fileType)
+          && isSupportedRasterDevelopFileType(photo.fileType)
         );
       }
 
@@ -3763,15 +3765,15 @@
         return developAdjustmentsByPhoto.get(photoId);
       }
 
-      function isJpegDevelopFileType(fileType) {
-        return ["JPG", "JPEG"].includes((fileType || "").toUpperCase());
+      function isSupportedRasterDevelopFileType(fileType) {
+        return ["JPG", "JPEG", "PNG", "TIF", "TIFF"].includes((fileType || "").toUpperCase());
       }
 
       function isDevelopable(photo) {
         return Boolean(photo
           && !photo.missing
           && !photo.unsupported
-          && isJpegDevelopFileType(photo?.fileType)
+          && isSupportedRasterDevelopFileType(photo?.fileType)
         );
       }
 
@@ -3800,8 +3802,8 @@
         const activeChannel = HSL_CHANNELS.includes(state?.activeHslChannel) ? state.activeHslChannel : "red";
         const values = normalizeHslChannel(state?.draftHslMixer?.[activeChannel]);
         developHslPanel.dataset.hslState = isDevelopable(selectedPhoto()) ? "enabled" : "blocked";
-        developHslSupportStatus.value = "JPEG/JPG";
-        developHslSupportStatus.textContent = "JPEG/JPG";
+        developHslSupportStatus.value = "Raster";
+        developHslSupportStatus.textContent = "Raster";
         developHslChannelButtons.forEach((button) => {
           const active = button.dataset.hslChannel === activeChannel;
           button.classList.toggle("is-active", active);
@@ -5790,7 +5792,7 @@
         const activeHslChannel = HSL_CHANNELS.includes(state.activeHslChannel) ? state.activeHslChannel : "red";
         const activeHslValues = normalizeHslChannel(state.draftHslMixer?.[activeHslChannel]);
         const summary = `Exposure ${formatExposure(state.draftExposure)}, contrast ${formatContrast(state.draftContrast)}, WB ${normalizeWhiteBalance(state.draftWhiteBalance)}, temp ${formatTemperature(state.draftTemperature)}, tint ${formatTint(state.draftTint)}, highlights ${formatSignedHundred(state.draftHighlights)}, shadows ${formatSignedHundred(state.draftShadows)}, whites ${formatSignedHundred(state.draftWhites)}, blacks ${formatSignedHundred(state.draftBlacks)}, vibrance ${formatSignedHundred(state.draftVibrance)}, saturation ${formatSignedHundred(state.draftSaturation)}, curve ${formatToneCurvePoint(state.draftToneCurveMidpoint)}, HSL ${activeHslChannel} ${formatSignedHundred(activeHslValues.hue)}/${formatSignedHundred(activeHslValues.saturation)}/${formatSignedHundred(activeHslValues.luminance)}, geometry ${geometrySummary(state.draftGeometry)}`;
-        if (["JPG", "JPEG"].includes((photo.fileType || "").toUpperCase())) {
+        if (isSupportedRasterDevelopFileType(photo.fileType)) {
           return {
             status: "Ready",
             toneCurveMidpoint: toneCurvePoint(state.draftToneCurveMidpoint),
@@ -5806,7 +5808,7 @@
           hslColorMixer: cloneHslMixer(state.draftHslMixer),
           geometry: cloneGeometryState(state.draftGeometry),
           masks: cloneManualMasks(state.draftMasks?.length ? state.draftMasks : state.committedMasks),
-          message: `Edit graph draft is valid, but RAW preview pixels are blocked until decode is implemented. ${summary}`,
+          message: `Edit graph draft is valid, but this source is outside the supported local raster path. ${summary}`,
         };
       }
 
@@ -6463,7 +6465,7 @@
         const targetPhotos = primaryOnly ? [selectedPhoto()].filter(Boolean) : selectedPagePhotos();
         const unsupported = targetPhotos.find((photo) => !isDevelopable(photo));
         if (unsupported) {
-          const message = "Unsupported target; batch sync is limited to JPEG/JPG Develop photos.";
+          const message = "Unsupported target; batch sync is limited to supported raster Develop photos.";
           editClipboardStatus.value = message;
           editClipboardStatus.textContent = message;
           setStatus(message);
@@ -6923,7 +6925,7 @@
             message: "Unsupported file type for SilicaRAW preview.",
           };
         }
-        if (isJpegDevelopFileType(photo.fileType)) {
+        if (isSupportedRasterDevelopFileType(photo.fileType)) {
           return {
             fileName: photo.fileName,
             status: "Ready",

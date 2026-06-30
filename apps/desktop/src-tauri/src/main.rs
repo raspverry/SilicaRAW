@@ -4644,6 +4644,8 @@ fn parse_desktop_app_file_type_filter(
 ) -> Result<silica_core::AppFileTypeFilter, silica_core::CoreError> {
     match file_type {
         "jpeg" => Ok(silica_core::AppFileTypeFilter::Jpeg),
+        "png" => Ok(silica_core::AppFileTypeFilter::Png),
+        "tiff" => Ok(silica_core::AppFileTypeFilter::Tiff),
         "raw" => Ok(silica_core::AppFileTypeFilter::Raw),
         "unsupported" => Ok(silica_core::AppFileTypeFilter::Unsupported),
         other => Err(silica_core::CoreError::AppSession(format!(
@@ -4655,6 +4657,8 @@ fn parse_desktop_app_file_type_filter(
 fn app_file_type_filter_string(filter: silica_core::AppFileTypeFilter) -> &'static str {
     match filter {
         silica_core::AppFileTypeFilter::Jpeg => "jpeg",
+        silica_core::AppFileTypeFilter::Png => "png",
+        silica_core::AppFileTypeFilter::Tiff => "tiff",
         silica_core::AppFileTypeFilter::Raw => "raw",
         silica_core::AppFileTypeFilter::Unsupported => "unsupported",
     }
@@ -4733,6 +4737,8 @@ fn parse_desktop_library_query_file_type(
 ) -> Result<silica_core::LibraryQueryFileType, silica_core::CoreError> {
     match file_type {
         "jpeg" => Ok(silica_core::LibraryQueryFileType::Jpeg),
+        "png" => Ok(silica_core::LibraryQueryFileType::Png),
+        "tiff" => Ok(silica_core::LibraryQueryFileType::Tiff),
         "raw" => Ok(silica_core::LibraryQueryFileType::Raw),
         "unsupported" => Ok(silica_core::LibraryQueryFileType::Unsupported),
         other => Err(silica_core::CoreError::AppSession(format!(
@@ -6805,7 +6811,7 @@ mod tests {
             raw_copy.error.as_ref().map(|error| error.kind.as_str()),
             Some("unsupportedEdit")
         );
-        assert!(raw_copy.message.contains("JPEG/JPG"));
+        assert!(raw_copy.message.contains("supported raster"));
 
         let source_commit = super::commit_exposure_contrast_edit(
             library_root.display().to_string(),
@@ -6850,7 +6856,7 @@ mod tests {
                 assert_eq!(targets[0].photo_id, raw_photo_id);
                 assert_eq!(targets[0].status, "blocked");
                 assert_eq!(targets[0].code.as_deref(), Some("unsupported_target"));
-                assert!(targets[0].message.contains("JPEG/JPG"));
+                assert!(targets[0].message.contains("supported raster"));
             }
             other => panic!("unexpected raw plan response data: {other:?}"),
         }
