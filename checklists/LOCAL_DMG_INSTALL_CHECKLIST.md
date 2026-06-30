@@ -124,20 +124,27 @@ This is not the clean-Mac result for Task 6.3. It records whether the DMG can be
 
 Latest local build-machine smoke:
 
-- Date: 2026-06-11
-- Git commit: `ca49652`
+- Date: 2026-06-30
+- Git commit: `d8305260c24b5f6625334176339bd5bd3d922f95`
+- Tag: `developer-preview-20260630.1`
 - Artifact type: `developer unsigned DMG`
-- DMG path: `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg`
-- DMG SHA256: `c75bf14b422a46758c0ef24a830230fc4cf467a5ebf908a324786ade02959b1d`
-- App path launched: `/Applications/SilicaRAW.app`
+- Workflow run: https://github.com/raspverry/SilicaRAW/actions/runs/28434695717
+- Artifact: `silicaraw-unsigned-developer-preview-macos`
+- Artifact API digest: `sha256:01fe90e99944364c75c807d261e0d76b59db51d14d35fb55645ef007e01e5641`
+- DMG path: `.tmp/developer-preview-28434695717/silicaraw-unsigned-developer-preview-macos/SilicaRAW_0.1.0_aarch64.dmg`
+- DMG SHA256: `665f1998cc7d7d148eecb458cafa0af508d39e33d9fe1f4170221de3f0de4aac`
+- App path launched: not launched from this artifact smoke
 - macOS version: `26.4`
 - Machine: `arm64`, `Apple M5 Max`
 - DMG verification: pass
 - DMG mount and app presence: pass
-- Installed app tree hash matches built app: pass
-- Installed-app preflight: pass, `.tmp/local-dmg-smoke/installed-app-preflight-canonical.json`
-- GUI launch command: pass, process observed at `/Applications/SilicaRAW.app/Contents/MacOS/silica-desktop`
-- Screenshot capture: not recorded; macOS screen capture permission blocked `screencapture`
+- Mounted app tree hash: `b1e15b8deeba36b6de637c5c608efe0a04c6ef3207d80d07c21614c093fe53d2`
+- Installed app tree hash matches mounted app: not run
+- Installed-app preflight: not run for this downloaded artifact
+- GUI launch command: not run for this downloaded artifact
+- Checksum verification: pass
+- Unsigned warning file: present
+- Smoke report: `.tmp/developer-preview-28434695717/local-dmg-artifact-smoke.json`
 - Clean-Mac Task 6.3 result: still pending
 
 ## Related References

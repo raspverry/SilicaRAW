@@ -2,7 +2,7 @@
 
 SilicaRAW is an early-stage, open-source RAW photo editor for Apple Silicon.
 
-The current delivery target is a local macOS alpha that can be installed from a DMG and complete a minimal JPEG/JPG editor workflow with JPEG, PNG, and TIFF export without modifying original photo files. Broad RAW decoding, the product Metal viewer, MLX, MCP, plugins, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are intentionally out of the current alpha scope.
+The current delivery target is a local macOS alpha that can be installed from a DMG and complete a minimal JPEG/PNG/TIFF raster editor workflow with local export without modifying original photo files. Broad RAW decoding, the product Metal viewer, MLX, MCP, plugins, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are intentionally out of the current alpha scope.
 
 SilicaRAW is not production-ready. Current repository claims are limited to fixture-backed behavior in the harness and documented manual checks.
 
