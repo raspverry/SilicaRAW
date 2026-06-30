@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-29
+updated: 2026-06-30
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-06-30] release | Developer preview artifact recorded
+
+- Created `developer-preview-20260630.1` from `main` commit `d8305260c24b5f6625334176339bd5bd3d922f95`.
+- GitHub Actions built the unsigned developer-preview DMG successfully in run `28434695717`.
+- Downloaded artifact checksum, unsigned warning file, and local DMG verify/mount smoke passed; clean-Mac downloaded-artifact QA remains pending and the artifact is not user-ready local distribution.
 
 ## [2026-06-29] runtime | Restored grids migrate legacy raster rows
 
