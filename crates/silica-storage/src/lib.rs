@@ -259,15 +259,13 @@ pub struct PhotoMetadata {
 
 /// Return the metadata extraction policy for one original path.
 pub fn metadata_extraction_policy_for_path(path: &Path) -> MetadataExtractionPolicy {
-    let is_jpeg = path
+    let is_supported_raster = path
         .extension()
         .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| {
-            extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
-        });
+        .is_some_and(is_supported_photo_extension);
 
     MetadataExtractionPolicy {
-        dimension_source: if is_jpeg {
+        dimension_source: if is_supported_raster {
             MetadataDimensionSource::ExistingRasterPath
         } else {
             MetadataDimensionSource::Unavailable
@@ -852,6 +850,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "export_settings_metadata_policy",
         sql: EXPORT_SETTINGS_METADATA_POLICY_SQL,
     },
+    Migration {
+        version: 12,
+        name: "raster_source_file_types",
+        sql: RASTER_SOURCE_FILE_TYPES_SQL,
+    },
 ];
 
 /// Open a catalog database and apply all embedded migrations.
@@ -1429,7 +1432,8 @@ pub fn list_library_photos(
         .map_err(LibraryStorageError::from)
 }
 
-/// Query imported catalog photos by bounded page without mutating catalog state.
+/// Query imported catalog photos by bounded page without touching original files.
+/// Legacy catalogs may be migrated before the read-only page query runs.
 pub fn query_library_photos(
     library_root_path: impl AsRef<Path>,
     request: LibraryQueryRequest,
@@ -1916,7 +1920,8 @@ pub fn get_photo_preview_candidate(
                     photo_id: row.get(0)?,
                     file_name: row.get(1)?,
                     path: row.get(2)?,
-                    unsupported: sql_to_bool(row.get::<_, i64>(3)?) || file_type != "jpeg",
+                    unsupported: sql_to_bool(row.get::<_, i64>(3)?)
+                        || !is_supported_raster_catalog_file_type(&file_type),
                 })
             },
         )
@@ -4116,13 +4121,23 @@ pub fn run_migrations_through(
     for migration in MIGRATIONS.iter().filter(|migration| {
         migration.version > applied_version && migration.version <= target_version
     }) {
-        let transaction = connection.transaction()?;
-        transaction.execute_batch(migration.sql)?;
-        transaction.execute(
-            "INSERT INTO schema_migrations(version, name) VALUES (?1, ?2)",
-            params![migration.version, migration.name],
-        )?;
-        transaction.commit()?;
+        let disable_foreign_keys = migration.version == 12;
+        if disable_foreign_keys {
+            connection.pragma_update(None, "foreign_keys", "OFF")?;
+        }
+        let result = (|| {
+            let transaction = connection.transaction()?;
+            transaction.execute_batch(migration.sql)?;
+            transaction.execute(
+                "INSERT INTO schema_migrations(version, name) VALUES (?1, ?2)",
+                params![migration.version, migration.name],
+            )?;
+            transaction.commit()
+        })();
+        if disable_foreign_keys {
+            connection.pragma_update(None, "foreign_keys", "ON")?;
+        }
+        result?;
     }
 
     Ok(())
@@ -4204,30 +4219,49 @@ fn open_existing_library_for_read_only_query(
         return Err(LibraryStorageError::MissingCatalog(catalog_path));
     }
 
-    let connection = Connection::open_with_flags(&catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    connection.busy_timeout(Duration::from_secs(5))?;
-    connection.pragma_update(None, "foreign_keys", "ON")?;
-    let schema_version = connection.query_row(
-        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
-        [],
-        |row| row.get(0),
-    )?;
+    let connection = open_catalog_for_read_only_query(&catalog_path)?;
+    let schema_version = current_schema_version(&connection)?;
 
-    if schema_version != CURRENT_SCHEMA_VERSION {
+    if schema_version > CURRENT_SCHEMA_VERSION {
         return Err(LibraryStorageError::CatalogSchemaVersion {
             expected: CURRENT_SCHEMA_VERSION,
             found: schema_version,
         });
     }
 
+    let connection = if schema_version < CURRENT_SCHEMA_VERSION {
+        drop(connection);
+        let migrated = open_catalog(&catalog_path)?;
+        let migrated_schema_version = current_schema_version(&migrated)?;
+        drop(migrated);
+
+        if migrated_schema_version != CURRENT_SCHEMA_VERSION {
+            return Err(LibraryStorageError::CatalogSchemaVersion {
+                expected: CURRENT_SCHEMA_VERSION,
+                found: migrated_schema_version,
+            });
+        }
+
+        open_catalog_for_read_only_query(&catalog_path)?
+    } else {
+        connection
+    };
+
     Ok((
         LocalLibrary {
             root_path: root_path.to_path_buf(),
             catalog_path,
-            schema_version,
+            schema_version: CURRENT_SCHEMA_VERSION,
         },
         connection,
     ))
+}
+
+fn open_catalog_for_read_only_query(catalog_path: &Path) -> rusqlite::Result<Connection> {
+    let connection = Connection::open_with_flags(catalog_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    connection.busy_timeout(Duration::from_secs(5))?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    Ok(connection)
 }
 
 fn upsert_local_library_row(
@@ -4594,11 +4628,17 @@ fn catalog_file_type_for_path(path: &str, unsupported: bool) -> &'static str {
 
     if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
         "jpeg"
-    } else if is_supported_photo_extension(extension) {
-        "raw"
+    } else if extension.eq_ignore_ascii_case("png") {
+        "png"
+    } else if extension.eq_ignore_ascii_case("tif") || extension.eq_ignore_ascii_case("tiff") {
+        "tiff"
     } else {
         "unsupported"
     }
+}
+
+fn is_supported_raster_catalog_file_type(file_type: &str) -> bool {
+    matches!(file_type, "jpeg" | "png" | "tiff")
 }
 
 fn photo_flags_from_row(
@@ -4634,7 +4674,8 @@ fn library_photo_grid_item_from_row(
     let rating = u8::try_from(row.get::<_, Option<i64>>(6)?.unwrap_or(0))
         .unwrap_or(0)
         .min(ALPHA_MAX_RATING);
-    let unsupported = sql_to_bool(row.get::<_, i64>(4)?) || catalog_file_type != "jpeg";
+    let unsupported = sql_to_bool(row.get::<_, i64>(4)?)
+        || !is_supported_raster_catalog_file_type(&catalog_file_type);
 
     Ok(LibraryPhotoGridItem {
         photo_id,
@@ -4654,7 +4695,8 @@ fn library_photo_grid_item_from_row(
 
 fn photo_metadata_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoMetadata> {
     let file_type: String = row.get(3)?;
-    let unsupported = sql_to_bool(row.get::<_, i64>(4)?) || file_type != "jpeg";
+    let unsupported =
+        sql_to_bool(row.get::<_, i64>(4)?) || !is_supported_raster_catalog_file_type(&file_type);
     let metadata_present = row.get::<_, i64>(7)? != 0;
 
     Ok(PhotoMetadata {
@@ -5790,6 +5832,129 @@ DROP TABLE export_settings_v10;
 DROP TABLE export_presets_v10;
 "#;
 
+const RASTER_SOURCE_FILE_TYPES_SQL: &str = r#"
+PRAGMA legacy_alter_table = ON;
+
+ALTER TABLE photos RENAME TO photos_v11;
+
+CREATE TABLE photos (
+  id TEXT PRIMARY KEY,
+  library_id TEXT NOT NULL,
+  folder_id TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  path TEXT NOT NULL,
+  file_size INTEGER NOT NULL DEFAULT 0,
+  modified_at TEXT,
+  capture_time TEXT,
+  imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  missing INTEGER NOT NULL DEFAULT 0 CHECK (missing IN (0, 1)),
+  unsupported INTEGER NOT NULL DEFAULT 0 CHECK (unsupported IN (0, 1)),
+  partial_hash TEXT,
+  full_hash TEXT,
+  file_type TEXT NOT NULL DEFAULT 'unsupported'
+    CHECK (file_type IN ('jpeg', 'png', 'tiff', 'raw', 'unsupported')),
+  FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE,
+  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE,
+  UNIQUE (library_id, path)
+);
+
+INSERT INTO photos(
+  id,
+  library_id,
+  folder_id,
+  file_name,
+  path,
+  file_size,
+  modified_at,
+  capture_time,
+  imported_at,
+  missing,
+  unsupported,
+  partial_hash,
+  full_hash,
+  file_type
+)
+SELECT
+  id,
+  library_id,
+  folder_id,
+  file_name,
+  path,
+  file_size,
+  modified_at,
+  capture_time,
+  imported_at,
+  missing,
+  CASE
+    WHEN (
+      lower(file_name) GLOB '*.jpg'
+      OR lower(file_name) GLOB '*.jpeg'
+      OR lower(file_name) GLOB '*.png'
+      OR lower(file_name) GLOB '*.tif'
+      OR lower(file_name) GLOB '*.tiff'
+      OR lower(path) GLOB '*.jpg'
+      OR lower(path) GLOB '*.jpeg'
+      OR lower(path) GLOB '*.png'
+      OR lower(path) GLOB '*.tif'
+      OR lower(path) GLOB '*.tiff'
+    ) THEN 0
+    ELSE 1
+  END,
+  partial_hash,
+  full_hash,
+  CASE
+    WHEN (
+      lower(file_name) GLOB '*.jpg'
+      OR lower(file_name) GLOB '*.jpeg'
+      OR lower(path) GLOB '*.jpg'
+      OR lower(path) GLOB '*.jpeg'
+    ) THEN 'jpeg'
+    WHEN (
+      lower(file_name) GLOB '*.png'
+      OR lower(path) GLOB '*.png'
+    ) THEN 'png'
+    WHEN (
+      lower(file_name) GLOB '*.tif'
+      OR lower(file_name) GLOB '*.tiff'
+      OR lower(path) GLOB '*.tif'
+      OR lower(path) GLOB '*.tiff'
+    ) THEN 'tiff'
+    ELSE 'unsupported'
+  END
+FROM photos_v11;
+
+DROP TABLE photos_v11;
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_id
+  ON photos(library_id);
+
+CREATE INDEX IF NOT EXISTS idx_photos_folder_id
+  ON photos(folder_id);
+
+CREATE INDEX IF NOT EXISTS idx_photos_capture_time
+  ON photos(capture_time);
+
+CREATE INDEX IF NOT EXISTS idx_photos_imported_at
+  ON photos(imported_at);
+
+CREATE INDEX IF NOT EXISTS idx_photos_missing
+  ON photos(missing);
+
+CREATE INDEX IF NOT EXISTS idx_photos_unsupported
+  ON photos(unsupported);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_imported_id
+  ON photos(library_id, imported_at DESC, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_file_name_path_id
+  ON photos(library_id, file_name ASC, path ASC, id ASC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_library_file_type_id
+  ON photos(library_id, file_type, id ASC);
+
+PRAGMA legacy_alter_table = OFF;
+"#;
+
 const LIBRARY_QUERY_COUNT_SQL: &str = r#"
 SELECT COUNT(*)
 FROM photos
@@ -5802,8 +5967,16 @@ WHERE photos.library_id = :library_id
   AND (
     :file_type IS NULL
     OR (:file_type = 'jpeg' AND photos.file_type = 'jpeg' AND photos.unsupported = 0)
+    OR (:file_type = 'png' AND photos.file_type = 'png' AND photos.unsupported = 0)
+    OR (:file_type = 'tiff' AND photos.file_type = 'tiff' AND photos.unsupported = 0)
     OR (:file_type = 'raw' AND photos.file_type = 'raw')
-    OR (:file_type = 'unsupported' AND (photos.unsupported = 1 OR photos.file_type <> 'jpeg'))
+    OR (
+      :file_type = 'unsupported'
+      AND (
+        photos.unsupported = 1
+        OR photos.file_type NOT IN ('jpeg', 'png', 'tiff')
+      )
+    )
   )
   AND (
     :metadata_filter IS NULL
@@ -5847,8 +6020,16 @@ WHERE photos.library_id = :library_id
   AND (
     :file_type IS NULL
     OR (:file_type = 'jpeg' AND photos.file_type = 'jpeg' AND photos.unsupported = 0)
+    OR (:file_type = 'png' AND photos.file_type = 'png' AND photos.unsupported = 0)
+    OR (:file_type = 'tiff' AND photos.file_type = 'tiff' AND photos.unsupported = 0)
     OR (:file_type = 'raw' AND photos.file_type = 'raw')
-    OR (:file_type = 'unsupported' AND (photos.unsupported = 1 OR photos.file_type <> 'jpeg'))
+    OR (
+      :file_type = 'unsupported'
+      AND (
+        photos.unsupported = 1
+        OR photos.file_type NOT IN ('jpeg', 'png', 'tiff')
+      )
+    )
   )
   AND (
     :metadata_filter IS NULL
@@ -5924,6 +6105,8 @@ fn library_query_order_clause(sort: LibraryQuerySort) -> &'static str {
 fn library_query_file_type_value(file_type: LibraryQueryFileType) -> &'static str {
     match file_type {
         LibraryQueryFileType::Jpeg => "jpeg",
+        LibraryQueryFileType::Png => "png",
+        LibraryQueryFileType::Tiff => "tiff",
         LibraryQueryFileType::Raw => "raw",
         LibraryQueryFileType::Unsupported => "unsupported",
     }
@@ -6380,6 +6563,9 @@ mod tests {
             .expect("insert folder");
         for (id, file_name, unsupported) in [
             ("photo-jpeg", "portrait.JPG", 0_i64),
+            ("photo-png", "screen.PNG", 0_i64),
+            ("photo-tiff", "scan.TIFF", 0_i64),
+            ("photo-tif", "flatbed.tif", 0_i64),
             ("photo-raw", "sample.DNG", 0_i64),
             ("photo-unsupported", "notes.txt", 1_i64),
         ] {
@@ -6405,6 +6591,9 @@ mod tests {
 
         for (id, expected_type, expected_unsupported) in [
             ("photo-jpeg", "jpeg", 0_i64),
+            ("photo-png", "png", 0_i64),
+            ("photo-tiff", "tiff", 0_i64),
+            ("photo-tif", "tiff", 0_i64),
             ("photo-raw", "unsupported", 1_i64),
             ("photo-unsupported", "unsupported", 1_i64),
         ] {
@@ -6418,6 +6607,86 @@ mod tests {
             assert_eq!(actual_type, expected_type);
             assert_eq!(actual_unsupported, expected_unsupported);
         }
+    }
+
+    #[test]
+    fn library_query_migrates_legacy_png_rows_before_read_only_grid() {
+        let workspace = unique_library_root("legacy-png-query");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let catalog_path = library_root.join(CATALOG_DATABASE_FILE);
+
+        std::fs::create_dir_all(&import_root).expect("create import root");
+        ensure_library_directories(&library_root).expect("create library support dirs");
+
+        {
+            let mut connection = Connection::open(&catalog_path).expect("open legacy catalog");
+            configure_connection(&connection).expect("configure legacy catalog");
+            run_migrations_through(&mut connection, 11).expect("run legacy migrations");
+            connection
+                .execute(
+                    "INSERT INTO libraries(id, root_path) VALUES ('local', ?1)",
+                    params![library_root.display().to_string()],
+                )
+                .expect("insert library");
+            connection
+                .execute(
+                    "INSERT INTO folders(id, library_id, path) VALUES ('folder', 'local', ?1)",
+                    params![import_root.display().to_string()],
+                )
+                .expect("insert folder");
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO photos(
+                      id, library_id, folder_id, file_name, path, unsupported, file_type
+                    )
+                    VALUES (
+                      'photo-png',
+                      'local',
+                      'folder',
+                      'sample.PNG',
+                      ?1,
+                      1,
+                      'unsupported'
+                    )
+                    "#,
+                    params![import_root.join("sample.PNG").display().to_string()],
+                )
+                .expect("insert legacy png row");
+        }
+
+        let page = query_library_photos(
+            &library_root,
+            LibraryQueryRequest::new(
+                0,
+                10,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters::default(),
+            ),
+        )
+        .expect("query migrates legacy catalog");
+
+        assert_eq!(page.total_count, 1);
+        assert_eq!(page.items[0].file_type, "PNG");
+        assert!(!page.items[0].unsupported);
+
+        let connection = open_catalog(&catalog_path).expect("open migrated catalog");
+        assert_eq!(
+            current_schema_version(&connection).expect("schema version"),
+            CURRENT_SCHEMA_VERSION
+        );
+        let (file_type, unsupported): (String, i64) = connection
+            .query_row(
+                "SELECT file_type, unsupported FROM photos WHERE id = 'photo-png'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("migrated png row");
+        assert_eq!(file_type, "png");
+        assert_eq!(unsupported, 0);
+
+        remove_library_root(&workspace);
     }
 
     #[test]

@@ -557,9 +557,9 @@ def state_script(state):
     const baseName = names[index % names.length];
     return {{
       photoId: `unsupported-${{number}}`,
-      path: `/fixture/unsupported/${{number}}_${{baseName}}.png`,
-      fileName: `${{number}}_${{baseName}}.png`,
-      fileType: "PNG",
+      path: `/fixture/unsupported/${{number}}_${{baseName}}.webp`,
+      fileName: `${{number}}_${{baseName}}.webp`,
+      fileType: "WEBP",
       rating: 0,
       picked: false,
       rejected: false,
@@ -647,7 +647,7 @@ def state_script(state):
     document.querySelector("#minRatingFilter").value = "3";
     document.querySelector("#cullingFilter").value = "picked";
     document.querySelector("#librarySort").value = "rating_desc";
-    document.querySelector("#gridStateNote").textContent = "Filtered to picked JPEG/JPG photos with stored dimensions.";
+    document.querySelector("#gridStateNote").textContent = "Filtered to picked raster photos with stored dimensions.";
     document.querySelector("#gridPageStatus").textContent = "Filtered page 1";
   }}
 
@@ -1036,8 +1036,8 @@ def state_script(state):
     document.querySelector("#developToneCurvePanel").dataset.toneCurveState = "enabled";
     document.querySelector("#developToneCurveLine").setAttribute("points", "0,100 50,38 100,0");
     document.querySelector("#developHslPanel").dataset.hslState = "enabled";
-    document.querySelector("#developHslSupportStatus").value = "JPEG/JPG";
-    document.querySelector("#developHslSupportStatus").textContent = "JPEG/JPG";
+    document.querySelector("#developHslSupportStatus").value = "Raster";
+    document.querySelector("#developHslSupportStatus").textContent = "Raster";
     document.querySelector("#developHslChannelBlue").setAttribute("aria-pressed", "true");
     document.querySelector("#developHslHueSlider").value = "-12";
     document.querySelector("#developHslHueValue").value = "-12";
@@ -1906,8 +1906,8 @@ def capture(url):
                         )
                     if grid_state["subtitle"] != "60 of 60 catalog rows" or grid_state["libraryPhotoCount"] != "60 photos":
                         failures.append(f"{viewport_name} {surface_name}: unsupported grid count state missing")
-                    if not grid_state["selectedPhoto"].endswith(".png"):
-                        failures.append(f"{viewport_name} {surface_name}: unsupported selected PNG state missing")
+                    if not grid_state["selectedPhoto"].endswith(".webp"):
+                        failures.append(f"{viewport_name} {surface_name}: unsupported selected source state missing")
                     if (
                         virtual_grid.get("scrollTop", 0) <= 0
                         or virtual_grid.get("scrollHeight", 0) <= virtual_grid.get("clientHeight", 0)
@@ -1999,7 +1999,7 @@ def capture(url):
                         failures.append(f"{viewport_name} {surface_name}: tone curve support status wrong")
                     if not develop_state["toneCurveUnsupportedDisabled"]:
                         failures.append(f"{viewport_name} {surface_name}: unsupported tone curve controls enabled")
-                    if not develop_state["hslVisible"] or develop_state["hslStatus"] != "JPEG/JPG":
+                    if not develop_state["hslVisible"] or develop_state["hslStatus"] != "Raster":
                         failures.append(f"{viewport_name} {surface_name}: HSL panel support state not visible")
                     if not develop_state["hslBlueActive"] or develop_state["hslHue"] != "-12" or develop_state["hslSaturation"] != "24" or develop_state["hslLuminance"] != "-8":
                         failures.append(f"{viewport_name} {surface_name}: HSL seeded blue channel state not visible")

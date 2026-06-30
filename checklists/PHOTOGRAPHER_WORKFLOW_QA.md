@@ -24,7 +24,7 @@ This checklist is the Task 22.5 manual workflow record for a local macOS alpha a
 
 ## Metadata
 
-- [ ] Confirm known JPEG/JPG dimensions display when available.
+- [ ] Confirm known supported-raster dimensions display when available.
 - [ ] Confirm RAW or unsupported metadata shows unavailable/blocked states honestly.
 - [ ] Confirm missing metadata does not trigger original-file mutation.
 
@@ -37,12 +37,12 @@ This checklist is the Task 22.5 manual workflow record for a local macOS alpha a
 ## Develop
 
 - [ ] Apply exposure and contrast adjustments and confirm preview/readback match committed state.
-- [ ] Exercise white balance, tone recovery, color presence, tone curve, HSL, and geometry controls on supported JPEG/JPG assets.
+- [ ] Exercise white balance, tone recovery, color presence, tone curve, HSL, and geometry controls on supported raster assets.
 - [ ] Confirm unsupported Detail or RAW-only paths show blocked states instead of silent no-ops.
 
 ## Masks
 
-- [ ] Create or inspect manual linear/radial/brush mask state on a supported JPEG/JPG asset.
+- [ ] Create or inspect manual linear/radial/brush mask state on a supported raster asset.
 - [ ] Confirm AI/MLX mask paths remain unavailable in the local alpha.
 - [ ] Confirm RAW-derived masked export blocks before output when unsupported.
 

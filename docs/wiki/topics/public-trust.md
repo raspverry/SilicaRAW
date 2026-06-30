@@ -23,7 +23,7 @@ This page records what SilicaRAW can publicly claim today and what remains unpro
 
 - SilicaRAW is an early-stage, open-source Apple Silicon-first photo editor project.
 - The local alpha target is a local macOS app installed from a DMG.
-- Current local-alpha workflow support is limited to fixture-backed JPEG/JPG import, culling flags, preview/develop state, exposure/contrast persistence, JPEG sRGB export, cache cleanup, backup artifacts, and staged restore boundaries.
+- Current local-alpha workflow support is limited to fixture-backed standard raster import, culling flags, preview/develop state, exposure/contrast persistence, JPEG sRGB export, cache cleanup, backup artifacts, and staged restore boundaries.
 - Original photo files are referenced by path and must not be modified by SilicaRAW.
 - The app has no default telemetry, cloud sync, network upload, auto-update, plugin runtime, MCP server, or MLX runtime in the local alpha scope.
 

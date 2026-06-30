@@ -13,7 +13,7 @@ cargo test -p silica-core local_alpha_workflow_preserves_original_file_hash
 Automated coverage:
 
 - [x] Creates a disposable local library.
-- [x] Creates a generated local JPEG fixture outside the library folder.
+- [x] Creates generated local raster fixtures outside the library folder.
 - [x] Records the original fixture hash before import.
 - [x] Imports by reference.
 - [x] Applies rating and Pick state.

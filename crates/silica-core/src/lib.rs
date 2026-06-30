@@ -397,6 +397,8 @@ pub enum AppLibrarySort {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppFileTypeFilter {
     Jpeg,
+    Png,
+    Tiff,
     Raw,
     Unsupported,
 }
@@ -1682,6 +1684,7 @@ pub fn record_app_session_library_preferences(
 }
 
 /// Plan app relaunch restore from app-session state without opening a writable library.
+/// Older catalogs are restorable so the first grid query can run the required migration.
 pub fn plan_app_session_restore(
     session_path: impl AsRef<Path>,
 ) -> Result<AppSessionRestorePlan, CoreError> {
@@ -1704,7 +1707,7 @@ pub fn plan_app_session_restore(
 
     match silica_storage::inspect_local_library_for_restore(&last_library_root_path) {
         Ok(library) => {
-            let status = if library.schema_version == silica_storage::CURRENT_SCHEMA_VERSION {
+            let status = if library.schema_version <= silica_storage::CURRENT_SCHEMA_VERSION {
                 AppSessionRestoreStatus::Restored
             } else {
                 AppSessionRestoreStatus::InvalidCatalog
@@ -2843,6 +2846,7 @@ pub fn list_library_photos(
 }
 
 /// Query imported catalog photos by bounded page without cache hydration.
+/// Legacy catalogs may be migrated by storage before the read-only page query runs.
 pub fn query_library_photos(
     library_root_path: impl AsRef<Path>,
     request: silica_storage::LibraryQueryRequest,
@@ -3077,7 +3081,7 @@ pub fn get_photo_histogram(
                 .to_string(),
         }));
     }
-    if !is_jpeg_path(&source_path) {
+    if !is_supported_raster_source_path(&source_path) {
         return Ok(Some(PhotoHistogramSession {
             photo_id: candidate.photo_id,
             source_path: candidate.path,
@@ -3089,7 +3093,7 @@ pub fn get_photo_histogram(
             pixel_count: 0,
             cache_key: String::new(),
             cache_path: String::new(),
-            message: "Histogram blocked until RAW decode provides preview pixels.".to_string(),
+            message: "Histogram unavailable for source formats outside the supported local alpha raster path.".to_string(),
         }));
     }
 
@@ -3242,11 +3246,12 @@ pub fn preview_exposure_contrast_edit(
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let request = apply_lens_geometry_preview_boundary(request, &graph);
     let request = apply_manual_mask_preview_boundary(request, &graph)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -3339,11 +3344,12 @@ pub fn preview_white_balance_edit(
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let request = apply_lens_geometry_preview_boundary(request, &graph);
     let request = apply_manual_mask_preview_boundary(request, &graph)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -3436,11 +3442,12 @@ pub fn preview_tone_recovery_edit(
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let request = apply_lens_geometry_preview_boundary(request, &graph);
     let request = apply_manual_mask_preview_boundary(request, &graph)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -3533,11 +3540,12 @@ pub fn preview_tone_curve_edit(
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let request = apply_lens_geometry_preview_boundary(request, &graph);
     let request = apply_manual_mask_preview_boundary(request, &edited)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -3629,11 +3637,12 @@ pub fn preview_hsl_color_mixer_edit(
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let request = apply_lens_geometry_preview_boundary(request, &graph);
     let request = apply_manual_mask_preview_boundary(request, &edited)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -3721,11 +3730,12 @@ pub fn preview_color_presence_edit(
     let request = apply_detail_preview_boundary(request, render_detail_from_graph(&graph));
     let request = apply_lens_geometry_preview_boundary(request, &graph);
     let request = apply_manual_mask_preview_boundary(request, &graph)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -5025,6 +5035,9 @@ fn export_photo_raster(
     let icc_profile_sha256_value = icc_profile_sha256
         .as_deref()
         .map_or(serde_json::Value::Null, serde_json::Value::from);
+    let decoder_backend = "raster".to_string();
+    let input_profile = "assume_srgb".to_string();
+    let working_space = "srgb".to_string();
     let settings_value = serde_json::json!({
         "format": exported_format.clone(),
         "color_profile": exported_color_profile.clone(),
@@ -5052,6 +5065,9 @@ fn export_photo_raster(
         "output_sha256": output_sha256.clone(),
         "icc_profile_embedded": icc_profile_embedded,
         "icc_profile_sha256": icc_profile_sha256_value,
+        "decoder_backend": decoder_backend.clone(),
+        "input_profile": input_profile.clone(),
+        "working_space": working_space.clone(),
         "profile_metadata_source": export_profile_metadata_source(format),
         "source_metadata_segments": source_metadata_segments,
         "output_metadata_segments": output_metadata_segments,
@@ -5087,9 +5103,9 @@ fn export_photo_raster(
         output_sha256,
         icc_profile_embedded,
         icc_profile_sha256: icc_profile_sha256.unwrap_or_default(),
-        decoder_backend: None,
-        input_profile: None,
-        working_space: None,
+        decoder_backend: Some(decoder_backend),
+        input_profile: Some(input_profile),
+        working_space: Some(working_space),
         export_record_id,
         message: export_raster_message(format, color_profile).to_string(),
     }))
@@ -5408,11 +5424,12 @@ fn preview_manual_mask_edit(
     );
     let request = apply_lens_geometry_preview_boundary(request, edited);
     let request = apply_manual_mask_preview_boundary(request, edited)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -5487,11 +5504,12 @@ fn preview_detail_edit(
     );
     let request = apply_lens_geometry_preview_boundary(request, edited);
     let request = apply_manual_mask_preview_boundary(request, edited)?;
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -5566,11 +5584,12 @@ fn preview_geometry_edit(
         render_geometry_from_graph(edited),
     );
     let request = apply_lens_geometry_preview_boundary(request, edited);
-    let source_is_jpeg = is_jpeg_path(Path::new(&request.source_path));
+    let source_is_supported_raster =
+        is_supported_raster_source_path(Path::new(&request.source_path));
     let mut message = request.message;
     let status = match preview_status_from_render(request.status) {
-        PhotoPreviewStatus::Ready if !source_is_jpeg => {
-            message = "JPEG/JPG Develop preview pixels are the only enabled local alpha path."
+        PhotoPreviewStatus::Ready if !source_is_supported_raster => {
+            message = "JPEG/JPG/PNG/TIFF Develop preview pixels are enabled for local alpha raster sources."
                 .to_string();
             PhotoPreviewStatus::BlockedByDecode
         }
@@ -5654,7 +5673,7 @@ fn ensure_jpeg_loupe_preview_cache(
     source_path: &str,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
-    if !is_jpeg_path(&source_path) || !source_path.is_file() {
+    if !is_supported_raster_source_path(&source_path) || !source_path.is_file() {
         return Ok(None);
     }
 
@@ -5774,7 +5793,7 @@ fn write_jpeg_develop_preview_bytes(
     masks: Vec<silica_render::ManualMaskRenderAdjustment>,
 ) -> Result<Option<Vec<u8>>, CoreError> {
     let source_path = PathBuf::from(source_path);
-    if !is_jpeg_path(&source_path) || !source_path.is_file() {
+    if !is_supported_raster_source_path(&source_path) || !source_path.is_file() {
         return Ok(None);
     }
 
@@ -5889,7 +5908,9 @@ fn has_fresh_jpeg_thumbnail_cache(
 }
 
 fn is_jpeg_thumbnail_candidate(photo: &silica_storage::LibraryPhotoGridItem) -> bool {
-    !photo.missing && !photo.unsupported && matches!(photo.file_type.as_str(), "JPG" | "JPEG")
+    !photo.missing
+        && !photo.unsupported
+        && matches!(photo.file_type.as_str(), "JPG" | "JPEG" | "PNG" | "TIFF")
 }
 
 fn app_session_to_json(session: &AppSession) -> serde_json::Value {
@@ -6022,6 +6043,8 @@ fn parse_app_file_type_filter(
         None | Some(serde_json::Value::Null) => None,
         Some(value) => match value.as_str() {
             Some("jpeg") => Some(AppFileTypeFilter::Jpeg),
+            Some("png") => Some(AppFileTypeFilter::Png),
+            Some("tiff") => Some(AppFileTypeFilter::Tiff),
             Some("raw") => Some(AppFileTypeFilter::Raw),
             Some("unsupported") => Some(AppFileTypeFilter::Unsupported),
             Some(_) | None => {
@@ -6035,6 +6058,8 @@ fn parse_app_file_type_filter(
 fn app_file_type_filter_string(filter: AppFileTypeFilter) -> &'static str {
     match filter {
         AppFileTypeFilter::Jpeg => "jpeg",
+        AppFileTypeFilter::Png => "png",
+        AppFileTypeFilter::Tiff => "tiff",
         AppFileTypeFilter::Raw => "raw",
         AppFileTypeFilter::Unsupported => "unsupported",
     }
@@ -6408,11 +6433,14 @@ fn app_session_library_display_name(root_path: &Path) -> String {
         .to_string()
 }
 
-fn is_jpeg_path(path: &Path) -> bool {
+fn is_supported_raster_source_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| {
-            extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "jpg" | "jpeg" | "png" | "tif" | "tiff"
+            )
         })
 }
 
@@ -7365,10 +7393,10 @@ fn edit_clipboard_catalog_target_block(
     let Some(metadata) = silica_storage::get_photo_metadata(library_root_path, photo_id)? else {
         return Ok(Some(("missing_photo", "Photo not found.".to_string())));
     };
-    if metadata.unsupported || metadata.file_type != "jpeg" {
+    if metadata.unsupported || !is_supported_raster_file_type(&metadata.file_type) {
         return Ok(Some((
             "unsupported_target",
-            "Edit clipboard copy and sync are limited to JPEG/JPG Develop photos in this alpha."
+            "Edit clipboard copy and sync are limited to supported raster Develop photos in this alpha."
                 .to_string(),
         )));
     }
@@ -7382,10 +7410,11 @@ fn local_alpha_develop_source_block(
     let Some(metadata) = silica_storage::get_photo_metadata(library_root_path, photo_id)? else {
         return Ok(Some(("missing_photo", "Photo not found.".to_string())));
     };
-    if metadata.unsupported || metadata.file_type != "jpeg" {
+    if metadata.unsupported || !is_supported_raster_file_type(&metadata.file_type) {
         return Ok(Some((
             "unsupported_source",
-            "Develop edits are limited to JPEG/JPG source photos in this alpha.".to_string(),
+            "Develop edits are limited to supported raster source photos in this alpha."
+                .to_string(),
         )));
     }
     if !Path::new(&metadata.source_path).is_file() {
@@ -7395,6 +7424,10 @@ fn local_alpha_develop_source_block(
         )));
     }
     Ok(None)
+}
+
+fn is_supported_raster_file_type(file_type: &str) -> bool {
+    matches!(file_type, "jpeg" | "png" | "tiff")
 }
 
 fn ensure_supported_develop_source(
@@ -8468,13 +8501,13 @@ mod tests {
         )
         .expect_err("RAW copy must be blocked");
         assert!(matches!(raw_copy, CoreError::UnsupportedEdit(_)));
-        assert!(raw_copy.to_string().contains("JPEG/JPG"));
+        assert!(raw_copy.to_string().contains("supported raster"));
 
         let unsupported_commit =
             commit_exposure_contrast_edit(&created.root_path, &raw_photo.photo_id, 0.2, 4.0)
                 .expect_err("unsupported source Develop commit must be blocked");
         assert!(matches!(unsupported_commit, CoreError::UnsupportedEdit(_)));
-        assert!(unsupported_commit.to_string().contains("JPEG/JPG"));
+        assert!(unsupported_commit.to_string().contains("supported raster"));
         assert!(
             silica_storage::load_active_edit_graph(&created.root_path, &raw_photo.photo_id)
                 .expect("load unsupported source active graph")
@@ -8505,7 +8538,7 @@ mod tests {
         assert_eq!(plan.ready_count, 0);
         assert_eq!(plan.blocked_count, 1);
         assert_eq!(plan.targets[0].code.as_deref(), Some("unsupported_target"));
-        assert!(plan.targets[0].message.contains("JPEG/JPG"));
+        assert!(plan.targets[0].message.contains("supported raster"));
 
         let result = apply_edit_clipboard_sync(
             &created.root_path,
@@ -9092,6 +9125,37 @@ mod tests {
             Some(library_root.join("catalog.db").as_path())
         );
         assert!(!library_root.join("thumbnails").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn app_session_restore_allows_older_catalog_for_grid_migration() {
+        let workspace = unique_library_root("app-session-restore-legacy");
+        let session_path = workspace.join("app-session.json");
+        let library_root = workspace.join("restore-library");
+        let created = create_library(&library_root).expect("create library");
+        {
+            let connection =
+                silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+            connection
+                .execute("DELETE FROM schema_migrations WHERE version = 12", [])
+                .expect("simulate legacy catalog version");
+        }
+
+        let mut session = AppSession::default();
+        session.last_library_root_path = Some(library_root.clone());
+        session.last_mode = AppSessionMode::Library;
+        write_app_session(&session_path, &session).expect("write app session");
+
+        let restored = plan_app_session_restore(&session_path).expect("plan legacy restore");
+
+        assert_eq!(restored.status, AppSessionRestoreStatus::Restored);
+        assert_eq!(restored.schema_version, Some(11));
+        assert_eq!(
+            restored.library_root_path.as_deref(),
+            Some(library_root.as_path())
+        );
 
         remove_library_root(&workspace);
     }
@@ -9688,6 +9752,125 @@ mod tests {
             )
             .expect("count thumbnail cache rows");
         assert_eq!(cache_count, 1);
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn supports_png_and_tiff_sources_through_preview_develop_and_jpeg_export() {
+        let workspace = unique_library_root("core-raster-source-flow");
+        let library_root = workspace.join("SilicaRAW Library");
+        let import_root = workspace.join("Originals");
+        let export_root = workspace.join("Exports");
+        let png_file = import_root.join("sample.png");
+        let tiff_file = import_root.join("sample.tiff");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::create_dir_all(&export_root).expect("create export directory");
+        write_source_image(&png_file, image::ImageFormat::Png);
+        write_source_image(&tiff_file, image::ImageFormat::Tiff);
+        let png_hash = file_hash(&png_file);
+        let tiff_hash = file_hash(&tiff_file);
+
+        let created = create_library(&library_root).expect("create library through core");
+        import_folder(&created.root_path, &import_root).expect("import folder through core");
+
+        let rows = list_library_photos(&created.root_path).expect("list grid rows");
+        for (file_name, file_type) in [("sample.png", "PNG"), ("sample.tiff", "TIFF")] {
+            let row = rows
+                .iter()
+                .find(|row| row.file_name == file_name)
+                .expect("raster grid row");
+            assert_eq!(row.file_type, file_type);
+            assert!(!row.unsupported);
+            assert!(row.thumbnail_path.is_some());
+        }
+
+        let png_page = query_library_photos(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                0,
+                10,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters {
+                    file_type: Some(LibraryQueryFileType::Png),
+                    ..Default::default()
+                },
+            ),
+        )
+        .expect("query png files");
+        assert_eq!(png_page.items.len(), 1);
+        assert_eq!(png_page.items[0].file_name, "sample.png");
+
+        let tiff_page = query_library_photos(
+            &created.root_path,
+            LibraryQueryRequest::new(
+                0,
+                10,
+                LibraryQuerySort::FileNameAsc,
+                LibraryQueryFilters {
+                    file_type: Some(LibraryQueryFileType::Tiff),
+                    ..Default::default()
+                },
+            ),
+        )
+        .expect("query tiff files");
+        assert_eq!(tiff_page.items.len(), 1);
+        assert_eq!(tiff_page.items[0].file_name, "sample.tiff");
+
+        let connection = silica_storage::open_catalog(&created.catalog_path).expect("open catalog");
+        for (file_name, source_path, source_hash, output_name) in [
+            ("sample.png", &png_file, &png_hash, "sample-png-export.jpg"),
+            (
+                "sample.tiff",
+                &tiff_file,
+                &tiff_hash,
+                "sample-tiff-export.jpg",
+            ),
+        ] {
+            let photo_id: String = connection
+                .query_row(
+                    "SELECT id FROM photos WHERE file_name = ?1",
+                    [file_name],
+                    |row| row.get(0),
+                )
+                .expect("photo id");
+
+            let preview = open_photo_preview(&created.root_path, &photo_id)
+                .expect("open preview")
+                .expect("preview session");
+            assert_eq!(preview.status, PhotoPreviewStatus::Ready);
+            assert!(preview.preview_bytes.is_some());
+
+            let develop_preview =
+                preview_exposure_contrast_edit(&created.root_path, &photo_id, 0.25, 6.0)
+                    .expect("preview develop edit")
+                    .expect("develop preview");
+            assert_eq!(develop_preview.status, PhotoPreviewStatus::Ready);
+            assert!(develop_preview.develop_preview_bytes.is_some());
+
+            let committed = commit_exposure_contrast_edit(&created.root_path, &photo_id, 0.25, 6.0)
+                .expect("commit develop edit")
+                .expect("committed edit");
+            assert_eq!(committed.photo_id, photo_id);
+
+            let histogram = get_photo_histogram(&created.root_path, &photo_id)
+                .expect("compute histogram")
+                .expect("histogram");
+            assert_eq!(histogram.status, PhotoHistogramStatus::Ready);
+            assert_eq!(histogram.pixel_count, 4);
+
+            let output_path = export_root.join(output_name);
+            let exported = export_photo_jpeg_srgb(&created.root_path, &photo_id, &output_path)
+                .expect("export jpeg")
+                .expect("export result");
+            assert_eq!(exported.format, "jpeg");
+            assert_eq!(exported.decoder_backend.as_deref(), Some("raster"));
+            assert_eq!(exported.input_profile.as_deref(), Some("assume_srgb"));
+            assert_eq!(exported.working_space.as_deref(), Some("srgb"));
+            assert!(output_path.is_file());
+            assert_original_hash(source_path, source_hash, "raster source workflow");
+        }
 
         remove_library_root(&workspace);
     }
@@ -12998,6 +13181,10 @@ mod tests {
     }
 
     fn write_source_jpeg(path: &Path) {
+        write_source_image(path, image::ImageFormat::Jpeg);
+    }
+
+    fn write_source_image(path: &Path, format: image::ImageFormat) {
         let image = image::RgbImage::from_fn(2, 2, |x, y| {
             if (x + y) % 2 == 0 {
                 image::Rgb([64, 128, 192])
@@ -13006,8 +13193,8 @@ mod tests {
             }
         });
         image
-            .save_with_format(path, image::ImageFormat::Jpeg)
-            .expect("write source jpeg");
+            .save_with_format(path, format)
+            .expect("write source image");
     }
 
     fn write_source_jpeg_with_exif(path: &Path) {

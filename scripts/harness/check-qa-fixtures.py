@@ -78,7 +78,11 @@ def main():
     roles = {fixture.get("role") for fixture in fixtures}
     extensions = {Path(fixture.get("relative_path", "")).suffix.lower() for fixture in fixtures}
     require("supported-jpeg" in roles, "fixture set must include supported JPEG/JPG samples", failures)
+    require("supported-png" in roles, "fixture set must include supported PNG samples", failures)
+    require("supported-tiff" in roles, "fixture set must include supported TIFF samples", failures)
     require({".jpg", ".jpeg"}.issubset(extensions), "fixture set must include both .jpg and .jpeg samples", failures)
+    require(".png" in extensions, "fixture set must include a .png sample", failures)
+    require(".tiff" in extensions, "fixture set must include a .tiff sample", failures)
     require("unsupported" in roles, "fixture set must include unsupported files", failures)
     require("raw-blocked-placeholder" in roles, "fixture set must include optional RAW-blocked placeholders when requested", failures)
 
@@ -93,6 +97,10 @@ def main():
             data = file_path.read_bytes()
             if fixture.get("role") == "supported-jpeg":
                 require(data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9"), f"{relative_path} must look like a JPEG", failures)
+            if fixture.get("role") == "supported-png":
+                require(data.startswith(b"\x89PNG\r\n\x1a\n"), f"{relative_path} must look like a PNG", failures)
+            if fixture.get("role") == "supported-tiff":
+                require(data.startswith((b"II*\x00", b"MM\x00*")), f"{relative_path} must look like a TIFF", failures)
             if fixture.get("role") == "raw-blocked-placeholder":
                 require(b"RAW placeholder" in data, f"{relative_path} must be an explicit placeholder, not a camera RAW file", failures)
 

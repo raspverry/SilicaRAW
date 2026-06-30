@@ -84,8 +84,8 @@ The catalog is the local SQLite-backed record of libraries, folders, photos, met
 - Task 11.6.3 adds current-page roving-focus keyboard navigation for the product grid without changing the paged query contract.
 - Task 11.6.4 keeps product grid multi-selection page-local and UI-only: primary selection stays explicit, range/toggle selection updates visual state and counts, and batch catalog edits remain out of scope.
 - Task 11.7.1 records the metadata schema/dependency gate: no EXIF parser is added yet, and unavailable camera/lens/orientation/capture metadata must stay explicit.
-- Task 11.7.2 records the backfill/extraction policy: no open/restore backfill, existing unknown metadata stays unknown until explicit import/backfill work, and JPEG/JPG dimensions may use the existing raster path without implying RAW decode support.
-- Task 11.7.3 adds migration 4 plus import-time metadata persistence: JPEG/JPG width and height are stored when available, RAW rows stay explicitly unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
+- Task 11.7.2 records the backfill/extraction policy: no open/restore backfill, existing unknown metadata stays unknown until explicit import/backfill work, and supported-raster dimensions may use the existing raster path without implying RAW decode support.
+- Task 11.7.3 adds migration 4 plus import-time metadata persistence: supported-raster width and height are stored when available, RAW rows stay explicitly unavailable, unsupported files do not get fake metadata rows, and originals remain unchanged.
 - Task 11.7.4 adds typed metadata read APIs through storage, core, and desktop command boundaries. Query responses use explicit `known`, `unknown`, and `unavailable` field states and read only the catalog, not original files.
 - Task 11.8.1 wires the Library/Loupe inspector to `get_photo_metadata` and keeps multi-selection metadata primary-photo-only.
 - Task 11.8.2 adds the first metadata-backed query filter: `has_dimensions`, backed by stored `photo_metadata.width` and `photo_metadata.height`. Camera/lens filters remain unavailable until parser/index support exists.
@@ -102,8 +102,8 @@ Task 11.5 starts with a contract before storage implementation:
   - file name ascending, then path ascending, then photo id ascending
   - rating descending, then photo id ascending
 - Accepted filters are minimum rating, picked, rejected, file type, `has_dimensions`, and search text.
-- File type is a whitelisted enum: JPEG, RAW, or unsupported. Storage records this as normalized `photos.file_type` values `jpeg`, `raw`, and `unsupported`.
-- For the installed local alpha source contract, only JPEG/JPG rows are supported photo sources. RAW, PNG, TIFF, HEIC, database, and sidecar-like files may be cataloged by reference as unsupported rows, but they must not appear preview-ready, develop-ready, or export-ready.
+- File type is a whitelisted enum: JPEG, PNG, TIFF, RAW, or unsupported. Storage records this as normalized `photos.file_type` values `jpeg`, `png`, `tiff`, `raw`, and `unsupported`.
+- For the installed local alpha source contract, JPEG/JPG, PNG, TIF, and TIFF rows are supported standard raster photo sources. RAW, HEIC, WebP, database, and sidecar-like files may be cataloged by reference as unsupported rows, but they must not appear preview-ready, develop-ready, or export-ready.
 - The `raw` file type remains reserved for older catalogs and explicit RAW proof work. It is not a supported installed-alpha source state unless a later task adds end-to-end RAW decode, preview, edit, export, and QA evidence.
 - Required query indexes are:
   - `idx_photos_library_imported_id`
@@ -138,8 +138,8 @@ Task 11.7 starts with a storage-shape and dependency gate before extraction:
 - `photo_metadata` normalized fields are nullable values: `width`, `height`, `orientation`, `capture_time`, `camera_make`, `camera_model`, and `lens_model`.
 - `photos.file_size` and `photos.modified_at` remain file-system metadata captured at import time; they are not duplicated into `photo_metadata`.
 - Existing imports without `photo_metadata` rows remain unknown until an import-time extractor or explicit scoped backfill populates them.
-- JPEG/JPG dimensions may be read through the existing raster path already used for thumbnails/previews.
-- Import-time JPEG/JPG extraction stores width and height when `image::image_dimensions` can read them; failed reads leave metadata unavailable instead of inventing values.
+- JPEG/JPG, PNG, TIF, and TIFF dimensions may be read through the existing raster path already used for thumbnails/previews.
+- Import-time supported-raster extraction stores width and height when `image::image_dimensions` can read them; failed reads leave metadata unavailable instead of inventing values.
 - RAW metadata policy does not imply RAW decode support; RAW dimensions and camera/lens metadata stay unavailable until later gates add supported extraction.
 - Until a parser is added, camera make, camera model, lens model, orientation, and EXIF capture time are stored and displayed as unavailable rather than inferred.
 - `photo_metadata.raw_json` remains parser-owned untrusted data and defaults to `{}`.

@@ -10,7 +10,7 @@ use std::fmt;
 pub const CRATE_NAME: &str = "silica-catalog";
 
 /// Current local alpha catalog schema version.
-pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 11;
+pub const ALPHA_CATALOG_SCHEMA_VERSION: i64 = 12;
 
 /// Migration bookkeeping table required in every catalog database.
 pub const SCHEMA_MIGRATIONS_TABLE: &str = "schema_migrations";
@@ -92,9 +92,9 @@ pub const ALPHA_CATALOG_SCHEMA: CatalogSchemaContract = CatalogSchemaContract {
 
 /// File extensions accepted as supported source candidates in the local alpha scanner.
 ///
-/// RAW and other raster formats remain catalog-reviewable as unsupported entries until
-/// their source pipelines have end-to-end preview, Develop, and export gates.
-pub const ALPHA_SUPPORTED_PHOTO_EXTENSIONS: &[&str] = &["jpg", "jpeg"];
+/// RAW, HEIC, WebP, and other formats remain catalog-reviewable as unsupported entries
+/// until their source pipelines have end-to-end preview, Develop, and export gates.
+pub const ALPHA_SUPPORTED_PHOTO_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "tif", "tiff"];
 
 /// Return whether an extension is a supported local alpha source candidate.
 pub fn is_supported_photo_extension(extension: &str) -> bool {
@@ -251,6 +251,8 @@ pub enum LibraryQuerySort {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryQueryFileType {
     Jpeg,
+    Png,
+    Tiff,
     Raw,
     Unsupported,
 }
@@ -461,7 +463,7 @@ mod tests {
 
     #[test]
     fn records_phase_4_1_catalog_schema_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 11);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 12);
         assert_eq!(ALPHA_CATALOG_SCHEMA.migration_table, "schema_migrations");
         assert_eq!(
             ALPHA_CATALOG_SCHEMA.required_tables,
@@ -510,10 +512,11 @@ mod tests {
     fn classifies_alpha_import_file_extensions() {
         assert!(is_supported_photo_extension("jpg"));
         assert!(is_supported_photo_extension("JPEG"));
+        assert!(is_supported_photo_extension("png"));
+        assert!(is_supported_photo_extension("tiff"));
+        assert!(is_supported_photo_extension("tif"));
         assert!(!is_supported_photo_extension("DNG"));
         assert!(!is_supported_photo_extension("RAF"));
-        assert!(!is_supported_photo_extension("png"));
-        assert!(!is_supported_photo_extension("tiff"));
         assert!(!is_supported_photo_extension("heic"));
         assert!(!is_supported_photo_extension("txt"));
         assert!(!is_supported_photo_extension(""));
@@ -602,7 +605,7 @@ mod tests {
 
     #[test]
     fn records_paged_query_index_contract() {
-        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 11);
+        assert_eq!(ALPHA_CATALOG_SCHEMA.current_version, 12);
         for index_name in [
             "idx_photos_library_imported_id",
             "idx_photos_library_file_name_path_id",

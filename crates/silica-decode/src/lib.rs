@@ -792,7 +792,7 @@ pub fn plan_preview_decode(source_path: impl AsRef<str>, unsupported: bool) -> P
 }
 
 fn is_raster_preview_extension(extension: &str) -> bool {
-    ["jpg", "jpeg"]
+    ["jpg", "jpeg", "png", "tif", "tiff"]
         .iter()
         .any(|supported| extension.eq_ignore_ascii_case(supported))
 }
@@ -853,7 +853,13 @@ mod tests {
         );
         assert_eq!(unsupported_plan.backend, super::PreviewDecodeBackend::None);
 
-        for source_path in ["/tmp/sample.png", "/tmp/sample.tiff", "/tmp/sample.heic"] {
+        for source_path in ["/tmp/sample.png", "/tmp/sample.tif", "/tmp/sample.tiff"] {
+            let raster_plan = super::plan_preview_decode(source_path, false);
+            assert_eq!(raster_plan.status, super::PreviewDecodeStatus::Ready);
+            assert_eq!(raster_plan.backend, super::PreviewDecodeBackend::Raster);
+        }
+
+        for source_path in ["/tmp/sample.heic", "/tmp/sample.webp"] {
             let unsupported_raster_plan = super::plan_preview_decode(source_path, false);
             assert_eq!(
                 unsupported_raster_plan.status,

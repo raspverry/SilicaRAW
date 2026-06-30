@@ -15,7 +15,7 @@ Phase 5.6 turns the Phase 5.5 UI vertical slice from a static/command-wired shel
 Phase 5.5 proved the screen structure and command paths. Phase 5.6 must prove the runtime product loop:
 
 ```txt
-create/open library -> import JPEG/JPG by reference -> real grid thumbnail -> real loupe preview -> visible exposure/contrast preview -> commit edit -> export JPEG sRGB -> clear disposable caches -> reopen and restore state
+create/open library -> import supported raster photos by reference -> real grid thumbnail -> real loupe preview -> visible exposure/contrast preview -> commit edit -> export JPEG sRGB -> clear disposable caches -> reopen and restore state
 ```
 
 ## Alpha Capability Contract
@@ -24,8 +24,8 @@ The installed local alpha must be honest about what works.
 
 Required before Phase 6:
 
-- JPEG/JPG originals are the first fully supported visible photo path.
-- JPEG/JPG grid thumbnails, loupe preview, Develop preview, edit persistence, and JPEG sRGB export must work through the installed app.
+- JPEG/JPG, PNG, TIF, and TIFF originals are the supported standard-raster visible photo path.
+- Supported-raster grid thumbnails, loupe preview, Develop preview, edit persistence, and JPEG sRGB export must work through the installed app.
 - RAW files may be imported as catalog entries only if they show a clear decode-blocked state.
 - Unsupported files must never look editable or exportable.
 - Original source files must remain unmodified.
@@ -34,8 +34,8 @@ Deferred until explicit later tasks:
 
 - RAW decoding.
 - Native Metal viewer output.
-- Display P3 export.
-- PNG, TIFF, HEIC, and other raster formats as guaranteed installed-alpha edit/export inputs.
+- Display P3 export for PNG/TIFF.
+- HEIC, WebP, and other raster formats as guaranteed installed-alpha edit/export inputs.
 - Masks, AI review, MLX, MCP, plugins, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution.
 
 ## Current Runtime Gap Audit
@@ -48,11 +48,11 @@ This audit records why Phase 6 clean-Mac testing must wait for Phase 5.6.
 | Import path UX | Native/selectable import folder UX is implemented. | None for the current local alpha path. | Completed in Task 5.6.3. |
 | Export path UX | Native save-location UX is implemented and cancel is distinct from error. | None for the current local alpha path. | Completed in Task 5.6.3. |
 | Command responses | Tauri commands return structured response envelopes. | None for covered local alpha commands. | Completed in Task 5.6.2. |
-| Grid | JPEG/JPG rows render real cached thumbnail pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.4. |
-| Loupe | JPEG/JPG rows render real cached Loupe preview pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.5. |
-| Develop | JPEG/JPG exposure/contrast drafts render real adjusted preview pixels and Develop reads committed edit state on selection/open. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Pixel preview completed in Task 5.6.6; persisted readback completed in Task 5.6.7. |
-| Edit state restore | Frontend reads the active catalog edit state through `get_photo_edit_state` and restores sliders plus clean/dirty state. | None for the current JPEG/JPG local alpha path. | Completed in Task 5.6.7. |
-| Export support | Export path writes JPEG sRGB, but UI implies broader raster exportability. | UI capability copy does not match codec coverage. | Installed-alpha contract narrows guaranteed source path to JPEG/JPG until more codecs are tested. |
+| Grid | Supported-raster rows render real cached thumbnail pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.4 and widened for PNG/TIFF source inputs. |
+| Loupe | Supported-raster rows render real cached Loupe preview pixels. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Completed in Task 5.6.5 and widened for PNG/TIFF source inputs. |
+| Develop | Supported-raster exposure/contrast drafts render real adjusted preview pixels and Develop reads committed edit state on selection/open. | RAW/missing/unsupported rows intentionally remain blocked or placeholder states. | Pixel preview completed in Task 5.6.6; persisted readback completed in Task 5.6.7. |
+| Edit state restore | Frontend reads the active catalog edit state through `get_photo_edit_state` and restores sliders plus clean/dirty state. | None for the current supported-raster local alpha path. | Completed in Task 5.6.7. |
+| Export support | Export path writes JPEG/PNG/TIFF sRGB outputs from supported raster sources. | Display P3 remains JPEG-only until color-managed PNG/TIFF proof exists. | Completed with raster export support and source-input widening. |
 | Cache clear | Product command and Library maintenance UI clear only `thumbnails`, `previews`, `render-cache`, `ai-cache`, then recreate those directories. | None for the current local alpha cache clear scope. | Completed in Task 5.6.8. |
 | Recents/session | Clean launch shows an empty recent state and no fictional library rows. | Real persisted recents/session restore remains deferred beyond the current local alpha hardening pass. | Fake demo state removed in Task 5.6.9. |
 | Culling controls | Library inspector supports rating 0 through 5, pick/reject toggles, and clear culling flags with coherent mutual exclusion. | None for the current local alpha culling scope. | Completed in Task 5.6.9. |
@@ -78,7 +78,7 @@ This audit records why Phase 6 clean-Mac testing must wait for Phase 5.6.
 Phase 6 can resume only after Phase 5.6 proves:
 
 - A tester can complete the local alpha workflow without editing code or relying on static demo rows.
-- The app shows real JPEG/JPG pixels in grid, loupe, and Develop surfaces.
+- The app shows real supported-raster pixels in grid, loupe, and Develop surfaces.
 - Exposure/contrast edits are visible, committed, and restored after reopen.
 - Export writes a separate JPEG sRGB file and never overwrites the source.
 - Product cache clearing deletes only disposable cache data.
