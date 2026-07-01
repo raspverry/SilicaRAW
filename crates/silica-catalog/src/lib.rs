@@ -111,6 +111,7 @@ pub struct ImportCandidate {
     pub file_size: i64,
     pub modified_at: Option<String>,
     pub partial_hash: String,
+    pub full_hash: Option<String>,
     pub unsupported: bool,
 }
 
@@ -530,12 +531,14 @@ mod tests {
             file_size: 11,
             modified_at: Some("2026-06-08T10:00:00Z".to_string()),
             partial_hash: "hash".to_string(),
+            full_hash: Some("full-hash".to_string()),
             unsupported: true,
         };
 
         assert!(candidate.unsupported);
         assert_eq!(candidate.file_name, "notes.txt");
         assert_eq!(candidate.partial_hash, "hash");
+        assert_eq!(candidate.full_hash.as_deref(), Some("full-hash"));
     }
 
     #[test]

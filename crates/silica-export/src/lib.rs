@@ -2221,7 +2221,7 @@ fn profile_contains_ascii(profile: &[u8], needle: &[u8]) -> bool {
         .any(|window| window.eq_ignore_ascii_case(needle))
 }
 
-fn sha256_file(path: &Path) -> Result<String, io::Error> {
+pub fn sha256_file(path: &Path) -> Result<String, io::Error> {
     let mut file = File::open(path)?;
     let mut digest = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];

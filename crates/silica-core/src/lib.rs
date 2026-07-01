@@ -5035,6 +5035,10 @@ fn export_photo_raster(
     let icc_profile_sha256_value = icc_profile_sha256
         .as_deref()
         .map_or(serde_json::Value::Null, serde_json::Value::from);
+    let source_sha256_after_export =
+        silica_export::sha256_file(Path::new(&render_request.source_path)).ok();
+    let source_original_hash_unchanged =
+        source_sha256_after_export.as_deref() == Some(source_sha256.as_str());
     let decoder_backend = "raster".to_string();
     let input_profile = "assume_srgb".to_string();
     let working_space = "srgb".to_string();
@@ -5062,6 +5066,8 @@ fn export_photo_raster(
         "source_path": render_request.source_path,
         "output_path": render_request.output_path,
         "source_sha256": source_sha256.clone(),
+        "source_sha256_after_export": source_sha256_after_export.clone(),
+        "source_original_hash_unchanged": source_original_hash_unchanged,
         "output_sha256": output_sha256.clone(),
         "icc_profile_embedded": icc_profile_embedded,
         "icc_profile_sha256": icc_profile_sha256_value,
@@ -10814,6 +10820,11 @@ mod tests {
             settings["source_sha256"].as_str(),
             exported.source_sha256.as_deref()
         );
+        assert_eq!(
+            settings["source_sha256_after_export"].as_str(),
+            exported.source_sha256.as_deref()
+        );
+        assert_eq!(settings["source_original_hash_unchanged"], true);
 
         let flags = get_photo_flags(&created.root_path, &exported.photo_id)
             .expect("read flags")

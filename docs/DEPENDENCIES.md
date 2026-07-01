@@ -410,14 +410,14 @@ Verification source: `cargo info objc2-core-image@0.3.2 --verbose`.
 ```txt
 Name: sha2
 Version: 0.10.9
-Purpose: Compute SHA-256 source/output/profile hashes for feature-gated RAW, color fixture probe, and ICC export evidence.
+Purpose: Compute SHA-256 source/output/profile hashes for import safety, feature-gated RAW, color fixture probe, and ICC export evidence.
 License: MIT OR Apache-2.0
 Repository/Homepage: https://github.com/RustCrypto/hashes
-Used by: crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature; crates/silica-export for Task 13.6 ICC export proof; crates/silica-mlx in Task 24.2 for deterministic model file hash checks.
-Why needed: Task 12.2 RAW evidence, Task 13.3 color profile evidence, Task 13.6 ICC export proof, and Task 24.2 model manifest validation must verify source/output/profile/model hashes and original-file preservation.
+Used by: crates/silica-storage for import source fingerprint proof; crates/silica-decode behind the `core-image-raw-probe` feature; crates/silica-render behind the `color-probe` feature; crates/silica-export for Task 13.6 ICC export proof; crates/silica-mlx in Task 24.2 for deterministic model file hash checks.
+Why needed: Import-by-reference safety, Task 12.2 RAW evidence, Task 13.3 color profile evidence, Task 13.6 ICC export proof, and Task 24.2 model manifest validation must verify source/output/profile/model hashes and original-file preservation.
 Alternatives considered: Python-only hash verification, existing partial FNV-style test hash, platform-specific hashing APIs.
-Risk notes: Do not use partial hashes for fixture or export evidence.
-Binary size impact: Pure Rust hashing code is linked into the local alpha export crate and feature-gated proof builds.
+Risk notes: Do not use partial hashes for fixture, import safety, or export evidence.
+Binary size impact: Pure Rust hashing code is linked into storage, the local alpha export crate, and feature-gated proof builds.
 Security notes: Reads local fixture/export files only and does not mutate originals.
 Verification source: `cargo info sha2@0.10.9`; Task 13.3 color-probe tests; Task 13.6 export ICC tests.
 ```

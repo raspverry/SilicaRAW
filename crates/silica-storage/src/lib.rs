@@ -17,6 +17,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use rusqlite::{named_params, params, Connection, OpenFlags, OptionalExtension, Transaction};
+use sha2::{Digest, Sha256};
 use silica_catalog::{
     is_supported_photo_extension, CatalogFlagError, ImportCandidate,
     ALPHA_CATALOG_REQUIRED_INDEXES, ALPHA_CATALOG_REQUIRED_TABLES, ALPHA_CATALOG_SCHEMA_VERSION,
@@ -290,6 +291,7 @@ pub struct FolderImportSummary {
     pub scanned_files: usize,
     pub supported_files: usize,
     pub unsupported_files: usize,
+    pub originals_unchanged: bool,
     pub candidates: Vec<ImportCandidate>,
     pub issues: Vec<ImportIssue>,
 }
@@ -1281,6 +1283,7 @@ pub fn import_folder_with_options(
         scanned_files,
         supported_files: scanned_files - unsupported_files,
         unsupported_files,
+        originals_unchanged: import_candidates_fingerprints_unchanged(&candidates),
         candidates,
         issues,
     })
@@ -1292,6 +1295,7 @@ fn empty_import_summary(folder_path: PathBuf, issues: Vec<ImportIssue>) -> Folde
         scanned_files: 0,
         supported_files: 0,
         unsupported_files: 0,
+        originals_unchanged: true,
         candidates: Vec::new(),
         issues,
     }
@@ -4432,6 +4436,18 @@ fn scan_import_directory(
                 continue;
             }
         };
+        let full_hash = match full_file_sha256(&path) {
+            Ok(hash) => hash,
+            Err(error) => {
+                state.issues.push(import_issue(
+                    ImportIssueKind::EntryMetadataFailed,
+                    &path,
+                    Some(file_name),
+                    format!("failed to read file hash: {error}"),
+                ));
+                continue;
+            }
+        };
 
         if unsupported {
             state.issues.push(import_issue(
@@ -4448,6 +4464,7 @@ fn scan_import_directory(
             file_size: metadata.len() as i64,
             modified_at: modified_at_string(&metadata),
             partial_hash,
+            full_hash: Some(full_hash),
             unsupported,
         });
     }
@@ -4575,9 +4592,10 @@ fn record_import_candidates(
               missing,
               unsupported,
               file_type,
-              partial_hash
+              partial_hash,
+              full_hash
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, ?11)
             ON CONFLICT(library_id, path) DO UPDATE SET
               folder_id = excluded.folder_id,
               file_name = excluded.file_name,
@@ -4586,7 +4604,8 @@ fn record_import_candidates(
               missing = 0,
               unsupported = excluded.unsupported,
               file_type = excluded.file_type,
-              partial_hash = excluded.partial_hash
+              partial_hash = excluded.partial_hash,
+              full_hash = excluded.full_hash
             "#,
             params![
                 photo_id,
@@ -4599,6 +4618,7 @@ fn record_import_candidates(
                 bool_to_sql(candidate.unsupported),
                 catalog_file_type_for_path(&candidate.path, candidate.unsupported),
                 candidate.partial_hash,
+                candidate.full_hash,
             ],
         )?;
 
@@ -4614,6 +4634,25 @@ fn record_import_candidates(
 
     transaction.commit()?;
     Ok(())
+}
+
+fn import_candidates_fingerprints_unchanged(candidates: &[ImportCandidate]) -> bool {
+    candidates.iter().all(|candidate| {
+        let path = Path::new(&candidate.path);
+        let Ok(metadata) = fs::metadata(path) else {
+            return false;
+        };
+        if !metadata.is_file() || metadata.len() as i64 != candidate.file_size {
+            return false;
+        }
+        if modified_at_string(&metadata) != candidate.modified_at {
+            return false;
+        }
+        candidate
+            .full_hash
+            .as_deref()
+            .is_some_and(|expected| full_file_sha256(path).is_ok_and(|hash| hash == expected))
+    })
 }
 
 fn catalog_file_type_for_path(path: &str, unsupported: bool) -> &'static str {
@@ -5138,6 +5177,22 @@ fn partial_file_hash(path: &Path) -> Result<String, LibraryStorageError> {
     }
 
     Ok(format!("{hash:016x}"))
+}
+
+fn full_file_sha256(path: &Path) -> Result<String, LibraryStorageError> {
+    let mut file = File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 fn stable_catalog_id(prefix: &str, value: &str) -> String {
@@ -8287,6 +8342,7 @@ mod tests {
         assert_eq!(summary.scanned_files, 3);
         assert_eq!(summary.supported_files, 1);
         assert_eq!(summary.unsupported_files, 2);
+        assert!(summary.originals_unchanged);
         assert_eq!(summary.candidates.len(), 3);
         assert!(summary
             .candidates
@@ -8307,15 +8363,16 @@ mod tests {
             .expect("count photos");
         assert_eq!(imported_count, 3);
 
-        let (path, file_size, unsupported, file_type, partial_hash): (
+        let (path, file_size, unsupported, file_type, partial_hash, full_hash): (
             String,
             i64,
             i64,
+            String,
             String,
             String,
         ) = connection
             .query_row(
-                "SELECT path, file_size, unsupported, file_type, partial_hash FROM photos WHERE file_name = 'sample.jpg'",
+                "SELECT path, file_size, unsupported, file_type, partial_hash, full_hash FROM photos WHERE file_name = 'sample.jpg'",
                 [],
                 |row| {
                     Ok((
@@ -8324,6 +8381,7 @@ mod tests {
                         row.get(2)?,
                         row.get(3)?,
                         row.get(4)?,
+                        row.get(5)?,
                     ))
                 },
             )
@@ -8333,6 +8391,7 @@ mod tests {
         assert_eq!(unsupported, 0);
         assert_eq!(file_type, "jpeg");
         assert!(!partial_hash.is_empty());
+        assert_eq!(full_hash.len(), 64);
 
         let (unsupported, file_type): (i64, String) = connection
             .query_row(
@@ -8369,6 +8428,30 @@ mod tests {
         assert!(!library_root.join("sample.jpg").exists());
         assert!(!library_root.join("sample.DNG").exists());
         assert!(!library_root.join("notes.txt").exists());
+
+        remove_library_root(&workspace);
+    }
+
+    #[test]
+    fn import_fingerprint_check_rejects_full_hash_mismatch() {
+        let workspace = unique_library_root("import-fingerprint");
+        let import_root = workspace.join("Originals");
+        let supported_file = import_root.join("sample.jpg");
+
+        std::fs::create_dir_all(&import_root).expect("create import directory");
+        std::fs::write(&supported_file, b"supported jpeg candidate").expect("write supported");
+        let metadata = std::fs::metadata(&supported_file).expect("read metadata");
+        let candidate = ImportCandidate {
+            file_name: "sample.jpg".to_string(),
+            path: path_to_string(&supported_file).expect("source path"),
+            file_size: metadata.len() as i64,
+            modified_at: modified_at_string(&metadata),
+            partial_hash: partial_file_hash(&supported_file).expect("partial hash"),
+            full_hash: Some("0".repeat(64)),
+            unsupported: false,
+        };
+
+        assert!(!import_candidates_fingerprints_unchanged(&[candidate]));
 
         remove_library_root(&workspace);
     }

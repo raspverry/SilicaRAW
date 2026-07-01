@@ -239,6 +239,9 @@ Required export evidence keys for local raster exports:
 
 ```txt
 color_profile
+source_sha256
+source_sha256_after_export
+source_original_hash_unchanged
 output_sha256
 icc_profile_embedded
 icc_profile_sha256
