@@ -124,27 +124,27 @@ This is not the clean-Mac result for Task 6.3. It records whether the DMG can be
 
 Latest local build-machine smoke:
 
-- Date: 2026-06-30
-- Git commit: `d8305260c24b5f6625334176339bd5bd3d922f95`
-- Tag: `developer-preview-20260630.1`
+- Date: 2026-07-08
+- Git commit: `a2f66bfec44306bff290172ef4be10954d16463a`
+- Tag: not tagged; local current-main Q6.1 inspection
 - Artifact type: `developer unsigned DMG`
-- Workflow run: https://github.com/raspverry/SilicaRAW/actions/runs/28434695717
-- Artifact: `silicaraw-unsigned-developer-preview-macos`
-- Artifact API digest: `sha256:01fe90e99944364c75c807d261e0d76b59db51d14d35fb55645ef007e01e5641`
-- DMG path: `.tmp/developer-preview-28434695717/silicaraw-unsigned-developer-preview-macos/SilicaRAW_0.1.0_aarch64.dmg`
-- DMG SHA256: `665f1998cc7d7d148eecb458cafa0af508d39e33d9fe1f4170221de3f0de4aac`
+- Workflow run: not run for this local inspection
+- Artifact: local build output
+- Artifact API digest: not applicable
+- DMG path: `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg`
+- DMG SHA256: `c4c053834bbc9d148d6108b40bd443e07114ebae0a978c67213f0f6b7f242ff3`
 - App path launched: not launched from this artifact smoke
 - macOS version: `26.4`
-- Machine: `arm64`, `Apple M5 Max`
+- Machine: `arm64`
 - DMG verification: pass
 - DMG mount and app presence: pass
-- Mounted app tree hash: `b1e15b8deeba36b6de637c5c608efe0a04c6ef3207d80d07c21614c093fe53d2`
+- Mounted app tree hash: `89ab925b523bc2b7943fcfa8ad3318e3266b542edc5d8f7967addf8ff60da95d`
 - Installed app tree hash matches mounted app: not run
-- Installed-app preflight: not run for this downloaded artifact
-- GUI launch command: not run for this downloaded artifact
+- Installed-app preflight: not run for this Q6.1 artifact inspection
+- GUI launch command: not run for this Q6.1 artifact inspection
 - Checksum verification: pass
-- Unsigned warning file: present
-- Smoke report: `.tmp/developer-preview-28434695717/local-dmg-artifact-smoke.json`
+- Unsigned warning file: not generated for this local build-machine inspection
+- Smoke report: `.tmp/q6-unsigned-dmg-inspection/local-dmg-artifact-smoke.json`
 - Clean-Mac Task 6.3 result: still pending
 
 ## Related References

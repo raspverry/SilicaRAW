@@ -2,7 +2,7 @@
 title: Developer Preview Artifacts
 status: active
 audience: maintainers
-updated: 2026-06-30
+updated: 2026-07-08
 source_of_truth: docs/wiki/roadmaps/developer-preview-artifact-runbook.md
 ---
 
@@ -13,6 +13,18 @@ source_of_truth: docs/wiki/roadmaps/developer-preview-artifact-runbook.md
 This report records unsigned developer-preview DMG evidence only. These artifacts are internal testing artifacts, not user-ready local distribution, public beta, or v1.0 release assets.
 
 User-ready local distribution remains blocked until Developer ID signing, notarization, stapling, checksums, GitHub Release publication, and clean-Mac downloaded-artifact QA are complete.
+
+## Current Main Local Inspection
+
+The current-main local build-machine unsigned DMG inspection is recorded separately in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md).
+
+| Field | Value |
+| --- | --- |
+| Commit | `a2f66bfec44306bff290172ef4be10954d16463a` |
+| DMG | `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg` |
+| DMG SHA256 | `c4c053834bbc9d148d6108b40bd443e07114ebae0a978c67213f0f6b7f242ff3` |
+| Local smoke | `.tmp/q6-unsigned-dmg-inspection/local-dmg-artifact-smoke.json` |
+| Clean-Mac gate | `not run` |
 
 ## Latest Record
 
