@@ -99,4 +99,4 @@ This pass does not prove manual GUI interaction, native file picker behavior, `/
 
 ## Next Gate
 
-Q6.1 unsigned DMG inspection is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md). Q6.2 should copy the app from the mounted DMG to `/Applications`, launch `/Applications/SilicaRAW.app`, and record that the app is not running from the repository checkout or mounted image.
+Q6.1 unsigned DMG inspection is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md), and the Q6.2 install/launch sub-proof is recorded in [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md). The next open gate is the full Q6.2 installed workflow from `/Applications/SilicaRAW.app`.

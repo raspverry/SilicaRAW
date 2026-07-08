@@ -126,6 +126,7 @@ Latest local build-machine smoke:
 
 - Date: 2026-07-08
 - Git commit: `a2f66bfec44306bff290172ef4be10954d16463a`
+- Installed launch evidence source commit: `cc2f3418da6513c1cdd6222fb0bdf08ba5ff67b6`
 - Tag: not tagged; local current-main Q6.1 inspection
 - Artifact type: `developer unsigned DMG`
 - Workflow run: not run for this local inspection
@@ -133,18 +134,20 @@ Latest local build-machine smoke:
 - Artifact API digest: not applicable
 - DMG path: `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg`
 - DMG SHA256: `c4c053834bbc9d148d6108b40bd443e07114ebae0a978c67213f0f6b7f242ff3`
-- App path launched: not launched from this artifact smoke
+- App path launched: `/Applications/SilicaRAW.app`
 - macOS version: `26.4`
 - Machine: `arm64`
 - DMG verification: pass
 - DMG mount and app presence: pass
 - Mounted app tree hash: `89ab925b523bc2b7943fcfa8ad3318e3266b542edc5d8f7967addf8ff60da95d`
-- Installed app tree hash matches mounted app: not run
-- Installed-app preflight: not run for this Q6.1 artifact inspection
-- GUI launch command: not run for this Q6.1 artifact inspection
+- Installed app tree hash matches mounted app: pass
+- Installed app tree hash: `89ab925b523bc2b7943fcfa8ad3318e3266b542edc5d8f7967addf8ff60da95d`
+- Installed-app preflight: launch sub-proof pass; full installed workflow not run
+- GUI launch command: `python3 scripts/harness/installed-app-launch-smoke.py --app /Applications/SilicaRAW.app --output .tmp/q6-installed-app-launch/installed-app-launch-smoke.json`
 - Checksum verification: pass
 - Unsigned warning file: not generated for this local build-machine inspection
-- Smoke report: `.tmp/q6-unsigned-dmg-inspection/local-dmg-artifact-smoke.json`
+- Smoke reports: `.tmp/q6-unsigned-dmg-inspection/local-dmg-artifact-smoke.json`, `.tmp/q6-installed-app-launch/local-dmg-artifact-smoke.json`, `.tmp/q6-installed-app-launch/installed-app-launch-smoke.json`
+- Full installed workflow result: not run; still pending
 - Clean-Mac Task 6.3 result: still pending
 
 ## Related References

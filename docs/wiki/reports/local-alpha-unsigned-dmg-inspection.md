@@ -54,7 +54,7 @@ python3 scripts/harness/local-dmg-artifact-smoke.py \
 | Mounted app tree SHA256 | `89ab925b523bc2b7943fcfa8ad3318e3266b542edc5d8f7967addf8ff60da95d` |
 | Mounted app file count | `3` |
 | Mounted app size bytes | `15058030` |
-| Installed app comparison | not run |
+| Installed app comparison | not run in this Q6.1 smoke; recorded later in [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md) |
 | Copied to install path | false |
 | Clean-Mac gate remains | true |
 | Failures | none |
@@ -92,8 +92,8 @@ This pass proves:
 - the DMG mounts read-only and contains `SilicaRAW.app`
 - the mounted app has expected bundle metadata and ad-hoc signing state
 
-This pass does not prove drag-to-`/Applications`, installed-app launch, local workflow from `/Applications`, Gatekeeper acceptance, notarization, GitHub Release download behavior, offline behavior, or clean-Mac behavior.
+This pass does not prove drag-to-`/Applications`, installed-app launch, local workflow from `/Applications`, Gatekeeper acceptance, notarization, GitHub Release download behavior, offline behavior, or clean-Mac behavior. The later [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md) report records the install/launch sub-proof only; the full installed workflow remains open.
 
 ## Next Gate
 
-Q6.2 should copy the app from the mounted DMG to `/Applications`, launch `/Applications/SilicaRAW.app`, and record that the app is not running from the repository checkout or mounted image.
+Q6.2 has an install/launch sub-proof. It still needs the full local alpha workflow from `/Applications/SilicaRAW.app`: create/open library, import by reference, review flags, preview, exposure/contrast edit, JPEG sRGB export, restart persistence, and original-file safety.
