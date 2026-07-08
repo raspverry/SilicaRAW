@@ -19,11 +19,11 @@ It is not a release approval. It separates source, static UI, installed app, uns
 | Field | Value |
 | --- | --- |
 | Branch | `main` |
-| Commit | `7bedb18fdd0a8f26ef7b8432d8b87ab6cbbac96a` |
-| Recent PRs | [#139 Add local alpha closure evidence index](https://github.com/raspverry/SilicaRAW/pull/139), [#140 Record built app launch evidence](https://github.com/raspverry/SilicaRAW/pull/140), [#141 Record library import reference evidence](https://github.com/raspverry/SilicaRAW/pull/141) |
-| CI | [Harness run 28949153961](https://github.com/raspverry/SilicaRAW/actions/runs/28949153961), `success` |
-| Final Visual QA | [Final Visual QA run 28949153952](https://github.com/raspverry/SilicaRAW/actions/runs/28949153952), `success` |
-| Scope | Import/export source hash evidence, closure evidence routing, source/static UI harness gates, built `.app` launch evidence, library import reference evidence |
+| Commit | `8226e99e3127c72590209df853fd6bf5d849e190` |
+| Recent PRs | [#140 Record built app launch evidence](https://github.com/raspverry/SilicaRAW/pull/140), [#141 Record library import reference evidence](https://github.com/raspverry/SilicaRAW/pull/141), [#142 Record review edit persistence evidence](https://github.com/raspverry/SilicaRAW/pull/142) |
+| CI | [Harness run 28950083128](https://github.com/raspverry/SilicaRAW/actions/runs/28950083128), `success` |
+| Final Visual QA | [Final Visual QA run 28950083457](https://github.com/raspverry/SilicaRAW/actions/runs/28950083457), `success` |
+| Scope | Import/export source hash evidence, closure evidence routing, source/static UI harness gates, built `.app` launch evidence, library import reference evidence, review/edit persistence evidence |
 | Artifact status | No current-main DMG recorded in this index yet |
 
 ## Gate Evidence Matrix
@@ -36,6 +36,7 @@ It is not a release approval. It separates source, static UI, installed app, uns
 | Built `.app` launch | Recorded for current local build | Generated `.app` bundle launches as a GUI app and process path is the app executable | `/Applications` install, full workflow, DMG, Gatekeeper, clean-Mac behavior | [Local Alpha Built App Launch](local-alpha-built-app-launch.md) | `target/release/bundle/macos/SilicaRAW.app`, `.tmp/q5-built-app-launch/installed-app-preflight.json` |
 | Library import by reference | Recorded for current local build | Developer desktop runtime creates/opens a library, imports by reference, records catalog paths outside the library root, and preserves source hashes | Manual GUI path picker, `/Applications`, DMG, Gatekeeper, clean-Mac behavior | [Local Alpha Library Import Reference Evidence](local-alpha-library-import-reference.md) | `.tmp/q5-library-import-reference/library-import-reference-evidence.json` |
 | Review/edit persistence | Recorded for current local build | Developer desktop runtime persists review flags, undoable edit history, active exposure/contrast edit state, and app-session selected-photo restore state | Manual GUI controls, `/Applications`, DMG, Gatekeeper, clean-Mac behavior | [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md) | `.tmp/q5-review-edit-persistence/library-import-reference-evidence.json`, `.tmp/q5-review-edit-persistence/run/AppConfig/app-session.json` |
+| JPEG sRGB export | Recorded for current local build | Developer desktop runtime writes a separate JPEG sRGB artifact, records export settings/source SHA evidence, and preserves original source hashes | Manual GUI export dialog, `/Applications`, DMG, Gatekeeper, clean-Mac behavior | [Local Alpha JPEG sRGB Export Evidence](local-alpha-jpeg-export-evidence.md) | `.tmp/q5-jpeg-export-evidence/library-import-reference-evidence.json`, `.tmp/q5-jpeg-export-evidence/run/Exports/reference-urban-export.jpg` |
 | Developer-preview DMG artifact | Recorded for older preview | Unsigned DMG build, checksum, mount, mounted app presence | Current `main`, user-ready release, signed/notarized behavior, clean-Mac behavior | [Developer Preview Artifacts](developer-preview-artifacts.md) | `.tmp/developer-preview-28434695717/silicaraw-unsigned-developer-preview-macos/SilicaRAW_0.1.0_aarch64.dmg` |
 | Installed app workflow from `/Applications` | Pending for current `main` | App bundle launch, local persistence, export, original safety from installed app | User-ready signed distribution unless signed/notarized artifact is used | [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) | `/Applications/SilicaRAW.app`, output evidence TBD |
 | Offline installed workflow | Pending for current `main` | Local workflow does not require network | Gatekeeper acceptance or clean-Mac behavior by itself | [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) | Evidence TBD |
@@ -54,11 +55,11 @@ It is not a release approval. It separates source, static UI, installed app, uns
 | DMG | `SilicaRAW_0.1.0_aarch64.dmg` |
 | DMG SHA256 | `665f1998cc7d7d148eecb458cafa0af508d39e33d9fe1f4170221de3f0de4aac` |
 | Smoke status | DMG verification and mounted app presence passed |
-| Current-main status | Stale relative to `7bedb18fdd0a8f26ef7b8432d8b87ab6cbbac96a`; rebuild required before using it as current evidence |
+| Current-main status | Stale relative to `8226e99e3127c72590209df853fd6bf5d849e190`; rebuild required before using it as current evidence |
 
 ## Required Record for Remaining Installed App Evidence
 
-Q5.1 through Q5.3 now have developer-local evidence records. Remaining installed-app evidence should add or link records with:
+Q5.1 through Q5.4 now have developer-local evidence records. Remaining installed-app evidence should add or link records with:
 
 - tested commit and app version
 - app path launched, normally `/Applications/SilicaRAW.app`

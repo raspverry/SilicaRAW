@@ -315,6 +315,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Export a supported raster photo to JPEG sRGB and verify output exists, opens, and does not overwrite any original.
 - **Acceptance:** Export creates a new artifact with evidence and leaves originals unchanged.
 - **Validation:** output inspection plus original hash manifest before/after.
+- **Status:** Completed on 2026-07-08. Recorded Q5.4 evidence from the developer desktop command runtime. The report captures the separate JPEG export path, output SHA-256, macOS `sips` open/format/dimension check, JPEG sRGB quality 90 settings, embedded ICC evidence, and source SHA-256 before/after export preservation. Evidence is recorded in [Local Alpha JPEG sRGB Export Evidence](../reports/local-alpha-jpeg-export-evidence.md). This remains developer runtime evidence, not GUI, `/Applications`, DMG, Gatekeeper, notarization, offline, or clean-Mac proof.
 
 ### Q5.5: Prove Unsupported, Missing, and Cache-Clear States
 

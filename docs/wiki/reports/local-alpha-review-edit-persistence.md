@@ -85,8 +85,8 @@ The connected runtime smoke verifies:
 
 This pass proves review/edit persistence through the local desktop command runtime and catalog/session files.
 
-This pass does not prove manual GUI interaction, `/Applications` launch, DMG install, Gatekeeper, notarization, offline behavior, or clean-Mac behavior. Those remain Q5.4 through Q7 gates.
+This pass does not prove manual GUI interaction, `/Applications` launch, DMG install, Gatekeeper, notarization, offline behavior, or clean-Mac behavior. Those remain Q5.5 through Q7 gates.
 
 ## Next Gate
 
-Q5.4 should record JPEG sRGB export evidence with output inspection and original-source overwrite safety.
+Q5.4 is recorded in [Local Alpha JPEG sRGB Export Evidence](local-alpha-jpeg-export-evidence.md). Q5.5 should record unsupported, missing-original, and cache-clear trust-state evidence.

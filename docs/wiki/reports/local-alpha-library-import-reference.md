@@ -95,4 +95,4 @@ This pass does not prove:
 
 ## Next Gate
 
-Q5.3 is recorded in [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md). Q5.4 should record JPEG sRGB export evidence without expanding product scope.
+Q5.3 is recorded in [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md), and Q5.4 is recorded in [Local Alpha JPEG sRGB Export Evidence](local-alpha-jpeg-export-evidence.md). Q5.5 should record unsupported, missing-original, and cache-clear trust-state evidence without expanding product scope.
