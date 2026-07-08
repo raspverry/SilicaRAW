@@ -2,7 +2,7 @@
 title: Current LLM Route
 status: active
 audience: agents
-updated: 2026-06-20
+updated: 2026-07-08
 source_of_truth: docs/wiki/llm/index.md
 ---
 
@@ -29,6 +29,7 @@ For local alpha quality closure, Task 27.2, or any beta release-candidate work, 
 - [Local Alpha Quality Closure Plan](../roadmaps/local-alpha-quality-closure-plan.md)
 - [Public Beta Evidence Index](../roadmaps/public-beta-evidence-index.md)
 - [Public Beta Readiness Audit](../roadmaps/public-beta-readiness-audit.md)
+- [Local Alpha Closure Evidence](../reports/local-alpha-closure-evidence.md)
 - [Blocked Public Beta UI Hardening Plan](../roadmaps/blocked-public-beta-ui-hardening-plan.md)
 - [Public Beta Scope Freeze Checklist](../../../checklists/PUBLIC_BETA_SCOPE_FREEZE.md)
 - [Public Beta Readiness Audit Checklist](../../../checklists/PUBLIC_BETA_READINESS_AUDIT.md)

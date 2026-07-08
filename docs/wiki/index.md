@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-06-20
+updated: 2026-07-08
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -95,6 +95,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 
 - [Reports Index](reports/index.md)
 - [Library Scale Benchmarks](reports/library-scale-benchmarks.md)
+- [Local Alpha Closure Evidence](reports/local-alpha-closure-evidence.md)
 - [Developer Preview Artifacts](reports/developer-preview-artifacts.md)
 
 ### Contributing

@@ -2,7 +2,7 @@
 title: Local Alpha Quality Closure Plan
 status: active
 audience: maintainers
-updated: 2026-06-22
+updated: 2026-07-08
 source_of_truth: docs/wiki/roadmaps/local-dmg-distribution-plan.md
 ---
 
@@ -277,6 +277,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Record the exact command, artifact path, screenshot set, app build, and DMG file used for each gate.
 - **Acceptance:** A maintainer can reproduce why a candidate passed or failed without rereading chat history.
 - **Validation:** evidence index review.
+- **Status:** Completed on 2026-07-08. Added the [Local Alpha Closure Evidence](../reports/local-alpha-closure-evidence.md) report to separate source harness, visual QA, installed app, unsigned developer-preview DMG, signed DMG, and clean-Mac evidence. The index records current-main source baseline, known artifact paths, stale developer-preview DMG evidence, and the missing Q5/Q6/Q7 evidence required before Task 27.2 or Phase 28 can proceed.
 
 ## Phase Q5: Installed App Workflow Seal
 

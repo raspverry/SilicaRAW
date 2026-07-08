@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-06-30
+updated: 2026-07-08
 source_of_truth: none
 ---
 
@@ -13,6 +13,12 @@ source_of_truth: none
 This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
+
+## [2026-07-08] quality | Closure evidence index added
+
+- Completed Q4.4 of the local alpha quality closure plan.
+- Added `docs/wiki/reports/local-alpha-closure-evidence.md` as the cross-gate evidence index for source harness, visual QA, installed app, unsigned developer-preview DMG, signed DMG, and clean-Mac gates.
+- Recorded that the latest developer-preview DMG evidence is stale relative to current `main`, and that Q5/Q6/Q7 evidence remains pending or blocked before Task 27.2 and Phase 28 can proceed.
 
 ## [2026-06-30] release | Developer preview artifact recorded
 
