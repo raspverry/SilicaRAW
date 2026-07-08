@@ -8138,6 +8138,534 @@ mod tests {
         eprintln!("phase-11 connected runtime smoke complete");
     }
 
+    #[test]
+    fn desktop_trust_state_evidence_smoke() {
+        let Some(fixtures_root) =
+            std::env::var_os("SILICARAW_TRUST_STATE_FIXTURES").map(PathBuf::from)
+        else {
+            eprintln!("skipping desktop_trust_state_evidence_smoke; fixture env var is not set");
+            return;
+        };
+        let Some(evidence_path) =
+            std::env::var_os("SILICARAW_TRUST_STATE_OUTPUT").map(PathBuf::from)
+        else {
+            eprintln!("skipping desktop_trust_state_evidence_smoke; output env var is not set");
+            return;
+        };
+        let run_root = evidence_path
+            .parent()
+            .expect("evidence path parent")
+            .join("run");
+        let library_root = run_root.join("SilicaRAW Library");
+        let import_root = run_root.join("Import Originals");
+        let export_root = run_root.join("Exports");
+        std::fs::create_dir_all(&import_root).expect("create trust import directory");
+        std::fs::create_dir_all(&export_root).expect("create trust export directory");
+
+        assert!(
+            fixtures_root.join("fixture-manifest.json").is_file(),
+            "trust state smoke requires generated legal fixture metadata"
+        );
+        let supported_png = import_root.join("supported-png.png");
+        let cache_original = import_root.join("cache-source.jpeg");
+        let missing_original = import_root.join("missing-source.jpg");
+        let raw_placeholder = import_root.join("blocked-raw.DNG");
+        let unsupported_original = import_root.join("notes.txt");
+        std::fs::copy(
+            fixtures_root.join("supported/reference-urban.png"),
+            &supported_png,
+        )
+        .expect("copy supported PNG fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/reference-still-life.jpeg"),
+            &cache_original,
+        )
+        .expect("copy cache source fixture");
+        std::fs::copy(
+            fixtures_root.join("supported/reference-urban.jpg"),
+            &missing_original,
+        )
+        .expect("copy missing source fixture");
+        std::fs::copy(
+            fixtures_root.join("raw-blocked/blocked-raw.DNG"),
+            &raw_placeholder,
+        )
+        .expect("copy RAW-blocked fixture");
+        std::fs::copy(
+            fixtures_root.join("unsupported/notes.txt"),
+            &unsupported_original,
+        )
+        .expect("copy unsupported text fixture");
+        let missing_before_bytes =
+            std::fs::read(&missing_original).expect("read missing source before deletion");
+        let originals = tracked_originals(&[
+            supported_png.clone(),
+            cache_original.clone(),
+            raw_placeholder.clone(),
+            unsupported_original.clone(),
+        ]);
+
+        let created = super::create_library_at_path(library_root.display().to_string(), None);
+        assert!(created.ok, "create trust library failed: {created:?}");
+        let imported = super::import_folder(
+            library_root.display().to_string(),
+            import_root.display().to_string(),
+            None,
+        );
+        assert!(imported.ok, "trust import failed: {imported:?}");
+        match response_data(&imported) {
+            super::DesktopCommandData::ImportSummary {
+                scanned_files,
+                supported_files,
+                unsupported_files,
+                originals_unchanged,
+                ..
+            } => {
+                assert_eq!(*scanned_files, 5);
+                assert_eq!(*supported_files, 3);
+                assert_eq!(*unsupported_files, 2);
+                assert!(*originals_unchanged);
+            }
+            other => panic!("unexpected import data: {other:?}"),
+        }
+
+        let grid = super::list_library_photos(library_root.display().to_string());
+        assert!(grid.ok, "trust grid failed: {grid:?}");
+        let (
+            png_id,
+            png_file_type,
+            png_thumbnail_ready,
+            raw_id,
+            raw_file_type,
+            raw_thumbnail_present,
+            text_id,
+            text_file_type,
+            text_thumbnail_present,
+            missing_id,
+            missing_thumbnail_ready_before_delete,
+            cache_id,
+        ) = match response_data(&grid) {
+            super::DesktopCommandData::PhotoGrid { photos } => {
+                assert_eq!(photos.len(), 5);
+                let png = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "supported-png.png")
+                    .expect("supported PNG row");
+                assert_eq!(png.file_type, "PNG");
+                assert!(!png.unsupported);
+                assert!(!png.missing);
+                assert!(png.thumbnail_path.is_some());
+                assert!(png
+                    .thumbnail_bytes
+                    .as_ref()
+                    .is_some_and(|bytes| bytes.len() > 2));
+
+                let cache = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "cache-source.jpeg")
+                    .expect("cache source row");
+                assert!(!cache.unsupported);
+                assert!(!cache.missing);
+
+                let missing = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "missing-source.jpg")
+                    .expect("missing source row before delete");
+                assert!(!missing.unsupported);
+                assert!(!missing.missing);
+                assert!(missing.thumbnail_bytes.is_some());
+
+                let raw = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "blocked-raw.DNG")
+                    .expect("RAW unsupported row");
+                assert!(raw.unsupported);
+                assert!(!raw.missing);
+                assert!(raw.thumbnail_path.is_none());
+                assert!(raw.thumbnail_bytes.is_none());
+
+                let text = photos
+                    .iter()
+                    .find(|photo| photo.file_name == "notes.txt")
+                    .expect("text unsupported row");
+                assert!(text.unsupported);
+                assert!(!text.missing);
+                assert!(text.thumbnail_path.is_none());
+                assert!(text.thumbnail_bytes.is_none());
+                (
+                    png.photo_id.clone(),
+                    png.file_type.clone(),
+                    png.thumbnail_bytes.is_some(),
+                    raw.photo_id.clone(),
+                    raw.file_type.clone(),
+                    raw.thumbnail_bytes.is_some(),
+                    text.photo_id.clone(),
+                    text.file_type.clone(),
+                    text.thumbnail_bytes.is_some(),
+                    missing.photo_id.clone(),
+                    missing.thumbnail_bytes.is_some(),
+                    cache.photo_id.clone(),
+                )
+            }
+            other => panic!("unexpected trust grid data: {other:?}"),
+        };
+        assert_originals_unchanged(&originals, "trust grid");
+
+        let png_preview =
+            super::open_photo_preview(library_root.display().to_string(), png_id.clone());
+        assert!(
+            png_preview.ok,
+            "supported PNG preview failed: {png_preview:?}"
+        );
+        let (png_preview_status, png_preview_bytes_present) = match response_data(&png_preview) {
+            super::DesktopCommandData::PhotoPreview {
+                status,
+                preview_bytes,
+                ..
+            } => {
+                assert_eq!(*status, "Ready");
+                assert!(preview_bytes.as_ref().is_some_and(|bytes| bytes.len() > 2));
+                (status.to_string(), preview_bytes.is_some())
+            }
+            other => panic!("unexpected PNG preview data: {other:?}"),
+        };
+
+        let raw_preview =
+            super::open_photo_preview(library_root.display().to_string(), raw_id.clone());
+        assert!(
+            raw_preview.ok,
+            "RAW unsupported preview failed: {raw_preview:?}"
+        );
+        let (raw_preview_status, raw_preview_message) = match response_data(&raw_preview) {
+            super::DesktopCommandData::PhotoPreview {
+                status,
+                preview_bytes,
+                message,
+                ..
+            } => {
+                assert_eq!(*status, "Unsupported");
+                assert!(preview_bytes.is_none());
+                assert!(message.contains("Unsupported file type"));
+                (status.to_string(), message.clone())
+            }
+            other => panic!("unexpected RAW preview data: {other:?}"),
+        };
+
+        let text_preview =
+            super::open_photo_preview(library_root.display().to_string(), text_id.clone());
+        assert!(
+            text_preview.ok,
+            "text unsupported preview failed: {text_preview:?}"
+        );
+        let (text_preview_status, text_preview_message) = match response_data(&text_preview) {
+            super::DesktopCommandData::PhotoPreview {
+                status,
+                preview_bytes,
+                message,
+                ..
+            } => {
+                assert_eq!(*status, "Unsupported");
+                assert!(preview_bytes.is_none());
+                assert!(message.contains("Unsupported file type"));
+                (status.to_string(), message.clone())
+            }
+            other => panic!("unexpected text preview data: {other:?}"),
+        };
+
+        let cache_preview =
+            super::open_photo_preview(library_root.display().to_string(), cache_id.clone());
+        assert!(
+            cache_preview.ok,
+            "cache source preview failed: {cache_preview:?}"
+        );
+
+        std::fs::remove_file(&missing_original)
+            .expect("remove referenced source for missing state");
+        assert!(!missing_original.exists());
+        let missing_grid = super::list_library_photos(library_root.display().to_string());
+        assert!(missing_grid.ok, "missing grid failed: {missing_grid:?}");
+        let (missing_grid_marked_missing, missing_grid_thumbnail_present) =
+            match response_data(&missing_grid) {
+                super::DesktopCommandData::PhotoGrid { photos } => {
+                    let missing = photos
+                        .iter()
+                        .find(|photo| photo.photo_id == missing_id)
+                        .expect("missing source row after delete");
+                    assert!(missing.missing);
+                    assert!(missing.thumbnail_path.is_none());
+                    assert!(missing.thumbnail_bytes.is_none());
+                    (missing.missing, missing.thumbnail_bytes.is_some())
+                }
+                other => panic!("unexpected missing grid data: {other:?}"),
+            };
+
+        let missing_preview =
+            super::open_photo_preview(library_root.display().to_string(), missing_id.clone());
+        assert!(
+            missing_preview.ok,
+            "missing source preview command failed: {missing_preview:?}"
+        );
+        let (missing_preview_status, missing_preview_message) =
+            match response_data(&missing_preview) {
+                super::DesktopCommandData::PhotoPreview {
+                    status,
+                    preview_bytes,
+                    message,
+                    ..
+                } => {
+                    assert_eq!(*status, "BlockedByDecode");
+                    assert!(preview_bytes.is_none());
+                    assert!(message.contains("source file is missing"));
+                    (status.to_string(), message.clone())
+                }
+                other => panic!("unexpected missing preview data: {other:?}"),
+            };
+
+        let missing_histogram =
+            super::get_photo_histogram(library_root.display().to_string(), missing_id.clone());
+        assert!(
+            missing_histogram.ok,
+            "missing histogram command failed: {missing_histogram:?}"
+        );
+        let (missing_histogram_status, missing_histogram_pixel_count) =
+            match response_data(&missing_histogram) {
+                super::DesktopCommandData::Histogram {
+                    status,
+                    pixel_count,
+                    ..
+                } => {
+                    assert_eq!(*status, "Missing");
+                    assert_eq!(*pixel_count, 0);
+                    (status.to_string(), *pixel_count)
+                }
+                other => panic!("unexpected missing histogram data: {other:?}"),
+            };
+
+        let missing_develop = super::preview_exposure_contrast_edit(
+            library_root.display().to_string(),
+            missing_id.clone(),
+            0.4,
+            12.0,
+        );
+        assert!(
+            missing_develop.ok,
+            "missing develop preview command failed: {missing_develop:?}"
+        );
+        let (missing_develop_status, missing_develop_preview_present) =
+            match response_data(&missing_develop) {
+                super::DesktopCommandData::EditPreview {
+                    status,
+                    develop_preview_bytes,
+                    ..
+                } => {
+                    assert_eq!(*status, "BlockedByDecode");
+                    assert!(develop_preview_bytes.is_none());
+                    (status.to_string(), develop_preview_bytes.is_some())
+                }
+                other => panic!("unexpected missing develop data: {other:?}"),
+            };
+
+        let missing_commit = super::commit_exposure_contrast_edit(
+            library_root.display().to_string(),
+            missing_id.clone(),
+            0.4,
+            12.0,
+        );
+        assert!(!missing_commit.ok);
+        let missing_commit_error = missing_commit.error.as_ref().expect("missing commit error");
+        assert_eq!(missing_commit_error.kind, "unsupportedEdit");
+        assert!(missing_commit_error
+            .message
+            .contains("source file is missing"));
+
+        let blocked_export_path = export_root.join("missing-source-export.jpg");
+        let missing_export = super::export_photo_jpeg_srgb(
+            library_root.display().to_string(),
+            missing_id,
+            blocked_export_path.display().to_string(),
+        );
+        assert!(!missing_export.ok);
+        let missing_export_error = missing_export.error.as_ref().expect("missing export error");
+        assert_eq!(missing_export_error.kind, "exportBlocked");
+        assert!(missing_export_error
+            .message
+            .contains("source file is missing"));
+        assert!(!blocked_export_path.exists());
+
+        for directory in ["render-cache", "ai-cache"] {
+            let path = library_root.join(directory);
+            std::fs::create_dir_all(&path).expect("create disposable cache directory");
+            std::fs::write(path.join("sentinel.cache"), b"cache bytes")
+                .expect("write disposable sentinel");
+        }
+        for directory in ["sidecars", "exports", "logs", "backups"] {
+            let path = library_root.join(directory);
+            std::fs::create_dir_all(&path).expect("create protected directory");
+            std::fs::write(path.join("keep.txt"), b"preserve this").expect("write protected file");
+        }
+
+        let cleared = super::clear_library_cache(library_root.display().to_string());
+        assert!(cleared.ok, "trust cache clear failed: {cleared:?}");
+        let (cleared_directories, recreated_directories, removed_cache_records, cache_message) =
+            match response_data(&cleared) {
+                super::DesktopCommandData::CacheClear {
+                    cleared_directories: cleared,
+                    recreated_directories: recreated,
+                    removed_cache_records: removed,
+                    message,
+                } => {
+                    assert_eq!(
+                        cleared,
+                        &vec![
+                            "thumbnails".to_string(),
+                            "previews".to_string(),
+                            "render-cache".to_string(),
+                            "ai-cache".to_string()
+                        ]
+                    );
+                    assert_eq!(cleared, recreated);
+                    assert!(*removed > 0);
+                    (
+                        cleared.clone(),
+                        recreated.clone(),
+                        *removed,
+                        message.clone(),
+                    )
+                }
+                other => panic!("unexpected cache clear data: {other:?}"),
+            };
+        let disposable_cache_removed = ["render-cache", "ai-cache"]
+            .iter()
+            .all(|directory| !library_root.join(directory).join("sentinel.cache").exists());
+        assert!(disposable_cache_removed);
+        let protected_files_preserved = ["sidecars", "exports", "logs", "backups"]
+            .iter()
+            .all(|directory| library_root.join(directory).join("keep.txt").is_file());
+        assert!(protected_files_preserved);
+        assert_originals_unchanged(&originals, "trust cache clear");
+        assert_eq!(
+            missing_before_bytes.len() > 2,
+            true,
+            "missing source fixture should be a real source before intentional deletion"
+        );
+
+        if let Some(parent) = evidence_path.parent() {
+            std::fs::create_dir_all(parent).expect("create trust evidence parent");
+        }
+        let report = format!(
+            concat!(
+                "{{\n",
+                "  \"schema_version\": 1,\n",
+                "  \"smoke\": \"q5-trust-states\",\n",
+                "  \"run_output\": {},\n",
+                "  \"library_path\": {},\n",
+                "  \"import_path\": {},\n",
+                "  \"supported_source_sanity\": {{\n",
+                "    \"png\": {{\n",
+                "      \"photo_id\": {},\n",
+                "      \"file_type\": {},\n",
+                "      \"unsupported\": false,\n",
+                "      \"missing\": false,\n",
+                "      \"thumbnail_bytes_present\": {},\n",
+                "      \"preview_status\": {},\n",
+                "      \"preview_bytes_present\": {}\n",
+                "    }}\n",
+                "  }},\n",
+                "  \"unsupported_states\": {{\n",
+                "    \"raw\": {{\n",
+                "      \"photo_id\": {},\n",
+                "      \"file_type\": {},\n",
+                "      \"unsupported\": true,\n",
+                "      \"missing\": false,\n",
+                "      \"thumbnail_bytes_present\": {},\n",
+                "      \"preview_status\": {},\n",
+                "      \"preview_message\": {}\n",
+                "    }},\n",
+                "    \"text\": {{\n",
+                "      \"photo_id\": {},\n",
+                "      \"file_type\": {},\n",
+                "      \"unsupported\": true,\n",
+                "      \"missing\": false,\n",
+                "      \"thumbnail_bytes_present\": {},\n",
+                "      \"preview_status\": {},\n",
+                "      \"preview_message\": {}\n",
+                "    }}\n",
+                "  }},\n",
+                "  \"missing_original_state\": {{\n",
+                "    \"thumbnail_ready_before_delete\": {},\n",
+                "    \"source_intentionally_deleted\": true,\n",
+                "    \"grid_missing\": {},\n",
+                "    \"grid_thumbnail_bytes_present\": {},\n",
+                "    \"preview_status\": {},\n",
+                "    \"preview_message\": {},\n",
+                "    \"histogram_status\": {},\n",
+                "    \"histogram_pixel_count\": {},\n",
+                "    \"develop_preview_status\": {},\n",
+                "    \"develop_preview_bytes_present\": {},\n",
+                "    \"commit_error_kind\": {},\n",
+                "    \"commit_error_message\": {},\n",
+                "    \"export_error_kind\": {},\n",
+                "    \"export_error_message\": {},\n",
+                "    \"blocked_export_path_exists\": {}\n",
+                "  }},\n",
+                "  \"cache_clear_state\": {{\n",
+                "    \"cleared_directories\": {},\n",
+                "    \"recreated_directories\": {},\n",
+                "    \"removed_cache_records\": {},\n",
+                "    \"message\": {},\n",
+                "    \"disposable_cache_removed\": {},\n",
+                "    \"protected_files_preserved\": {},\n",
+                "    \"tracked_originals_unchanged\": true\n",
+                "  }},\n",
+                "  \"known_limitations\": [\n",
+                "    \"This evidence uses the developer desktop command runtime and generated legal fixtures.\",\n",
+                "    \"It does not prove manual GUI interaction, DMG mount behavior, Gatekeeper, notarization, offline behavior, or clean-Mac downloaded-artifact behavior.\"\n",
+                "  ]\n",
+                "}}\n"
+            ),
+            json_string(&run_root.display().to_string()),
+            json_string(&library_root.display().to_string()),
+            json_string(&import_root.display().to_string()),
+            json_string(&png_id),
+            json_string(&png_file_type),
+            png_thumbnail_ready,
+            json_string(&png_preview_status),
+            png_preview_bytes_present,
+            json_string(&raw_id),
+            json_string(&raw_file_type),
+            raw_thumbnail_present,
+            json_string(&raw_preview_status),
+            json_string(&raw_preview_message),
+            json_string(&text_id),
+            json_string(&text_file_type),
+            text_thumbnail_present,
+            json_string(&text_preview_status),
+            json_string(&text_preview_message),
+            missing_thumbnail_ready_before_delete,
+            missing_grid_marked_missing,
+            missing_grid_thumbnail_present,
+            json_string(&missing_preview_status),
+            json_string(&missing_preview_message),
+            json_string(&missing_histogram_status),
+            missing_histogram_pixel_count,
+            json_string(&missing_develop_status),
+            missing_develop_preview_present,
+            json_string(&missing_commit_error.kind),
+            json_string(&missing_commit_error.message),
+            json_string(&missing_export_error.kind),
+            json_string(&missing_export_error.message),
+            blocked_export_path.exists(),
+            json_string_array(&cleared_directories),
+            json_string_array(&recreated_directories),
+            removed_cache_records,
+            json_string(&cache_message),
+            disposable_cache_removed,
+            protected_files_preserved,
+        );
+        std::fs::write(&evidence_path, report).expect("write trust state evidence");
+        eprintln!("q5 trust state evidence smoke complete");
+    }
+
     fn response_data(response: &super::DesktopCommandResponse) -> &super::DesktopCommandData {
         response.data.as_ref().expect("response data")
     }
@@ -8187,6 +8715,39 @@ mod tests {
                 path.display()
             );
         }
+    }
+
+    fn json_string(value: &str) -> String {
+        format!("\"{}\"", json_escape(value))
+    }
+
+    fn json_string_array(values: &[String]) -> String {
+        format!(
+            "[{}]",
+            values
+                .iter()
+                .map(|value| json_string(value))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+
+    fn json_escape(value: &str) -> String {
+        let mut escaped = String::new();
+        for character in value.chars() {
+            match character {
+                '"' => escaped.push_str("\\\""),
+                '\\' => escaped.push_str("\\\\"),
+                '\n' => escaped.push_str("\\n"),
+                '\r' => escaped.push_str("\\r"),
+                '\t' => escaped.push_str("\\t"),
+                character if character.is_control() => {
+                    escaped.push_str(&format!("\\u{:04x}", character as u32));
+                }
+                character => escaped.push(character),
+            }
+        }
+        escaped
     }
 
     fn write_source_jpeg(path: &Path) {
