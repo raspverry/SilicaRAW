@@ -95,4 +95,4 @@ This pass does not prove:
 
 ## Next Gate
 
-Q5.3 is recorded in [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md), Q5.4 is recorded in [Local Alpha JPEG sRGB Export Evidence](local-alpha-jpeg-export-evidence.md), and Q5.5 is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md). The next gate is Q6.1 unsigned developer-preview DMG build and inspection.
+Q5.3 is recorded in [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md), Q5.4 is recorded in [Local Alpha JPEG sRGB Export Evidence](local-alpha-jpeg-export-evidence.md), Q5.5 is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md), and Q6.1 is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md). The next gate is Q6.2 install to `/Applications` and launch.

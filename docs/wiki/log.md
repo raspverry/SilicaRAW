@@ -1089,6 +1089,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 Use this log to understand recent wiki changes before editing multiple wiki pages.
 
+## [2026-07-08] quality | Unsigned DMG inspection
+
+- Completed Q6.1 of the local alpha quality closure plan as local build-machine unsigned DMG evidence.
+- Built `SilicaRAW_0.1.0_aarch64.dmg`, recorded its SHA-256, verified and mounted it, and recorded mounted app metadata plus ad-hoc signing state.
+- Routed the next active gate to Q6.2 install to `/Applications` and launch.
+- Kept Gatekeeper, signing, notarization, offline, GitHub Release download, and clean-Mac proof as later gates.
+
 ## [2026-07-08] quality | Trust-state evidence
 
 - Completed Q5.5 of the local alpha quality closure plan as developer desktop command-runtime evidence.

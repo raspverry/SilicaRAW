@@ -77,4 +77,4 @@ This pass does not prove manual GUI export dialog behavior, `/Applications` laun
 
 ## Next Gate
 
-Q5.5 trust-state evidence is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md). The next gate is Q6.1 unsigned developer-preview DMG build and inspection.
+Q5.5 trust-state evidence is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md), and Q6.1 is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md). The next gate is Q6.2 install to `/Applications` and launch.

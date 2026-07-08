@@ -99,4 +99,4 @@ This pass does not prove manual GUI interaction, native file picker behavior, `/
 
 ## Next Gate
 
-Q6.1 should build and inspect the unsigned developer-preview DMG before any `/Applications` install smoke is treated as current evidence.
+Q6.1 unsigned DMG inspection is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md). Q6.2 should copy the app from the mounted DMG to `/Applications`, launch `/Applications/SilicaRAW.app`, and record that the app is not running from the repository checkout or mounted image.

@@ -335,6 +335,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Build the unsigned DMG, mount it, inspect bundle metadata, and verify expected app contents.
 - **Acceptance:** The artifact is internally testable and clearly labeled as unsigned developer preview.
 - **Validation:** checksum, mount log, bundle inspection.
+- **Status:** Completed on 2026-07-08 for current `main` as local build-machine evidence. Built `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg` with `cargo tauri build --bundles app,dmg --ci --no-sign`, recorded DMG SHA-256, ran `scripts/harness/local-dmg-artifact-smoke.py`, verified and mounted the DMG, confirmed `SilicaRAW.app` presence, and recorded bundle metadata plus ad-hoc signing state. Evidence is recorded in [Local Alpha Unsigned DMG Inspection](../reports/local-alpha-unsigned-dmg-inspection.md). This does not prove `/Applications`, Gatekeeper, notarization, offline, GitHub Release download, or clean-Mac behavior.
 
 ### Q6.2: Install to `/Applications` and Launch
 
