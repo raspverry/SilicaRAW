@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-07-08] quality | Built app launch evidence recorded
+
+- Completed Q5.1 of the local alpha quality closure plan.
+- Built unsigned `target/release/bundle/macos/SilicaRAW.app` with `cargo tauri build --bundles app --ci --no-sign`.
+- Generated legal fixture preflight evidence and launched the `.app` bundle, confirming the running process path was the app bundle executable rather than static browser UI.
+- Recorded the evidence boundary in `docs/wiki/reports/local-alpha-built-app-launch.md`; `/Applications`, DMG, Gatekeeper, clean-Mac, and full installed-workflow gates remain open.
+
 ## [2026-07-08] quality | Closure evidence index added
 
 - Completed Q4.4 of the local alpha quality closure plan.

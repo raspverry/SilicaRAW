@@ -288,6 +288,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Run the app bundle path that local users will launch. Static HTML checks are not enough for this phase.
 - **Acceptance:** The tested path matches the app bundle behavior, not only browser simulation.
 - **Validation:** installed app smoke log.
+- **Status:** Completed on 2026-07-08. Built an unsigned release `.app` with `cargo tauri build --bundles app --ci --no-sign`, generated legal fixture preflight evidence, launched `target/release/bundle/macos/SilicaRAW.app`, and verified the running process path was the app bundle executable. Evidence is recorded in [Local Alpha Built App Launch](../reports/local-alpha-built-app-launch.md). This does not close `/Applications`, DMG, Gatekeeper, clean-Mac, or full installed-workflow gates.
 
 ### Q5.2: Prove Library and Import by Reference
 
