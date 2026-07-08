@@ -77,4 +77,4 @@ This pass does not prove manual GUI export dialog behavior, `/Applications` laun
 
 ## Next Gate
 
-Q5.5 should record unsupported, missing-original, and cache-clear trust-state evidence from the local runtime.
+Q5.5 trust-state evidence is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md). The next gate is Q6.1 unsigned developer-preview DMG build and inspection.

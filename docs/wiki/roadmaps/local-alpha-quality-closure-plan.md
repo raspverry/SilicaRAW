@@ -324,6 +324,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Check unsupported source rows, deleted original rows, and disposable cache clear behavior in the installed app.
 - **Acceptance:** Trust states from Q1 are visible and accurate in the real app.
 - **Validation:** screenshot and action-log evidence.
+- **Status:** Completed on 2026-07-08 as developer desktop command-runtime evidence. Added `scripts/harness/check-trust-state-evidence.py` and the env-gated `desktop_trust_state_evidence_smoke` test. The evidence records supported PNG preview readiness, RAW/text unsupported rows without thumbnails or preview bytes, deleted-original downgrade across grid, preview, histogram, Develop, edit commit, and export, plus disposable cache clear preserving protected directories and original files. Evidence is recorded in [Local Alpha Trust-State Evidence](../reports/local-alpha-trust-state-evidence.md). This remains developer runtime evidence, not manual GUI, `/Applications`, DMG, Gatekeeper, notarization, offline, or clean-Mac proof.
 
 ## Phase Q6: Unsigned Developer-Preview DMG Gate
 

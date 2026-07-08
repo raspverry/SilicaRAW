@@ -1089,6 +1089,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 Use this log to understand recent wiki changes before editing multiple wiki pages.
 
+## [2026-07-08] quality | Trust-state evidence
+
+- Completed Q5.5 of the local alpha quality closure plan as developer desktop command-runtime evidence.
+- Recorded supported PNG readiness, RAW/text unsupported state, deleted-original downgrade across preview, histogram, Develop, edit commit, and export, and disposable cache clear scope.
+- Routed the next active gate to Q6.1 unsigned developer-preview DMG build and inspection.
+- Kept manual GUI, `/Applications`, DMG, Gatekeeper, signing, offline, and clean-Mac proof as later gates.
+
 ## [2026-07-08] quality | JPEG sRGB export evidence
 
 - Completed Q5.4 of the local alpha quality closure plan.
