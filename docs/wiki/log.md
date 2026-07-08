@@ -1089,6 +1089,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 Use this log to understand recent wiki changes before editing multiple wiki pages.
 
+## [2026-07-08] quality | Review edit persistence evidence
+
+- Completed Q5.3 of the local alpha quality closure plan.
+- Recorded final rating, pick/reject state, color label, edited/exported flags, active exposure/contrast edit state, undoable history sequence, and app-session selected-photo restore evidence.
+- Routed the next active gate to Q5.4 JPEG sRGB export evidence.
+- Kept GUI, `/Applications`, DMG, Gatekeeper, signing, offline, and clean-Mac proof as later gates.
+
 ## [2026-07-08] quality | Library import reference evidence
 
 - Completed Q5.2 of the local alpha quality closure plan.

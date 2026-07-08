@@ -98,6 +98,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local Alpha Closure Evidence](reports/local-alpha-closure-evidence.md)
 - [Local Alpha Built App Launch](reports/local-alpha-built-app-launch.md)
 - [Local Alpha Library Import Reference Evidence](reports/local-alpha-library-import-reference.md)
+- [Local Alpha Review and Edit Persistence Evidence](reports/local-alpha-review-edit-persistence.md)
 - [Developer Preview Artifacts](reports/developer-preview-artifacts.md)
 
 ### Contributing

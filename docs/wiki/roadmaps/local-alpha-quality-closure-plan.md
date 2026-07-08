@@ -306,6 +306,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Rate, pick, reject, open preview, apply exposure/contrast, restart the app, and verify state persists.
 - **Acceptance:** Local alpha workflow state survives restart through documented storage paths.
 - **Validation:** installed app smoke plus catalog/edit state inspection.
+- **Status:** Completed on 2026-07-08. Recorded Q5.3 evidence from the developer desktop command runtime using the same exact smoke path as Q5.2. The report captures final review flags, undoable flag/edit history, active exposure/contrast edit state, app-session selected-photo restore state, and original-source preservation. Evidence is recorded in [Local Alpha Review and Edit Persistence Evidence](../reports/local-alpha-review-edit-persistence.md). This remains developer runtime evidence, not GUI, `/Applications`, DMG, Gatekeeper, notarization, offline, or clean-Mac proof.
 
 ### Q5.4: Prove JPEG sRGB Export
 
