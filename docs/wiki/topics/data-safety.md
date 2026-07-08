@@ -19,7 +19,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Spike 004 selected `rusqlite` with bundled SQLite and embedded SQL migrations.
 - Phase 4.1 records the local alpha schema contract in `silica-catalog` and verifies `silica-storage` migrations against it.
 - Phase 4.2 adds local library create/open without mutating sibling original photo directories.
-- Phase 4.3 records imported folder files by reference and verifies mixed-file import does not copy or mutate originals.
+- Phase 4.3 records imported folder files by reference and verifies mixed-file import does not copy or mutate originals. The desktop import response is backed by a post-import full SHA-256 source check rather than a hard-coded success claim.
 - Phase 4.4 persists culling flags in SQLite `photo_flags` and verifies they survive library reopen without touching originals or sidecars.
 - Phase 5.3 persists exposure/contrast edit graphs in SQLite `edit_states` on commit and verifies draft preview updates do not write edit state rows.
 - Phase 6.2 adds a core workflow hash QA that verifies one original fixture hash stays unchanged across import by reference, culling flags, preview, draft edit, committed edit, JPEG sRGB export, simulated cache-directory clearing, and library reopen.
@@ -30,7 +30,7 @@ Data safety is a core trust requirement. Originals are sacred, catalog state mus
 - Task 10.5.3 adds staged restore from backup artifacts with existing-target rollback copies, restored catalog/sidecar preservation, newer-schema rejection before target mutation, and original-file safety tests.
 - Task 14.7 records the native viewer disposable texture lifecycle boundary: viewer texture identity is rebuildable runtime state and cleanup on photo change, drawable resize, library close, or app close does not write catalog rows, sidecars, originals, export outputs, or persistent GPU cache state.
 - Task 15.2 adds fixture-backed RAW preview artifacts as disposable cache files under library `previews/`; source/output canonical matches, stale source hashes, and preview cache path escapes are rejected before trust claims are made.
-- Task 15.5 adds RAW-derived JPEG sRGB export through a full-resolution source artifact under `render-cache/raw-export-sources/`; final export rejects original overwrite, records source/output/ICC hashes, records original hash unchanged evidence, and does not depend on viewer texture cache.
+- Task 15.5 adds RAW-derived JPEG sRGB export through a full-resolution source artifact under `render-cache/raw-export-sources/`; final export rejects original overwrite, records source/output/ICC hashes, records original hash unchanged evidence, and does not depend on viewer texture cache. Raster exports also record post-export source hash evidence in `exports.export_settings_json`.
 - Task 16.0 records the [Action Trust](action-trust.md) boundary: undo/redo covers catalog state only, exports and cache bytes are not deleted or reconstructed by undo, sidecar writes are explicit, and original-file mutation remains blocked.
 - Task 16.1 records exact action semantics so edit commits and culling flags can be undone through catalog state, while export output files, cache bytes, sidecars, backups, imports, restore attempts, and originals remain outside undo mutation.
 - Task 16.3 adds transaction-safe undo/redo for edit checkpoints and culling flags. Tests verify export output files survive undo/redo and original files remain outside the command path.

@@ -150,6 +150,8 @@ edit_graph.profile.working_space
 edit_graph.profile.decoder_backend
 exports.export_settings_json.color_profile
 exports.export_settings_json.source_sha256
+exports.export_settings_json.source_sha256_after_export
+exports.export_settings_json.source_original_hash_unchanged
 exports.export_settings_json.output_sha256
 exports.export_settings_json.icc_profile_embedded
 exports.export_settings_json.icc_profile_sha256

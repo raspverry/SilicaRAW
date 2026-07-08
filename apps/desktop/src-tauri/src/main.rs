@@ -1436,25 +1436,35 @@ fn import_folder(
         PathBuf::from(&folder_path),
         options,
     ) {
-        Ok(summary) => DesktopCommandResponse::ok(
-            command,
-            format!(
-                "Imported {} supported file(s) by reference; originals unchanged.",
-                summary.supported_files
-            ),
-            DesktopCommandData::ImportSummary {
-                folder_path: summary.folder_path.display().to_string(),
-                scanned_files: summary.scanned_files,
-                supported_files: summary.supported_files,
-                unsupported_files: summary.unsupported_files,
-                issues: summary
-                    .issues
-                    .into_iter()
-                    .map(desktop_import_issue)
-                    .collect(),
-                originals_unchanged: true,
-            },
-        ),
+        Ok(summary) => {
+            let message = if summary.originals_unchanged {
+                format!(
+                    "Imported {} supported file(s) by reference; originals unchanged.",
+                    summary.supported_files
+                )
+            } else {
+                format!(
+                    "Imported {} supported file(s) by reference; source fingerprints changed during import.",
+                    summary.supported_files
+                )
+            };
+            DesktopCommandResponse::ok(
+                command,
+                message,
+                DesktopCommandData::ImportSummary {
+                    folder_path: summary.folder_path.display().to_string(),
+                    scanned_files: summary.scanned_files,
+                    supported_files: summary.supported_files,
+                    unsupported_files: summary.unsupported_files,
+                    issues: summary
+                        .issues
+                        .into_iter()
+                        .map(desktop_import_issue)
+                        .collect(),
+                    originals_unchanged: summary.originals_unchanged,
+                },
+            )
+        }
         Err(error) => DesktopCommandResponse::error(
             command,
             error,
