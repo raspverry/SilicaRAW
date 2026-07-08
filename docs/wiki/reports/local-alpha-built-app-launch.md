@@ -12,7 +12,7 @@ source_of_truth: docs/wiki/roadmaps/local-alpha-quality-closure-plan.md
 
 This report records Q5.1 evidence that a built `SilicaRAW.app` bundle launches as a native app bundle, not as static HTML in a browser.
 
-It does not prove the `/Applications` installed workflow, DMG install behavior, Gatekeeper acceptance, clean-Mac behavior, offline workflow, or the full local alpha workflow. Those remain Q5.3 through Q7 evidence gates.
+It does not prove the `/Applications` installed workflow, DMG install behavior, Gatekeeper acceptance, clean-Mac behavior, offline workflow, or the full local alpha workflow. Those remain Q5.4 through Q7 evidence gates.
 
 ## Test Record
 
@@ -108,4 +108,4 @@ This pass does not prove:
 
 ## Next Gate
 
-Q5.2 is recorded in [Local Alpha Library Import Reference Evidence](local-alpha-library-import-reference.md). The next Q5 gate is review/edit persistence evidence.
+Q5.2 is recorded in [Local Alpha Library Import Reference Evidence](local-alpha-library-import-reference.md), and Q5.3 is recorded in [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md). The next Q5 gate is JPEG sRGB export evidence.
