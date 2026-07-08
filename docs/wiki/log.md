@@ -1089,6 +1089,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 Use this log to understand recent wiki changes before editing multiple wiki pages.
 
+## [2026-07-08] quality | Library import reference evidence
+
+- Completed Q5.2 of the local alpha quality closure plan.
+- Added a dedicated Q5.2 evidence runner for library create/open, import-by-reference catalog rows, action-log payloads, edit/export source SHA preservation, and original SHA-256 before/after checks.
+- Added the Local Alpha Library Import Reference Evidence report and routed the next active gate to Q5.3 review/edit persistence.
+- Kept `/Applications`, DMG, Gatekeeper, signed/notarized, offline, and clean-Mac proof as later gates.
+
 ## [2026-06-20] quality | Source capability contract narrowed
 
 - Completed Q1.1 of the local alpha quality closure plan.

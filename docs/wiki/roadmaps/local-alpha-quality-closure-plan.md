@@ -297,6 +297,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Create or open a local library, import a folder by reference, and verify catalog rows point at originals without copying or modifying them.
 - **Acceptance:** Original files are unchanged before and after import.
 - **Validation:** original hash manifest before/after.
+- **Status:** Completed on 2026-07-08. Added `scripts/harness/check-library-import-reference-evidence.py` as a Q5.2 evidence runner. It records the current built `.app` artifact hash, generates legal fixtures, runs the exact desktop connected runtime smoke, inspects `catalog.db`, verifies final catalog rows reference import-folder originals outside the library root, checks catalog fingerprints against source files, records import action-log payloads, verifies edit/export source SHA-256 preservation, and records before/after source hashes. Evidence is recorded in [Local Alpha Library Import Reference Evidence](../reports/local-alpha-library-import-reference.md). This remains developer runtime evidence, not GUI, `/Applications`, DMG, Gatekeeper, notarization, offline, or clean-Mac proof.
 
 ### Q5.3: Prove Review and Edit Persistence
 
