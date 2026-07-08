@@ -108,4 +108,4 @@ This pass does not prove:
 
 ## Next Gate
 
-Q5.2 is recorded in [Local Alpha Library Import Reference Evidence](local-alpha-library-import-reference.md), Q5.3 is recorded in [Local Alpha Review and Edit Persistence Evidence](local-alpha-review-edit-persistence.md), Q5.4 is recorded in [Local Alpha JPEG sRGB Export Evidence](local-alpha-jpeg-export-evidence.md), Q5.5 is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md), and Q6.1 is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md). The next gate is Q6.2 install to `/Applications` and launch.
+Q5.2 through Q5.5 are recorded in their dedicated local alpha reports. Q6.1 unsigned DMG inspection is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md), and the Q6.2 install/launch sub-proof is recorded in [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md). The next open gate is the full Q6.2 installed workflow from `/Applications/SilicaRAW.app`.

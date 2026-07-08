@@ -344,6 +344,7 @@ Follow this order. Do not polish around broken trust states.
 - **Work:** Copy the app from the DMG to `/Applications`, launch it, and rerun the minimal installed workflow.
 - **Acceptance:** The app does not depend on the repository checkout or dev server.
 - **Validation:** installed app workflow evidence from `/Applications`.
+- **Status:** Partial on 2026-07-08. Installed `/Applications/SilicaRAW.app` from the Q6.1 DMG, verified the installed app tree matches the mounted DMG app, launched it from `/Applications`, confirmed the process path is not the repository checkout, and recorded evidence in [Local Alpha Installed App Launch](../reports/local-alpha-installed-app-launch.md). Q6.2 remains open until the full local alpha workflow runs from `/Applications`: create/open library, import by reference, grid review, preview, exposure/contrast edit, JPEG sRGB export, restart persistence, and original-file safety.
 
 ### Q6.3: Verify Offline Behavior
 

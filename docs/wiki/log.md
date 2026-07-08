@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-07-08] quality | Installed app launch sub-proof recorded
+
+- Recorded a Q6.2 sub-proof without marking Q6.2 complete.
+- Installed the Q6.1 unsigned DMG app to `/Applications/SilicaRAW.app`, verified the installed app tree hash matches the mounted DMG app, and launched it from `/Applications`.
+- Added `scripts/harness/installed-app-launch-smoke.py` to record the launched process path and confirm it is not the repository checkout binary.
+- Kept the full installed app workflow, offline behavior, Gatekeeper, signed/notarized, GitHub Release download, and clean-Mac gates open.
+
 ## [2026-07-08] quality | Built app launch evidence recorded
 
 - Completed Q5.1 of the local alpha quality closure plan.
