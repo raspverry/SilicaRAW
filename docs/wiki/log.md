@@ -1089,6 +1089,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 Use this log to understand recent wiki changes before editing multiple wiki pages.
 
+## [2026-07-08] quality | JPEG sRGB export evidence
+
+- Completed Q5.4 of the local alpha quality closure plan.
+- Recorded separate JPEG sRGB export output evidence, macOS `sips` image-open check, export settings, embedded ICC evidence, output SHA-256, and source SHA-256 before/after preservation.
+- Routed the next active gate to Q5.5 unsupported, missing-original, and cache-clear trust-state evidence.
+- Kept GUI, `/Applications`, DMG, Gatekeeper, signing, offline, and clean-Mac proof as later gates.
+
 ## [2026-07-08] quality | Review edit persistence evidence
 
 - Completed Q5.3 of the local alpha quality closure plan.
