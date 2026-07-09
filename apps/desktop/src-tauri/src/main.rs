@@ -5,7 +5,7 @@ mod native_metal_viewer;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{path::BaseDirectory, Manager};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -4811,7 +4811,467 @@ fn core_error_kind(error: &silica_core::CoreError) -> &'static str {
     }
 }
 
+fn run_installed_workflow_smoke_from_env() -> Result<bool, String> {
+    if std::env::var_os("SILICARAW_INSTALLED_WORKFLOW_SMOKE").is_none() {
+        return Ok(false);
+    }
+    let fixtures_root = std::env::var_os("SILICARAW_INSTALLED_WORKFLOW_FIXTURES")
+        .map(PathBuf::from)
+        .ok_or_else(|| "SILICARAW_INSTALLED_WORKFLOW_FIXTURES is required".to_string())?;
+    let output_root = std::env::var_os("SILICARAW_INSTALLED_WORKFLOW_OUTPUT")
+        .map(PathBuf::from)
+        .ok_or_else(|| "SILICARAW_INSTALLED_WORKFLOW_OUTPUT is required".to_string())?;
+
+    run_installed_workflow_smoke(&fixtures_root, &output_root)?;
+    Ok(true)
+}
+
+fn run_installed_workflow_smoke(fixtures_root: &Path, run_root: &Path) -> Result<(), String> {
+    let library_root = run_root.join("SilicaRAW Library");
+    let import_root = run_root.join("Import Originals");
+    let export_root = run_root.join("Exports");
+    let session_path = run_root.join("AppConfig").join("app-session.json");
+
+    if !fixtures_root.join("fixture-manifest.json").is_file() {
+        return Err(format!(
+            "installed workflow smoke requires fixture manifest under {}",
+            fixtures_root.display()
+        ));
+    }
+
+    std::fs::create_dir_all(&import_root).map_err(|error| {
+        format!(
+            "create installed workflow import root {}: {error}",
+            import_root.display()
+        )
+    })?;
+    std::fs::create_dir_all(&export_root).map_err(|error| {
+        format!(
+            "create installed workflow export root {}: {error}",
+            export_root.display()
+        )
+    })?;
+
+    seed_installed_workflow_fixture(
+        fixtures_root,
+        &import_root,
+        "supported/reference-urban.jpg",
+        "reference-urban.jpg",
+    )?;
+    seed_installed_workflow_fixture(
+        fixtures_root,
+        &import_root,
+        "supported/reference-still-life.jpeg",
+        "reference-still-life.jpeg",
+    )?;
+    seed_installed_workflow_fixture(
+        fixtures_root,
+        &import_root,
+        "raw-blocked/blocked-raw.DNG",
+        "blocked-raw.DNG",
+    )?;
+    seed_installed_workflow_fixture(
+        fixtures_root,
+        &import_root,
+        "unsupported/notes.txt",
+        "notes.txt",
+    )?;
+
+    let primary_original = import_root.join("reference-urban.jpg");
+    let raw_placeholder = import_root.join("blocked-raw.DNG");
+    let originals = track_installed_workflow_originals(&[
+        primary_original.clone(),
+        import_root.join("reference-still-life.jpeg"),
+        raw_placeholder.clone(),
+        import_root.join("notes.txt"),
+    ])?;
+
+    let created = create_library_at_path(
+        library_root.display().to_string(),
+        Some(session_path.clone()),
+    );
+    installed_workflow_response_data(&created, "create library")?;
+    let opened = open_library_at_path(
+        library_root.display().to_string(),
+        Some(session_path.clone()),
+    );
+    installed_workflow_response_data(&opened, "open library")?;
+    assert_installed_workflow_originals_unchanged(&originals, "create/open library")?;
+
+    let imported = import_folder(
+        library_root.display().to_string(),
+        import_root.display().to_string(),
+        None,
+    );
+    match installed_workflow_response_data(&imported, "import folder")? {
+        DesktopCommandData::ImportSummary {
+            scanned_files,
+            supported_files,
+            unsupported_files,
+            originals_unchanged,
+            ..
+        } => {
+            if (*scanned_files, *supported_files, *unsupported_files) != (4, 2, 2) {
+                return Err(format!(
+                    "installed workflow import counts mismatch: scanned={scanned_files} supported={supported_files} unsupported={unsupported_files}"
+                ));
+            }
+            if !*originals_unchanged {
+                return Err("installed workflow import reported changed originals".to_string());
+            }
+        }
+        other => return Err(format!("installed workflow import returned {other:?}")),
+    }
+    assert_installed_workflow_originals_unchanged(&originals, "import by reference")?;
+
+    let grid = list_library_photos(library_root.display().to_string());
+    let (photo_id, raw_photo_id) = match installed_workflow_response_data(&grid, "library grid")? {
+        DesktopCommandData::PhotoGrid { photos } => {
+            let primary = photos
+                .iter()
+                .find(|photo| photo.file_name == "reference-urban.jpg")
+                .ok_or_else(|| "installed workflow primary grid row missing".to_string())?;
+            let raw = photos
+                .iter()
+                .find(|photo| photo.file_name == "blocked-raw.DNG")
+                .ok_or_else(|| "installed workflow RAW-blocked grid row missing".to_string())?;
+            if primary.unsupported || primary.thumbnail_bytes.as_ref().is_none_or(Vec::is_empty) {
+                return Err("installed workflow primary grid row is not preview-ready".to_string());
+            }
+            if !raw.unsupported || raw.thumbnail_bytes.is_some() {
+                return Err("installed workflow RAW-blocked row is not blocked".to_string());
+            }
+            (primary.photo_id.clone(), raw.photo_id.clone())
+        }
+        other => return Err(format!("installed workflow grid returned {other:?}")),
+    };
+    assert_installed_workflow_originals_unchanged(&originals, "grid thumbnail generation")?;
+
+    let page = query_library_photos(
+        library_root.display().to_string(),
+        DesktopLibraryQueryRequest {
+            offset: 0,
+            limit: 2,
+            sort: "file_name_asc".to_string(),
+            filters: DesktopLibraryQueryFilters::default(),
+        },
+    );
+    match installed_workflow_response_data(&page, "paged grid")? {
+        DesktopCommandData::PhotoGridPage {
+            photos,
+            total_count,
+            has_next_page,
+            ..
+        } => {
+            if *total_count != 4 || photos.len() != 2 || !*has_next_page {
+                return Err("installed workflow paged grid mismatch".to_string());
+            }
+        }
+        other => return Err(format!("installed workflow page returned {other:?}")),
+    }
+
+    let final_flags = set_photo_flags(
+        library_root.display().to_string(),
+        photo_id.clone(),
+        4,
+        true,
+        false,
+        Some("green".to_string()),
+    );
+    match installed_workflow_response_data(&final_flags, "rating pick reject")? {
+        DesktopCommandData::PhotoFlags {
+            rating,
+            picked,
+            rejected,
+            color_label,
+            ..
+        } => {
+            if *rating != 4 || !*picked || *rejected || color_label.as_deref() != Some("green") {
+                return Err("installed workflow flags mismatch".to_string());
+            }
+        }
+        other => return Err(format!("installed workflow flags returned {other:?}")),
+    }
+    assert_installed_workflow_originals_unchanged(&originals, "rating pick reject")?;
+
+    let loupe = open_photo_preview(library_root.display().to_string(), photo_id.clone());
+    match installed_workflow_response_data(&loupe, "loupe preview")? {
+        DesktopCommandData::PhotoPreview {
+            status,
+            source_path,
+            preview_bytes,
+            ..
+        } => {
+            if *status != "Ready"
+                || source_path != &primary_original.display().to_string()
+                || preview_bytes.as_ref().is_none_or(Vec::is_empty)
+            {
+                return Err("installed workflow loupe preview mismatch".to_string());
+            }
+        }
+        other => return Err(format!("installed workflow loupe returned {other:?}")),
+    }
+
+    let raw_preview = open_photo_preview(library_root.display().to_string(), raw_photo_id);
+    match installed_workflow_response_data(&raw_preview, "RAW blocked preview")? {
+        DesktopCommandData::PhotoPreview {
+            status,
+            preview_bytes,
+            ..
+        } => {
+            if *status != "Unsupported" || preview_bytes.is_some() {
+                return Err("installed workflow RAW preview was not blocked".to_string());
+            }
+        }
+        other => return Err(format!("installed workflow RAW preview returned {other:?}")),
+    }
+    assert_installed_workflow_originals_unchanged(&originals, "loupe preview")?;
+
+    let develop_preview = preview_exposure_contrast_edit(
+        library_root.display().to_string(),
+        photo_id.clone(),
+        0.4,
+        12.0,
+    );
+    match installed_workflow_response_data(&develop_preview, "develop preview")? {
+        DesktopCommandData::EditPreview {
+            status,
+            exposure,
+            contrast,
+            develop_preview_bytes,
+            ..
+        } => {
+            if *status != "Ready"
+                || *exposure != 0.4
+                || *contrast != 12.0
+                || develop_preview_bytes.as_ref().is_none_or(Vec::is_empty)
+            {
+                return Err("installed workflow develop preview mismatch".to_string());
+            }
+        }
+        other => {
+            return Err(format!(
+                "installed workflow develop preview returned {other:?}"
+            ))
+        }
+    }
+
+    let committed = commit_exposure_contrast_edit(
+        library_root.display().to_string(),
+        photo_id.clone(),
+        0.4,
+        12.0,
+    );
+    installed_workflow_response_data(&committed, "commit develop edit")?;
+    assert_installed_workflow_originals_unchanged(&originals, "develop edit preview and commit")?;
+
+    let output_path = export_root.join("reference-urban-export.jpg");
+    let exported = export_photo_jpeg_srgb(
+        library_root.display().to_string(),
+        photo_id.clone(),
+        output_path.display().to_string(),
+    );
+    match installed_workflow_response_data(&exported, "JPEG sRGB export")? {
+        DesktopCommandData::Export {
+            source_path,
+            output_path: actual_output_path,
+            format,
+            color_profile,
+            bytes_written,
+            ..
+        } => {
+            if source_path != &primary_original.display().to_string()
+                || actual_output_path != &output_path.display().to_string()
+                || source_path == actual_output_path
+                || format != "jpeg"
+                || color_profile != "srgb"
+                || *bytes_written == 0
+            {
+                return Err("installed workflow export mismatch".to_string());
+            }
+        }
+        other => return Err(format!("installed workflow export returned {other:?}")),
+    }
+    if !output_path.is_file() {
+        return Err(format!(
+            "installed workflow export output missing: {}",
+            output_path.display()
+        ));
+    }
+    assert_installed_workflow_originals_unchanged(&originals, "JPEG sRGB export")?;
+
+    let recorded_selection = record_app_session_selection_at_path(
+        session_path.clone(),
+        library_root.display().to_string(),
+        Some(photo_id.clone()),
+        "develop".to_string(),
+    );
+    installed_workflow_response_data(&recorded_selection, "record session selection")?;
+    let restored_launch = resolve_launch_restore_at_path(session_path);
+    match installed_workflow_response_data(&restored_launch, "launch restore")? {
+        DesktopCommandData::LaunchRestore {
+            status,
+            state,
+            selected_photo_id,
+            selected_photo_status,
+            resolved_mode,
+            ..
+        } => {
+            if status != "restored"
+                || state != "library"
+                || selected_photo_id.as_deref() != Some(photo_id.as_str())
+                || selected_photo_status != "restored"
+                || resolved_mode != "develop"
+            {
+                return Err("installed workflow launch restore mismatch".to_string());
+            }
+        }
+        other => {
+            return Err(format!(
+                "installed workflow launch restore returned {other:?}"
+            ))
+        }
+    }
+
+    let reopened = open_library_at_path(library_root.display().to_string(), None);
+    installed_workflow_response_data(&reopened, "reopen library")?;
+    let restored_flags = get_photo_flags(library_root.display().to_string(), photo_id.clone());
+    match installed_workflow_response_data(&restored_flags, "restore flags")? {
+        DesktopCommandData::PhotoFlags {
+            rating,
+            picked,
+            rejected,
+            color_label,
+            ..
+        } => {
+            if *rating != 4 || !*picked || *rejected || color_label.as_deref() != Some("green") {
+                return Err("installed workflow restored flags mismatch".to_string());
+            }
+        }
+        other => {
+            return Err(format!(
+                "installed workflow restored flags returned {other:?}"
+            ))
+        }
+    }
+    let restored_edit = get_photo_edit_state(library_root.display().to_string(), photo_id);
+    match installed_workflow_response_data(&restored_edit, "restore edit state")? {
+        DesktopCommandData::EditState {
+            exposure,
+            contrast,
+            persisted,
+            ..
+        } => {
+            if *exposure != 0.4 || *contrast != 12.0 || !*persisted {
+                return Err("installed workflow restored edit mismatch".to_string());
+            }
+        }
+        other => {
+            return Err(format!(
+                "installed workflow restored edit returned {other:?}"
+            ))
+        }
+    }
+    assert_installed_workflow_originals_unchanged(&originals, "library reopen")?;
+
+    let marker = format!(
+        "installed_app_workflow_smoke_complete\ncurrent_exe={}\nlibrary={}\nimport={}\nexport={}\n",
+        std::env::current_exe()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|_| "unknown".to_string()),
+        library_root.display(),
+        import_root.display(),
+        output_path.display(),
+    );
+    std::fs::write(run_root.join("installed-workflow-smoke.marker"), marker)
+        .map_err(|error| format!("write installed workflow marker: {error}"))?;
+    eprintln!("installed app workflow smoke complete");
+    Ok(())
+}
+
+fn seed_installed_workflow_fixture(
+    fixtures_root: &Path,
+    import_root: &Path,
+    source: &str,
+    destination: &str,
+) -> Result<(), String> {
+    let source_path = fixtures_root.join(source);
+    let destination_path = import_root.join(destination);
+    if destination_path.exists() {
+        return Ok(());
+    }
+    std::fs::copy(&source_path, &destination_path).map_err(|error| {
+        format!(
+            "copy installed workflow fixture {} to {}: {error}",
+            source_path.display(),
+            destination_path.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn track_installed_workflow_originals(
+    paths: &[PathBuf],
+) -> Result<Vec<(PathBuf, Vec<u8>)>, String> {
+    paths
+        .iter()
+        .map(|path| {
+            std::fs::read(path)
+                .map(|bytes| (path.clone(), bytes))
+                .map_err(|error| {
+                    format!(
+                        "read installed workflow original {}: {error}",
+                        path.display()
+                    )
+                })
+        })
+        .collect()
+}
+
+fn assert_installed_workflow_originals_unchanged(
+    originals: &[(PathBuf, Vec<u8>)],
+    stage: &str,
+) -> Result<(), String> {
+    for (path, before) in originals {
+        let after = std::fs::read(path).map_err(|error| {
+            format!(
+                "read installed workflow original after {stage} {}: {error}",
+                path.display()
+            )
+        })?;
+        if &after != before {
+            return Err(format!(
+                "installed workflow original changed during {stage}: {}",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn installed_workflow_response_data<'a>(
+    response: &'a DesktopCommandResponse,
+    stage: &str,
+) -> Result<&'a DesktopCommandData, String> {
+    if !response.ok {
+        return Err(format!("installed workflow {stage} failed: {response:?}"));
+    }
+    response
+        .data
+        .as_ref()
+        .ok_or_else(|| format!("installed workflow {stage} returned no data"))
+}
+
 fn main() {
+    match run_installed_workflow_smoke_from_env() {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("installed app workflow smoke failed: {error}");
+            std::process::exit(1);
+        }
+    }
+
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
 
     #[cfg(all(target_os = "macos", feature = "native-metal-viewer"))]
@@ -8136,6 +8596,52 @@ mod tests {
         }
         assert_originals_unchanged(&originals, "library reopen");
         eprintln!("phase-11 connected runtime smoke complete");
+    }
+
+    #[test]
+    fn installed_workflow_smoke_runs_from_binary_entrypoint() {
+        let workspace = unique_library_root("desktop-installed-workflow-smoke");
+        let fixtures_root = workspace.join("fixtures");
+        let run_root = workspace.join("run");
+        let import_root = run_root.join("Import Originals");
+        let export_root = run_root.join("Exports");
+        let library_root = run_root.join("SilicaRAW Library");
+        let marker_path = run_root.join("installed-workflow-smoke.marker");
+
+        std::fs::create_dir_all(fixtures_root.join("supported"))
+            .expect("create supported fixture dir");
+        std::fs::create_dir_all(fixtures_root.join("raw-blocked")).expect("create raw fixture dir");
+        std::fs::create_dir_all(fixtures_root.join("unsupported"))
+            .expect("create unsupported fixture dir");
+        std::fs::write(
+            fixtures_root.join("fixture-manifest.json"),
+            b"{\"schema_version\":1}\n",
+        )
+        .expect("write fixture manifest");
+        write_source_jpeg(&fixtures_root.join("supported/reference-urban.jpg"));
+        write_source_jpeg(&fixtures_root.join("supported/reference-still-life.jpeg"));
+        std::fs::write(
+            fixtures_root.join("raw-blocked/blocked-raw.DNG"),
+            b"raw placeholder",
+        )
+        .expect("write raw fixture");
+        std::fs::write(fixtures_root.join("unsupported/notes.txt"), b"notes")
+            .expect("write unsupported fixture");
+
+        super::run_installed_workflow_smoke(&fixtures_root, &run_root)
+            .expect("installed workflow smoke");
+
+        assert!(marker_path.is_file());
+        assert!(library_root.join("catalog.db").is_file());
+        assert!(import_root.join("reference-urban.jpg").is_file());
+        assert!(export_root.join("reference-urban-export.jpg").is_file());
+
+        let reopened = super::open_library_at_path(library_root.display().to_string(), None);
+        assert!(
+            reopened.ok,
+            "reopen installed smoke library failed: {reopened:?}"
+        );
+        remove_library_root(&workspace);
     }
 
     #[test]
