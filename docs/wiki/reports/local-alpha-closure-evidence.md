@@ -18,11 +18,11 @@ It is not a release approval. It separates source, static UI, installed app, uns
 
 | Field | Value |
 | --- | --- |
-| Branch | `qa/q6-installed-workflow-evidence` |
-| Commit | `e0ddfa8919c86930cfc3297d02967214b0a6e5e2` |
-| Recent PRs | [#144 Record Q5.5 trust-state evidence](https://github.com/raspverry/SilicaRAW/pull/144), [#145 Record Q6.1 unsigned DMG inspection](https://github.com/raspverry/SilicaRAW/pull/145), [#146 Record Q6.2 installed app launch](https://github.com/raspverry/SilicaRAW/pull/146) |
-| CI | Pending for this branch; local harness validation required before merge |
-| Final Visual QA | Pending for this branch; no UI surface changes expected |
+| Branch | `main` |
+| Commit | `e8267470b07e5558f82156ae7560dd5c05b06e5c` |
+| Recent PRs | [#145 Record Q6.1 unsigned DMG inspection](https://github.com/raspverry/SilicaRAW/pull/145), [#146 Record Q6.2 installed app launch](https://github.com/raspverry/SilicaRAW/pull/146), [#147 Record Q6.2 installed workflow evidence](https://github.com/raspverry/SilicaRAW/pull/147) |
+| CI | [Harness run 28986151543](https://github.com/raspverry/SilicaRAW/actions/runs/28986151543), `success` |
+| Final Visual QA | [Final Visual QA run 28986151541](https://github.com/raspverry/SilicaRAW/actions/runs/28986151541), `success` |
 | Scope | Import/export source hash evidence, closure evidence routing, source/static UI harness gates, built `.app` launch evidence, library import reference evidence, review/edit persistence evidence, JPEG sRGB export evidence, trust-state evidence, unsigned DMG inspection evidence, installed app launch sub-proof, installed executable workflow evidence |
 | Artifact status | Current local build-machine unsigned DMG, `/Applications` launch sub-proof, and installed executable workflow evidence recorded; offline and clean-Mac gates still pending |
 
