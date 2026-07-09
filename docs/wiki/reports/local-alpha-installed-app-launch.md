@@ -84,4 +84,4 @@ This pass does not prove native UI import, edit, export, restart persistence, of
 
 ## Next Gate
 
-Q6.2 still needs full installed-app workflow evidence from `/Applications`: create/open library, import by reference, grid review, preview, Develop exposure/contrast, export JPEG sRGB, restart persistence, and original-file safety.
+Q6.2 installed executable workflow evidence is recorded in [Local Alpha Installed App Workflow](local-alpha-installed-app-workflow.md). Q6.3 should verify offline behavior for the installed app workflow.

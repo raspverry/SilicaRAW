@@ -18,13 +18,13 @@ It is not a release approval. It separates source, static UI, installed app, uns
 
 | Field | Value |
 | --- | --- |
-| Branch | `main` |
-| Commit | `cc2f3418da6513c1cdd6222fb0bdf08ba5ff67b6` |
-| Recent PRs | [#143 Record jpeg export evidence](https://github.com/raspverry/SilicaRAW/pull/143), [#144 Record Q5.5 trust-state evidence](https://github.com/raspverry/SilicaRAW/pull/144), [#145 Record Q6.1 unsigned DMG inspection](https://github.com/raspverry/SilicaRAW/pull/145) |
-| CI | [Harness run 28982050229](https://github.com/raspverry/SilicaRAW/actions/runs/28982050229), `success` |
-| Final Visual QA | [Final Visual QA run 28982050184](https://github.com/raspverry/SilicaRAW/actions/runs/28982050184), `success` |
-| Scope | Import/export source hash evidence, closure evidence routing, source/static UI harness gates, built `.app` launch evidence, library import reference evidence, review/edit persistence evidence, JPEG sRGB export evidence, trust-state evidence, unsigned DMG inspection evidence, installed app launch sub-proof |
-| Artifact status | Current local build-machine unsigned DMG and `/Applications` launch sub-proof recorded; full installed workflow still pending |
+| Branch | `qa/q6-installed-workflow-evidence` |
+| Commit | `e0ddfa8919c86930cfc3297d02967214b0a6e5e2` |
+| Recent PRs | [#144 Record Q5.5 trust-state evidence](https://github.com/raspverry/SilicaRAW/pull/144), [#145 Record Q6.1 unsigned DMG inspection](https://github.com/raspverry/SilicaRAW/pull/145), [#146 Record Q6.2 installed app launch](https://github.com/raspverry/SilicaRAW/pull/146) |
+| CI | Pending for this branch; local harness validation required before merge |
+| Final Visual QA | Pending for this branch; no UI surface changes expected |
+| Scope | Import/export source hash evidence, closure evidence routing, source/static UI harness gates, built `.app` launch evidence, library import reference evidence, review/edit persistence evidence, JPEG sRGB export evidence, trust-state evidence, unsigned DMG inspection evidence, installed app launch sub-proof, installed executable workflow evidence |
+| Artifact status | Current local build-machine unsigned DMG, `/Applications` launch sub-proof, and installed executable workflow evidence recorded; offline and clean-Mac gates still pending |
 
 ## Gate Evidence Matrix
 
@@ -40,8 +40,8 @@ It is not a release approval. It separates source, static UI, installed app, uns
 | Trust states | Recorded for current local build | Developer desktop runtime proves supported PNG readiness, RAW/text unsupported state, deleted-original downgrade, blocked write paths, and disposable cache clear scope | Manual GUI interaction, `/Applications`, DMG, Gatekeeper, clean-Mac behavior | [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md) | `.tmp/q5-trust-states/trust-state-evidence.json` |
 | Unsigned DMG inspection | Recorded for current local build | Local build produces unsigned DMG, checksum, `hdiutil verify`, mounted app presence, bundle metadata, and ad-hoc signing state | `/Applications` install, GitHub Release artifact, Gatekeeper, clean-Mac behavior | [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md) | `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg`, `.tmp/q6-unsigned-dmg-inspection/local-dmg-artifact-smoke.json` |
 | Installed app launch from `/Applications` | Partial recorded for current local build | Installed app matches the mounted DMG app and launches as `/Applications/SilicaRAW.app/Contents/MacOS/silica-desktop`, not the repository checkout | Full import/edit/export/restart workflow, offline behavior, Gatekeeper, clean-Mac behavior | [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md) | `/Applications/SilicaRAW.app`, `.tmp/q6-installed-app-launch/local-dmg-artifact-smoke.json`, `.tmp/q6-installed-app-launch/installed-app-launch-smoke.json` |
+| Installed app workflow from `/Applications` | Recorded for current local build | Installed executable workflow creates/opens a library, imports by reference, populates grid, blocks unsupported RAW placeholder preview, persists rating/Pick/Reject/edit state, exports JPEG sRGB, and preserves original file hashes | WebView click automation, native path picker, offline behavior, Gatekeeper, clean-Mac behavior | [Local Alpha Installed App Workflow](local-alpha-installed-app-workflow.md) | `/Applications/SilicaRAW.app`, `.tmp/q6-installed-workflow/installed-app-workflow-evidence.json` |
 | Developer-preview GitHub artifact | Recorded for older preview | Unsigned DMG build, checksum, mount, mounted app presence | Current `main`, user-ready release, signed/notarized behavior, clean-Mac behavior | [Developer Preview Artifacts](developer-preview-artifacts.md) | `.tmp/developer-preview-28434695717/silicaraw-unsigned-developer-preview-macos/SilicaRAW_0.1.0_aarch64.dmg` |
-| Installed app workflow from `/Applications` | Workflow pending for current `main` | Local persistence, export, original safety, and restart behavior from installed app | User-ready signed distribution unless signed/notarized artifact is used | [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) | `/Applications/SilicaRAW.app`, output evidence TBD |
 | Offline installed workflow | Pending for current `main` | Local workflow does not require network | Gatekeeper acceptance or clean-Mac behavior by itself | [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) | Evidence TBD |
 | Signed user-ready DMG | Blocked | Gatekeeper-accepted local alpha candidate | Not applicable until produced | [Local DMG Release Runbook](../roadmaps/local-dmg-release-runbook.md) | Blocked by Developer ID and notarization prerequisites |
 | Clean-Mac downloaded artifact | Blocked | GitHub-hosted downloaded artifact works outside the developer machine | Not applicable until signed/notarized artifact exists | [Local DMG Install Smoke Checklist](../../../checklists/LOCAL_DMG_INSTALL_CHECKLIST.md) | Blocked by signed/notarized release artifact |
@@ -62,7 +62,7 @@ It is not a release approval. It separates source, static UI, installed app, uns
 
 ## Required Record for Remaining Installed App Evidence
 
-Q5.1 through Q5.5, Q6.1, and the Q6.2 installed launch sub-proof now have developer-local evidence records. Remaining installed-app workflow evidence should add or link records with:
+Q5.1 through Q5.5, Q6.1, the Q6.2 installed launch sub-proof, and the Q6.2 installed executable workflow now have developer-local evidence records. Remaining installed/offline evidence should add or link records with:
 
 - tested commit and app version
 - app path launched, normally `/Applications/SilicaRAW.app`

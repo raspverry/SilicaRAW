@@ -125,29 +125,28 @@ This is not the clean-Mac result for Task 6.3. It records whether the DMG can be
 Latest local build-machine smoke:
 
 - Date: 2026-07-08
-- Git commit: `a2f66bfec44306bff290172ef4be10954d16463a`
-- Installed launch evidence source commit: `cc2f3418da6513c1cdd6222fb0bdf08ba5ff67b6`
-- Tag: not tagged; local current-main Q6.1 inspection
+- Git commit: `e0ddfa8919c86930cfc3297d02967214b0a6e5e2`
+- Tag: not tagged; local current-branch Q6.2 installed workflow evidence
 - Artifact type: `developer unsigned DMG`
 - Workflow run: not run for this local inspection
 - Artifact: local build output
 - Artifact API digest: not applicable
 - DMG path: `target/release/bundle/dmg/SilicaRAW_0.1.0_aarch64.dmg`
-- DMG SHA256: `c4c053834bbc9d148d6108b40bd443e07114ebae0a978c67213f0f6b7f242ff3`
+- DMG SHA256: `cc75a60e35a09410dc681f66ce0b23890ca62d7a4243a5b4b0d9a9829986a266`
 - App path launched: `/Applications/SilicaRAW.app`
 - macOS version: `26.4`
 - Machine: `arm64`
 - DMG verification: pass
 - DMG mount and app presence: pass
-- Mounted app tree hash: `89ab925b523bc2b7943fcfa8ad3318e3266b542edc5d8f7967addf8ff60da95d`
+- Mounted app tree hash: `680510cd60a972acd495acea53b15c0c50a0ce51df41ea9e8a7239e9e96b00a1`
 - Installed app tree hash matches mounted app: pass
-- Installed app tree hash: `89ab925b523bc2b7943fcfa8ad3318e3266b542edc5d8f7967addf8ff60da95d`
-- Installed-app preflight: launch sub-proof pass; full installed workflow not run
+- Installed app tree hash: `680510cd60a972acd495acea53b15c0c50a0ce51df41ea9e8a7239e9e96b00a1`
+- Installed-app preflight: launch sub-proof pass; installed executable workflow pass
 - GUI launch command: `python3 scripts/harness/installed-app-launch-smoke.py --app /Applications/SilicaRAW.app --output .tmp/q6-installed-app-launch/installed-app-launch-smoke.json`
 - Checksum verification: pass
 - Unsigned warning file: not generated for this local build-machine inspection
-- Smoke reports: `.tmp/q6-unsigned-dmg-inspection/local-dmg-artifact-smoke.json`, `.tmp/q6-installed-app-launch/local-dmg-artifact-smoke.json`, `.tmp/q6-installed-app-launch/installed-app-launch-smoke.json`
-- Full installed workflow result: not run; still pending
+- Smoke reports: `.tmp/q6-installed-workflow/local-dmg-artifact-smoke.json`, `.tmp/q6-installed-workflow/installed-app-launch-smoke.json`, `.tmp/q6-installed-workflow/installed-app-workflow-evidence.json`
+- Full installed workflow result: pass for installed executable workflow; WebView click and native path picker automation not covered
 - Clean-Mac Task 6.3 result: still pending
 
 ## Related References

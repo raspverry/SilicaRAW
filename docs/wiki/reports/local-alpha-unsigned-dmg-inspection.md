@@ -92,8 +92,8 @@ This pass proves:
 - the DMG mounts read-only and contains `SilicaRAW.app`
 - the mounted app has expected bundle metadata and ad-hoc signing state
 
-This pass does not prove drag-to-`/Applications`, installed-app launch, local workflow from `/Applications`, Gatekeeper acceptance, notarization, GitHub Release download behavior, offline behavior, or clean-Mac behavior. The later [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md) report records the install/launch sub-proof only; the full installed workflow remains open.
+This pass does not prove drag-to-`/Applications`, installed-app launch, local workflow from `/Applications`, Gatekeeper acceptance, notarization, GitHub Release download behavior, offline behavior, or clean-Mac behavior. Later reports record the [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md) sub-proof and [Local Alpha Installed App Workflow](local-alpha-installed-app-workflow.md) installed executable workflow evidence.
 
 ## Next Gate
 
-Q6.2 has an install/launch sub-proof. It still needs the full local alpha workflow from `/Applications/SilicaRAW.app`: create/open library, import by reference, review flags, preview, exposure/contrast edit, JPEG sRGB export, restart persistence, and original-file safety.
+Q6.2 installed executable workflow evidence is recorded in [Local Alpha Installed App Workflow](local-alpha-installed-app-workflow.md). Q6.3 should verify offline behavior for the installed app workflow.
