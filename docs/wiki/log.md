@@ -14,6 +14,13 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-07-08] quality | Installed app workflow evidence recorded
+
+- Completed Q6.2 of the local alpha quality closure plan as installed executable workflow evidence.
+- Added `scripts/harness/check-installed-app-workflow-evidence.py` and an env-gated installed workflow smoke in the desktop executable.
+- Built an unsigned DMG, installed it to `/Applications/SilicaRAW.app`, verified mounted/installed app identity, launched from `/Applications`, and ran create/open library, import by reference, grid, blocked RAW placeholder, preview, exposure/contrast, JPEG sRGB export, restart restore, and original-file safety through the installed executable.
+- Kept WebView click automation, native path picker behavior, offline behavior, Gatekeeper, signed/notarized, GitHub Release download, and clean-Mac gates open.
+
 ## [2026-07-08] quality | Installed app launch sub-proof recorded
 
 - Recorded a Q6.2 sub-proof without marking Q6.2 complete.

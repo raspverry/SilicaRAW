@@ -77,4 +77,4 @@ This pass does not prove manual GUI export dialog behavior, `/Applications` laun
 
 ## Next Gate
 
-Q5.5 trust-state evidence is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md), Q6.1 unsigned DMG inspection is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md), and the Q6.2 install/launch sub-proof is recorded in [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md). The next open gate is the full Q6.2 installed workflow from `/Applications/SilicaRAW.app`.
+Q5.5 trust-state evidence is recorded in [Local Alpha Trust-State Evidence](local-alpha-trust-state-evidence.md), Q6.1 unsigned DMG inspection is recorded in [Local Alpha Unsigned DMG Inspection](local-alpha-unsigned-dmg-inspection.md), Q6.2 install/launch is recorded in [Local Alpha Installed App Launch](local-alpha-installed-app-launch.md), and Q6.2 installed executable workflow is recorded in [Local Alpha Installed App Workflow](local-alpha-installed-app-workflow.md). The next open gate is Q6.3 offline behavior for `/Applications/SilicaRAW.app`.

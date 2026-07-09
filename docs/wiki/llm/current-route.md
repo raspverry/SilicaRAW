@@ -36,6 +36,7 @@ For local alpha quality closure, Task 27.2, or any beta release-candidate work, 
 - [Local Alpha Trust-State Evidence](../reports/local-alpha-trust-state-evidence.md)
 - [Local Alpha Unsigned DMG Inspection](../reports/local-alpha-unsigned-dmg-inspection.md)
 - [Local Alpha Installed App Launch](../reports/local-alpha-installed-app-launch.md)
+- [Local Alpha Installed App Workflow](../reports/local-alpha-installed-app-workflow.md)
 - [Blocked Public Beta UI Hardening Plan](../roadmaps/blocked-public-beta-ui-hardening-plan.md)
 - [Public Beta Scope Freeze Checklist](../../../checklists/PUBLIC_BETA_SCOPE_FREEZE.md)
 - [Public Beta Readiness Audit Checklist](../../../checklists/PUBLIC_BETA_READINESS_AUDIT.md)
@@ -95,7 +96,7 @@ For local alpha quality closure, Task 27.2, or any beta release-candidate work, 
 - Task 27.1 audits readiness and blocks public beta release-candidate work.
 - Public beta is blocked until a signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist.
 - Blocked-gate UI hardening may fix local developer-preview QA bugs, but must not be treated as public beta release-candidate work.
-- Local alpha quality closure is now the active route while Task 27.2 is blocked. Q4.4 closure evidence indexing, Q5.1 through Q5.5 developer-runtime evidence, Q6.1 unsigned developer-preview DMG inspection, and the Q6.2 install/launch sub-proof are recorded. Q6.2 is not complete until the full local alpha workflow runs from `/Applications/SilicaRAW.app`.
+- Local alpha quality closure is now the active route while Task 27.2 is blocked. Q4.4 closure evidence indexing, Q5.1 through Q5.5 developer-runtime evidence, Q6.1 unsigned developer-preview DMG inspection, Q6.2 install/launch sub-proof, and Q6.2 installed executable workflow evidence are recorded. The next open gate is Q6.3 offline behavior for `/Applications/SilicaRAW.app`.
 - Trust issues in source support, export overwrite protection, and missing-original state come before UI polish.
 - Unsigned developer-preview DMGs are internal testing artifacts only and must not be called public beta.
 - MLX runtime, plugin runtime, MCP server/runtime, broad RAW claims, broad visual color-correctness claims, cloud sync, telemetry, auto-update, Homebrew, and Mac App Store distribution are excluded from public beta scope.

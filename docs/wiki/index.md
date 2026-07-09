@@ -103,6 +103,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local Alpha Trust-State Evidence](reports/local-alpha-trust-state-evidence.md)
 - [Local Alpha Unsigned DMG Inspection](reports/local-alpha-unsigned-dmg-inspection.md)
 - [Local Alpha Installed App Launch](reports/local-alpha-installed-app-launch.md)
+- [Local Alpha Installed App Workflow](reports/local-alpha-installed-app-workflow.md)
 - [Developer Preview Artifacts](reports/developer-preview-artifacts.md)
 
 ### Contributing
