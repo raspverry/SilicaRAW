@@ -2,7 +2,7 @@
 title: Wiki Log
 status: active
 audience: all
-updated: 2026-07-08
+updated: 2026-07-11
 source_of_truth: none
 ---
 
@@ -1155,3 +1155,9 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Added the draft Phase 29-36 service-track router for foundation hardening, the linear Display P3 CPU/Metal path, LUT workflows, evidence-gated RAW, optional local AI assistance, and LUT-first video.
 - Kept implementation blocked until Task 29.0 accepts the charter and activates the plan.
 - Preserved Q6.3/Q6.4, Task 27.2, and Phase 28 release gates; unsigned artifacts remain developer previews only.
+
+## [2026-07-11] phase-29 | Task cards created
+
+- Created the Phase 29 task cards and linked them from the task index.
+- Task 29.0 remains the next design gate and must activate the draft Phase 29-36 track before implementation starts.
+- Kept the current route and release gates unchanged.

@@ -2,8 +2,8 @@
 title: Task Cards
 status: active
 audience: agents
-updated: 2026-06-17
-source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
+updated: 2026-07-11
+source_of_truth: none
 ---
 
 # Task Cards
@@ -12,7 +12,9 @@ source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 
 Task cards are small, LLM-readable pages for the next atomic work items. Use them instead of reading large roadmap or design-spec files when the task is already selected.
 
-For Phase 14 through v1.0 ordering, use the [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md). If a future phase has no task cards yet, create them from that master plan before implementation.
+For Phase 14 through Phase 28 ordering, use the [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md). If a phase in that range has no task cards yet, create them from that master plan before implementation.
+
+Phase 29 through Phase 36 route to the draft [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md). Task 29.0 must accept the charter and activate that plan before any Phase 29-36 implementation starts.
 
 ## Phase 12
 
@@ -158,6 +160,22 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 
 - [27.0: Public Beta Scope Freeze and Evidence Index](27.0-public-beta-scope-freeze.md)
 - [27.1: Public Beta Readiness Audit](27.1-public-beta-readiness-audit.md)
+
+## Phase 29
+
+- [29.0: Service Direction Design Gate](29.0-service-direction-design-gate.md)
+- [29.1: Detail UI Regression and Truth Audit](29.1-detail-ui-regression-truth-audit.md)
+- [29.2: ICC Profile Portability](29.2-icc-profile-portability.md)
+- [29.3: Modularize silica-export](29.3-modularize-silica-export.md)
+- [29.4: Modularize silica-storage](29.4-modularize-silica-storage.md)
+- [29.5: Modularize silica-core](29.5-modularize-silica-core.md)
+- [29.6: Modularize Desktop main.rs](29.6-modularize-desktop-main-rs.md)
+- [29.7: Extract Frontend Modules](29.7-extract-frontend-modules.md)
+- [29.8: Frontend State Isolation](29.8-frontend-state-isolation.md)
+- [29.9: Enable CSP and Capability Audit](29.9-enable-csp-capability-audit.md)
+- [29.10: In-Memory Develop Preview](29.10-in-memory-develop-preview.md)
+- [29.11: Decoded Source Preview Cache](29.11-decoded-source-preview-cache.md)
+- [29.12: Develop Slider Coalescing](29.12-develop-slider-coalescing.md)
 
 ## Notes for LLM Agents
 
