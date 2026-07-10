@@ -1,6 +1,6 @@
 ---
 title: LUT and Video Service Master Plan
-status: draft
+status: active
 audience: agents
 updated: 2026-07-11
 source_of_truth: docs/wiki/roadmaps/lut-video-service-master-plan.md
@@ -10,7 +10,7 @@ source_of_truth: docs/wiki/roadmaps/lut-video-service-master-plan.md
 
 ## Summary
 
-This page is the draft execution router for the service-capable pre-v1 track: Phase 29 through Phase 36. The product remains a local-first macOS desktop editor; "service-capable" does not mean SaaS, a hosted service, or a network dependency.
+The Phase 29-36 implementation route is active; distribution remains blocked. This page routes the service-capable pre-v1 track. The product remains a local-first macOS desktop editor; "service-capable" does not mean SaaS, a hosted service, or a network dependency.
 
 The required baseline is Phases 29-32. RAW and video claims require Phases 33 and 35 respectively; deterministic local AI assistance in Phase 34 is optional.
 
@@ -30,10 +30,11 @@ This plan continues the numbering of the [Post-Alpha Master Execution Plan](post
 ## Operating Rules
 
 - Use this page before choosing any Phase 29 or later task.
-- Keep frontmatter `status: draft` until the Task 29.0 ADR accepts the charter; only then may a docs-only update mark this plan active.
+- Task 29.0 accepted the charter in [ADR 0011](../decisions/adr-0011-service-direction-charter.md); this plan is active.
 - One task is one atomic, committable unit: one PR, smallest reviewable scope.
 - When a phase starts, create its task cards under `docs/wiki/tasks/` from this page in a docs-only task first (`29.0`, `29.1`, ... follow the existing card template: Goal, Read Before Work, Files, Scope, Acceptance Criteria, Validation, Stop Gates, Completion State) and link them from `docs/wiki/tasks/index.md`.
-- Creating cards does not activate the track or change `docs/wiki/llm/current-route.md`. Update the current route only when Task 29.0 accepts the charter; keep Q6.3/Q6.4 and release gates visible after that update.
+- Route Phase 29 work only through the dependency DAG below, and keep Q6.3/Q6.4 and all inherited release gates visible in `docs/wiki/llm/current-route.md`.
+- Preserve Rust Core state ownership and the documented crate boundaries. This track introduces no service runtime, background server, or hosted control plane.
 - Every `X.0` task is a design gate. Do not start `X.1+` before the `X.0` decision is recorded (ADR under `docs/wiki/decisions/` when it changes architecture, schema, or dependencies).
 - All existing hard rules stay in force: never modify original files, no network/telemetry/cloud by default, document every new dependency in `docs/DEPENDENCIES.md`, do not invent edit graph structure outside `schemas/edit_graph.schema.json`, use design tokens for UI.
 - Do not claim visual color correctness beyond recorded evidence. LUT claims follow the same evidence discipline as export color claims.
@@ -94,9 +95,9 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 
 ### Task 29.0: Service Direction Design Gate
 
-- Goal: record the track charter before implementation. SilicaRAW remains a local-first macOS desktop application, not SaaS or a network service. This service-capable pre-v1 track may extend feature scope, but it never bypasses Q6.3, Task 27.2, or any Phase 28 release gate. Required baseline scope is Phases 29-32; RAW and video claims require completion of Phases 33 and 35 respectively; Phase 34 deterministic local AI is optional. Product identity remains `SilicaRAW` with bundle identifier `dev.silicaraw.desktop`; no fork, rename, or rebrand is assumed. CSP hardening is required.
+- Goal: record the track charter before implementation. SilicaRAW remains a local-first macOS desktop application, not SaaS or a network service. This service-capable pre-v1 track may extend feature scope, but it never bypasses Q6.3, Q6.4, Task 27.2, or any Phase 28 release gate. Required baseline scope is Phases 29-32; RAW and video claims require completion of Phases 33 and 35 respectively; Phase 34 deterministic local AI is optional. Product identity remains `SilicaRAW` with bundle identifier `dev.silicaraw.desktop`; no fork, rename, or rebrand is assumed. Strict CSP hardening is required in Task 29.9.
 - Files: `docs/wiki/decisions/`, this plan.
-- Acceptance: ADR accepted; all charter requirements above are explicit; Task 29.1+ remains blocked until acceptance; plan status changes from `draft` to `active` only after acceptance; no code change.
+- Status: completed on 2026-07-11. The maintainer instruction to implement Task 29.0 supplied the acceptance recorded in [ADR 0011](../decisions/adr-0011-service-direction-charter.md). The Phase 29-36 implementation route is active; distribution remains blocked. Code, schemas, dependencies, runtime behavior, Rust Core ownership, crate boundaries, and inherited release gates are unchanged.
 
 ### Task 29.1: Detail UI Regression and Truth Audit
 

@@ -2,7 +2,7 @@
 title: Post-Alpha Product Roadmap
 status: active
 audience: all
-updated: 2026-06-18
+updated: 2026-07-11
 source_of_truth: docs/13_Development_Roadmap.md
 ---
 
@@ -10,11 +10,13 @@ source_of_truth: docs/13_Development_Roadmap.md
 
 ## Summary
 
-This roadmap starts after the local DMG alpha distribution track is complete.
+This roadmap records Phase 10-28 scope and ordering.
 
-The local DMG plan proves that a user can download a GitHub Release DMG, install `SilicaRAW.app`, and complete the minimal local alpha workflow. This post-alpha roadmap defines the atomic product tasks needed to grow that alpha into a credible RAW editor.
+The [Local DMG Distribution Plan](local-dmg-distribution-plan.md) defines the evidence required to prove that a user can download a GitHub Release DMG, install `SilicaRAW.app`, and complete the minimal local alpha workflow. It does not claim that install or distribution proof is complete.
 
-Use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md) as the Phase 14 through v1.0 execution router. This roadmap defines scope; the master plan defines cross-phase dependency order, stop gates, and known future task splits.
+Active Phase 29-36 development is routed separately by the [LUT and Video Service Master Plan](lut-video-service-master-plan.md) under [ADR 0011](../decisions/adr-0011-service-direction-charter.md); distribution remains blocked.
+
+Use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md) as the Phase 14 through Phase 28 execution router. This roadmap defines scope; the master plan defines cross-phase dependency order, stop gates, and known future task splits.
 
 The order is deliberate:
 
@@ -31,9 +33,9 @@ Do not treat MLX, plugins, or MCP as shortcuts around the editor core. They are 
 
 ## Relationship to Local DMG Distribution
 
-This page continues after [Local DMG Distribution Plan](local-dmg-distribution-plan.md) Phase 9.
+Phase 10-28 history does not imply that the release gates in the [Local DMG Distribution Plan](local-dmg-distribution-plan.md) are complete.
 
-Phase 6 through Phase 9 remain focused on install, signing, notarization, GitHub Release assets, and release runbooks. This page is not a reason to add RAW, Metal, MLX, plugin, or MCP behavior before the local alpha release gate unless a maintainer explicitly changes scope.
+[ADR 0011](../decisions/adr-0011-service-direction-charter.md) explicitly authorizes only the separate Phase 29-36 implementation route. Local DMG Phases 6-9, Q6 gates, and release gates remain open; it does not satisfy or bypass them.
 
 ## Global Rules
 
@@ -419,7 +421,7 @@ The combined conclusion is that product breadth should not start with flashy AI 
 
 **Goal:** Replace the Spike 001 proof with a product viewer bridge boundary.
 
-**Planning Status:** Phase 14 now has a dedicated [Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md), [brief](../phases/phase-14-product-metal-viewer-bridge.md), and task cards. Phase 14 through v1.0 sequencing is routed by the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md).
+**Planning Status:** Phase 14 now has a dedicated [Product Metal Viewer Bridge Plan](phase-14-metal-viewer-bridge-plan.md), [brief](../phases/phase-14-product-metal-viewer-bridge.md), and task cards. Phase 14 through Phase 28 sequencing is routed by the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md).
 
 ### Task 14.1: AppKit/Metal Viewer Bridge Contract
 

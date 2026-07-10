@@ -2,7 +2,7 @@
 title: Phase 14 Product Metal Viewer Bridge Plan
 status: active
 audience: all
-updated: 2026-06-12
+updated: 2026-07-11
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -14,7 +14,7 @@ Phase 14 turns Spike 001 Path B into a product-grade native viewer bridge bounda
 
 This phase is not the full RAW/color/Metal vertical slice. It proves that SilicaRAW can reserve a native AppKit/Metal viewer region, host a feature-gated product module separate from the spike, own lifecycle and input deliberately, and define the render-request boundary needed by Phase 15.
 
-For Phase 14 through v1.0 sequencing, use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md). This Phase 14 plan remains the detailed Wave A execution plan.
+For Phase 14 through Phase 28 sequencing, use the [Post-Alpha Master Execution Plan](post-alpha-master-execution-plan.md). This Phase 14 plan remains the detailed Wave A execution plan.
 
 ## Current Status
 

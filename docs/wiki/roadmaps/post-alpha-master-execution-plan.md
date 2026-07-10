@@ -2,7 +2,7 @@
 title: Post-Alpha Master Execution Plan
 status: active
 audience: all
-updated: 2026-06-18
+updated: 2026-07-11
 source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 ---
 
@@ -10,13 +10,13 @@ source_of_truth: docs/wiki/roadmaps/post-alpha-product-roadmap.md
 
 ## Summary
 
-This page is the execution router for Phase 14 through v1.0.
+This page is the execution router for Phase 14 through Phase 28.
 
 It exists so maintainers and agents do not re-plan every phase from scratch. The [Post-Alpha Product Roadmap](post-alpha-product-roadmap.md) remains the scope source of truth. This master plan controls sequence, dependency order, stop gates, and known task splits that must be applied when creating future task cards.
 
 ## Operating Rule
 
-- Use this page before choosing any Phase 14 or later task.
+- Use this page before choosing any Phase 14 through Phase 28 task.
 - Use the active phase plan, phase brief, and task card for the actual implementation details.
 - If a future phase does not yet have task cards, create those cards from this master plan in a docs-only task, then implement the first card.
 - Do not create a new phase-wide planning document unless this page marks an unresolved design gate.
@@ -418,4 +418,4 @@ shasum -a 256 SilicaRAW.dmg
 
 ## Notes for LLM Agents
 
-This page is the durable plan for Phase 14 through v1.0. Read it once when choosing work, then switch to the smallest active task card and topic pages. Do not re-open broad planning unless a stop gate above is hit.
+This page is the durable plan for Phase 14 through Phase 28. Read it once when choosing work, then switch to the smallest active task card and topic pages. Do not re-open broad planning unless a stop gate above is hit.

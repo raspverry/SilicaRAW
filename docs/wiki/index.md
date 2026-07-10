@@ -18,8 +18,8 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - Start with [LLM Routing Index](llm/index.md) if you are an agent trying to minimize read context.
 - Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
 - Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
-- For Phase 14 through v1.0 sequencing, use the [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md) before creating new phase task cards.
-- For proposed Phase 29 and later service-track work, review the [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md). Task 29.0 must accept its charter before implementation starts.
+- For Phase 14 through Phase 28 sequencing, use the [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md) before creating new phase task cards.
+- The Phase 29-36 implementation route is active while distribution remains blocked. Use the [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md): Task 29.0 accepted its charter in ADR 0011, Task 29.1 is the default next task, and other Phase 29 branches follow the DAG.
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
 - Check [Open Questions](questions/open-questions.md) before inventing answers.
 - Use [Conventions](conventions.md) when adding or editing wiki pages.
@@ -44,8 +44,8 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Developer Preview Artifact Runbook](roadmaps/developer-preview-artifact-runbook.md): unpaid unsigned DMG artifact build, download, and verification steps.
 - [Local Alpha Quality Closure Plan](roadmaps/local-alpha-quality-closure-plan.md): active closure plan for data trust, UI polish, installed app QA, and DMG readiness while Task 27.2 is blocked.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
-- [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through v1.0.
-- [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md): draft router for Phase 29 through Phase 36 covering foundation hardening, the linear Display P3 CPU/Metal chain, LUT workflows, evidence-gated RAW, optional local AI assistance, and LUT-first video support.
+- [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through Phase 28.
+- [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md): active router for Phase 29 through Phase 36 covering foundation hardening, the linear Display P3 CPU/Metal chain, LUT workflows, evidence-gated RAW, optional local AI assistance, and LUT-first video support.
 - [Blocked Public Beta UI Hardening Plan](roadmaps/blocked-public-beta-ui-hardening-plan.md): UI shell and keyboard hardening allowed while Task 27.2 is externally blocked.
 - [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
 - [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): completed color proof execution plan and fixture evidence gate.
@@ -73,6 +73,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [ADR 0007: Defer Homebrew and Auto-Update](decisions/adr-0007-homebrew-and-auto-update-deferral.md): Homebrew Cask and updater work wait for local DMG alpha trust gates.
 - [ADR 0008: Project License](decisions/adr-0008-project-license.md): SilicaRAW source code and project documentation use the MIT License.
 - [ADR 0009: MLX Runtime Spike](decisions/adr-0009-mlx-runtime-spike.md): MLX remains optional while the future runtime path, no-model behavior, and packaging gates are recorded.
+- [ADR 0011: Service Direction Charter](decisions/adr-0011-service-direction-charter.md): the active service-capable pre-v1 track remains local-first and preserves inherited release gates.
 
 ### Topics
 
