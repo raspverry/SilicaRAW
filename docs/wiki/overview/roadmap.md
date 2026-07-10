@@ -2,8 +2,8 @@
 title: Roadmap Overview
 status: active
 audience: all
-updated: 2026-06-17
-source_of_truth: docs/13_Development_Roadmap.md
+updated: 2026-07-11
+source_of_truth: none
 ---
 
 # Roadmap Overview
@@ -92,7 +92,8 @@ The current implementation order starts with:
 - Phase 26 is complete through Task 26.3: read-only MCP manifests validate, the adapter calls Core APIs only, and no MCP server/runtime, mutating tools, or direct storage access is enabled.
 - Task 27.0 is complete: public beta scope is frozen, the evidence index exists, and public beta is blocked until signed/notarized DMG and clean-Mac downloaded-artifact QA exist.
 - Task 27.1 is complete: public beta readiness was audited and remains blocked until Apple Developer Program funding, Developer ID certificate, notarization credentials, signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist.
-- The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through v1.0 so maintainers do not recreate phase-wide plans before each phase.
+- The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through Phase 28, so maintainers do not recreate phase-wide plans before each phase.
+- The [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md) is a draft Phase 29-36 track, not the current active route. Task 29.0 must accept its charter before that track becomes active.
 
 ## Links
 
@@ -110,6 +111,7 @@ The current implementation order starts with:
 - [Product Alpha Runtime Completion](../topics/product-alpha-runtime-completion.md)
 - [Post-Alpha Product Roadmap](../roadmaps/post-alpha-product-roadmap.md)
 - [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md)
+- [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md)
 - [LLM Routing Index](../llm/index.md)
 - [Phase 11 Summary](../phases/phase-11-summary.md)
 - [Phase 12 RAW Proof Brief](../phases/phase-12-raw-proof.md)
