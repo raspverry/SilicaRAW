@@ -14,7 +14,7 @@ Task cards are small, LLM-readable pages for the next atomic work items. Use the
 
 For Phase 14 through Phase 28 ordering, use the [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md). If a phase in that range has no task cards yet, create them from that master plan before implementation.
 
-Phase 29 through Phase 36 route to the draft [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md). Task 29.0 must accept the charter and activate that plan before any Phase 29-36 implementation starts.
+Phase 29-36 implementation routes through the active [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md); distribution remains blocked. Task 29.0 accepted the charter in [ADR 0011](../decisions/adr-0011-service-direction-charter.md); Task 29.1 is the default next task, and every other Phase 29 branch follows the plan DAG.
 
 ## Phase 12
 
@@ -162,6 +162,8 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 - [27.1: Public Beta Readiness Audit](27.1-public-beta-readiness-audit.md)
 
 ## Phase 29
+
+Task 29.0 is complete. Task 29.1 is the default next product-development task; other branches may start only when the Phase 29 DAG permits them.
 
 - [29.0: Service Direction Design Gate](29.0-service-direction-design-gate.md)
 - [29.1: Detail UI Regression and Truth Audit](29.1-detail-ui-regression-truth-audit.md)

@@ -93,7 +93,7 @@ The current implementation order starts with:
 - Task 27.0 is complete: public beta scope is frozen, the evidence index exists, and public beta is blocked until signed/notarized DMG and clean-Mac downloaded-artifact QA exist.
 - Task 27.1 is complete: public beta readiness was audited and remains blocked until Apple Developer Program funding, Developer ID certificate, notarization credentials, signed/notarized DMG, checksums, and clean-Mac downloaded-artifact QA exist.
 - The [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md) is the execution router for Phase 14 through Phase 28, so maintainers do not recreate phase-wide plans before each phase.
-- The [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md) is a draft Phase 29-36 track, not the current active route. Task 29.0 must accept its charter before that track becomes active.
+- The Phase 29-36 implementation route in the [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md) is active; distribution remains blocked. Task 29.0 is complete through [ADR 0011](../decisions/adr-0011-service-direction-charter.md), Task 29.1 is the default next task, and other Phase 29 branches follow the DAG. Q6.3/Q6.4 remain open, Task 27.2 remains blocked, Phase 28 has not started, and unsigned DMGs remain developer-preview-only.
 
 ## Links
 

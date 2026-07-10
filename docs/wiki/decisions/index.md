@@ -2,7 +2,7 @@
 title: Decision Records
 status: active
 audience: all
-updated: 2026-06-18
+updated: 2026-07-11
 source_of_truth: docs/wiki/conventions.md
 ---
 
@@ -28,6 +28,7 @@ Use ADRs for decisions that future contributors or LLM agents might otherwise re
 | [ADR 0008](adr-0008-project-license.md) | accepted | License SilicaRAW source code and project documentation under MIT. |
 | [ADR 0009](adr-0009-mlx-runtime-spike.md) | accepted | Record the Phase 24 MLX runtime spike without enabling a runtime or bundling models. |
 | [ADR 0010](adr-0010-mcp-transport-session.md) | accepted | Use disabled-by-default stdio-first MCP with process-lifetime sessions. |
+| [ADR 0011](adr-0011-service-direction-charter.md) | accepted | Keep the active service-capable pre-v1 track local-first with explicit capability and release gates. |
 
 ## ADR Format
 

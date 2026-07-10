@@ -1161,3 +1161,9 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Created the Phase 29 task cards and linked them from the task index.
 - Task 29.0 remains the next design gate and must activate the draft Phase 29-36 track before implementation starts.
 - Kept the current route and release gates unchanged.
+
+## [2026-07-11] phase-29 | Service direction charter accepted
+
+- Recorded the maintainer's Task 29.0 instruction as ADR 0011 acceptance: the local-first Phase 29-36 implementation route is active, with Task 29.1 as the default next product-development task, while distribution remains blocked.
+- Kept Q6.3/Q6.4 open, Task 27.2 blocked, Phase 28 not started, and unsigned DMGs developer-preview-only; no public distribution readiness is claimed.
+- Preserved the Phase 29 DAG, current identity, Rust Core state ownership, crate boundaries, and the no-service-runtime rule; code, schemas, dependencies, runtime behavior, and release evidence remain unchanged.
