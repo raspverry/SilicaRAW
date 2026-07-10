@@ -1149,3 +1149,9 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Completed Q1.2 of the local alpha quality closure plan.
 - Hardened export overwrite protection so existing output paths that are hard links to the original source are blocked before writes.
 - Covered both JPEG export and fixture-backed RAW proof export guard paths.
+
+## [2026-07-11] plan | LUT and video service track drafted
+
+- Added the draft Phase 29-36 service-track router for foundation hardening, the linear Display P3 CPU/Metal path, LUT workflows, evidence-gated RAW, optional local AI assistance, and LUT-first video.
+- Kept implementation blocked until Task 29.0 accepts the charter and activates the plan.
+- Preserved Q6.3/Q6.4, Task 27.2, and Phase 28 release gates; unsigned artifacts remain developer previews only.

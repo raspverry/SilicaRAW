@@ -2,7 +2,7 @@
 title: SilicaRAW Wiki
 status: active
 audience: all
-updated: 2026-07-08
+updated: 2026-07-11
 source_of_truth: docs/00_INDEX.md
 ---
 
@@ -19,6 +19,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
 - Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
 - For Phase 14 through v1.0 sequencing, use the [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md) before creating new phase task cards.
+- For proposed Phase 29 and later service-track work, review the [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md). Task 29.0 must accept its charter before implementation starts.
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
 - Check [Open Questions](questions/open-questions.md) before inventing answers.
 - Use [Conventions](conventions.md) when adding or editing wiki pages.
@@ -44,6 +45,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - [Local Alpha Quality Closure Plan](roadmaps/local-alpha-quality-closure-plan.md): active closure plan for data trust, UI polish, installed app QA, and DMG readiness while Task 27.2 is blocked.
 - [Post-Alpha Product Roadmap](roadmaps/post-alpha-product-roadmap.md): atomic phases for growing the local alpha into a credible RAW editor.
 - [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md): execution router, dependency graph, and stop gates for Phase 14 through v1.0.
+- [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md): draft router for Phase 29 through Phase 36 covering foundation hardening, the linear Display P3 CPU/Metal chain, LUT workflows, evidence-gated RAW, optional local AI assistance, and LUT-first video support.
 - [Blocked Public Beta UI Hardening Plan](roadmaps/blocked-public-beta-ui-hardening-plan.md): UI shell and keyboard hardening allowed while Task 27.2 is externally blocked.
 - [Phase 12 RAW Proof Plan](roadmaps/phase-12-raw-proof-plan.md): current RAW proof execution plan and legal fixture evidence gate.
 - [Phase 13 Color Pipeline Proof Plan](roadmaps/phase-13-color-pipeline-proof-plan.md): completed color proof execution plan and fixture evidence gate.
