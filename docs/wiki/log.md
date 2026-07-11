@@ -1173,3 +1173,10 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Completed Task 29.1 as an audit-only product-behavior pass: Detail controls remain disabled and unsupported, persisted values remain readable, and no Detail pixel behavior was added.
 - Retained the existing disabled-control and unsupported-message assertions; added assertions for absent callable frontend Detail preview or commit paths and persisted Detail readback.
 - Kept the backend unsupported-preview, unsupported-commit, and export-blocker behavior unchanged; Task 29.2 ICC Profile Portability is next.
+
+## [2026-07-11] phase-29 | ICC profile portability completed
+
+- Completed Task 29.2 with CC0-1.0 `sRGB-v4.icc` and `DisplayP3Compat-v4.icc` assets pinned to Compact-ICC-Profiles commit `bdd84663061bc4ae95ca70decff54f581e27f702`; portable SHA-256 values are `c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353` and `231752984cd4a5278e1b8d2390fe496767d4511fc81f54e1a5c69ae9ab4c42b5` respectively.
+- Kept readable macOS system profiles preferred byte-for-byte, preserving existing local sRGB `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e` and Display P3 `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0` evidence; missing profiles and non-macOS export use portable bytes.
+- Made `silica-render` tests use portable profiles on every platform while leaving non-macOS product color-probe behavior at `UnsupportedPlatform`. The PR completion gate now requires exact `cargo test -p silica-export` and `cargo test -p silica-render --features color-probe` commands on `macos-latest` and `ubuntu-latest`; no Linux result or run ID is recorded before CI.
+- Preserved the exact embedded ICC payload hash contract. No dependencies, color transforms, export defaults, or visual color-correctness claims changed; Task 29.3 is default next, and the Phase 29 DAG and distribution gates are unchanged.

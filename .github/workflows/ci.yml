@@ -16,6 +16,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  icc-portability-evidence:
+    name: ICC Portability Evidence (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show Rust toolchain
+        run: rustup show
+
+      - name: cargo test -p silica-export
+        run: cargo test -p silica-export
+
+      - name: cargo test -p silica-render --features color-probe
+        run: cargo test -p silica-render --features color-probe
+
   harness:
     name: Harness
     runs-on: macos-latest

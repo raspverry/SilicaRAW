@@ -2,7 +2,7 @@
 title: Color Management
 status: active
 audience: all
-updated: 2026-06-13
+updated: 2026-07-11
 source_of_truth: docs/09_Color_Management_Specification.md
 ---
 
@@ -24,6 +24,7 @@ Color management is a release-trust issue. Spike 003 selected the first implemen
 - Local ignored Class F fixtures now have profile-probe evidence for sRGB, Display P3, and untagged JPEG handling.
 - Phase 13 now has an execution plan, brief, and task cards for fixture-backed color proof.
 - The local export UI/API now keeps sRGB as the default and exposes Display P3 only as an explicit ICC-backed choice.
+- Task 29.2 makes ICC profile bytes portable without changing color transforms or export defaults: export prefers readable macOS system bytes and falls back to pinned portable bytes when unavailable or on non-macOS, while color-probe tests use portable bytes on every platform and non-macOS product probes remain unsupported.
 - Task 17.2.1 adds deterministic local white-balance adjustment for supported JPEG/JPG Develop preview and JPEG export parity. This is product edit behavior, not a fixture-backed color-correctness claim.
 - Task 18.2.2 adds deterministic local HSL color mixer adjustment for supported JPEG/JPG Develop preview and JPEG export parity. This is product edit behavior, not a fixture-backed color-correctness claim.
 
@@ -139,6 +140,26 @@ Manual visual review is ready but not executed:
 - [Color Export Manual QA Checklist](../../../checklists/COLOR_EXPORT_MANUAL_QA.md)
 
 User-facing Display P3 export stays limited to an explicit ICC-backed output option; visual color correctness remains blocked.
+
+## Phase 29.2 ICC Profile Portability
+
+Task 29.2 bundles CC0-1.0 profiles from `saucecontrol/Compact-ICC-Profiles` at upstream commit `bdd84663061bc4ae95ca70decff54f581e27f702`.
+
+| Profile | Portable asset SHA-256 | Existing readable macOS local evidence SHA-256 |
+| --- | --- | --- |
+| sRGB-v4 | `c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353` | `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e` |
+| DisplayP3Compat-v4 / Display P3 | `231752984cd4a5278e1b8d2390fe496767d4511fc81f54e1a5c69ae9ab4c42b5` | `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0` |
+
+On macOS, `silica-export` still prefers each readable system profile byte-for-byte. It uses the portable profile only when the system file is missing; non-macOS export always uses the portable bytes. `silica-render` tests embed the portable profiles on every platform, but this does not broaden product support: non-macOS color-probe requests still return `UnsupportedPlatform`.
+
+The PR completion gate requires these exact commands on both `macos-latest` and `ubuntu-latest`:
+
+```bash
+cargo test -p silica-export
+cargo test -p silica-render --features color-probe
+```
+
+The matrix requirement is recorded here without claiming a Linux result or CI run ID before CI. `icc_profile_sha256` still hashes the exact ICC payload embedded in the export. No dependencies, color transforms, export defaults, or visual color-correctness claims changed.
 
 ## Phase 13.7 Color Metadata Contract
 

@@ -17,6 +17,11 @@ use sha2::{Digest, Sha256};
 /// Stable crate name used by scaffold verification.
 pub const CRATE_NAME: &str = "silica-export";
 
+const PORTABLE_SRGB_ICC_PROFILE: &[u8] =
+    include_bytes!("../../../assets/color-profiles/sRGB-v4.icc");
+const PORTABLE_DISPLAY_P3_ICC_PROFILE: &[u8] =
+    include_bytes!("../../../assets/color-profiles/DisplayP3Compat-v4.icc");
+
 /// File format written by the local alpha export path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportImageFormat {
@@ -2070,14 +2075,31 @@ fn validate_hsl_channel_adjustment(
 }
 
 fn export_icc_profile(profile: ExportColorProfile) -> Result<Vec<u8>, ExportError> {
-    let path = export_icc_profile_path(profile);
-    fs::read(&path).map_err(|error| ExportError::IccProfileUnavailable {
-        profile,
-        path,
-        message: error.to_string(),
-    })
+    #[cfg(target_os = "macos")]
+    {
+        let path = export_icc_profile_path(profile);
+        return Ok(system_or_portable_icc_profile(profile, &path));
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(portable_icc_profile(profile).to_vec())
+    }
 }
 
+fn portable_icc_profile(profile: ExportColorProfile) -> &'static [u8] {
+    match profile {
+        ExportColorProfile::Srgb => PORTABLE_SRGB_ICC_PROFILE,
+        ExportColorProfile::DisplayP3 => PORTABLE_DISPLAY_P3_ICC_PROFILE,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn system_or_portable_icc_profile(profile: ExportColorProfile, path: &Path) -> Vec<u8> {
+    fs::read(path).unwrap_or_else(|_| portable_icc_profile(profile).to_vec())
+}
+
+#[cfg(target_os = "macos")]
 fn export_icc_profile_path(profile: ExportColorProfile) -> PathBuf {
     match profile {
         ExportColorProfile::Srgb => {
@@ -2594,6 +2616,78 @@ mod tests {
             super::classify_icc_profile(&profile),
             Some(super::ExportColorProfile::DisplayP3)
         );
+    }
+
+    #[test]
+    fn portable_icc_profiles_have_pinned_hashes_and_classification() {
+        for (profile, expected_sha256) in [
+            (
+                super::ExportColorProfile::Srgb,
+                "c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353",
+            ),
+            (
+                super::ExportColorProfile::DisplayP3,
+                "231752984cd4a5278e1b8d2390fe496767d4511fc81f54e1a5c69ae9ab4c42b5",
+            ),
+        ] {
+            let bytes = super::portable_icc_profile(profile);
+
+            assert_eq!(super::sha256_hex(bytes), expected_sha256);
+            assert_eq!(super::classify_icc_profile(bytes), Some(profile));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_export_profile_matches_system_bytes_or_valid_portable_fallback() {
+        for profile in [
+            super::ExportColorProfile::Srgb,
+            super::ExportColorProfile::DisplayP3,
+        ] {
+            let path = super::export_icc_profile_path(profile);
+            let exported = super::export_icc_profile(profile).expect("load export ICC profile");
+
+            match std::fs::read(path) {
+                Ok(system_bytes) => assert_eq!(exported, system_bytes),
+                Err(_) => {
+                    assert_eq!(exported, super::portable_icc_profile(profile));
+                    assert_eq!(super::classify_icc_profile(&exported), Some(profile));
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_profile_loader_preserves_exact_readable_bytes() {
+        let root = unique_export_root("readable-system-icc");
+        let path = root.join("Readable Profile.icc");
+        std::fs::create_dir_all(&root).expect("create profile root");
+        let system_bytes = b"exact readable system profile bytes";
+        std::fs::write(&path, system_bytes).expect("write readable profile");
+
+        assert_eq!(
+            super::system_or_portable_icc_profile(super::ExportColorProfile::Srgb, &path),
+            system_bytes
+        );
+
+        remove_export_root(&root);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_missing_profile_path_uses_valid_portable_fallback() {
+        let path = unique_export_root("missing-system-icc").join("Missing Profile.icc");
+
+        for profile in [
+            super::ExportColorProfile::Srgb,
+            super::ExportColorProfile::DisplayP3,
+        ] {
+            let fallback = super::system_or_portable_icc_profile(profile, &path);
+
+            assert_eq!(fallback, super::portable_icc_profile(profile));
+            assert_eq!(super::classify_icc_profile(&fallback), Some(profile));
+        }
     }
 
     #[test]

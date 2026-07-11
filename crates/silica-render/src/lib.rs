@@ -2980,54 +2980,60 @@ mod tests {
         assert!(!request.contains_image_pixels());
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     #[test]
     fn color_probe_classifies_embedded_srgb_profile() {
-        let path = write_color_probe_fixture(
-            "srgb",
-            jpeg_with_icc_profile(b"header IEC sRGB profile bytes"),
+        let profile = include_bytes!("../../../assets/color-profiles/sRGB-v4.icc");
+        assert_eq!(
+            super::sha256_hex(profile),
+            "c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353"
         );
+        let jpeg = jpeg_with_icc_profile(profile);
+        assert_embedded_profile_classification(&jpeg, profile, super::ColorProbeInputProfile::Srgb);
+        let path = write_color_probe_fixture("srgb", jpeg);
 
         let result =
             super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
         let _ = std::fs::remove_file(&path);
 
         assert_eq!(result.source_path, path.to_string_lossy());
-        assert_eq!(result.status, super::ColorProbeStatus::Success);
-        assert_eq!(result.input_profile, super::ColorProbeInputProfile::Srgb);
-        assert!(result.embedded_icc);
-        assert!(result.source_sha256.is_some());
-        assert_eq!(
-            result.working_space,
-            super::WorkingColorSpace::LinearDisplayP3
-        );
-        assert_eq!(result.output_profile, super::ColorProbeOutputProfile::Srgb);
-        assert_eq!(
-            result.transform_path,
-            super::ColorProbeTransformPath::EmbeddedIccToLinearDisplayP3ToSrgb
+        assert_color_probe_outcome(
+            &result,
+            super::ColorProbeInputProfile::Srgb,
+            true,
+            super::ColorProbeTransformPath::EmbeddedIccToLinearDisplayP3ToSrgb,
         );
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     #[test]
-    fn color_probe_classifies_local_display_p3_profile() {
-        let profile = std::fs::read("/System/Library/ColorSync/Profiles/Display P3.icc")
-            .expect("local Display P3 profile");
-        let path = write_color_probe_fixture("display-p3", jpeg_with_icc_profile(&profile));
+    fn color_probe_classifies_portable_display_p3_profile() {
+        let profile = include_bytes!("../../../assets/color-profiles/DisplayP3Compat-v4.icc");
+        assert_eq!(
+            super::sha256_hex(profile),
+            "231752984cd4a5278e1b8d2390fe496767d4511fc81f54e1a5c69ae9ab4c42b5"
+        );
+        let jpeg = jpeg_with_icc_profile(profile);
+        assert_embedded_profile_classification(
+            &jpeg,
+            profile,
+            super::ColorProbeInputProfile::DisplayP3,
+        );
+        let path = write_color_probe_fixture("display-p3", jpeg);
 
         let result =
             super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
         let _ = std::fs::remove_file(&path);
 
-        assert_eq!(result.status, super::ColorProbeStatus::Success);
-        assert_eq!(
-            result.input_profile,
-            super::ColorProbeInputProfile::DisplayP3
+        assert_color_probe_outcome(
+            &result,
+            super::ColorProbeInputProfile::DisplayP3,
+            true,
+            super::ColorProbeTransformPath::EmbeddedIccToLinearDisplayP3ToSrgb,
         );
-        assert!(result.embedded_icc);
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     #[test]
     fn color_probe_classifies_display_p3_profile_by_xyz_tags_when_hash_differs() {
         let profile = synthetic_rgb_icc_profile([
@@ -3035,40 +3041,46 @@ mod tests {
             [0.2919769287109375, 0.6922454833984375, 0.0418853759765625],
             [0.1571044921875, 0.0665740966796875, 0.7840728759765625],
         ]);
-        let path =
-            write_color_probe_fixture("display-p3-synthetic", jpeg_with_icc_profile(&profile));
+        let jpeg = jpeg_with_icc_profile(&profile);
+        assert_embedded_profile_classification(
+            &jpeg,
+            &profile,
+            super::ColorProbeInputProfile::DisplayP3,
+        );
+        let path = write_color_probe_fixture("display-p3-synthetic", jpeg);
 
         let result =
             super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
         let _ = std::fs::remove_file(&path);
 
-        assert_eq!(result.status, super::ColorProbeStatus::Success);
-        assert_eq!(
-            result.input_profile,
-            super::ColorProbeInputProfile::DisplayP3
+        assert_color_probe_outcome(
+            &result,
+            super::ColorProbeInputProfile::DisplayP3,
+            true,
+            super::ColorProbeTransformPath::EmbeddedIccToLinearDisplayP3ToSrgb,
         );
-        assert!(result.embedded_icc);
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     #[test]
     fn color_probe_records_untagged_raster_as_assume_srgb() {
-        let path = write_color_probe_fixture("untagged", minimal_jpeg_without_icc());
+        let jpeg = minimal_jpeg_without_icc();
+        assert_eq!(super::first_icc_profile(&jpeg).expect("parse JPEG"), None);
+        let path = write_color_probe_fixture("untagged", jpeg);
 
         let result =
             super::probe_color_profile(super::ColorProbeRequest::new(path.to_string_lossy()));
         let _ = std::fs::remove_file(&path);
 
-        assert_eq!(result.status, super::ColorProbeStatus::Success);
-        assert_eq!(result.input_profile, super::ColorProbeInputProfile::None);
-        assert!(!result.embedded_icc);
-        assert_eq!(
-            result.transform_path,
-            super::ColorProbeTransformPath::AssumeSrgbToLinearDisplayP3ToSrgb
+        assert_color_probe_outcome(
+            &result,
+            super::ColorProbeInputProfile::None,
+            false,
+            super::ColorProbeTransformPath::AssumeSrgbToLinearDisplayP3ToSrgb,
         );
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     #[test]
     fn color_probe_reports_missing_file_without_panicking() {
         let path = std::env::temp_dir().join(unique_color_probe_name("missing"));
@@ -3078,19 +3090,80 @@ mod tests {
         assert_eq!(result.status, super::ColorProbeStatus::Failed);
         assert_eq!(
             result.error_category,
-            Some(super::ColorProbeErrorCategory::MissingFile)
+            Some(match result.platform {
+                super::ColorProbePlatform::Macos => super::ColorProbeErrorCategory::MissingFile,
+                super::ColorProbePlatform::UnsupportedPlatform => {
+                    super::ColorProbeErrorCategory::UnsupportedPlatform
+                }
+            })
         );
         assert_eq!(result.source_sha256, None);
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
+    fn assert_embedded_profile_classification(
+        jpeg: &[u8],
+        expected_profile: &[u8],
+        expected_classification: super::ColorProbeInputProfile,
+    ) {
+        let embedded_profile = super::first_icc_profile(jpeg)
+            .expect("parse JPEG")
+            .expect("embedded ICC profile");
+
+        assert_eq!(embedded_profile.as_slice(), expected_profile);
+        assert_eq!(
+            super::classify_icc_profile(&embedded_profile),
+            expected_classification
+        );
+    }
+
+    #[cfg(feature = "color-probe")]
+    fn assert_color_probe_outcome(
+        result: &super::ColorProbeResult,
+        expected_input_profile: super::ColorProbeInputProfile,
+        expected_embedded_icc: bool,
+        expected_transform_path: super::ColorProbeTransformPath,
+    ) {
+        assert_eq!(
+            result.working_space,
+            super::WorkingColorSpace::LinearDisplayP3
+        );
+        assert_eq!(result.output_profile, super::ColorProbeOutputProfile::Srgb);
+
+        match result.platform {
+            super::ColorProbePlatform::Macos => {
+                assert_eq!(result.status, super::ColorProbeStatus::Success);
+                assert_eq!(result.input_profile, expected_input_profile);
+                assert_eq!(result.embedded_icc, expected_embedded_icc);
+                assert!(result.source_sha256.is_some());
+                assert_eq!(result.transform_path, expected_transform_path);
+                assert_eq!(result.error_category, None);
+            }
+            super::ColorProbePlatform::UnsupportedPlatform => {
+                assert_eq!(result.status, super::ColorProbeStatus::Failed);
+                assert_eq!(result.input_profile, super::ColorProbeInputProfile::Unknown);
+                assert!(!result.embedded_icc);
+                assert_eq!(result.source_sha256, None);
+                assert_eq!(
+                    result.transform_path,
+                    super::ColorProbeTransformPath::Unavailable
+                );
+                assert_eq!(
+                    result.error_category,
+                    Some(super::ColorProbeErrorCategory::UnsupportedPlatform)
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "color-probe")]
     fn write_color_probe_fixture(name: &str, bytes: Vec<u8>) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(unique_color_probe_name(name));
         std::fs::write(&path, bytes).expect("write color probe fixture");
         path
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     fn unique_color_probe_name(name: &str) -> String {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -3099,7 +3172,7 @@ mod tests {
         format!("silicaraw-color-probe-{name}-{nanos}.jpg")
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     fn jpeg_with_icc_profile(profile: &[u8]) -> Vec<u8> {
         let mut bytes = vec![0xff, 0xd8];
         let mut payload = b"ICC_PROFILE\0\x01\x01".to_vec();
@@ -3111,7 +3184,7 @@ mod tests {
         bytes
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     fn synthetic_rgb_icc_profile(primaries: [[f64; 3]; 3]) -> Vec<u8> {
         let tag_table_start = 128;
         let tag_count_size = 4;
@@ -3151,7 +3224,7 @@ mod tests {
         profile
     }
 
-    #[cfg(all(feature = "color-probe", target_os = "macos"))]
+    #[cfg(feature = "color-probe")]
     fn minimal_jpeg_without_icc() -> Vec<u8> {
         vec![0xff, 0xd8, 0xff, 0xd9]
     }

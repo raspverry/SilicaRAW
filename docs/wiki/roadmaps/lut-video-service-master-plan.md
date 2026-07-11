@@ -47,7 +47,7 @@ As of 2026-07-11:
 - The only real pixel math is the CPU chain in `crates/silica-export/src/lib.rs:1337-1596`. It handles encoded RGB8 bytes and re-quantizes after stages, but it has no explicit input profile/transfer transform proving that those bytes are sRGB. This chain is legacy behavior and parity evidence, not the working-space authority.
 - Detail sharpening and noise reduction are persisted as edit state but never applied to pixels (no `apply_detail`/`apply_noise` exists in `silica-export`); the Develop Detail controls are already disabled and labeled unsupported, and export is blocked for non-neutral stored Detail state.
 - Develop preview does a full open-decode-adjust-encode-write-read disk round-trip per slider event with no debounce.
-- `silica-export` profile lookup and `silica-render` color-probe tests hardcode macOS ColorSync profile paths (`/System/Library/ColorSync/Profiles/...`); portable ICC fixtures and Linux coverage are missing.
+- Task 29.2 removed required macOS ColorSync profile-path access: export prefers readable system profile bytes and falls back to pinned portable ICC assets when they are missing or on non-macOS, while `silica-render` tests use portable profile bytes on every platform. Non-macOS product color-probe behavior remains `UnsupportedPlatform`.
 - `silica-render` is a routing contract (no rendering); `native_metal_viewer` is a shell (no Metal calls); `silica-mlx` has no ML runtime.
 - God files: `crates/silica-core/src/lib.rs` (~13.3k lines), `crates/silica-storage/src/lib.rs` (~10.6k), `apps/desktop/src-tauri/src/main.rs` (~9.3k), `apps/desktop/static/index.html` (~8k with one inline script).
 - There is no LUT, `.cube`, or video code anywhere in the repository.
@@ -111,15 +111,16 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 ### Task 29.2: ICC Profile Portability
 
 - Goal: remove `/System/Library/ColorSync/Profiles/*.icc` hard dependencies from `silica-export` profile lookup and `silica-render` color-probe tests.
-- Files: `crates/silica-export`, `crates/silica-render`, `docs/DEPENDENCIES.md` if a profile-generation dependency is added (prefer none).
-- Scope: bundle minimal known-good sRGB and Display P3 ICC byte tables as repo assets (license-checked) or generate them; make profile-byte tests platform-neutral while keeping macOS system profiles as an optional override; record profile SHA-256 in export results unchanged.
-- Acceptance: `cargo test -p silica-export` and `cargo test -p silica-render --features color-probe` pass on Linux; macOS behavior and embedded-ICC evidence unchanged.
-- Status: default next sequential task after Task 29.1. The dependency DAG and feature scope are unchanged.
+- Files: `assets/color-profiles`, `crates/silica-export`, `crates/silica-render`, `.github/workflows/ci.yml`.
+- Scope: bundle minimal known-good sRGB and Display P3 ICC byte tables as repo assets (license-checked) or generate them; make profile-byte tests platform-neutral while keeping readable macOS system profiles as the preferred byte source with portable fallback; record profile SHA-256 in export results unchanged.
+- Acceptance: the PR enforces exact `cargo test -p silica-export` and `cargo test -p silica-render --features color-probe` commands on `macos-latest` and `ubuntu-latest` as the completion gate; readable macOS system bytes remain preferred and exact embedded-payload hash evidence remains unchanged.
+- Status: completed on 2026-07-11. CC0-1.0 Compact-ICC-Profiles assets are pinned at upstream commit `bdd84663061bc4ae95ca70decff54f581e27f702`: sRGB-v4 SHA-256 `c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353` and DisplayP3Compat-v4 SHA-256 `231752984cd4a5278e1b8d2390fe496767d4511fc81f54e1a5c69ae9ab4c42b5`. Readable macOS system profiles stay preferred byte-for-byte, preserving existing local sRGB `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e` and Display P3 `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0` evidence; missing profiles and non-macOS export use the portable bytes. `silica-render` tests use portable bytes on all platforms, but non-macOS product probes still report `UnsupportedPlatform`. The PR CI matrix enforces the completion gate; no Linux result or run ID is claimed here before CI. The exact embedded ICC payload hash contract is unchanged, and no dependency, transform, default, or visual correctness claim changed.
 
 ### Task 29.3: Modularize silica-export
 
 - Goal: split `crates/silica-export/src/lib.rs` into modules (e.g. `ops/`, `encode/`, `metadata/`, `requests/`) with zero behavior change.
 - Acceptance: public API unchanged (re-exports allowed); `cargo test -p silica-export` passes; no logic edits in the same PR.
+- Status: default next sequential task after Task 29.2. The Phase 29 DAG and distribution gates are unchanged.
 
 ### Task 29.4: Modularize silica-storage
 
