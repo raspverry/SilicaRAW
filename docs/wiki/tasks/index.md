@@ -14,7 +14,7 @@ Task cards are small, LLM-readable pages for the next atomic work items. Use the
 
 For Phase 14 through Phase 28 ordering, use the [Post-Alpha Master Execution Plan](../roadmaps/post-alpha-master-execution-plan.md). If a phase in that range has no task cards yet, create them from that master plan before implementation.
 
-Phase 29-36 implementation routes through the active local-first [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md); distribution remains blocked. Task 29.0 accepted the charter in [ADR 0011](../decisions/adr-0011-service-direction-charter.md), Tasks 29.1 and 29.2 are complete, and Task 29.3: Modularize `silica-export` is the default next sequential product-development task. Other Phase 29 branches remain governed by the existing DAG, Phase 30 waits for all Phase 29 tasks, Q6.3/Q6.4 remain open, Task 27.2 remains blocked, Phase 28 has not started, and unsigned DMGs remain developer-preview-only.
+Phase 29-36 implementation routes through the active local-first [LUT and Video Service Master Plan](../roadmaps/lut-video-service-master-plan.md); distribution remains blocked. Tasks 29.0 through 29.3 are complete, and Task 29.4: Modularize `silica-storage` is the default next sequential product-development task. Other Phase 29 branches remain governed by the existing DAG, Phase 30 waits for all Phase 29 tasks, Q6.3/Q6.4 remain open, Task 27.2 remains blocked, Phase 28 has not started, and unsigned DMGs remain developer-preview-only.
 
 ## Phase 12
 
@@ -163,7 +163,7 @@ Phase 19 is complete. Prefer [Phase 19 Manual Masks](../phases/phase-19-manual-m
 
 ## Phase 29
 
-Tasks 29.0-29.2 are complete. Task 29.3: Modularize `silica-export` is the default next sequential product-development task; other branches may start only when the existing Phase 29 DAG permits them. Phase 30 waits for all Phase 29 tasks.
+Tasks 29.0-29.3 are complete. Task 29.4: Modularize `silica-storage` is the default next sequential product-development task; other branches may start only when the existing Phase 29 DAG permits them. Phase 30 waits for all Phase 29 tasks.
 
 - [29.0: Service Direction Design Gate](29.0-service-direction-design-gate.md)
 - [29.1: Detail UI Regression and Truth Audit](29.1-detail-ui-regression-truth-audit.md)

@@ -1180,3 +1180,9 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Kept readable macOS system profiles preferred byte-for-byte, preserving existing local sRGB `2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e` and Display P3 `0ff6958f98684c61f6bbdce1368ddeaf3873baf84545baba482e920d92a914c0` evidence; missing profiles and non-macOS export use portable bytes.
 - Made `silica-render` tests use portable profiles on every platform while leaving non-macOS product color-probe behavior at `UnsupportedPlatform`. The PR completion gate now requires exact `cargo test -p silica-export` and `cargo test -p silica-render --features color-probe` commands on `macos-latest` and `ubuntu-latest`; no Linux result or run ID is recorded before CI.
 - Preserved the exact embedded ICC payload hash contract. No dependencies, color transforms, export defaults, or visual color-correctness claims changed; Task 29.3 is default next, and the Phase 29 DAG and distribution gates are unchanged.
+
+## [2026-07-11] phase-29 | silica-export modularization completed
+
+- Completed Task 29.3 with a mechanical split of `silica-export` into private `model`, `metadata`, `pixels`, `ops`, and `tests` modules while re-exporting the stable root API.
+- Review evidence matched public items, functions/constants/tests, models, test names, and assertions to `main`; `cargo test -p silica-export`, `cargo doc -p silica-export --no-deps`, `cargo check --workspace`, `scripts/harness/check.sh`, and `git diff --check` passed.
+- No logic, dependency, schema, behavior, output, metadata, ICC, original-safety, or public API change is claimed. Task 29.4 is default next, and the Phase 29 DAG plus distribution gates are unchanged.
