@@ -622,6 +622,18 @@ def main():
         f"unexpected Tauri command wiring: {', '.join(unknown_commands)}",
         failures,
     )
+    forbidden_detail_commands = [
+        "preview_detail_sharpening_edit",
+        "preview_detail_noise_reduction_edit",
+        "commit_detail_sharpening_edit",
+        "commit_detail_noise_reduction_edit",
+    ]
+    for forbidden_command in forbidden_detail_commands:
+        require(
+            forbidden_command not in commands and forbidden_command not in source,
+            f"unsupported Detail command wiring must stay absent: {forbidden_command}",
+            failures,
+        )
 
     for step in WORKFLOW_STEPS:
         for element_id in step["ids"]:
@@ -801,6 +813,201 @@ def main():
         "Restored committed edit state.",
     ]:
         require(marker in source, f"persisted develop readback marker missing: {marker}", failures)
+    readback_start = source.find("async function readPersistedDevelopState(")
+    readback_end = source.find("async function previewDevelopEdit(", readback_start)
+    readback_source = (
+        source[readback_start:readback_end]
+        if readback_start != -1 and readback_end > readback_start
+        else ""
+    )
+    readback_apply_start = readback_source.find(
+        "applyPersistedDevelopState(readbackPhotoId, {"
+    )
+    readback_apply_end = (
+        readback_source.find("});", readback_apply_start)
+        if readback_apply_start != -1
+        else -1
+    )
+    readback_apply_source = (
+        readback_source[readback_apply_start:readback_apply_end]
+        if readback_apply_start != -1 and readback_apply_end > readback_apply_start
+        else ""
+    )
+    require(
+        'const response = await invoke("get_photo_edit_state", {' in readback_source
+        and "detail: response.data.detail" in readback_apply_source,
+        "persisted Detail readback must pass get_photo_edit_state detail into applyPersistedDevelopState",
+        failures,
+    )
+    apply_persisted_start = source.find("function applyPersistedDevelopState(")
+    apply_persisted_end = source.find(
+        "function setDevelopHistoryButtons(", apply_persisted_start
+    )
+    apply_persisted_source = (
+        source[apply_persisted_start:apply_persisted_end]
+        if apply_persisted_start != -1 and apply_persisted_end > apply_persisted_start
+        else ""
+    )
+    require(apply_persisted_source, "applyPersistedDevelopState function block missing", failures)
+    require_ordered_markers(
+        apply_persisted_source,
+        [
+            "state.committedDetail = normalizeDetailState(editState?.detail)",
+            "state.draftDetail = cloneDetailState(state.committedDetail)",
+        ],
+        "persisted Detail state must normalize committed readback before cloning draft state",
+        failures,
+    )
+    detail_adjustment_call = re.compile(
+        r"\b(?:stepDevelopAdjustment|resetDevelopAdjustment|updateDevelopAdjustment)"
+        r"\s*\(\s*[\"'](?:detail|sharpen|noise(?:Reduction)?|mlxDenoise)",
+        re.IGNORECASE,
+    )
+    require(
+        detail_adjustment_call.search(source) is None,
+        "Develop preview/commit helpers must not receive a Detail family call",
+        failures,
+    )
+    detail_owned_marker = re.compile(
+        r"\bdevelopDetail[A-Za-z0-9_]*\b"
+        r"|\bclipboardSubsetDetail\b"
+        r"|data-detail-control"
+        r"|\bdataset\s*(?:\?\.|\.)\s*detailControl\b"
+    )
+    detail_preview_commit_marker = re.compile(
+        r"\b(?:previewDevelopEdit|commitDevelopEdit)\b"
+    )
+    detail_state_mutation = re.compile(
+        r"\b(?:draftDetail|committedDetail)\s*=(?!=)"
+    )
+    detail_callable_event_path_found = False
+    for registration in re.finditer(
+        r"\baddEventListener\s*(?:\?\.)?\s*\(|\bon[a-z]+\s*=",
+        source,
+        re.IGNORECASE,
+    ):
+        registration_source = source[
+            max(0, registration.start() - 1200) : min(len(source), registration.end() + 1200)
+        ]
+        has_forbidden_command = any(
+            command in registration_source for command in forbidden_detail_commands
+        )
+        has_detail_helper_call = detail_adjustment_call.search(registration_source) is not None
+        has_detail_state_mutation = detail_state_mutation.search(registration_source) is not None
+        has_detail_owner = (
+            detail_owned_marker.search(registration_source) is not None
+            or has_forbidden_command
+            or has_detail_helper_call
+            or has_detail_state_mutation
+        )
+        has_callable_mutation = (
+            has_forbidden_command
+            or has_detail_helper_call
+            or has_detail_state_mutation
+            or detail_preview_commit_marker.search(registration_source) is not None
+        )
+        if has_detail_owner and has_callable_mutation:
+            detail_callable_event_path_found = True
+            break
+    require(
+        not detail_callable_event_path_found,
+        "Detail-owned event paths must not expose preview, commit, or state mutation",
+        failures,
+    )
+    detail_callable_delegated_path_found = False
+    for delegated in re.finditer(
+        r"\b(?:closest|matches)\s*(?:\?\.)?\s*\([^)]*data-detail-control[^)]*\)"
+        r"|\bdataset\s*(?:\?\.|\.)\s*detailControl\b",
+        source,
+    ):
+        delegated_source = source[
+            max(0, delegated.start() - 1200) : min(len(source), delegated.end() + 1200)
+        ]
+        if (
+            any(command in delegated_source for command in forbidden_detail_commands)
+            or detail_adjustment_call.search(delegated_source) is not None
+            or detail_state_mutation.search(delegated_source) is not None
+            or detail_preview_commit_marker.search(delegated_source) is not None
+        ):
+            detail_callable_delegated_path_found = True
+            break
+    require(
+        not detail_callable_delegated_path_found,
+        "Delegated Detail paths must not expose preview, commit, or state mutation",
+        failures,
+    )
+    global_keydown_start = source.find("function handleGlobalKeydown(")
+    global_keydown_end = source.find("async function runBatchExport(", global_keydown_start)
+    global_keydown_source = (
+        source[global_keydown_start:global_keydown_end]
+        if global_keydown_start != -1 and global_keydown_end > global_keydown_start
+        else ""
+    )
+    require(global_keydown_source, "handleGlobalKeydown function block missing", failures)
+    keyboard_has_forbidden_command = any(
+        command in global_keydown_source for command in forbidden_detail_commands
+    )
+    keyboard_has_detail_helper_call = (
+        detail_adjustment_call.search(global_keydown_source) is not None
+    )
+    keyboard_has_detail_state_mutation = (
+        detail_state_mutation.search(global_keydown_source) is not None
+    )
+    keyboard_has_detail_owner = (
+        re.search(
+            r"\b[A-Za-z0-9_]*detail[A-Za-z0-9_]*\b|data-detail-control",
+            global_keydown_source,
+            re.IGNORECASE,
+        )
+        is not None
+        or keyboard_has_forbidden_command
+        or keyboard_has_detail_helper_call
+        or keyboard_has_detail_state_mutation
+    )
+    keyboard_has_callable_mutation = (
+        keyboard_has_forbidden_command
+        or keyboard_has_detail_helper_call
+        or keyboard_has_detail_state_mutation
+        or detail_preview_commit_marker.search(global_keydown_source) is not None
+    )
+    require(
+        not global_keydown_source
+        or not (keyboard_has_detail_owner and keyboard_has_callable_mutation),
+        "Detail-owned global keyboard paths must not expose preview, commit, or state mutation",
+        failures,
+    )
+    require(
+        "clipboardSubsetDetail.disabled = true" in source,
+        "Detail clipboard subset must keep an explicit disabled assignment",
+        failures,
+    )
+    detail_clipboard_reenable = re.compile(
+        r"""
+        \bclipboardSubsetDetail\s*(?:\?\.|\.)\s*(?:
+            disabled\s*=\s*false\b
+            |removeAttribute\s*(?:\?\.)?\s*\(\s*["']disabled["']\s*\)
+            |toggleAttribute\s*(?:\?\.)?\s*\(\s*["']disabled["']\s*,\s*false\s*\)
+            |setAttribute\s*(?:\?\.)?\s*\(
+                \s*["']disabled["']\s*,\s*(?:false|["']false["'])\s*
+            \)
+        )
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+    require(
+        detail_clipboard_reenable.search(source) is None,
+        "Detail clipboard subset must not contain an obvious re-enable path",
+        failures,
+    )
+    detail_clipboard_selection = (
+        "clipboardSubsetDetail.checked && !clipboardSubsetDetail.disabled"
+    )
+    require(
+        detail_clipboard_selection in source
+        and source.count("clipboardSubsetDetail.checked") == 1,
+        "Detail clipboard mutation selection must remain gated by its disabled runtime state",
+        failures,
+    )
     for marker in [
         "loadDevelopHistory",
         "get_photo_history",
