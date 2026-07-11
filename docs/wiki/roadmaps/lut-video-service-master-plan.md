@@ -126,11 +126,13 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 
 - Goal: same mechanical split for `crates/silica-storage/src/lib.rs` (e.g. `schema/`, `migrations/`, `photos/`, `edits/`, `exports/`, `sessions/`).
 - Acceptance: public API unchanged; all storage tests pass.
+- Status: completed on 2026-07-11. `silica-storage` was mechanically split into private `model`, `common`, `migrations`, `library`, `photos`, `cache`, `sidecar`, `backup`, `edits`, `actions`, `exports`, and `tests` modules with the stable root API re-exported. Review evidence recorded 266/266 production items, body mismatches 0, public surface 127, 12 migration entries, 14 SQL literals, 18 error variants, 75 tests, and 7 test helpers. Validation passed with `cargo test -p silica-storage`, `cargo doc -p silica-storage --no-deps`, `cargo check --workspace`, and `git diff --check`. No behavior, schema, migration, SQL, dependency, persistence, or public API change is claimed. Task 29.5 is the default next sequential product-development task; the Phase 29 DAG and distribution gates are unchanged.
 
 ### Task 29.5: Modularize silica-core
 
 - Goal: same mechanical split for `crates/silica-core/src/lib.rs` (e.g. `library/`, `develop/`, `export/`, `session/`, `permissions/`).
 - Acceptance: public API unchanged; all core tests pass.
+- Status: default next sequential product-development task because Tasks 29.3 and 29.4 are complete.
 
 ### Task 29.6: Modularize Desktop main.rs
 

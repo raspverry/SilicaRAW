@@ -1186,3 +1186,9 @@ Use this log to understand recent wiki changes before editing multiple wiki page
 - Completed Task 29.3 with a mechanical split of `silica-export` into private `model`, `metadata`, `pixels`, `ops`, and `tests` modules while re-exporting the stable root API.
 - Review evidence matched public items, functions/constants/tests, models, test names, and assertions to `main`; `cargo test -p silica-export`, `cargo doc -p silica-export --no-deps`, `cargo check --workspace`, `scripts/harness/check.sh`, and `git diff --check` passed.
 - No logic, dependency, schema, behavior, output, metadata, ICC, original-safety, or public API change is claimed. Task 29.4 is default next, and the Phase 29 DAG plus distribution gates are unchanged.
+
+## [2026-07-11] phase-29 | silica-storage modularization completed
+
+- Completed Task 29.4 with a mechanical split of `silica-storage` into private `model`, `common`, `migrations`, `library`, `photos`, `cache`, `sidecar`, `backup`, `edits`, `actions`, `exports`, and `tests` modules while re-exporting the stable root API.
+- Review evidence recorded 266/266 production items, body mismatches 0, public surface 127, 12 migration entries, 14 SQL literals, 18 error variants, 75 tests, and 7 test helpers; `cargo test -p silica-storage`, `cargo doc -p silica-storage --no-deps`, `cargo check --workspace`, and `git diff --check` passed.
+- No behavior, schema, migration, SQL, dependency, persistence, or public API change is claimed. Task 29.5 Modularize silica-core is default next, and the Phase 29 DAG plus distribution gates are unchanged.
