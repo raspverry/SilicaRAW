@@ -106,6 +106,7 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 - Scope: preserve the disabled Detail controls and unsupported messaging; audit frontend events and IPC wiring; remove any remaining callable UI path only if the audit finds one; keep stored edit state readable; document the gap.
 - Acceptance: Detail controls remain disabled and clearly marked unsupported; no frontend interaction can preview or commit Detail edits that the pixel pipeline ignores; existing detail edit-state tests still pass.
 - Stop gate: do not implement sharpening/NR here; that is future work after Phase 30.
+- Status: completed on 2026-07-11. No listener or keyboard/delegated path can preview or commit Detail. The generic `clipboardSubsetInputs` change listener includes the disabled Detail checkbox, but it cannot select Detail because the checkbox stays disabled and the selection builder requires `!disabled`. Persisted Detail readback remains; workflow smoke guards the absent callable preview/commit paths and clipboard lock. HTML/UI and desktop/backend logic were unchanged, and no Detail pixel behavior was added.
 
 ### Task 29.2: ICC Profile Portability
 
@@ -113,6 +114,7 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 - Files: `crates/silica-export`, `crates/silica-render`, `docs/DEPENDENCIES.md` if a profile-generation dependency is added (prefer none).
 - Scope: bundle minimal known-good sRGB and Display P3 ICC byte tables as repo assets (license-checked) or generate them; make profile-byte tests platform-neutral while keeping macOS system profiles as an optional override; record profile SHA-256 in export results unchanged.
 - Acceptance: `cargo test -p silica-export` and `cargo test -p silica-render --features color-probe` pass on Linux; macOS behavior and embedded-ICC evidence unchanged.
+- Status: default next sequential task after Task 29.1. The dependency DAG and feature scope are unchanged.
 
 ### Task 29.3: Modularize silica-export
 
