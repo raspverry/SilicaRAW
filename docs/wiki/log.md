@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-07-11] roadmap | Task 29.5 completion recorded
+
+- Completed Task 29.5 as a mechanical `silica-core` module split with stable `lib.rs` facade/re-exports and no dependency, schema, behavior, public API, or original-safety change.
+- Recorded no-finding API/behavior review results, preserved test inventory, and passed implementation validation commands.
+- Routed the default next sequential product-development task to 29.6 while preserving the Phase 29 DAG and all distribution gates.
+
 ## [2026-07-08] quality | Installed app workflow evidence recorded
 
 - Completed Q6.2 of the local alpha quality closure plan as installed executable workflow evidence.

@@ -49,7 +49,7 @@ As of 2026-07-11:
 - Develop preview does a full open-decode-adjust-encode-write-read disk round-trip per slider event with no debounce.
 - Task 29.2 removed required macOS ColorSync profile-path access: export prefers readable system profile bytes and falls back to pinned portable ICC assets when they are missing or on non-macOS, while `silica-render` tests use portable profile bytes on every platform. Non-macOS product color-probe behavior remains `UnsupportedPlatform`.
 - `silica-render` is a routing contract (no rendering); `native_metal_viewer` is a shell (no Metal calls); `silica-mlx` has no ML runtime.
-- God files: `crates/silica-core/src/lib.rs` (~13.3k lines), `crates/silica-storage/src/lib.rs` (~10.6k), `apps/desktop/src-tauri/src/main.rs` (~9.3k), `apps/desktop/static/index.html` (~8k with one inline script).
+- Remaining god files: `apps/desktop/src-tauri/src/main.rs` (~9.3k) and `apps/desktop/static/index.html` (~8k with one inline script). `silica-export`, `silica-storage`, and `silica-core` have completed mechanical module splits without public API or behavior changes.
 - There is no LUT, `.cube`, or video code anywhere in the repository.
 
 ## Track Map
@@ -126,18 +126,19 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 
 - Goal: same mechanical split for `crates/silica-storage/src/lib.rs` (e.g. `schema/`, `migrations/`, `photos/`, `edits/`, `exports/`, `sessions/`).
 - Acceptance: public API unchanged; all storage tests pass.
-- Status: completed on 2026-07-11. `silica-storage` was mechanically split into private `model`, `common`, `migrations`, `library`, `photos`, `cache`, `sidecar`, `backup`, `edits`, `actions`, `exports`, and `tests` modules with the stable root API re-exported. Review evidence recorded 266/266 production items, body mismatches 0, public surface 127, 12 migration entries, 14 SQL literals, 18 error variants, 75 tests, and 7 test helpers. Validation passed with `cargo test -p silica-storage`, `cargo doc -p silica-storage --no-deps`, `cargo check --workspace`, and `git diff --check`. No behavior, schema, migration, SQL, dependency, persistence, or public API change is claimed. Task 29.5 is the default next sequential product-development task; the Phase 29 DAG and distribution gates are unchanged.
+- Status: completed on 2026-07-11. `silica-storage` was mechanically split into private `model`, `common`, `migrations`, `library`, `photos`, `cache`, `sidecar`, `backup`, `edits`, `actions`, `exports`, and `tests` modules with the stable root API re-exported. Review evidence recorded 266/266 production items, body mismatches 0, public surface 127, 12 migration entries, 14 SQL literals, 18 error variants, 75 tests, and 7 test helpers. Validation passed with `cargo test -p silica-storage`, `cargo doc -p silica-storage --no-deps`, `cargo check --workspace`, and `git diff --check`. No behavior, schema, migration, SQL, dependency, persistence, or public API change is claimed. At completion, Task 29.5 became the default next sequential product-development task; the Phase 29 DAG and distribution gates are unchanged.
 
 ### Task 29.5: Modularize silica-core
 
 - Goal: same mechanical split for `crates/silica-core/src/lib.rs` (e.g. `library/`, `develop/`, `export/`, `session/`, `permissions/`).
 - Acceptance: public API unchanged; all core tests pass.
-- Status: default next sequential product-development task because Tasks 29.3 and 29.4 are complete.
+- Status: completed on 2026-07-11. `silica-core` was mechanically split into private `clipboard`, `common`, `develop`, `error`, `export`, `library`, `permissions`, `pipeline`, `raw`, `session`, and `trust` modules, with `tests.rs` and a stable `lib.rs` facade/re-export surface. Reviewers found no public API or behavior findings. Validation passed with `cargo test -p silica-core` (85/85 default active tests), `cargo check --workspace`, `cargo check -p silica-core --features core-image-raw-probe`, `cargo doc -p silica-core --no-deps`, and `git diff --check`. No dependency, schema, behavior, public API, or original-safety change is claimed. The exact test macro inventory remained `assert_eq` 549, `assert` 262, `assert_ne` 8, `matches` 12, and `panic` 1; source tests are 86 with one macOS + `core-image-raw-probe` conditional test. Task 29.6 is the default next sequential product-development task; the Phase 29 DAG and all distribution gates are unchanged.
 
 ### Task 29.6: Modularize Desktop main.rs
 
 - Goal: split `apps/desktop/src-tauri/src/main.rs` into `commands/` and `dto/` modules; keep the single `generate_handler!` registration list in `main.rs`.
 - Acceptance: command names and payload shapes unchanged; desktop tests pass.
+- Status: default next sequential product-development task because Task 29.5 is complete. Tasks on other Phase 29 DAG branches may still proceed independently according to the table above.
 
 ### Task 29.7: Extract Frontend Modules
 
