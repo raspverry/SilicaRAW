@@ -19,7 +19,7 @@ This wiki is the public, LLM-readable knowledge layer for SilicaRAW. It helps pe
 - Read [Architecture Overview](overview/architecture.md) before changing boundaries between crates or systems.
 - Read [Roadmap Overview](overview/roadmap.md) before choosing implementation order.
 - For Phase 14 through Phase 28 sequencing, use the [Post-Alpha Master Execution Plan](roadmaps/post-alpha-master-execution-plan.md) before creating new phase task cards.
-- The Phase 29-36 implementation route is active while distribution remains blocked. Use the [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md): Task 29.0 accepted its charter in ADR 0011, Tasks 29.1 and 29.2 are complete, Task 29.3: Modularize `silica-export` is the default next sequential product-development task, other Phase 29 branches remain governed by the existing DAG, and Phase 30 waits for all Phase 29 tasks.
+- The Phase 29-36 implementation route is active while distribution remains blocked. Use the [LUT and Video Service Master Plan](roadmaps/lut-video-service-master-plan.md): Tasks 29.0 through 29.3 are complete, Task 29.4: Modularize `silica-storage` is the default next sequential product-development task, other Phase 29 branches remain governed by the existing DAG, and Phase 30 waits for all Phase 29 tasks.
 - Check [Decision Records](decisions/index.md) before changing an accepted direction.
 - Check [Open Questions](questions/open-questions.md) before inventing answers.
 - Use [Conventions](conventions.md) when adding or editing wiki pages.

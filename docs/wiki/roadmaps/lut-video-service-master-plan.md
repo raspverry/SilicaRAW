@@ -120,7 +120,7 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 
 - Goal: split `crates/silica-export/src/lib.rs` into modules (e.g. `ops/`, `encode/`, `metadata/`, `requests/`) with zero behavior change.
 - Acceptance: public API unchanged (re-exports allowed); `cargo test -p silica-export` passes; no logic edits in the same PR.
-- Status: default next sequential task after Task 29.2. The Phase 29 DAG and distribution gates are unchanged.
+- Status: completed on 2026-07-11. `silica-export` was mechanically split into private `model.rs`, `metadata.rs`, `pixels.rs`, `ops.rs`, and `tests.rs` modules with the stable root API re-exported. Reviewers matched 56/56 public items and methods, 139 functions/constants/tests, 37 models, 29 test names, and 122 assertions to `main`. Validation passed with `cargo test -p silica-export`, `cargo doc -p silica-export --no-deps`, `cargo check --workspace`, `scripts/harness/check.sh`, and `git diff --check`. No logic, dependency, schema, behavior, output, metadata, ICC, original-safety, or public API change is claimed. Task 29.4 is the default next sequential product-development task; the Phase 29 DAG and distribution gates are unchanged.
 
 ### Task 29.4: Modularize silica-storage
 
