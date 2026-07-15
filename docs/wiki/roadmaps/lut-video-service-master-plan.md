@@ -49,7 +49,7 @@ As of 2026-07-11:
 - Develop preview does a full open-decode-adjust-encode-write-read disk round-trip per slider event with no debounce.
 - Task 29.2 removed required macOS ColorSync profile-path access: export prefers readable system profile bytes and falls back to pinned portable ICC assets when they are missing or on non-macOS, while `silica-render` tests use portable profile bytes on every platform. Non-macOS product color-probe behavior remains `UnsupportedPlatform`.
 - `silica-render` is a routing contract (no rendering); `native_metal_viewer` is a shell (no Metal calls); `silica-mlx` has no ML runtime.
-- Remaining god files: `apps/desktop/src-tauri/src/main.rs` (~9.3k) and `apps/desktop/static/index.html` (~8k with one inline script). `silica-export`, `silica-storage`, and `silica-core` have completed mechanical module splits without public API or behavior changes.
+- Remaining god file: `apps/desktop/static/index.html` (~8k with one inline script). `silica-export`, `silica-storage`, `silica-core`, and desktop `main.rs` have completed mechanical module splits without public API or behavior changes.
 - There is no LUT, `.cube`, or video code anywhere in the repository.
 
 ## Track Map
@@ -138,7 +138,7 @@ Tasks on separate DAG branches may run in parallel, but every Task 29.1-29.12 is
 
 - Goal: split `apps/desktop/src-tauri/src/main.rs` into `commands/` and `dto/` modules; keep the single `generate_handler!` registration list in `main.rs`.
 - Acceptance: command names and payload shapes unchanged; desktop tests pass.
-- Status: default next sequential product-development task because Task 29.5 is complete. Tasks on other Phase 29 DAG branches may still proceed independently according to the table above.
+- Status: completed on 2026-07-11. Desktop `main.rs` was mechanically split into `commands/session.rs` (12 commands), `commands/library_review.rs` (12), `commands/develop.rs` (32), `commands/export_cache.rs` (10), and DTO modules `response`, `data`, `session`, `library`, `develop`, `export`, and `activity`. `main.rs` retains startup, the installed workflow smoke, tests, and exactly one 66-entry `generate_handler!` list. Review evidence recorded old/current production top-level definitions 211 (154 functions, 36 structs, 2 enums, 19 impls), impl methods 31, missing/extra/body mismatches 0, 66 command signatures/attributes/bodies identical, registration order identical, 38 DTO types (36 structs, 2 enums) with identical serde surfaces, 9 cfg guards, a byte-identical test module with 46 default active tests, and byte-identical startup and installed workflow smoke. Validation passed with `cargo test -p silica-desktop` (46/46), `cargo check -p silica-desktop --all-features`, `cargo fmt --all --check`, `git diff --check`, and `scripts/harness/check.sh`. No dependency, schema, payload, behavior, startup, original-safety, or public API change is claimed. Task 29.7 is the default next sequential product-development task; the Phase 29 DAG and all distribution gates are unchanged.
 
 ### Task 29.7: Extract Frontend Modules
 

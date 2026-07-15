@@ -14,6 +14,12 @@ This append-only log records meaningful changes to the SilicaRAW wiki.
 
 ## Entries
 
+## [2026-07-11] roadmap | Task 29.6 completion recorded
+
+- Completed Task 29.6 as a mechanical desktop `main.rs` split into focused command modules and DTO modules while preserving startup, installed workflow smoke, tests, and one 66-entry `generate_handler!` list.
+- Recorded zero-mismatch review evidence for production definitions, command signatures/attributes/bodies, registration order, DTO serde surfaces, cfg guards, tests, startup, and installed workflow smoke.
+- Routed the default next sequential product-development task to 29.7 while preserving the Phase 29 DAG and all distribution gates.
+
 ## [2026-07-11] roadmap | Task 29.5 completion recorded
 
 - Completed Task 29.5 as a mechanical `silica-core` module split with stable `lib.rs` facade/re-exports and no dependency, schema, behavior, public API, or original-safety change.
